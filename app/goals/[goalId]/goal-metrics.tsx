@@ -23,6 +23,8 @@ export type MetricView = {
   name: string;
   period: MetricPeriod;
   target: number | null;
+  /** The top of a range aim, or null. */
+  targetHigh?: number | null;
   counts: PeriodCount[];
   /** What it counts (plan #2397.1); a view without one counts a list. */
   source?: MetricSource;
@@ -70,6 +72,9 @@ export function GoalMetrics({
 function readsLine(metric: MetricView): string {
   if (metric.source === 'steps') return `Counts the steps closed on this goal, each ${metric.period}.`;
   if (metric.source === 'files') return `Counts the files Dash writes under this goal, each ${metric.period}.`;
+  if (metric.source === 'hours') {
+    return `Adds up the hours you log on this goal and its steps, each ${metric.period}. Write "applied 2h" in the capture box.`;
+  }
   const list = metric.list ?? 'its list';
   const by = metric.field ? ` by ${metric.field}` : '';
   return `Counts ${list}${by}, each ${metric.period}.`;
@@ -86,7 +91,7 @@ function readsLine(metric: MetricView): string {
  * a screen reader.
  */
 function MetricChartCard({ metric, held }: { metric: MetricView; held?: number }) {
-  const chart = metricChart(metric.counts, metric.period, metric.target);
+  const chart = metricChart(metric.counts, metric.period, metric.target, metric.targetHigh ?? null);
   const empty = !chart || nothingCounted(metric.counts);
   const count = chart?.bars.length ?? 0;
   const [focus, setFocus] = useState(Math.max(0, count - 1));
@@ -107,7 +112,7 @@ function MetricChartCard({ metric, held }: { metric: MetricView; held?: number }
           {metric.target !== null && (
             <span className="inline-flex items-center gap-1.5 text-ink-muted">
               <span aria-hidden className="w-4 border-t border-dashed border-ink-muted" />
-              {targetLine(metric.target, metric.period)}
+              {targetLine(metric.target, metric.period, metric.targetHigh ?? null)}
             </span>
           )}
         </p>
@@ -154,6 +159,17 @@ function MetricChartCard({ metric, held }: { metric: MetricView; held?: number }
         <div className="relative h-44 min-w-0 pt-5">
           <div className="relative h-full">
             <div aria-hidden className="absolute inset-x-0 bottom-0 border-t border-border-strong" />
+            {/* A range aim is a faint band from its low end to its top. */}
+            {chart.targetShare !== null && chart.targetHighShare !== null && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 bg-accent/10"
+                style={{
+                  bottom: pct(chart.targetShare),
+                  height: pct(chart.targetHighShare - chart.targetShare),
+                }}
+              />
+            )}
             {/* The target's line; the legend beside the summary names it. */}
             {chart.targetShare !== null && (
               <div

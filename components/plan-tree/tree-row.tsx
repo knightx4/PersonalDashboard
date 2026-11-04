@@ -176,6 +176,12 @@ export function titleHead(title: string): string {
  */
 export type TreeRowFrameParts = {
   status: ReactNode;
+  /**
+   * The same status menu, its word drawn with a chevron, for the Status fact
+   * beside the page: the glyph alone did not read as something to press
+   * (note 823e48a7).
+   */
+  statusPicker: ReactNode;
   title: ReactNode;
   menu: ReactNode;
   /** The notices and the panel: the detail, done-when, facts and files. */
@@ -188,7 +194,7 @@ export type TreeRowFrameParts = {
   substeps: ReactNode;
   /** The row's `activity` items: the Activity tab's runs. */
   activity: ReactNode;
-  /** The row's comment thread, for the Activity tab. */
+  /** The row's comment thread, for the Overview tab's Comments part. */
   thread: ReactNode;
   /**
    * The menu's Add a sub-step was pressed. The frame draws the composer, and
@@ -307,8 +313,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
   actions: TreeActions;
   /** The row's anchor. The dev plan's, which a `#494` in a comment lands on, by default. */
   anchorId?: string;
-  /** The answer that produced this row, when a re-shape wrote it. */
+  /** The answer (or the built step) that produced this row, when a re-shape wrote it. */
   origin?: {
+    /** An answer to a decision, or what building a step found. */
+    source?: 'answer' | 'build';
     number: number | null;
     /** As the stamp wrote it, to find its line: `1084` or `1073.4`. */
     written?: string;
@@ -408,7 +416,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
       .find(
         (line) =>
           line.trim() &&
-          !(origin && line.includes(`#${origin.written ?? origin.number}'s answer:`)) &&
+          !(
+            origin &&
+            line.includes(`#${origin.written ?? origin.number}'s ${origin.source ?? 'answer'}:`)
+          ) &&
           !sessionOrigin(line),
       ) ?? '';
   const glossText = readable(gloss);
@@ -530,6 +541,24 @@ export function TreeRow<E extends TreeCatalogEntry>({
       }
     />
   );
+  // The Status fact on a page's frame opens the same menu, with the word.
+  const statusPicker = frame ? (
+    <ActionMenu
+      label={`Change status of #${node.outline} ${node.title}`}
+      items={statusMenu}
+      align="start"
+      triggerClassName={cn(
+        '-ml-1.5 h-auto w-auto gap-1 px-1.5 py-0.5 text-ui font-medium',
+        TONE_TEXT[health.tone],
+      )}
+      trigger={
+        <>
+          <span>{health.word}</span>
+          <ChevronDown className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+        </>
+      }
+    />
+  ) : null;
   const healthMenu = health.title ? (
     <Tooltip label={health.title} className="justify-self-start">
       <span className="inline-flex">{healthTrigger}</span>
@@ -614,7 +643,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             never think to open. */}
       {origin && (
         <span className="block truncate text-small text-ink-ghost">
-          From {origin.ref ?? `#${origin.written ?? origin.number}`}&apos;s answer:{' '}
+          From {origin.ref ?? `#${origin.written ?? origin.number}`}&apos;s {origin.source ?? 'answer'}:{' '}
           {readable(origin.gist)}
         </span>
       )}
@@ -900,9 +929,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
       turns={node.thread}
       titles={titles}
       placeholder={threadPlaceholder}
-      // On a step's own page the thread is on its Activity tab, offered as
-      // the goal's is on its own (plan #2373.3).
+      // On a step's own page the thread is the Overview tab's Comments part
+      // (note 42b3d858).
       label={glyphOnly ? 'Comment on this step' : undefined}
+      // There its heading carries the count, so the fold would say it twice.
+      unfolded={glyphOnly}
     />
   );
 
@@ -1014,7 +1045,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!glyphOnly && questionsPart(false)}
                   {!glyphOnly && waits}
 
-                  {/* In a page's frame the thread is on the Activity tab (plan #2373.2). */}
+                  {/* In a page's frame the thread is on the Overview tab (note 42b3d858). */}
                   {!glyphOnly && thread}
 
                   {meta}
@@ -1060,6 +1091,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   if (heading && frame) {
     return frame({
       status: healthMenu,
+      statusPicker,
       title: row.editing && titleEditor ? titleEditor : headingTitle,
       menu: <ActionMenu label={`Actions for #${node.outline}`} items={menu} />,
       overview,

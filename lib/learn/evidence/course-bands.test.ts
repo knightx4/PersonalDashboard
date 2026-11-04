@@ -18,8 +18,8 @@ import type { CourseSource } from './courses';
 
 const course = (over: Partial<CourseSource> = {}): CourseSource => ({
   course_id: 'c1',
-  school: 'Yale University',
-  code: 'MGT 847',
+  school: 'Riverside School of Management',
+  code: 'FIN 610',
   title: 'Private Equity: Leveraged Buyouts',
   term: null,
   year: 2025,
@@ -58,17 +58,17 @@ describe('the band a course marks', () => {
 describe('the reason beside the band', () => {
   it('names the course, the depth and what the grade and years left', () => {
     expect(bandBasis(course(), 'advanced', { low: 1, high: 4 }, false, 2026)).toBe(
-      'from MGT 847 Private Equity: Leveraged Buyouts, H, 2025: an advanced course reaches level 4 at most, and the grade and a year since keep 4.',
+      'from FIN 610 Private Equity: Leveraged Buyouts, H, 2025: an advanced course reaches level 4 at most, and the grade and a year since keep 4.',
     );
     expect(bandBasis(course({ year: 2026 }), 'advanced', { low: 1, high: 4 }, false, 2026)).toBe(
-      'from MGT 847 Private Equity: Leveraged Buyouts, H, 2026: an advanced course reaches level 4 at most, and the grade keeps 4.',
+      'from FIN 610 Private Equity: Leveraged Buyouts, H, 2026: an advanced course reaches level 4 at most, and the grade keeps 4.',
     );
   });
 
   it('flags topics guessed from the title', () => {
-    const basis = bandBasis(course({ code: 'ACC 2304', title: 'Managerial Accounting', grade: 'A', year: 2017 }), 'intro', { low: 1, high: 1 }, true, 2026);
+    const basis = bandBasis(course({ code: 'ACC 210', title: 'Managerial Accounting', grade: 'A', year: 2017 }), 'intro', { low: 1, high: 1 }, true, 2026);
     expect(basis).toBe(
-      'from ACC 2304 Managerial Accounting, A, 2017: an introductory course reaches level 2 at most, and the grade and 9 years since leave 1. Topics guessed from the course title.',
+      'from ACC 210 Managerial Accounting, A, 2017: an introductory course reaches level 2 at most, and the grade and 9 years since leave 1. Topics guessed from the course title.',
     );
   });
 });
@@ -77,7 +77,7 @@ describe('what the call reads', () => {
   it('is the name, school and year, then the description and notes', () => {
     const text = namingText(course({ catalogue_description: 'Buyouts and their financing.', notes: ['Week 1: LBO math.'] }));
     expect(text).toBe(
-      'Course: MGT 847 Private Equity: Leveraged Buyouts\nSchool: Yale University\nTaken: 2025\n\nBuyouts and their financing.\n\nWeek 1: LBO math.',
+      'Course: FIN 610 Private Equity: Leveraged Buyouts\nSchool: Riverside School of Management\nTaken: 2025\n\nBuyouts and their financing.\n\nWeek 1: LBO math.',
     );
   });
 
@@ -150,7 +150,7 @@ describe('the band links', () => {
       held_reason: null,
     });
     expect(rows[0].weight).toBeCloseTo(0.917, 3);
-    expect(rows[0].basis).toMatch(/^from MGT 847/);
+    expect(rows[0].basis).toMatch(/^from FIN 610/);
   });
 
   it('gives a tested topic its level in place of the band, and drops one the answer missed', () => {
@@ -174,7 +174,7 @@ describe('the band links', () => {
         {
           course_id: 'c1',
           marks: [
-            { topic_id: 'debt', level: 3, basis: 'from MGT 847, and your explanation of it: tested at level 3.' },
+            { topic_id: 'debt', level: 3, basis: 'from FIN 610, and your explanation of it: tested at level 3.' },
             { topic_id: 'equity', level: 0, basis: 'missed' },
           ],
         },

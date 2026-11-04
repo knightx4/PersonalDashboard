@@ -21,8 +21,8 @@ const A = '2c04a4df-3837-4b4f-8b8d-e9ed51ea8410';
 const B = '57c0b782-aa80-41dd-84d3-a54fe91bbdb5';
 
 const RECORDS = [
-  { id: A, data: { loan_id: '*****8042P25', name: 'Grad PLUS 2024–25', balance: 80080.21 } },
-  { id: B, data: { loan_id: '*****8042P26', name: 'Grad PLUS 2025–26', balance: 78900.15 } },
+  { id: A, data: { loan_id: '*****5170P25', name: 'Graduate loan 2024–25', balance: 42000 } },
+  { id: B, data: { loan_id: '*****5170P26', name: 'Graduate loan 2025–26', balance: 39500 } },
 ];
 
 describe('readSources', () => {
@@ -41,7 +41,7 @@ describe('readSources', () => {
 
 describe('recordName', () => {
   it('names a row by its first value, passing over the ID', () => {
-    expect(recordName(FIELDS, RECORDS[0])).toBe('Grad PLUS 2024–25');
+    expect(recordName(FIELDS, RECORDS[0])).toBe('Graduate loan 2024–25');
     expect(recordName(FIELDS, { id: 'x', data: { loan_id: '1' } })).toBe('a row without a name');
   });
 });
@@ -57,7 +57,7 @@ describe('sourcesLine', () => {
         FIELDS,
         RECORDS,
       ),
-    ).toBe('From Grad PLUS 2024–25 and Grad PLUS 2025–26, figures as of 2 Sep 2026');
+    ).toBe('From Graduate loan 2024–25 and Graduate loan 2025–26, figures as of 2 Sep 2026');
   });
 
   it('dates each row when they differ, and counts a row since archived', () => {
@@ -72,7 +72,7 @@ describe('sourcesLine', () => {
         RECORDS,
       ),
     ).toBe(
-      'From Grad PLUS 2024–25 (2 Sep 2026), Grad PLUS 2025–26 (2 Oct 2026) and a row since archived (1 Aug 2026)',
+      'From Graduate loan 2024–25 (2 Sep 2026), Graduate loan 2025–26 (2 Oct 2026) and a row since archived (1 Aug 2026)',
     );
   });
 });

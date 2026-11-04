@@ -42,10 +42,10 @@ export const CITY_SUGGESTIONS: Suggestion[] = [
   suggestion({
     id: 'sg-hearing',
     kind: 'events',
-    title: 'Public hearing: the Atlantic Avenue mixed-use plan',
+    title: 'Public hearing: the Main Street mixed-use plan',
     url: 'https://example.test/hearing',
-    place: 'Brooklyn Borough Hall',
-    source: 'NYC Planning',
+    place: 'Springfield City Hall',
+    source: 'Springfield Planning',
     happensOn: '2026-10-15',
   }),
   suggestion({
@@ -53,7 +53,7 @@ export const CITY_SUGGESTIONS: Suggestion[] = [
     kind: 'events',
     title: 'Talk: how a zoning change gets made',
     url: 'https://example.test/talk',
-    place: 'Brooklyn Public Library, Central',
+    place: 'Springfield Public Library, Central',
     happensOn: '2026-10-17',
     reaction: 'going',
   }),
@@ -66,7 +66,7 @@ export function GoalSuggestionsSurface() {
         goalId="g-city"
         suggestions={CITY_SUGGESTIONS}
         helpKinds={[
-          { kind: 'events', note: 'Brooklyn, weeknights' },
+          { kind: 'events', note: 'Eastside, weeknights' },
           { kind: 'reading', note: null },
         ]}
       />

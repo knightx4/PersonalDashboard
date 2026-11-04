@@ -128,7 +128,7 @@ What happens to the threads already written is the first decision below.
 | `on_you` | On you | Nothing happens until the person acts. |
 | `with_dash` | With Dash | Dash has it and will act on its next run. |
 | `dash_working` | Dash is on it | A Dash run on it is in progress now. |
-| `waiting` | Waiting on … | Someone else has to act. It names who, as a ref or a short text such as "recruiter at EliseAI". |
+| `waiting` | Waiting on … | Someone else has to act. It names who, as a ref or a short text such as "recruiter at Initech". |
 | `settled` | Done | |
 
 The plan's and goals' vocabularies map onto these, `with_claude` becomes

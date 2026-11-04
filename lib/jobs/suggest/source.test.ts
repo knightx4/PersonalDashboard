@@ -8,7 +8,7 @@ describe('openingSource', () => {
       'From YC startup list · Ashby',
     );
     expect(openingSource({ origin: 'discovered', foundIn: 'Found on Hacker News', url: null }).key).toBe('hn');
-    expect(sourceText(openingSource({ origin: 'board', foundIn: "On Rogo's own job board", url: 'https://boards.greenhouse.io/rogo/jobs/2' }))).toBe(
+    expect(sourceText(openingSource({ origin: 'board', foundIn: "On Hooli's own job board", url: 'https://boards.greenhouse.io/rogo/jobs/2' }))).toBe(
       'From a company you follow · Greenhouse',
     );
     expect(sourceText(openingSource({ origin: 'search', foundIn: null, url: 'https://careers.example.com/role' }))).toBe(

@@ -11,8 +11,9 @@ import { whenDate } from '@/lib/core/when';
 
 /**
  * Publish (plan #1863.11; spec, "Finishing and publishing"). One press saves
- * the essay to the vault and copies it into the snapshot selveyknight.com
- * reads; edits after that stay here until the next press. Only a finished
+ * the essay to the vault and copies it into the snapshot the person's own
+ * site reads (their Website on the Details tab); edits after that stay here
+ * until the next press. Only a finished
  * essay can be published. Unpublish takes the snapshot away and leaves the
  * vault note as it is.
  */
@@ -23,9 +24,6 @@ export type PublishView =
   | { kind: 'publishing' }
   | { kind: 'unpublishing' }
   | { kind: 'failed'; error: string };
-
-/** The site's address, as the card names it. */
-export const SITE = 'selveyknight.com';
 
 function when(iso: string): string {
   const date = new Date(iso);
@@ -38,7 +36,10 @@ export function publishLine(state: {
   finished: boolean;
   publishedAt: string | null;
   firstPublishedAt: string | null;
+  /** Their site as the card names it (siteName), or null when they have given none. */
+  site: string | null;
 }): string {
+  const where = state.site ?? 'your site';
   if (state.publishedAt) {
     const first = state.firstPublishedAt ?? state.publishedAt;
     const since = `Published since ${when(first)}.`;
@@ -46,8 +47,8 @@ export function publishLine(state: {
       ? since
       : `${since} Last published ${when(state.publishedAt)}.`;
   }
-  if (!state.finished) return `Finish the essay first. Only a finished essay goes on ${SITE}.`;
-  return `Puts this version on ${SITE}. Edits after that stay here until you publish again.`;
+  if (!state.finished) return `Finish the essay first. Only a finished essay goes on ${where}.`;
+  return `Puts this version on ${where}. Edits after that stay here until you publish again.`;
 }
 
 export function EssayPublishCard({
@@ -59,6 +60,7 @@ export function EssayPublishCard({
   canPublish,
   onPublish,
   initial = { kind: 'idle' },
+  site = null,
   className,
 }: {
   essayId: string;
@@ -72,6 +74,8 @@ export function EssayPublishCard({
   /** Saves and publishes through the editor's save queue. */
   onPublish: () => Promise<PublishResult | { ok: false; error: string }>;
   initial?: PublishView;
+  /** Their site as the card names it (siteName in lib/you/details.ts); null says "your site" and links nothing. */
+  site?: string | null;
   className?: string;
 }) {
   const [view, setView] = useState<PublishView>(initial);
@@ -124,17 +128,18 @@ export function EssayPublishCard({
             finished,
             publishedAt: state.publishedAt,
             firstPublishedAt: state.firstPublishedAt,
+            site,
           })}
         </p>
-        {live && state.slug && (
+        {live && state.slug && site && (
           <p className="mt-1 text-ui [overflow-wrap:anywhere]">
             <a
-              href={`https://${SITE}${essayAddress(state.slug)}`}
+              href={`https://${site}${essayAddress(state.slug)}`}
               target="_blank"
               rel="noopener noreferrer"
               className={cn('flex min-h-11 items-center', linkVariants())}
             >
-              {SITE}
+              {site}
               {essayAddress(state.slug)}
             </a>
           </p>

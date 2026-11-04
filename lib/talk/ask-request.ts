@@ -30,6 +30,8 @@ import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-answer';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { isOwner } from '@/lib/dev/owner';
+import { goalsRoutine } from '@/lib/feedback/routine';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
@@ -42,6 +44,8 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { codeDeps } from '@/lib/dash/think-code';
+import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
 import {
@@ -114,6 +118,8 @@ export async function askDashInRequest(input: {
   mentions?: readonly AskMention[];
   /** The workspace the lookups are kept to, already checked; null for every one. */
   scope?: ModuleId | null;
+  /** "Think it through" was on (plan #2789.10). */
+  think?: boolean;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -151,9 +157,17 @@ export async function askDashInRequest(input: {
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
-      write: (tool, args, seen) =>
+      write: (tool, args, seen, conversationId) =>
         tool.apply(
-          { ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, quickNotePorts: () => sessionInboxPorts(user.id) },
+          {
+            ...ctx,
+            seen,
+            goals: (history) => createGoalsClient(history),
+            createTask,
+            quickNotePorts: () => sessionInboxPorts(user.id),
+            goalRoutine: goalRoutineInRequest,
+            origin: { kind: 'ask_dash', ref: conversationId },
+          },
           args,
         ),
       // A paid press is checked and priced as the person, and only queued (plan #2228.1).
@@ -167,6 +181,8 @@ export async function askDashInRequest(input: {
       mentions: mentionCitations(input.mentions ?? []),
       scope,
       model: await choosing,
+      // The code is read as the owner, as Dev is (plan #2789.10).
+      think: input.think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -185,7 +201,7 @@ export async function askDashInRequest(input: {
           const supabase = await createClient();
           const { error } = await supabase
             .from('feedback_items')
-            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/chat/dash/${conversationRef}` });
           if (error) console.error('the gap note was not filed', error.message);
         } catch (error) {
           console.error('the gap note was not filed', error);
@@ -218,6 +234,15 @@ export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[
 }
 
 /**
+ * Whether the signed-in person may start the goals routine, and the routine
+ * it is fired at: the owner's account only, as the goal page's Ask Dash
+ * (app/goals/[goalId]/shaping-actions.ts). Only inside a request.
+ */
+async function goalRoutineInRequest() {
+  return { canRun: await isOwner(), routine: goalsRoutine() };
+}
+
+/**
  * What a thread needs to reply through the shared loop (plan #1465): the
  * signed-in person's lookups, their writes through their own clients, and
  * where a write's record is kept (core.dash_actions, surface 'thread').
@@ -237,6 +262,9 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           goals: (history) => createGoalsClient(history),
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
+          goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a thread is answered on the page it was asked on.
+          origin: { kind: 'goal_page', ref: null },
           thread: acts,
         },
         args,

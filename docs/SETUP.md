@@ -221,6 +221,33 @@ control and will not survive a rebuild.
 
 ## Tier 1 — before build step 4 (auth). ~15 minutes.
 
+### Who owns this install
+
+The Dev workspace, the owner-only routines and `scripts/sql.ts` belong to one
+account: the one `core.app_settings.owner_user_id` names (migration 0284).
+Nothing in the repository names it. Once you have signed up, run this once in
+the Supabase SQL editor with your own address:
+
+```sql
+insert into core.app_settings (owner_user_id)
+select id from auth.users where email = 'you@example.com'
+on conflict (singleton) do update set owner_user_id = excluded.owner_user_id;
+```
+
+Until it is set, Dev stays shut and `scripts/sql.ts` refuses every write.
+
+What is yours rather than the app's goes in your own rows, never in code: your
+name, email, phone, mailing address and website on You → Details (the cover
+letter is signed with them, and published essays link to the website), your
+time zone on the account page, and your own projects on Dev → Projects.
+
+The scripts find the Supabase project from the environment
+(`lib/db/project.ts`): `NEXT_PUBLIC_SUPABASE_URL`, else
+`SUPABASE_PROJECT_REF`, else the ref inside `SUPABASE_SERVICE_ROLE_KEY`.
+`npx tsx scripts/project-ref.ts` prints the one they will use. The app's own
+GitHub repository comes from `APP_REPOSITORY` (`owner/name`), else the one
+Vercel deployed from, else `GITHUB_REPOSITORY` (`lib/plan/github.ts`).
+
 ### Site URL and redirect allow-list (required for password reset / OAuth)
 
 Email/password sign-up works with the defaults, but production redirects
@@ -237,9 +264,9 @@ Or set them in the dashboard under **Authentication → URL Configuration**:
 
 | Field | Value |
 |---|---|
-| Site URL | `https://dash.selveyknight.com` |
-| Redirect URLs | `https://dash.selveyknight.com/auth/callback` |
-| | `https://dash.selveyknight.com/**` |
+| Site URL | `https://dash.example.com` |
+| Redirect URLs | `https://dash.example.com/auth/callback` |
+| | `https://dash.example.com/**` |
 | | `https://shopping-manager-amber.vercel.app/auth/callback` |
 | | `http://localhost:3000/auth/callback` |
 
@@ -374,7 +401,7 @@ block and not the second looks verified, passes a spot check, and takes no mail
 whatever. Nothing in this app can see it: the address renders, the settings
 page is happy, and every message sent to it bounces at the sender before
 Mailgun is ever involved. That is exactly what happened here on
-`in.selveyknight.com` — SPF, DKIM and the CNAME all present, no MX at all, two
+`in.example.com` — SPF, DKIM and the CNAME all present, no MX at all, two
 newsletter signups and a test message lost to it.
 
 So check the MX explicitly, not the green tick:

@@ -99,6 +99,8 @@ export type PipelineParams = {
   company?: string;
   page?: string;
   sort?: string;
+  /** `rev` runs the sort the other way (note fd6c7ef2). */
+  dir?: string;
   group?: string;
   hide?: string | string[];
 };
@@ -315,6 +317,12 @@ export function pipelineHref(
 ): string {
   return addressHref(PIPELINE_ADDRESS, params, changes);
 }
+
+/**
+ * Where interviews are listed since the Interviews page folded into Pipeline
+ * (plan #1496.7.1): the roles in process, each opening on its rounds.
+ */
+export const INTERVIEWS_HREF = pipelineHref({}, { stage: 'in_process' });
 
 /** Where an old /jobs/roles link lands: the table, with what it asked for. */
 export function rolesRedirect(params: PipelineParams): string {

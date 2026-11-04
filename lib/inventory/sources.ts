@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The sections of Shopping's nav its rows sit under (app/shopping/layout.tsx).
  * None of them sits under another row: an order's merchant has no page.
  */
-const ORDERS: Section = { href: '/shopping/orders', label: 'Orders' };
+const ORDERS: Section = { href: '/shopping/orders', label: 'Now' };
 const INVENTORY: Section = { href: '/shopping/inventory', label: 'Inventory' };
 const SAVED: Section = { href: '/shopping/saved', label: 'Saved' };
 const SHARE: Section = { href: '/shopping/share', label: 'Share' };

@@ -9,6 +9,8 @@ import {
   countOpenQuestions,
   countProposed,
   goalRunText,
+  UNMAPPED,
+  workLabel,
   quietRunError,
   RUN_QUIET_MS,
   runInFlight,
@@ -110,13 +112,13 @@ describe('runs', () => {
   });
 
   it('says which step a running run is on and when it last reported', () => {
-    const on = run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Draft the letter to Edfinancial' });
-    expect(runProgress(on, NOW)).toBe('on Draft the letter to Edfinancial, 3 minutes ago');
+    const on = run({ lastSeenAt: '2026-09-24T11:57:00Z', nowOn: 'Draft the letter to Brightline' });
+    expect(runProgress(on, NOW)).toBe('on Draft the letter to Brightline, 3 minutes ago');
     expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:30Z' }, NOW)).toBe(
-      'on Draft the letter to Edfinancial, just now',
+      'on Draft the letter to Brightline, just now',
     );
     expect(runProgress({ ...on, lastSeenAt: '2026-09-24T11:59:00Z' }, NOW)).toBe(
-      'on Draft the letter to Edfinancial, 1 minute ago',
+      'on Draft the letter to Brightline, 1 minute ago',
     );
     expect(runProgress(run({ lastSeenAt: '2026-09-24T11:57:00Z' }), NOW)).toBe('last reported 3 minutes ago');
     expect(runProgress(run(), NOW)).toBe('started 30 minutes ago');
@@ -207,6 +209,13 @@ describe('planning an area', () => {
 describe('approvalLine', () => {
   const base = { goalStatus: 'open' as const, approvedAt: null, proposed: 0, questions: 0 };
 
+  it('says Dash has not mapped an approved goal with no steps, beside Map it out', () => {
+    const line = approvalLine({ ...base, approvedAt: '2026-10-30T12:00:00Z', unmapped: true });
+    expect(line).toEqual({ text: UNMAPPED, approve: null });
+    expect(workLabel(0)).toBe('Map it out');
+    expect(workLabel(3)).toBe('Ask Dash');
+  });
+
   it('asks for the next steps on an approved goal whose steps are all finished', () => {
     const line = approvalLine({ ...base, approvedAt: '2026-09-26T18:17:00Z', nothingOpen: true });
     expect(line.approve).toBeNull();
@@ -260,5 +269,21 @@ describe('nothingOpen', () => {
     expect(nothingOpen([n('done', [n('open')])])).toBe(false);
     expect(nothingOpen([n('done'), n('blocked')])).toBe(false);
     expect(nothingOpen([])).toBe(false);
+  });
+});
+
+describe('goalRunText from Ask Dash', () => {
+  it('quotes what they asked for, and leaves it out when they asked for nothing more', () => {
+    const asked = goalRunText({
+      goalId: 'g-1',
+      goalTitle: 'Apply to economics graduate programs',
+      userId: 'u-1',
+      runId: 'r-1',
+      asked: 'A ranked shortlist\nwith reasons.',
+    });
+    expect(asked).toContain('They started this run from Ask Dash and asked, in their words:\n\n> A ranked shortlist\n> with reasons.');
+    expect(asked.indexOf('> A ranked shortlist')).toBeLessThan(asked.indexOf('Follow .claude/skills/goals/SKILL.md'));
+    const plain = goalRunText({ goalId: 'g-1', goalTitle: 'Get fit', userId: 'u-1', runId: 'r-1', asked: '  ' });
+    expect(plain).not.toContain('Ask Dash');
   });
 });

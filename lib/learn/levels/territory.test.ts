@@ -8,6 +8,7 @@ import {
   offAreaFrom,
   strayAreas,
   strayTextAreas,
+  subjectLensFor,
   territorySources,
   textsFor,
   topicsLeft,
@@ -129,6 +130,14 @@ describe('the business territory (plan #2483.2)', () => {
     }
   });
 
+  it('puts each area under a subject of its own, never the missing Business subject (plan #2489)', () => {
+    for (const name of BUSINESS.areas ?? []) expect(subjectLensFor(BUSINESS, name)).not.toBe(BUSINESS.subjectLens);
+    expect(subjectLensFor(BUSINESS, 'banking')).toBe('Financial services industry landscape');
+    expect(Object.keys(BUSINESS.areaLenses ?? {}).filter((a) => !BUSINESS.areas?.includes(a))).toEqual([]);
+    expect(subjectLensFor(BUSINESS)).toBe(BUSINESS.subjectLens);
+    expect(subjectLensFor(SAAS_METRICS, 'anything')).toBe(SAAS_METRICS.subjectLens);
+  });
+
   it('shares no ask with the SaaS metrics territory', () => {
     const saas = new Set(SAAS_METRICS.topics.map((t) => t.ask.trim().toLowerCase()));
     expect(BUSINESS.topics.filter((t) => saas.has(t.ask.trim().toLowerCase()))).toEqual([]);
@@ -147,8 +156,8 @@ describe('the business territory (plan #2483.2)', () => {
 describe('texts by area (plan #2483.2)', () => {
   it('gives an area its own texts and those naming none', () => {
     const keys = (name?: string) => textsFor(BUSINESS, name).map((t) => t.key);
-    expect(keys('accounting')).toEqual(['osacct', 'mit501', 'mit535', 'yale816', 'yale815']);
-    expect(keys('corporate-finance')).toEqual(['osfin', 'yale541', 'yale423', 'yale847', 'yale816']);
+    expect(keys('accounting')).toEqual(['osacct', 'mit501', 'mit535', 'acc520', 'acc530']);
+    expect(keys('corporate-finance')).toEqual(['osfin', 'fin410', 'fin420', 'fin610', 'acc520']);
     expect(keys()).toHaveLength(BUSINESS.texts.length);
     const given = territorySources(BUSINESS, [null], 'accounting');
     expect(given.sources.map((s) => s.label)).toEqual(textsFor(BUSINESS, 'accounting').map((t) => t.label));

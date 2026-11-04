@@ -10,7 +10,8 @@ import { setStepNotifyAction } from './actions';
  * closes it as done (plan #2376.2). Off until you turn it on, saved on the
  * press; a save that fails puts the switch back and says so beneath it.
  *
- * The caller draws it only on an open `claude` step's own page. `error` is
+ * The caller draws it on an open `claude` step, in the list row's opened
+ * panel and on the step's own page. `error` is
  * for the gallery, which draws the failed save; nothing in the app passes it.
  */
 export function NotifySwitch({ node, error: shownError }: { node: StepNode; error?: string }) {

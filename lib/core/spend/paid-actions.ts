@@ -32,15 +32,16 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 export const PAID_ACTIONS = {
   // Learn: a track and its ideas
   // Naming a goal drafts its topic since the claims graph moved (plan #2138.4).
-  'app/learn/know/actions.ts#proposeGoal': ['draft-topic', 'embed-topic-scope'],
-  // Learn: a topic with ten levels (plan #2138.2). Drafting embeds the scope
-  // in the same press to find a topic it duplicates; a topic the draft's links
-  // need is drafted the same way.
-  'app/learn/topics/actions.ts#draftTopicFromGoal': ['draft-topic', 'embed-topic-scope'],
-  'app/learn/topics/[id]/actions.ts#draftWantedTopic': ['draft-topic', 'embed-topic-scope'],
+  // Learn: a topic with ten levels (plan #2138.2), and a topic the draft's
+  // links need. Each queues the topic for the routine (learn 0193), which
+  // drafts it with no API spend, so these name nothing and show no hint;
+  // they stay listed because Dash's draft_topic tool presses the first.
+  'app/learn/know/actions.ts#proposeGoal': [],
+  'app/learn/topics/actions.ts#draftTopicFromGoal': [],
+  'app/learn/topics/[id]/actions.ts#draftWantedTopic': [],
   // Moving one subject from the claims graph (plan #2138.4): the call placing
-  // its ideas, and each topic it names that the map lacks, drafted and embedded.
-  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics', 'draft-topic', 'embed-topic-scope'],
+  // its ideas. The topics it names that the map lacks go to the routine.
+  'app/learn/topics/review/actions.ts#moveClaimsSubject': ['assign-topics'],
   'app/learn/know/actions.ts#proposePrior': ['concepts-from-prior'],
   'app/learn/know/actions.ts#approvePrior': ['place-track'],
   'app/learn/know/actions.ts#proposeBrief': ['concepts-from-brief'],
@@ -52,8 +53,10 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Try again on a research brief whose run failed (plan #2023.4)
   'app/learn/b/[id]/actions.ts#retryBrief': ['research-topic'],
-  // Learn: a research brief's topic drafted under a goal (plan #2184.1)
-  'app/learn/b/[id]/actions.ts#draftBriefTopics': ['draft-topic', 'embed-topic-scope'],
+  // Finances: Try again on a monthly money review whose run failed (plan #2593.8.3)
+  'app/finances/accounts/actions.ts#tryMonthReviewAgain': ['write-money-review'],
+  // Learn: a research brief's topic drafted under a goal (plan #2184.1), by the routine (learn 0193)
+  'app/learn/b/[id]/actions.ts#draftBriefTopics': [],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
   // Learn: a question in the chat on a reading's page (plan #1876.5)
@@ -85,6 +88,8 @@ export const PAID_ACTIONS = {
   'app/you/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
   'app/you/personality/actions.ts#saveTypedAction': ['read-personality', 'embed-note-match'],
   'app/you/personality/actions.ts#readAgainAction': ['read-personality', 'embed-note-match'],
+  // The analysis across all the tests, on its button on the Personality tab.
+  'app/you/personality/actions.ts#writeProfileAction': ['personality-profile', 'embed-note-match'],
   'app/learn/know/actions.ts#createCustomTrack': ['write-curriculum'],
   'app/learn/c/[id]/actions.ts#proposeBranch': ['branch-from-selection'],
   'app/learn/c/[id]/actions.ts#approveBranch': ['place-track'],
@@ -186,6 +191,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // Draft or redraft a person's persona card on Chat's People form (plan #2748.11)
+  'app/chat/actions.ts#draftPersonCard': ['draft-persona'],
   // The one explain prompt on a graded course (plan #2172.4.2)
   'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   // Summarise on a file kept under a course (plan #2401.4)
@@ -201,6 +208,8 @@ export const PAID_ACTIONS = {
   'app/dev/raised/actions.ts#decideRaise': ['reply-to-comment'],
   // Any other thread, a file's first (plan #1441): Dash's reply when tagged
   'app/thread-actions.ts#addRowComment': ['reply-to-comment'],
+  // ...and under a cover letter, the role's reply (note f0a52da9)
+  'app/thread-actions.ts#addRowComment:cover-letter': ['reply-to-role-comment'],
 
   // News: making the list of recommended newsletters. The view also presses
   // this once on its own, the first time it opens with no list stored.
@@ -248,7 +257,7 @@ export const PAID_ACTIONS = {
 
   // You: talking to one advisor alone, from the Talk tab of their profile
   // (plan #2581.6): their reply, then what they remember of it
-  'app/you/board/advisors/[key]/talk-actions.ts#sendToAdvisor': ['talk-to-advisor', 'remember-advisor-talk'],
+  'app/you/council/advisors/[key]/talk-actions.ts#sendToAdvisor': ['talk-to-advisor', 'remember-advisor-talk'],
 
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],
@@ -261,12 +270,14 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/projects/[id]/notes/route.ts#POST':
+    'A note sent from a project\'s own app, such as the music studio\'s note button (docs/PROJECT-NOTES.md), with a token Dash gave that app. It is triaged as a note filed in Dash is, one short Jev call recorded as triage-note, and an idea it leaves is scored. The button is in the other app, so there is no button here to carry a hint.',
   'app/learn/go/actions.ts#nextSessionItem':
     'A learning session (plan #2546.3) asks for the next item as each one shows, so the one after is written before Next is pressed: a review question, a lesson, a topic level’s lesson (plan #2546.5, with its source search), a piece check, a practice task or a level question, the same writing the review list, the piece page and Practice do. No button starts it; the presses that answer each item carry their own hints.',
   'app/api/ask/voice/route.ts#POST':
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':
-    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it.',
+    'The one daily cron, fired by Vercel. Its paid stage is the weekly check of research briefs for new sources (plan #2023.8), two web searches a brief, which runs only for briefs whose "Check every week" switch was turned on. The Learn embeddings stage also names the topics of up to thirty graded courses a day not yet named (plan #2172.4.1), one Haiku call each; no press starts it. The finances review stage writes the review of the month before once a month (plan #2593.8.2), one Sonnet call a person, retried at most twice when it fails.',
   'app/you/personality/actions.ts#restoreTypedAction':
     'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':

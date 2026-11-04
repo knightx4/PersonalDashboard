@@ -362,7 +362,13 @@ const OUTREACH_BODY = [
 ];
 
 /** Continuation of a conversation that already exists. */
-const REPLY_SUBJECT = [/^\s*(re|fw|fwd)\s*:/i];
+const REPLY_SUBJECT = [
+  /^\s*(re|fw|fwd)\s*:/i,
+  // LinkedIn's notice that someone answered a message thread, sent from
+  // hit-reply@linkedin.com (notes f28d2452, f41dac15). Read as anything else
+  // it was put down as not relevant and never reached the role it was about.
+  /^\s*message replied\s*:/i,
+];
 
 const REPLY_BODY = [
   /thanks for (following up|the follow.?up|getting back|your patience)/i,

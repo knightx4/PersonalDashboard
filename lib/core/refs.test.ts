@@ -204,10 +204,10 @@ describe('refPath', () => {
     expect(path.map((c) => c.label)).toEqual(['Job search', 'Pipeline', 'Acme', 'Product designer', 'Portfolio review']);
   });
 
+  // Orders is Shopping's home (plan #2593.1), so the section is not named twice.
   it('gives an order, which sits under nothing, its workspace and section alone', async () => {
     expect(await refPath(`public.orders:${ORDER}`, reader())).toEqual([
-      { label: 'Shopping', href: '/shopping/dashboard' },
-      { label: 'Orders', href: '/shopping/orders' },
+      { label: 'Shopping', href: '/shopping/orders' },
       { label: 'Order 1234', href: `/shopping/orders/${ORDER}` },
     ]);
   });
@@ -247,8 +247,7 @@ describe('refPath', () => {
   it('gives a gone row the path to where it was, and a non-ref none', async () => {
     const gone = 'a0000000-0000-4000-8000-0000000000ff';
     expect(await refPath(`public.orders:${gone}`, reader())).toEqual([
-      { label: 'Shopping', href: '/shopping/dashboard' },
-      { label: 'Orders', href: '/shopping/orders' },
+      { label: 'Shopping', href: '/shopping/orders' },
     ]);
     expect(await refPath(`public.merchants:${gone}`, reader())).toEqual([]);
     expect(await refPath('not a ref', reader())).toEqual([]);

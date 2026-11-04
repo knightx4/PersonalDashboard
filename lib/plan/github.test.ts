@@ -4,7 +4,7 @@ import { closeRefusal, commitOnMain, type CommitLanding } from '@/lib/plan/githu
 const answering = (body: unknown, status = 200) =>
   vi.fn(async () => new Response(JSON.stringify(body), { status }));
 
-const WEBSITE = { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' };
+const WEBSITE = { owner: 'example-owner', repo: 'alexrivera-site', branch: 'main' };
 
 describe('commitOnMain', () => {
   it("asks a project's repository when it is given one", async () => {
@@ -12,7 +12,7 @@ describe('commitOnMain', () => {
     const fetchFn = answering({ status: 'behind' });
     await commitOnMain({ sha: 'a405587', repo: WEBSITE, fetch: fetchFn as never });
     const [url] = fetchFn.mock.calls[0] as unknown as [string];
-    expect(url).toContain('/repos/knightx4/selveyknightwebsite/compare/main...a405587');
+    expect(url).toContain('/repos/example-owner/alexrivera-site/compare/main...a405587');
     vi.unstubAllEnvs();
   });
 
@@ -24,7 +24,7 @@ describe('commitOnMain', () => {
       fetch: answering({ message: 'Not Found' }, 404) as never,
     });
     expect(landing.onMain).toBeNull();
-    expect(landing.error).toContain('Give it access to knightx4/selveyknightwebsite');
+    expect(landing.error).toContain('Give it access to example-owner/alexrivera-site');
     vi.unstubAllEnvs();
   });
 
@@ -36,7 +36,7 @@ describe('commitOnMain', () => {
 
     expect(landing).toEqual({ onMain: true, status: 'behind', error: null });
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/repos/knightx4/PersonalDashboard/compare/main...a405587');
+    expect(url).toContain('/repos/example-owner/PersonalDashboard/compare/main...a405587');
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer ghp_test');
     vi.unstubAllEnvs();
   });
@@ -154,7 +154,7 @@ describe('closeRefusal for a project', () => {
       landing: landing({ onMain: false, status: 'ahead' }),
       repo: WEBSITE,
     });
-    expect(said).toContain('is not on main in knightx4/selveyknightwebsite');
+    expect(said).toContain('is not on main in example-owner/alexrivera-site');
     expect(said).toContain('only on a branch there');
   });
 

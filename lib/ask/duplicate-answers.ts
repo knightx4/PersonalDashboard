@@ -4,8 +4,8 @@ import { clip, readIn, type AskContext, type AskRow, type AskToolResult } from '
 /**
  * duplicate_answers (plan #2232.3): the application answers that repeat a
  * question already answered on another role, grouped by the question's
- * fingerprint (lib/jobs/fingerprint.ts), so "Why are you interested in Rogo?"
- * and "1. Why are you interested in Rogo?" fall in one group.
+ * fingerprint (lib/jobs/fingerprint.ts), so "Why are you interested in Hooli?"
+ * and "1. Why are you interested in Hooli?" fall in one group.
  *
  * It only finds. Removing is propose_delete, which the person confirms.
  * The rules, so that the model does not have to hold them:

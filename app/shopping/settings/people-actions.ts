@@ -23,7 +23,7 @@ function revalidatePeople(): void {
     '/shopping/settings',
     '/shopping/orders',
     '/shopping/inventory',
-    '/shopping/dashboard',
+    '/finances/spending',
   ]) {
     revalidatePath(path);
   }

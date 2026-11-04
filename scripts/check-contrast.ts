@@ -27,7 +27,6 @@ import { join } from 'node:path';
 import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
 import { generatePalette, MEANING_FLOOR, meaningGaps } from '../lib/theme/palette';
 import { DEFAULT_SKY, SKIES, skyTokens } from '../lib/theme/sky';
-import { DEFAULT_PALETTE, PALETTES, posterTokens } from '../lib/theme/poster';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
@@ -74,15 +73,7 @@ const SKIED: Record<string, Vars> = Object.fromEntries(
   ]),
 );
 
-/** Lightbox's poster palettes, each as the whole theme it makes. Primary is the block itself. */
-const PRINTED: Record<string, Vars> = Object.fromEntries(
-  PALETTES.filter((palette) => palette.id !== DEFAULT_PALETTE).flatMap((palette) => [
-    [`poster ${palette.id}`, { ...WRITTEN.poster, ...posterTokens(palette.id, 'day') }],
-    [`poster-dark ${palette.id}`, { ...WRITTEN['poster-dark'], ...posterTokens(palette.id, 'night') }],
-  ]),
-);
-
-const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED, ...SKIED, ...PRINTED };
+const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED, ...SKIED };
 
 type Rgb = [number, number, number];
 type Rgba = { rgb: Rgb; alpha: number };
@@ -177,6 +168,7 @@ const CHECKS: Check[] = [
   { ink: '--c-w-news', grounds: [...GROUNDS, '--c-w-news-tint'], min: TEXT, why: 'news accent' },
   { ink: '--c-w-goals', grounds: [...GROUNDS, '--c-w-goals-tint'], min: TEXT, why: 'goals accent' },
   { ink: '--c-w-you', grounds: [...GROUNDS, '--c-w-you-tint'], min: TEXT, why: 'you accent' },
+  { ink: '--c-w-finances', grounds: [...GROUNDS, '--c-w-finances-tint'], min: TEXT, why: 'finances accent' },
   { ink: '--c-w-dev', grounds: [...GROUNDS, '--c-w-dev-tint'], min: TEXT, why: 'dev accent' },
   { ink: '--c-positive', grounds: [...GROUNDS, '--c-positive-tint'], min: TEXT, why: 'refunds and savings' },
   { ink: '--c-caution', grounds: [...GROUNDS, '--c-caution-tint'], min: TEXT, why: 'needs attention' },
@@ -244,6 +236,7 @@ CHECKS.push(
   { ink: '--c-w-news-lit', grounds: PAGE, min: TEXT, why: 'news accent on the page ground' },
   { ink: '--c-w-goals-lit', grounds: PAGE, min: TEXT, why: 'goals accent on the page ground' },
   { ink: '--c-w-you-lit', grounds: PAGE, min: TEXT, why: 'you accent on the page ground' },
+  { ink: '--c-w-finances-lit', grounds: PAGE, min: TEXT, why: 'finances accent on the page ground' },
   { ink: '--c-w-dev-lit', grounds: PAGE, min: TEXT, why: 'dev accent on the page ground' },
 );
 
@@ -265,6 +258,7 @@ for (const hue of [
   '--c-w-news',
   '--c-w-goals',
   '--c-w-you',
+  '--c-w-finances',
   '--c-w-dev',
 ] as const) {
   CHECKS.push({
@@ -376,8 +370,7 @@ if (failures > 0) {
 
 console.log(
   `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
-    `${Object.keys(WRITTEN).length} written themes, ${Object.keys(SKIED).length} Aurora skies, ` +
-    `${Object.keys(PRINTED).length} Lightbox palettes and ` +
+    `${Object.keys(WRITTEN).length} written themes, ${Object.keys(SKIED).length} Aurora and Landscape skies and ` +
     `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
 );
 console.log(

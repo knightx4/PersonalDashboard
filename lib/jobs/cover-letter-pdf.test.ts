@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { coverLetterPdf, letterBlocks, letterDate, letterFileName } from './cover-letter-pdf';
 
@@ -9,36 +10,44 @@ const text = (block: ReturnType<typeof letterBlocks>[number]) =>
 describe('letterBlocks', () => {
   it('drops a stored header up to the salutation', () => {
     const blocks = letterBlocks(
-      'September 29, 2026\n\nHebbia\nForward Deployed Banker\n\nDear Hiring Team:\n\nI am applying.\n\nSincerely,\n\nSelvey Knight\n',
+      'September 29, 2026\n\nNorthwind\nOperations Analyst\n\nDear Hiring Team:\n\nI am applying.\n\nSincerely,\n\nAlex Rivera\n',
     );
     expect(blocks.map(text)).toEqual([
       'Dear Hiring Team:',
       'I am applying.',
       'Sincerely,',
-      'Selvey Knight',
+      'Alex Rivera',
     ]);
   });
 
-  it('adds the salutation and sign-off a bare body lacks', () => {
-    const blocks = letterBlocks('I am applying.\n\nThank you for your time.');
+  it('adds the salutation and sign-off a bare body lacks, signed with their name', () => {
+    const blocks = letterBlocks('I am applying.\n\nThank you for your time.', 'Alex Rivera');
     expect(blocks.map(text)).toEqual([
       'Dear Hiring Team:',
       'I am applying.',
       'Thank you for your time.',
       'Sincerely,',
-      'Selvey Knight',
+      'Alex Rivera',
+    ]);
+  });
+
+  it('signs off without a name when they have given none', () => {
+    expect(letterBlocks('I am applying.').map(text)).toEqual([
+      'Dear Hiring Team:',
+      'I am applying.',
+      'Sincerely,',
     ]);
   });
 
   it('reads bullets, bolding a short lead before a colon', () => {
     const [, bullet, wrapped] = letterBlocks(
-      'Dear team,\n\n- Own in ambiguity: At EY I led it.\n- **Apply AI**: models\nand more.\n\nBest,\nSelvey Knight',
+      'Dear team,\n\n- Own in ambiguity: At my last firm I led it.\n- **Apply AI**: models\nand more.\n\nBest,\nAlex Rivera',
     );
     expect(bullet).toEqual({
       kind: 'bullet',
       runs: [
         { text: 'Own in ambiguity:', bold: true },
-        { text: ' At EY I led it.', bold: false },
+        { text: ' At my last firm I led it.', bold: false },
       ],
     });
     expect(text(wrapped)).toBe('Apply AI: models and more.');
@@ -47,7 +56,10 @@ describe('letterBlocks', () => {
 
 describe('the download', () => {
   it('names the file and dates the letter as the Word letters did', () => {
-    expect(letterFileName('Hebbia / AI')).toBe('Selvey Knight Cover Letter - Hebbia AI.pdf');
+    expect(letterFileName('Northwind / AI', 'Alex Rivera')).toBe(
+      'Alex Rivera Cover Letter - Northwind AI.pdf',
+    );
+    expect(letterFileName('Northwind')).toBe('Cover Letter - Northwind.pdf');
     expect(letterDate(new Date('2026-10-03T15:00:00Z'), 'America/New_York')).toBe(
       'October 3, 2026',
     );
@@ -56,9 +68,47 @@ describe('the download', () => {
   it('builds a PDF from text Times cannot all draw', async () => {
     const bytes = await coverLetterPdf({
       letter: 'Dear team,\n\nI → shipped it — fast ✓.',
-      company: 'Hebbia',
+      company: 'Northwind',
       timeZone: 'UTC',
     });
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+  });
+
+  it('draws a contact line of their own, whatever it holds', async () => {
+    const bytes = await coverLetterPdf({
+      letter: 'Dear team,\n\nI am applying.',
+      company: 'Northwind',
+      timeZone: 'UTC',
+      letterhead: {
+        signer: 'Alex Rivera',
+        contact: '12 Rue Émile‑Zola, Lyon   +33 6 00 00 00 00   alex@example.com',
+      },
+    });
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
+  });
+
+  describe('a letter too long for one page', () => {
+    const para =
+      'I led the operations team through a reorganisation that cut our close from ten days to four and kept every report on time.';
+    const pages = async (paragraphs: number) => {
+      const bytes = await coverLetterPdf({
+        letter: `Dear team,\n\n${Array(paragraphs).fill(para).join('\n\n')}`,
+        company: 'Northwind',
+        timeZone: 'UTC',
+        letterhead: { signer: 'Alex Rivera', contact: 'alex@example.com' },
+      });
+      return (await PDFDocument.load(bytes)).getPageCount();
+    };
+
+    // Fourteen of these paragraphs run to a second page at 11pt, and sixteen
+    // are too many even at 10pt.
+    it('is set in smaller type to keep it on one page', async () => {
+      expect(await pages(14)).toBe(1);
+      expect(await pages(15)).toBe(1);
+    });
+
+    it('runs on to a second page when 10pt does not fit it either', async () => {
+      expect(await pages(16)).toBe(2);
+    });
   });
 });

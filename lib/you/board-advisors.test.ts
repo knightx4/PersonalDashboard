@@ -136,10 +136,10 @@ describe('addAdvisor', () => {
     expect(update.filters).toContainEqual(['eq', ['user_id', USER]]);
   });
 
-  it('refuses a name already on the board', async () => {
+  it('refuses a name already on the council', async () => {
     const { client, calls } = fakeYou([row()]);
     const result = await addAdvisor({ client, userId: USER, name: 'benjamin franklin', routine, fetch: okFetch() });
-    expect(result.error).toContain('already on your board');
+    expect(result.error).toContain('already on your council');
     expect(calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });

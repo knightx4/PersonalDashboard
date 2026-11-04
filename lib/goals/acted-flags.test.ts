@@ -16,14 +16,14 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const NOW = Date.parse('2026-09-29T21:00:00Z');
 
 const sent: ClosedStep = {
-  id: 'step-nelnet',
+  id: 'step-northstar',
   runId: 'run-1',
   goalId: 'goal-loans',
-  title: 'Ask Nelnet for the hardship forms',
+  title: 'Ask Northstar for the hardship forms',
   kind: 'claude',
   acts: null,
   approvedAt: null,
-  result: 'Sent the request to help@nelnet.net\n\nThey reply within five working days.',
+  result: 'Sent the request to help@northstar.example\n\nThey reply within five working days.',
   evidence: null,
   resolution: null,
 };
@@ -42,8 +42,8 @@ describe('what the check reads', () => {
 
   it('reads the title and what the run wrote, leaving out what is empty', () => {
     expect(actedState({ ...sent, evidence: 'Gmail, sent 29 September.' })).toBe(
-      'Step: Ask Nelnet for the hardship forms\n' +
-        'Result: Sent the request to help@nelnet.net\n\nThey reply within five working days.\n' +
+      'Step: Ask Northstar for the hardship forms\n' +
+        'Result: Sent the request to help@northstar.example\n\nThey reply within five working days.\n' +
         'Evidence: Gmail, sent 29 September.',
     );
   });
@@ -51,11 +51,11 @@ describe('what the check reads', () => {
   it('reads Claude steps only, and not one the person approved with a sentence', () => {
     expect(actedCandidate(sent)).toBe(true);
     expect(actedCandidate({ ...sent, kind: 'mine' })).toBe(false);
-    expect(actedCandidate({ ...sent, acts: 'Sends the request to Nelnet.', approvedAt: '2026-09-29T10:00:00Z' })).toBe(
+    expect(actedCandidate({ ...sent, acts: 'Sends the request to Northstar.', approvedAt: '2026-09-29T10:00:00Z' })).toBe(
       false,
     );
     // A sentence nobody approved is no permission.
-    expect(actedCandidate({ ...sent, acts: 'Sends the request to Nelnet.' })).toBe(true);
+    expect(actedCandidate({ ...sent, acts: 'Sends the request to Northstar.' })).toBe(true);
     expect(actedCandidate({ ...sent, result: null })).toBe(false);
   });
 
@@ -69,10 +69,10 @@ describe('the flag', () => {
   it('names the step and quotes the first line of the result', () => {
     const flag = actedFlag(sent);
     expect(flag.goalId).toBe('goal-loans');
-    expect(flag.title).toBe('Dash may have acted outside the plan on "Ask Nelnet for the hardship forms"');
-    expect(flag.detail).toContain('with this result: "Sent the request to help@nelnet.net"');
+    expect(flag.title).toBe('Dash may have acted outside the plan on "Ask Northstar for the hardship forms"');
+    expect(flag.detail).toContain('with this result: "Sent the request to help@northstar.example"');
     expect(flag.detail).toContain('Nothing has been undone.');
-    expect(flag.source).toBe('goals acts check step-nelnet');
+    expect(flag.source).toBe('goals acts check step-northstar');
     expect(flag.title).not.toMatch(/Claude/);
   });
 
@@ -170,7 +170,7 @@ function tables(steps: ClosedStep[], runIds = ['run-1']): Tables {
 const ask = async (step: ClosedStep) => (step.id === sent.id ? 0.93 : 0.04);
 
 describe('flagActedRuns', () => {
-  it('flags the goal for a step closed with "Sent the request to help@nelnet.net" and marks the run checked', async () => {
+  it('flags the goal for a step closed with "Sent the request to help@northstar.example" and marks the run checked', async () => {
     const { client, inserts, marked, filters } = fakeClient(tables([sent]));
     const result = await flagActedRuns({ client, now: NOW, ask, enabled: async () => true });
     expect(inserts).toEqual([
@@ -178,7 +178,7 @@ describe('flagActedRuns', () => {
         user_id: USER,
         module: 'goals',
         goal_id: 'goal-loans',
-        title: 'Dash may have acted outside the plan on "Ask Nelnet for the hardship forms"',
+        title: 'Dash may have acted outside the plan on "Ask Northstar for the hardship forms"',
         detail: actedFlag(sent).detail,
         ask: 'Check what was done and say whether anything needs putting right.',
         source: actedSource(sent.id),

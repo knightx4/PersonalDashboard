@@ -34,6 +34,11 @@ import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
 import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/lib/dash/shopping-writes';
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
+import { insertTask } from '@/lib/todo/tasks/write';
+import { THREAD_TOOLS } from './thread-writes';
+import { goalsRoutine } from '@/lib/feedback/routine';
+import { ProgressInputError, progressRpcArgs, readProgress } from '@/lib/plan/session-progress';
+import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -52,7 +57,14 @@ import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-wr
  * person.
  *
  * Four more (plan #1894.3) add a goal, add a step under one, close a step and
- * set a goal's done-when, by the same route.
+ * set a goal's done-when, by the same route. So do the rest of Ask Dash's
+ * plain writes: adding, renaming and ticking off a todo, marking an item
+ * returned, a note on a role, moving many roles, a round's prep note, post
+ * drafts and a Dev project. Ask Dash keeps the writes the connector cannot
+ * serve: add_todos and link_round_email name rows by an answer's sets and
+ * its mail lookups, which a connector client never has; set_dash_model is
+ * the app's own setting; the goals routine starts and the paid presses wait
+ * on an approval card, which another client does not draw.
  *
  * Each change is recorded in core.dash_actions as Dash's, so it is listed on
  * Home with an Undo, and logged in core.connector_calls like a lookup.
@@ -585,6 +597,8 @@ const GOALS_TOOLS: readonly ConnectorWriteTool[] = GOALS_WRITES.map((write) => (
         op: made.op,
         summary: made.summary,
         beforeValues: made.before,
+        // A dashboard change keeps its one column, so its Undo outlasts edits to the goal's others.
+        ...(made.kind === 'change_goal_dashboard' ? { afterValues: made.after } : {}),
         undo: made.undo,
       },
     );
@@ -725,7 +739,18 @@ type SharedWrite =
   | 'add_goal_step'
   | 'close_goal_step'
   | 'set_goal_done_when'
-  | 'change_items';
+  | 'change_items'
+  | 'add_todo'
+  | 'change_todo'
+  | 'close_todo'
+  | 'mark_returned'
+  | 'add_role_note'
+  | 'move_roles'
+  | 'write_prep_note'
+  | 'rewrite_post'
+  | 'suggest_post'
+  | 'add_project'
+  | 'take_on_for_goal';
 
 /**
  * The shared writes that name a goal or a step by its ref. Ask holds a ref to
@@ -733,7 +758,23 @@ type SharedWrite =
  * conversation, so it takes any ref, and every read in these tools names the
  * verified person, so a ref that is not theirs is refused as not found.
  */
-const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'close_goal_step', 'set_goal_done_when']);
+const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set([
+  'add_goal_step',
+  'close_goal_step',
+  'set_goal_done_when',
+  'take_on_for_goal',
+]);
+
+/**
+ * Whether the verified person may start the goals routine, and the routine:
+ * the owner's account only, as in the app (plan #2778.8). The service-role
+ * core client reads the owner from core.app_settings.
+ */
+async function connectorGoalRoutine(ctx: ConnectorWriteContext) {
+  const { data } = await ctx.core.from('app_settings').select('owner_user_id').maybeSingle();
+  const owner = (data as { owner_user_id: string | null } | null)?.owner_user_id ?? null;
+  return { canRun: owner !== null && owner === ctx.userId, routine: goalsRoutine() };
+}
 
 /**
  * The shared writes that take any ref the same way: every read in them names
@@ -741,7 +782,21 @@ const NAMES_GOAL_ROWS: ReadonlySet<SharedWrite> = new Set(['add_goal_step', 'clo
  * (plan #1894.5.1). add_interview_round reads the role and its application
  * by user id too (plan #1894.6.9).
  */
-const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([...NAMES_GOAL_ROWS, 'change_items', 'add_interview_round']);
+const TAKES_ANY_REF: ReadonlySet<SharedWrite> = new Set([
+  ...NAMES_GOAL_ROWS,
+  'change_items',
+  'add_interview_round',
+  // Each reads the todo, item, role, application, round or post draft it
+  // names by user id before changing anything (plan #1894: the connector
+  // does what Ask Dash does).
+  'change_todo',
+  'close_todo',
+  'mark_returned',
+  'add_role_note',
+  'move_roles',
+  'write_prep_note',
+  'rewrite_post',
+]);
 
 /** The shared writes that change Goals, and so need the goals client. */
 const WRITES_GOALS: ReadonlySet<SharedWrite> = new Set(['add_goal', ...NAMES_GOAL_ROWS]);
@@ -775,10 +830,17 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
         db,
         searchSources: [],
         seen: () => TAKES_ANY_REF.has(name),
-        // Only the goal writes reach this; none of the others writes a goal or a todo.
+        // Only the goal writes reach this; none of the others writes a goal.
         goals: goals && WRITES_GOALS.has(name) ? goals : async () => refuse(),
-        createTask: async () => refuse(),
+        // add_todo's write, on the service-role todo client for the verified person.
+        createTask: async (owner, task, timezone) =>
+          insertTask((await db('todo')) as unknown as TodoSupabaseClient, owner, task, timezone),
         quickNotePorts: ctx.quickNotePorts,
+        // Only take_on_for_goal starts a run from here; a Claude chat cannot
+        // be written back to, so the notification is its reply (plan #2778.8).
+        ...(name === 'take_on_for_goal'
+          ? { goalRoutine: () => connectorGoalRoutine(ctx), origin: { kind: 'chat' as const, ref: null } }
+          : {}),
       } satisfies DashWriteContext;
       const result = await dash.apply(write, input);
       if (!result.ok) return { ok: false, error: result.error };
@@ -850,6 +912,114 @@ const setGoalDoneWhen = sharedWrite(
   'Write, change or clear the done-when of one of the person\'s goals in Dash, when they ask: the line that says when the goal is finished ("the song is live on Spotify"). Name the goal by the goals.items ref search (kinds ["goal"]) or goal_status returned for it; look it up first. Write it in their words; an empty done_when clears it. It is listed on Home with an Undo.',
 );
 
+const addTodo = sharedWrite(
+  'add_todo',
+  'Add a new todo to the person\'s list in Dash\'s Todo workspace, when they ask you to ("add a todo to call the dentist", "remind me to renew my passport on Friday"). Write it as they would, in a short line, and give due_on (YYYY-MM-DD) only when they named a day. It arrives tagged now when due today or before, eventually when it has no date or one more than two weeks off; send tags only for more, from the ones they already use (the todos lookup lists them in tags_in_use), never new ones. A line on an existing todo\'s list is add_todo_item. It is listed on Home with an Undo.',
+);
+
+const changeTodo = sharedWrite(
+  'change_todo',
+  'Rename one of the person\'s open todos in Dash, or move it to another day, when they ask ("move the dentist to Friday"). Name it by the todo.tasks ref search or todos returned for it; look it up first. Send only what changes: title to rename it, due_on to move it (null takes the date off), due_time only with a due_on. Notes, pins, putting off and dropping are edit_todo. It is listed on Home with an Undo.',
+);
+
+const closeTodo = sharedWrite(
+  'close_todo',
+  'Tick off one of the person\'s open todos in Dash, when they say it is done or ask you to. Name it by the todo.tasks ref search or todos returned for it; look it up first. The items on its list are ticked off with it. It is listed on Home with an Undo.',
+);
+
+const markReturned = sharedWrite(
+  'mark_returned',
+  'Mark an item the person owns in Dash\'s Shopping workspace as returned, when they say they sent it back. Name it by the public.inventory_items ref search returned for it; look it up first. It records a full refund at what the item cost. Only an owned item linked to an order can be returned. It is listed on Home with an Undo.',
+);
+
+const addRoleNote = sharedWrite(
+  'add_role_note',
+  'Add a note to one of the person\'s roles in Dash\'s Jobs workspace, when they ask you to note something on it ("note on the Stripe role that the recruiter is Sam"). Name the role by the job_search.roles ref search returned, or the job_search.applications ref job_applications returned; look it up first. Write the note in their words. It is listed on Home with an Undo.',
+);
+
+const moveRoles = sharedWrite(
+  'move_roles',
+  'Move many of the person\'s job roles in Dash to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). Name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most 100 roles; set is not used here. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn). Ghosted cannot be set. Deleting roles is not something you can do. Each move goes into the role\'s history as the board\'s would, and one Undo on Home puts the whole move back. Say how many roles it moved.',
+);
+
+const writePrepNote = sharedWrite(
+  'write_prep_note',
+  'Write the prep note for an interview round on one of the person\'s roles in Dash\'s Jobs workspace, as the role page\'s "Prepare me" does, when they ask to be prepared ("prepare me for round 2 at Stripe"). Call it only when they ask for the prep: writing a note costs a model run, recorded against their spend. Name the round by its role (the job_search.roles or job_search.applications ref a lookup returned) and its number on that role. The note is written only when it is missing or out of date; when it is current this returns the stored one and spends nothing. With no job description and nothing in their evidence bank this refuses: pass that on in plain words. The reply says whether a run was spent; tell them. It cannot be undone; the role page can write the note again.',
+);
+
+const rewritePost = sharedWrite(
+  'rewrite_post',
+  'Rewrite the text of one of the person\'s X post drafts on the Posts tab in Dash\'s Dev workspace, when they ask ("make it shorter", "drop the second post"). Name the draft by the public.social_posts ref a lookup returned. Send posts as the whole new text, one string per post in the thread; a post left out is gone from the thread. Keep to their wording where they did not ask for a change. Each post must stay within X\'s length, with no links, hashtags, emoji, em dashes, @ mentions, amounts or anything from another workspace; a rewrite that breaks one is refused with the reasons and nothing changes. A draft they have posted or put aside cannot be rewritten. It is listed on Home with an Undo.',
+);
+
+const suggestPost = sharedWrite(
+  'suggest_post',
+  'Save a new X post draft to the Posts tab in Dash\'s Dev workspace, when they ask for a post about the app, how they build it, or something near it. Write about what the app does, never what they keep in it. Send angle as the one idea the post is about, and posts as the text, one string per post in the thread. No links, hashtags, emoji, em dashes, @ mentions, amounts, their name, the companies or people in their job search, or anything from another workspace; a draft that breaks one is refused with the reasons and nothing is saved, so fix them and call again. For picture, pass the path of one gallery picture post_pictures returned, where one fits. The draft waits on the Posts tab: nothing is posted. It is listed on Home with an Undo.',
+);
+
+const takeOnForGoal = sharedWrite(
+  'take_on_for_goal',
+  'Hand one of the person\'s goals in Dash a question to figure out, when they ask you to work something out for a goal and leave it with Dash ("have Dash figure out whether I should consolidate my loans"). Dash works it in a run of its own on the goal, several minutes or more, and the person gets a notification that opens the goal at the answer; you are not written back to, so tell them that. Pass the question in their words. Name the goal by the goals.items ref goal_status or search (kinds ["goal"]) returned; without one, the goal is picked from the question, and when that is unclear the call names the likeliest goals: ask them which and call again. Steps and tiles it suggests wait on the goal for their Add. Only the account that owns the app can start it.',
+);
+
+const addProject = sharedWrite(
+  'add_project',
+  'Add one of the person\'s GitHub repositories as a project in Dash\'s Dev workspace, when they ask ("add my recipes repo as a project"). It gets its own section on the plan. Name it by owner/name, or by its name alone and it is looked up among their repositories on GitHub; a name that matches none or several is refused with the matches, so ask which. One already added is refused, and one they archived is put back. It is listed on Home with an Undo.',
+);
+
+/**
+ * A session's report of what it is doing (plan #2800.1), for the project
+ * pages and Dev to show while it works. Bookkeeping rather than a change to
+ * the person's own rows, so it is not recorded on Home and has no Undo.
+ */
+const reportProgress: ConnectorWriteTool = {
+  definition: {
+    name: 'report_progress',
+    description:
+      'Say what this Claude Code session is doing, for the person to see on the project page and in Dev while you work. Call it when you start, after each step you build or commit, when you stop to wait on the person (state waiting, with what you need in needs), and when you finish (done) or end without finishing (stopped). Each call rewrites this session\'s row for its step, so send the whole current picture each time. Pass session_id (your session\'s id, from CLAUDE_CODE_REMOTE_SESSION_ID), and run_id when your brief names the plan run you were sent as, thread_id when you answer in a session thread, and project when you work on one of their Dev projects rather than the dashboard itself.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string', description: 'This session\'s id, such as cse_015….' },
+        state: { type: 'string', enum: ['working', 'waiting', 'done', 'stopped'], description: 'working while you work, waiting when you need the person, done when finished, stopped when ending without finishing.' },
+        action: { type: 'string', description: 'What you did last or are doing now, in one line the person can read ("Committed the export page").' },
+        needs: { type: 'string', description: 'While waiting: what you need from them, as a question or a job they can act on. Ignored in any other state.' },
+        run_id: { type: 'string', description: 'The plan run this session was sent as (the id under "Ending this run" in the brief). The step is taken from it.' },
+        plan_item_id: { type: 'string', description: 'The plan step\'s id, when you know it and are on a different step from the run\'s.' },
+        thread_id: { type: 'string', description: 'The session thread you answer in, when you were started from one.' },
+        project: { type: 'string', description: 'The Dev project\'s id (such as music-pipeline) when you work on one of their projects.' },
+      },
+      required: ['session_id', 'state', 'action'],
+      additionalProperties: false,
+    },
+  },
+  async run(ctx, input) {
+    let report;
+    try {
+      report = readProgress(input);
+    } catch (error) {
+      if (error instanceof ProgressInputError) throw new AskInputError(error.message);
+      throw error;
+    }
+    const { data, error } = await ctx.core.rpc('report_session_progress', progressRpcArgs(ctx.userId, report));
+    if (error) throw new AskInputError(error.message);
+    const row = data as { id: string; state: string; plan_item_id: string | null; updated_at: string };
+    return {
+      ok: true,
+      rows: [
+        {
+          table: 'core.session_progress',
+          ref: row.id,
+          title: report.action,
+          href: report.project ? `/dev/projects/${report.project}` : '/dev/plan',
+          detail: { state: row.state, needs: report.needs, updated_at: row.updated_at },
+        },
+      ],
+      note: report.state === 'waiting' ? 'Reported as waiting on the person.' : `Reported as ${report.state}.`,
+    };
+  },
+};
+
 /**
  * Talking to one advisor (plan #2581.7): the same exchange as the Talk tab of
  * their profile (lib/you/advisor-talk-send.ts), so the talk is kept there and
@@ -860,7 +1030,7 @@ const talkToAdvisor: ConnectorWriteTool = {
   definition: {
     name: 'talk_to_advisor',
     description:
-      "Talk to one of the person's advisors alone (Buffett, Munger, Dalio or any other on their board) and get that advisor's reply, in character. Use it when they ask to talk to, ask or hear from an advisor by name, such as \"talk to Buffett about taking the Stripe offer\". The advisor knows their goals and open decisions, remembers earlier talks, and can look up their rows. Pass the advisor's key (their lower-case name, such as buffett) and the person's message in their own words. The first call starts a talk and returns its chat_id; pass that chat_id back on every later message so the talk goes on. Quote the reply as the advisor's, do not rewrite it, and do not answer for the advisor yourself. What the advisor should remember of the exchange is kept by Dash, and the talk shows on the advisor's page in the dashboard.",
+      "Talk to one of the person's advisors alone (Buffett, Munger, Dalio or any other in their council) and get that advisor's reply, in character. Use it when they ask to talk to, ask or hear from an advisor by name, such as \"talk to Buffett about taking the Stripe offer\". The advisor knows their goals and open decisions, remembers earlier talks, and can look up their rows. Pass the advisor's key (their lower-case name, such as buffett) and the person's message in their own words. The first call starts a talk and returns its chat_id; pass that chat_id back on every later message so the talk goes on. Quote the reply as the advisor's, do not rewrite it, and do not answer for the advisor yourself. What the advisor should remember of the exchange is kept by Dash, and the talk shows on the advisor's page in the dashboard.",
     input_schema: {
       type: 'object',
       properties: {
@@ -901,7 +1071,7 @@ const talkToAdvisor: ConnectorWriteTool = {
           table: 'you.advisor_chats',
           ref: chatRef(sent.chatId ?? ''),
           title: `${sent.advisorName ?? 'Advisor'}, in a talk`,
-          href: sent.href ?? '/you/board',
+          href: sent.href ?? '/you/council',
           detail: { chat_id: sent.chatId ?? null, advisor: sent.advisorName ?? null, reply: reply.body },
         },
       ],
@@ -924,6 +1094,18 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   closeGoalStep,
   setGoalDoneWhen,
   changeItems,
+  addTodo,
+  changeTodo,
+  closeTodo,
+  markReturned,
+  addRoleNote,
+  moveRoles,
+  writePrepNote,
+  rewritePost,
+  suggestPost,
+  addProject,
+  takeOnForGoal,
+  reportProgress,
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,
@@ -933,6 +1115,8 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...SHOPPING_TOOLS,
   ...VAULT_TOOLS,
   ...JOBS_TOOLS,
+  // A Claude Code session's thread and its plan writes (plan #2789.5).
+  ...THREAD_TOOLS,
 ];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */

@@ -10,7 +10,7 @@
 -- nothing else and does nothing if they are already gone.
 
 delete from you.board_meetings
-where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where user_id = core.dev_owner_id()
   and id in (
     'b1e88ad1-6745-4c2b-8124-d30b9661b346',
     '4d7c9c90-4513-4446-abd4-66b2cf40c8dc'

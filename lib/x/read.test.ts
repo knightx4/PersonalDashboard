@@ -15,7 +15,7 @@ import {
 /** Import posts already on X and read new ones daily (plan #1819). */
 
 const NOW = Date.parse('2026-10-12T12:00:00Z');
-const ME = { user_id: 'u1', x_user_id: '42', handle: 'selveybuilds' };
+const ME = { user_id: 'u1', x_user_id: '42', handle: 'alexbuilds' };
 
 function tweet(id: string, over: Partial<XTweet> = {}): XTweet {
   return {
@@ -87,7 +87,7 @@ describe('what kind of post it is', () => {
   it('stores the whole text of a long post and links it under the handle', () => {
     const row = xPostRow(tweet('5', { text: 'cut short…', note_tweet: { text: 'the whole thing' } }), ME, 'now');
     expect(row?.text).toBe('the whole thing');
-    expect(row?.url).toBe('https://x.com/selveybuilds/status/5');
+    expect(row?.url).toBe('https://x.com/alexbuilds/status/5');
   });
 
   it('compares ids past what a number holds', () => {
@@ -168,7 +168,7 @@ describe('a later read', () => {
       x_post_id: id,
       text: 't',
       created_at: new Date(NOW - daysAgo * 86_400_000).toISOString(),
-      url: `https://x.com/selveybuilds/status/${id}`,
+      url: `https://x.com/alexbuilds/status/${id}`,
       conversation_id: id,
       kind: 'post',
       public_metrics: {},

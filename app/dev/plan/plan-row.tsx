@@ -179,6 +179,7 @@ function AnswerDecision({
         <TheOptions
           detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
           onChoose={choose}
+          itemId={node.id}
         />
 
         {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}

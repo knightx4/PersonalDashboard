@@ -5,7 +5,7 @@
 -- a topic, so they have to go before it can write them again from the stored
 -- Skok and a16z guides (the choice made on #2247.12, option a).
 --
--- Only the owner's account (selveyknight4@gmail.com) is touched, and only
+-- Only the owner's account is touched, and only
 -- topics found by the territory's `asked` keys (lib/learn/levels/territories/
 -- saas-metrics.ts). A topic is left alone when the owner has acted on it:
 -- approved, no longer a draft, a cell rewritten or changed after it was drafted,
@@ -15,7 +15,7 @@
 
 do $$
 declare
-  owner constant uuid := 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+  owner constant uuid := core.dev_owner_id();
   keys constant text[] := array[
     'Recurring revenue: MRR and ARR',
     'SaaS contracts: ACV and TCV',

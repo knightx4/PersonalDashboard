@@ -68,6 +68,7 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           return Promise.resolve({ data: turn.acknowledged_at, error: null });
         }
         if (schema === 'job_search' && name === 'merge_roles') return Promise.resolve(mergeRoles(tables, args));
+        if (schema === 'goals' && name === 'approve_goal') return Promise.resolve(approveGoal(tables, args, now));
         if (schema !== 'core' || name !== 'add_thread_turn') {
           return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
         }
@@ -294,4 +295,29 @@ export function fakeDashDeps(tables: FakeTables, userId: string, now = '2026-10-
     db: async (schema: AskSchema) => client(schema),
     now: () => now,
   };
+}
+
+/**
+ * goals.approve_goal as the function does it: the goal opens and is marked
+ * approved, every proposed step under it at any depth opens, and the count of
+ * steps opened comes back; null for no live goal by that id.
+ */
+function approveGoal(tables: FakeTables, args: Row, now: string): { data: number | null; error: null } {
+  const items = tables['goals.items'] ?? [];
+  const goal = items.find((r) => r.id === args.goal && r.level === 'goal' && r.archived_at == null);
+  if (!goal) return { data: null, error: null };
+  if (goal.status === 'proposed') goal.status = 'open';
+  goal.approved_at ??= now;
+  let opened = 0;
+  const open = (parent: unknown) => {
+    for (const step of items.filter((r) => r.parent_id === parent && r.archived_at == null)) {
+      if (step.status === 'proposed') {
+        step.status = 'open';
+        opened += 1;
+      }
+      open(step.id);
+    }
+  };
+  open(goal.id);
+  return { data: opened, error: null };
 }

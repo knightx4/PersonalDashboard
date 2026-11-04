@@ -11,6 +11,7 @@ import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { relatedNotesStore, vectorForText } from '@/lib/vault/notes/related';
 import { fromRow, RESULT_COLUMNS, type PersonalityResult, type ReadPoint, type ResultRow } from './model';
 import {
@@ -63,7 +64,7 @@ function toCandidate(note: RawNote): CandidateNote {
   };
 }
 
-async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: string[]): Promise<Map<string, CandidateNote>> {
+export async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: string[]): Promise<Map<string, CandidateNote>> {
   if (ids.length === 0) return new Map();
   const { data, error } = await vault
     .from('notes')
@@ -75,7 +76,7 @@ async function notesByIds(vault: VaultSupabaseClient, userId: string, ids: strin
   return new Map(((data ?? []) as RawNote[]).map((n) => [n.id, toCandidate(n)]));
 }
 
-async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<CandidateNote[]> {
+export async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<CandidateNote[]> {
   const { data, error } = await vault
     .from('notes')
     .select('id, path, title, body')
@@ -86,7 +87,7 @@ async function pinnedNotes(vault: VaultSupabaseClient, userId: string): Promise<
   return ((data ?? []) as RawNote[]).map(toCandidate);
 }
 
-async function loadResults(you: YouSupabaseClient): Promise<PersonalityResult[]> {
+export async function loadResults(you: YouSupabaseClient): Promise<PersonalityResult[]> {
   const { data, error } = await you.from('personality_results').select(RESULT_COLUMNS);
   assertSchemaExposed(error, YOU_SCHEMA);
   if (error) throw new Error(`Reading your results failed: ${error.message}`);
@@ -146,15 +147,16 @@ async function read(
       return rows.filter((r) => r.similarity >= READ_MIN_SIMILARITY).map((r) => r.note_id);
     }),
   );
-  const [bodies, pinned, themes] = await Promise.all([
+  const [bodies, pinned, themes, rules] = await Promise.all([
     notesByIds(vault, userId, [...new Set(nearestIds.flat())]),
     pinnedNotes(vault, userId),
     result.kind === 'big_five' ? loadTraitThemes(vault, userId, result.scores, { core }) : null,
+    loadVaultRules(vault, userId),
   ]);
   const nearest = nearestIds.map((ids) =>
     ids.map((id) => bodies.get(id)).filter((n): n is CandidateNote => Boolean(n)),
   );
-  const notes = chooseNotes(pinned, nearest);
+  const notes = chooseNotes(pinned, nearest, undefined, rules);
 
   // Nothing of yours to compare with: a read with no points, and no call.
   if (notes.length === 0) {

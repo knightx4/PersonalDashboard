@@ -16,7 +16,7 @@ import { encodeTranscript, storagePathFor } from './transcripts';
 
 const PROFILE: LearnerProfile = {
   tracks: [
-    { id: 'subject-1', name: 'Startup Finance', note: null, frontier: ['Cash flow timing'], settled: 3 },
+    { id: 'subject-1', name: 'Small Business Finance', note: null, frontier: ['Cash flow timing'], settled: 3 },
     { id: 'subject-2', name: 'Pricing', note: null, frontier: [], settled: 0 },
   ],
   goals: [{ id: 'goal-1', title: 'Raise a seed round', detail: null }],
@@ -25,11 +25,11 @@ const PROFILE: LearnerProfile = {
 
 const REPLY = {
   clips: [
-    { start: 21, end: 47, caption: 'Why profitable firms still run out of cash', idea: 'Working capital gaps need funding.', serves: ['Startup Finance', 'Pricing'], stands_alone: true },
+    { start: 21, end: 47, caption: 'Why profitable firms still run out of cash', idea: 'Working capital gaps need funding.', serves: ['Small Business Finance', 'Pricing'], stands_alone: true },
     { start: 65, end: 92, caption: 'The cash conversion cycle in one sum', idea: 'Inventory plus receivables minus payables days.', serves: 'Goal: "Raise a seed round"', stands_alone: true },
     { start: 97, end: 102, caption: 'Back to the earlier gap', idea: 'Refers back.', serves: '', stands_alone: false },
     { start: 0, end: 106, caption: 'The whole video', idea: 'Everything.', serves: '', stands_alone: true },
-    { start: 34, end: 47, caption: 'Profit is not cash', idea: 'Overlaps the first.', serves: 'Startup Finance', stands_alone: true },
+    { start: 34, end: 47, caption: 'Profit is not cash', idea: 'Overlaps the first.', serves: 'Small Business Finance', stands_alone: true },
     { start: 500, end: 520, caption: 'Past the end', idea: 'No such sentence.', serves: '', stands_alone: true },
     { start: 74, end: 83, caption: '   ', idea: 'No caption.', serves: '', stands_alone: true },
   ],
@@ -66,7 +66,7 @@ describe('cutPrompt', () => {
     const prompt = cutPrompt(PROFILE, { title: 'Working capital', channel: 'A channel', durationSeconds: 114, sentences: sentencesFromCues(CLIP_TRANSCRIPT) });
     expect(prompt).toContain('[21] Working capital is the cash');
     expect(prompt).toContain('[65] Now, the cash conversion cycle');
-    expect(prompt).toContain('Track "Startup Finance"');
+    expect(prompt).toContain('Track "Small Business Finance"');
     expect(prompt).toContain('Goal "Raise a seed round"');
   });
 });
@@ -80,7 +80,7 @@ describe('readCutReply', () => {
         endSeconds: 61,
         caption: 'Why profitable firms still run out of cash',
         idea: 'Working capital gaps need funding.',
-        serves: 'Startup Finance',
+        serves: 'Small Business Finance',
         subjectId: 'subject-1',
         goalId: null,
         subjectIds: ['subject-1', 'subject-2'],
@@ -114,12 +114,12 @@ describe('readCutReply', () => {
   });
 
   it('matches what a clip serves by name only', () => {
-    expect(matchServes('startup finance', PROFILE)).toEqual({ serves: 'startup finance', subjectId: 'subject-1', goalId: null, subjectIds: ['subject-1'] });
+    expect(matchServes('small business finance', PROFILE)).toEqual({ serves: 'small business finance', subjectId: 'subject-1', goalId: null, subjectIds: ['subject-1'] });
     expect(matchServes(null, PROFILE)).toEqual({ serves: null, subjectId: null, goalId: null, subjectIds: [] });
   });
 
   it('keeps every track a clip serves, the first one as its subject (plan #1695)', () => {
-    expect(matchServes(['Raise a seed round', 'Pricing', 'startup finance', 'pricing'], PROFILE)).toEqual({
+    expect(matchServes(['Raise a seed round', 'Pricing', 'small business finance', 'pricing'], PROFILE)).toEqual({
       serves: 'Pricing',
       subjectId: 'subject-2',
       goalId: null,

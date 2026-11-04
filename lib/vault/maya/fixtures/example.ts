@@ -1,8 +1,8 @@
 import type { MayaMaterial } from '../retrieve';
 
 /**
- * The worked example feature #1282 was shaped around, with the notes'
- * bodies written short for the tests: a note arguing you become yourself by
+ * A made-up example in the shape of the one feature #1282 was built around,
+ * with the notes' bodies written short for the tests: a note arguing you become yourself by
  * acting, beside an older essay that puts action last, as the expression of a
  * self already found.
  */
@@ -12,33 +12,33 @@ export const ESSAY_ID = 'note-road';
 export const INTROSPECTION_ID = 'note-introspection';
 export const PASSION_ID = 'note-passion';
 
-export const ESSAY_ACTION = 'act in accordance with the discovered self';
-export const PASSION_FAKE = 'forcing myself to move felt fake';
+export const ESSAY_ACTION = 'act on the self we have already found';
+export const PASSION_FAKE = 'pushing myself to start felt forced';
 
 export function exampleMaterial(overrides: Partial<MayaMaterial> = {}): MayaMaterial {
   const note = {
     id: SUBJECT_ID,
-    title: 'Against "Finding Yourself"',
-    body: 'People spend too long trying to find themselves. You do not find yourself, you become yourself, in action.',
+    title: 'Made, not found',
+    body: 'Waiting to know who you are before you start is a mistake. You do not find yourself, you become yourself, in action.',
     blobSha: 'sha-against',
   };
   const related = [
     {
       id: ESSAY_ID,
-      title: 'Life is a road to the self',
-      body: `The road has three parts: growth, a view of the self, and action. We reach the goal when we ${ESSAY_ACTION}.`,
+      title: 'The self comes first',
+      body: `There are three steps: learn, settle on who you are, then act. We get there when we ${ESSAY_ACTION}.`,
       similarity: 0.67,
     },
     {
       id: INTROSPECTION_ID,
-      title: 'On Introspection',
-      body: 'Going inward is good, but you have to come out again. Philosophising can be a defence against engaging.',
+      title: 'Looking inward',
+      body: 'Thinking about yourself helps, up to a point. Past it, more thinking is a way of not starting.',
       similarity: 0.77,
     },
     {
       id: PASSION_ID,
-      title: 'Rest in reason, move in Passion',
-      body: `Rest in reason is the easy side for me. When I tried, ${PASSION_FAKE} and led to poor results.`,
+      title: 'Think slowly, act quickly',
+      body: `Thinking it over is the easy side for me. When I tried, ${PASSION_FAKE} and went badly.`,
       similarity: 0.68,
     },
   ];
@@ -53,7 +53,7 @@ export function exampleMaterial(overrides: Partial<MayaMaterial> = {}): MayaMate
         statement: 'The self is found first and then expressed in action.',
         stance: 'held',
         via: 'related-note',
-        quotes: [{ noteId: ESSAY_ID, noteTitle: 'Life is a road to the self', quote: ESSAY_ACTION }],
+        quotes: [{ noteId: ESSAY_ID, noteTitle: 'The self comes first', quote: ESSAY_ACTION }],
       },
       {
         id: 'pos-become',
@@ -65,11 +65,11 @@ export function exampleMaterial(overrides: Partial<MayaMaterial> = {}): MayaMate
       },
       {
         id: 'pos-balance',
-        name: 'Balance reason and passion',
+        name: 'Balance thinking and acting',
         statement: 'Thinking and acting have to be kept in balance.',
         stance: 'held',
         via: 'theme',
-        quotes: [{ noteId: PASSION_ID, noteTitle: 'Rest in reason, move in Passion', quote: 'Rest in reason is the easy side for me.' }],
+        quotes: [{ noteId: PASSION_ID, noteTitle: 'Think slowly, act quickly', quote: 'Thinking it over is the easy side for me.' }],
       },
     ],
     conflicts: [{ leftId: 'pos-discovered', rightId: 'pos-become', crux: 'Whether the self comes before action.', origin: 'contradicts' }],

@@ -36,7 +36,11 @@
  * Pure, so the ranking and the cap are tested without a database. The reads
  * are in lib/goals/today-store.ts.
  */
+import { BODY_MAX, clip } from '@/lib/day-brief/notification';
+import { ARRIVAL_DAYS } from '@/lib/goals/dash-arrivals';
 import { dailyView } from '@/lib/goals/daily';
+import { showsOutside } from '@/lib/goals/plan-order';
+import { firstSentence } from '@/lib/goals/first-sentence';
 import {
   isClosedStatus,
   isStaleStepBlock,
@@ -63,7 +67,8 @@ export type TodayKind =
   | 'suggestion'
   | 'plan'
   | 'close'
-  | 'park';
+  | 'park'
+  | 'finished';
 
 export type TodayItem = {
   kind: TodayKind;
@@ -71,7 +76,7 @@ export type TodayItem = {
    * The row the action is on: the step for a question, an ask, a step or a
    * rhythm; the raised_items row for a flag; the suggestion for a suggestion
    * or "Did you go?"; the goal for a breakdown, a close or a park; the area
-   * for a plan.
+   * for a plan; the finished step for a finished step's notice.
    */
   id: string;
   /** What to do, as the line reads. */
@@ -120,6 +125,8 @@ export const TODAY_ACTIONS: Record<TodayKind, string> = {
   // The closing words (plan #1957.8): closing a goal is Done, parking it Later.
   close: 'Done',
   park: 'Later',
+  // A finished step's notice is read on the step's page (finishedNotices).
+  finished: 'Open',
 };
 
 /**
@@ -143,6 +150,7 @@ const KIND_ORDER: Record<TodayKind, number> = {
   suggestion: 8,
   park: 9,
   plan: 10,
+  finished: 11,
 };
 
 export type TodayInput = {
@@ -262,6 +270,8 @@ export function todayCandidates(input: TodayInput): Candidate[] {
 
   // Questions, breakdowns and proposed goals, read the way the home reads them.
   const daily = dailyView(goals as { goal: Goal; areaName: string }[], new Map(byGoal), today);
+  // Only what the goal's Plan tab has under Now or Up next (plan #2778.6).
+  const shows = showsOutside(byGoal, today);
   const questions = new Set<string>();
   for (const item of daily.waiting) {
     if (item.kind === 'question') questions.add(item.id);
@@ -281,8 +291,10 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         const base = { id: node.id, goalId: goal.id, goalTitle: goal.title };
         if (questions.has(node.id)) {
           if (parking.has(goal.id)) continue;
-          const unblocks = unblockedBy(node, nodes);
-          add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
+          if (shows(node)) {
+            const unblocks = unblockedBy(node, nodes);
+            add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
+          }
         } else if (node.kind === 'claude' && isStepBlocked(node) && node.blockKind === 'outside') {
           const question = askedOfYou(node.blockAsk);
           if (question) {
@@ -299,7 +311,8 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         } else if (
           node.kind === 'mine' &&
           (node.status === 'open' || isStaleStepBlock(node)) &&
-          waitsOnNothing(node)
+          waitsOnNothing(node) &&
+          shows(node)
         ) {
           const unblocks = unblockedBy(node, nodes);
           const on = node.dueOn === null ? null : node.dueOn < today ? today : node.dueOn;
@@ -569,4 +582,56 @@ function compareRhythm(a: Candidate, b: Candidate): number {
   if (ar !== br) return ar ? -1 : 1;
   if (!ar) return 0;
   return (a.daysLeft ?? 0) - (b.daysLeft ?? 0) || (b.short ?? 0) - (a.short ?? 0);
+}
+
+/**
+ * The notices of steps Dash finished that you asked to be told about
+ * (plan #2611.2): a step with notify_on_done on, done, closed within
+ * ARRIVAL_DAYS and not yet seen, newest first. The Goals Inbox lists them
+ * under Your actions until you open the step or dismiss the notice. They do
+ * not wait on the phone message (notified_at), so one shows whether or not a
+ * phone got it. The detail is the first sentence of what Dash wrote.
+ *
+ * They are kept off the ranking: a notice is news rather than work, so Do
+ * next leaves it out (homeLists), and it is added after the rows on you.
+ */
+export function finishedNotices(
+  goals: readonly { goal: Pick<Goal, 'id' | 'title'> }[],
+  byGoal: ReadonlyMap<string, readonly StepNode[]>,
+  now: number,
+): TodayItem[] {
+  const since = now - ARRIVAL_DAYS * 24 * 60 * 60 * 1000;
+  const found: { item: TodayItem; closed: number }[] = [];
+  for (const { goal } of goals) {
+    const walk = (list: readonly StepNode[]) => {
+      for (const node of list) {
+        const closed = node.closedAt ? Date.parse(node.closedAt) : NaN;
+        if (
+          node.status === 'done' &&
+          node.notifyOnDone === true &&
+          !node.noticeSeenAt &&
+          closed >= since
+        ) {
+          const sentence = clip(firstSentence(node.result), BODY_MAX);
+          found.push({
+            closed,
+            item: {
+              kind: 'finished',
+              id: node.id,
+              title: node.title,
+              detail: sentence || null,
+              goalId: goal.id,
+              goalTitle: goal.title,
+              action: TODAY_ACTIONS.finished,
+              unblocks: 0,
+              on: null,
+            },
+          });
+        }
+        walk(node.children);
+      }
+    };
+    walk(byGoal.get(goal.id) ?? []);
+  }
+  return found.sort((a, b) => b.closed - a.closed).map(({ item }) => item);
 }

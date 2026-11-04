@@ -21,7 +21,7 @@ const loans: CollectionField[] = [
   { key: 'old', label: 'Old', type: 'text', removed: true },
 ];
 
-const full = { name: 'Nelnet 1', balance: 18000, rate: 6.8, due_day: 15, notes: null };
+const full = { name: 'Northstar 1', balance: 9200, rate: 6.8, due_day: 15, notes: null };
 
 describe('askedFields', () => {
   it('is every shown field when the step names none', () => {
@@ -61,7 +61,7 @@ describe('informationProgress', () => {
   });
   const filled = [
     { id: 'a', data: full, draft: false },
-    { id: 'b', data: { ...full, name: 'Nelnet 2' }, draft: false },
+    { id: 'b', data: { ...full, name: 'Northstar 2' }, draft: false },
   ];
 
   it('leaves the step open when every field is filled but a question has no answer', () => {
@@ -129,7 +129,7 @@ describe('displayValue and inputValue', () => {
   const field = (key: string) => loans.find((f) => f.key === key) as CollectionField;
 
   it('shows each type in its own form', () => {
-    expect(displayValue(field('balance'), 18000.5)).toBe('$18,000.50');
+    expect(displayValue(field('balance'), 9200.5)).toBe('$9,200.50');
     expect(displayValue(field('rate'), 6.8)).toBe('6.8%');
     expect(displayValue(field('due_day'), 2)).toBe('2nd');
     expect(displayValue(field('due_day'), 23)).toBe('23rd');
@@ -140,7 +140,7 @@ describe('displayValue and inputValue', () => {
 
   it('starts a yes or no input on its word', () => {
     expect(inputValue({ key: 'y', label: 'Y', type: 'yes_no' }, true)).toBe('yes');
-    expect(inputValue(field('balance'), 18000)).toBe('18000');
+    expect(inputValue(field('balance'), 9200)).toBe('9200');
     expect(inputValue(field('name'), undefined)).toBe('');
   });
 });
@@ -148,13 +148,13 @@ describe('displayValue and inputValue', () => {
 describe('formValues', () => {
   it('reads only the shown fields, by their prefixed names', () => {
     const form = new Map<string, string>([
-      ['v:name', 'Nelnet'],
+      ['v:name', 'Northstar'],
       ['v:rate', '6.8%'],
       ['v:old', 'kept'],
       ['stepId', 'x'],
     ]);
     expect(formValues(loans, (name) => form.get(name) ?? null)).toEqual({
-      name: 'Nelnet',
+      name: 'Northstar',
       rate: '6.8%',
     });
   });

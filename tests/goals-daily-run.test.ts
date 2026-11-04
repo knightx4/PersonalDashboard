@@ -185,9 +185,9 @@ describe('runGoalsDaily', () => {
         name: 'loans',
         idKey: 'loan_id',
         idLabel: 'Loan ID',
-        kinds: [{ id: 'k1', name: 'Edfinancial statement' }],
-        senders: ['Edfinancial'],
-        query: 'from:Edfinancial after:2026/09/17',
+        kinds: [{ id: 'k1', name: 'Brightline statement' }],
+        senders: ['Brightline'],
+        query: 'from:Brightline after:2026/09/17',
         rows: [],
       },
     ]);
@@ -196,7 +196,7 @@ describe('runGoalsDaily', () => {
     expect(statements).toHaveBeenCalledWith(client, USER, expect.any(String));
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
-    expect(text).toContain('Search Gmail for: from:Edfinancial after:2026/09/17');
+    expect(text).toContain('Search Gmail for: from:Brightline after:2026/09/17');
     expect(text.indexOf('Reading new')).toBeLessThan(text.indexOf('goals.reviews'));
   });
 

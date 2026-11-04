@@ -111,15 +111,15 @@ describe('changeLines sentences', () => {
         table_name: 'records',
         row_id: 'r1',
         action: 'update',
-        old_values: { data: { name: 'Grad PLUS', balance: 80080.21 }, source: 'pasted' },
-        new_values: { data: { name: 'Grad PLUS', balance: 80686.15 }, ...newValues },
+        old_values: { data: { name: 'Graduate loan', balance: 42000 }, source: 'pasted' },
+        new_values: { data: { name: 'Graduate loan', balance: 42294 }, ...newValues },
       });
     const n = names();
     n.records.set('r1', 'loans-id');
     const first = changeLines([update({ source: 'gmail', source_ref: '19a2b3c4d5e6f' })], [], n);
-    expect(first.map((l) => l.sentence)).toEqual(['Updated Grad PLUS in loans from Gmail']);
+    expect(first.map((l) => l.sentence)).toEqual(['Updated Graduate loan in loans from Gmail']);
     const next = changeLines([update({ source_ref: '19a2b3c4d5e70' })], [], n);
-    expect(next.map((l) => l.sentence)).toEqual(['Updated Grad PLUS in loans from Gmail']);
+    expect(next.map((l) => l.sentence)).toEqual(['Updated Graduate loan in loans from Gmail']);
     const typed = changeLines([update({})], [], n);
     expect(typed.map((l) => l.sentence)).toEqual(['Edited a record in loans']);
   });

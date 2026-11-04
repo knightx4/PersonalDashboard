@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { normalizeTimeZone } from '@/lib/core/timezone';
+import { applyLinkedLoans, loadLinkedLoansOrNone } from '@/lib/goals/linked-loans';
 import { loadInformation, type CollectionInformation } from '@/lib/goals/collections-store';
 import { readQuestions, type StepAnswer, type StepQuestion } from '@/lib/goals/answers';
 import { loadAnswers } from '@/lib/goals/answers-store';
@@ -38,6 +39,7 @@ import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
+import { showsOutside } from '@/lib/goals/plan-order';
 import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, toGoalActivity, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -97,6 +99,7 @@ type ItemRow = {
   estimated_total?: number | string | null;
   total_unit?: string | null;
   notify_on_done?: boolean | null;
+  notice_seen_at?: string | null;
   activity?: string | null;
 };
 
@@ -127,7 +130,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, activity';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit, notify_on_done, notice_seen_at, activity';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -169,6 +172,7 @@ const toStep = (row: ItemRow): Step => ({
       : Number(row.estimated_total),
   totalUnit: row.total_unit ?? null,
   notifyOnDone: row.notify_on_done ?? false,
+  noticeSeenAt: row.notice_seen_at ?? null,
 });
 
 const toGoal = (row: ItemRow): Goal => ({
@@ -297,7 +301,9 @@ export async function loadGoalMap(
   collect(linked.map((entry) => entry.step));
   const [records, information, answers, threads] = await Promise.all([
     syncRhythms(client, userId, liveRhythms(goals.map(toGoal), byGoal), today, shown),
-    loadInformation(client, collectionIds),
+    loadInformation(client, collectionIds).then(async (info) =>
+      applyLinkedLoans(info, await loadLinkedLoansOrNone(client, userId)),
+    ),
     loadAnswers(client, informationIds),
     loadThreads(client, itemIds),
   ]);
@@ -753,7 +759,7 @@ export async function loadDailyView(
     syncRhythms(client, userId, live, today),
     loadLatestReviews(client),
   ]);
-  const view = dailyView(goals, byGoal, today);
+  const view = dailyView(goals, byGoal, today, showsOutside(byGoal, today));
   return {
     ...view,
     goals: view.goals.map((daily) => ({
@@ -780,7 +786,7 @@ export async function loadTodoGoals(
   // userId narrows the read for a service-role client (the morning brief);
   // under RLS it changes nothing.
   const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  return { steps: todoSteps(goals.map((g) => g.goal), byGoal) };
+  return { steps: todoSteps(goals.map((g) => g.goal), byGoal, showsOutside(byGoal, today)) };
 }
 
 /**
@@ -826,6 +832,54 @@ export async function setStepNotify(
     .eq('kind', 'claude')
     .not('status', 'in', '(done,dropped)')
     .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Record that the person has seen the notice of a finished step they asked to
+ * hear about (plan #2611.1): opening its page or dismissing it. Only a done
+ * step with notify_on_done on takes it, and only the first time, so the stamp
+ * keeps the moment it was first seen. False when nothing changed.
+ */
+export async function markStepNoticeSeen(
+  client: GoalsSupabaseClient,
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ notice_seen_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('level', 'step')
+    .eq('status', 'done')
+    .eq('notify_on_done', true)
+    .is('notice_seen_at', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Undo a dismiss in the Goals Inbox (plan #2611.2): the notice of a finished
+ * step shows again. False when nothing changed.
+ */
+export async function clearStepNoticeSeen(
+  client: GoalsSupabaseClient,
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await client
+    .from('items')
+    .update({ notice_seen_at: null })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('level', 'step')
+    .eq('status', 'done')
+    .eq('notify_on_done', true)
+    .not('notice_seen_at', 'is', null)
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;

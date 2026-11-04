@@ -22,15 +22,19 @@ plainly requires. Ask only when the answer genuinely changes what gets built,
 or when something is destructive and irreversible — dropping a table, deleting
 rows, rewriting data that cannot be recovered.
 
-Project ref: `asjztutnqxbecruvyrbj`.
+Project ref: `npx tsx scripts/project-ref.ts` prints it. It is read from the
+environment (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_PROJECT_REF, or the ref inside
+SUPABASE_SERVICE_ROLE_KEY), so no project is named in the repository.
 
 ## Only the owner's account is touched
 
 The database holds more than one account. Every read, write, data fix and
-investigation a session does through the connector is scoped to the owner,
-**selveyknight4@gmail.com**, user id `d001bb0f-ffe8-4bfb-880f-17dd1a62b685`:
-put `user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'` (or the join that
-reaches it) in every query over a table that holds people's rows. The
+investigation a session does is scoped to the owner, the account
+`core.app_settings.owner_user_id` names (migration 0284). Through
+scripts/sql.ts, write `user_id = :owner` and the script puts the owner's id
+in. Through the connector, scope to `user_id = core.dev_owner_id()`. Put one or
+the other (or the join that reaches it) in every query over a table that
+holds people's rows. The
 connector runs as a superuser and row-level security does not apply to it, so
 an unscoped query reads and changes everyone's rows. On 16 October 2026 a scan
 for duplicate companies read every account and a merge was run in another
@@ -39,8 +43,8 @@ beyond the counts a schema change needs.
 
 Migrations follow the same rule. Schema changes (tables, columns, functions,
 policies) apply to the database as a whole, but an `update`, `delete` or
-`insert` over existing rows is written against the owner's id, never across
-all accounts. Migration 0056 of migrations-job-search cleaned every account's
+`insert` over existing rows is written against `core.dev_owner_id()`, never
+across all accounts and never with an id typed in. Migration 0056 of migrations-job-search cleaned every account's
 company domains; that is the kind of statement this rules out.
 
 ## Rows are written through scripts/sql.ts
@@ -53,7 +57,7 @@ notification with nothing to answer. In a routine every one of those is a
 false alarm.
 
 ```sh
-npx tsx scripts/sql.ts "select … where user_id = 'd001bb0f-…'"
+npx tsx scripts/sql.ts "select … where user_id = :owner"
 npx tsx scripts/sql.ts --set goals.actor=claude --set goals.run_id=<id> "insert … returning id"
 npx tsx scripts/sql.ts --file /path/to/statement.sql   # for long text; avoids shell quoting
 ```

@@ -6,7 +6,7 @@
 -- Every find now lands here as well.
 --
 --   found_in      a short line saying where it was found, shown on the row:
---                 'Goal step: Find Yale SOM alumni at your target companies'.
+--                 'Goal step: Find alumni at your target companies'.
 --                 Null for the suggestion run's own searches.
 --   goal_item_id  the goal or step that found it, when a goals run did.
 --

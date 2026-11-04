@@ -16,7 +16,7 @@ with bare as (
   from core.import_keys k
   join core.import_runs r on r.id = k.run_id and r.user_id = k.user_id
   join job_search.contact_touches t on t.id = k.row_id and t.user_id = k.user_id
-  where k.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+  where k.user_id = (select u.id from auth.users u where lower(u.email) = public.owner_email())
     and k.source = 'linkedin'
     and k.kind = 'invitations'
     and t.channel = 'linkedin_connect'
@@ -26,8 +26,8 @@ with bare as (
 gone_keys as (
   delete from core.import_keys k
   using bare
-  where k.id = bare.key_id and k.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+  where k.id = bare.key_id and k.user_id = (select u.id from auth.users u where lower(u.email) = public.owner_email())
 )
 delete from job_search.contact_touches t
 using bare
-where t.id = bare.touch_id and t.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+where t.id = bare.touch_id and t.user_id = (select u.id from auth.users u where lower(u.email) = public.owner_email());

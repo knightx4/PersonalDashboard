@@ -9,7 +9,7 @@
 --                      kind of help, in the order they were chosen. kind is
 --                      one of events, volunteering, reading, courses and
 --                      job_leads, at most once each. note says what to look
---                      for ("Brooklyn, weeknights"), up to 200 characters,
+--                      for ("Eastside, weeknights"), up to 200 characters,
 --                      or is null. An empty array asks for nothing. Only a
 --                      goal carries entries; a step's array stays empty.
 --

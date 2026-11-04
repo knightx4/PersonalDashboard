@@ -1154,7 +1154,7 @@ describe('what an opened step says its run has done', () => {
       lastPush: null,
       refusal:
         'GITHUB_READ_TOKEN is missing a permission (403). Give it access to ' +
-        "knightx4/PersonalDashboard in the token's settings, then redeploy.",
+        "example-owner/PersonalDashboard in the token's settings, then redeploy.",
     });
     expect(html).toContain('Closed #');
     expect(html).toContain('GITHUB_READ_TOKEN is missing a permission (403)');

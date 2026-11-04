@@ -14,6 +14,7 @@ import { serverEnv } from '@/lib/env';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import {
   CAPTURE_BODY_MAX,
+  dayHintLine,
   fileCapture,
   type CaptureContext,
   type FiledEntry,
@@ -94,6 +95,11 @@ export async function fileGoalCapture(
    * goal the sentence is most likely about. Anything not a uuid is ignored.
    */
   goalId: string | null = null,
+  /**
+   * The day the box was set to (note 2653989d), told to the model as the day
+   * it all happened. Today, or anything progressDay refuses, adds nothing.
+   */
+  day: string | null = null,
 ): Promise<GoalCaptureState> {
   const user = await requireUser();
   if (typeof body !== 'string') return { error: 'Write what happened first.' };
@@ -106,6 +112,7 @@ export async function fileGoalCapture(
 
   const account = await loadAccountSettings(user.id);
   const today = todayIn(account.timezone);
+  const hints = [hintLine, dayHintLine(typeof day === 'string' ? day : null, today)].filter(Boolean).join('\n') || null;
   const captureId = randomUUID();
   const client = await createGoalsClient({ actor: 'capture', captureId });
   // Reading the tree opens and closes rhythm periods as every page read does;
@@ -127,7 +134,7 @@ export async function fileGoalCapture(
       apply: (id, action) =>
         applyCaptureAction(client, { userId: user.id, today, captureId: id, dash }, action),
       save: (id, filed) => saveFiled(client, id, filed),
-    }, hintLine, onGoal);
+    }, hints, onGoal);
     await recordSessionSpend(user.id, { module: 'goals', operation: 'file-capture' }, spend);
     if (!result.ok) return { error: result.error, captureId: result.captureId ?? undefined };
     if (result.filed.length > 0) refresh();

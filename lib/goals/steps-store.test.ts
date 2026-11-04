@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { loadLiveTree, setStepNotify } from '@/lib/goals/steps-store';
+import { loadLiveTree, markStepNoticeSeen, setStepNotify } from '@/lib/goals/steps-store';
 
 /**
  * A query that answers every filter by returning itself and resolves to the
@@ -123,5 +123,22 @@ describe('setStepNotify (plan #2376.2)', () => {
 
   it('says nothing changed when no such step took it', async () => {
     expect(await setStepNotify(recordingClient([], []), 's1', false)).toBe(false);
+  });
+
+  it('stamps the notice of a done step with the switch on, once, for its owner (plan #2611.1)', async () => {
+    const calls: unknown[][] = [];
+    expect(await markStepNoticeSeen(recordingClient([{ id: 's1' }], calls), 's1', 'u1')).toBe(true);
+    expect(calls.map((c) => c.slice(0, 1).concat(c.length > 2 ? c.slice(1) : []))).toEqual([
+      ['from'],
+      ['update'],
+      ['eq', 'id', 's1'],
+      ['eq', 'user_id', 'u1'],
+      ['eq', 'level', 'step'],
+      ['eq', 'status', 'done'],
+      ['eq', 'notify_on_done', true],
+      ['is', 'notice_seen_at', null],
+      ['select'],
+    ]);
+    expect(await markStepNoticeSeen(recordingClient([], []), 's1', 'u1')).toBe(false);
   });
 });

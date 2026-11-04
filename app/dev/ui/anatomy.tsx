@@ -235,7 +235,7 @@ const RETURNABLE: readonly { name: string; left: string }[] = [
 /**
  * A dashboard: one figure, the breakdowns that explain it, what to act on.
  *
- * Drawn from app/shopping/dashboard/page.tsx and the analytics page, which are
+ * Drawn from app/finances/spending/page.tsx and the analytics page, which are
  * the same arrangement with different numbers in it. /home and the jobs week
  * are not this shape and are not drawn here -- see the note in ANATOMIES.
  */

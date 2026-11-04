@@ -258,6 +258,12 @@ export const SPEND_OPERATIONS = {
     // Personality tab asks for a fresh read. The notes are found with the
     // cached trait sentences, under 'embed-note-match'.
     'read-personality',
+    // Dash's analysis across all the personality tests, on the Personality
+    // tab. One Sonnet call each time the button there asks for it, which it
+    // offers only when a test was added, changed or deleted since the last.
+    // The notes are found with the cached test sentences, under
+    // 'embed-note-match'.
+    'personality-profile',
     // Dash's summary and key points for one file kept under a course (plan
     // #2401.4). One Haiku call per press of Summarise on the Work & school
     // tab, reading the whole file: a PDF or photo as itself, a deck or Word
@@ -271,6 +277,16 @@ export const SPEND_OPERATIONS = {
     // from its file summaries on a press (plan #2401.7). One Haiku call
     // reading the stored summaries and key points, not the files.
     'collect-course-overview',
+    // A mentor's reply to the person's text (plan #2748.4): the model chosen
+    // for Dash, with Dash's lookups, one call or a few when it looks things
+    // up, after the message is saved. The persona and tools are cached.
+    'mentor-reply',
+    // The mentor's one-line first text when the reply has not started after
+    // about three seconds (plan #2748.4). One Haiku call, background.
+    'mentor-ack',
+    // A persona card drafted from the People form, or redrafted from a
+    // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
+    'draft-persona',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.
@@ -284,6 +300,13 @@ export const SPEND_OPERATIONS = {
     // the advisor already remembers.
     'remember-advisor-talk',
   ],
+  finances: [
+    // The monthly money review of the month before (plan #2593.8.2). Sonnet,
+    // one call per person a month from the daily cron's finances-review
+    // stage, and again from Try again on a review that failed; none for a
+    // month with nothing in the person's accounts; background.
+    'write-money-review',
+  ],
 } as const;
 
 export type JobsOperation = (typeof SPEND_OPERATIONS.jobs)[number];
@@ -292,6 +315,7 @@ export type CoreOperation = (typeof SPEND_OPERATIONS.core)[number];
 export type NewsOperation = (typeof SPEND_OPERATIONS.news)[number];
 export type GoalsOperation = (typeof SPEND_OPERATIONS.goals)[number];
 export type YouOperation = (typeof SPEND_OPERATIONS.you)[number];
+export type FinancesOperation = (typeof SPEND_OPERATIONS.finances)[number];
 
 /** A module and one of its operations, as a pair that cannot be mismatched. */
 export type SpendOperation =
@@ -300,4 +324,5 @@ export type SpendOperation =
   | { module: 'core'; operation: CoreOperation }
   | { module: 'news'; operation: NewsOperation }
   | { module: 'goals'; operation: GoalsOperation }
-  | { module: 'you'; operation: YouOperation };
+  | { module: 'you'; operation: YouOperation }
+  | { module: 'finances'; operation: FinancesOperation };

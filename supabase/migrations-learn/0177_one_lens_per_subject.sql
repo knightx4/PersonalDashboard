@@ -49,7 +49,7 @@ with moves as (
     join learn.aims a on a.id = gl.aim_id
     join learn.lenses sl on sl.subject_id = a.subject_id and sl.user_id = gl.user_id
    where gl.origin = 'goal'
-     and gl.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+     and gl.user_id = core.dev_owner_id()
 )
 insert into learn.lens_targets (user_id, lens_id, topic_id, target_level)
 select t.user_id, m.subject_lens, t.topic_id, t.target_level
@@ -63,7 +63,7 @@ with moves as (
     join learn.aims a on a.id = gl.aim_id
     join learn.lenses sl on sl.subject_id = a.subject_id and sl.user_id = gl.user_id
    where gl.origin = 'goal'
-     and gl.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+     and gl.user_id = core.dev_owner_id()
 )
 update core.conversations c
    set subject_ref = 'learn.lenses:' || m.subject_lens
@@ -77,5 +77,5 @@ update core.conversations c
    );
 
 delete from learn.lenses
- where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+ where user_id = core.dev_owner_id()
    and (origin = 'goal' or (origin = 'subject' and subject_id is null));

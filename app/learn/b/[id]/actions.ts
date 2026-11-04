@@ -2,14 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { startEssayFromBrief } from '@/lib/learn/briefs/essay';
 import { retryBriefFor } from '@/lib/learn/briefs/retry';
-import { writeCardsForBrief } from '@/inngest/learn/feed-top-up';
-import { approveDraftedTopic, draftBriefTopic } from '@/lib/learn/briefs/topics-store';
+import { draftBriefTopic } from '@/lib/learn/briefs/topics-store';
 
 /**
  * The brief page's writes (plan #2023.4): the short answer, the weekly check's
@@ -133,39 +131,26 @@ export async function startEssayOnBrief(briefId: string): Promise<{ error: strin
 
 /**
  * Draft the topic a ready brief is about, under the goal chosen beside it
- * (plan #2184.1): the topic compiler run twice on the brief's pages and the
- * goal's performances. A draft that cites a source on every row is approved
- * as soon as it is kept (plan #2356.2), which puts it on the goal's lens and
- * the brief under the goal, and the brief's cards are written for that goal
- * after the response. The press lands on the topic's page, where the topics
- * its links need are drafted from the same pages.
+ * (plan #2184.1), from the brief's pages and the goal's performances. The
+ * draft is written by the routine (learn 0193) and approved as soon as it is
+ * kept (plan #2356.2), which puts it on the goal's lens and the brief under
+ * the goal; the feed top-up writes the brief's cards after. The press lands
+ * on Topics, where the draft appears when the routine has written it.
  */
 // latency: pending
 export async function draftBriefTopics(briefId: string, aimId: string): Promise<{ error: string }> {
   const user = await requireUser();
   if (!Id.safeParse(briefId).success) return { error: 'That brief could not be found.' };
   if (!Id.safeParse(aimId).success) return { error: 'Choose the goal this research is for.' };
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
   const client = await createLearnClient();
-  let id: string;
   try {
-    const result = await draftBriefTopic(client, user.id, { briefId, aimId, anthropicApiKey: apiKey });
+    // With the routine (learn 0193): approved once kept, which puts it on the goal's lens.
+    const result = await draftBriefTopic(client, user.id, { briefId, aimId });
     if (!result.ok) return { error: result.detail };
-    id = result.id;
   } catch (caught) {
     return { error: caught instanceof Error ? caught.message : 'Drafting the topic failed.' };
   }
-  // The draft is kept even if approving fails: its page says it is held.
-  const approval = await approveDraftedTopic(client, user.id, id).catch((caught: unknown) => {
-    console.error('[learn brief] approve on draft', caught instanceof Error ? caught.message : caught);
-    return null;
-  });
-  if (approval?.brief) {
-    const settled = approval.brief.briefId;
-    after(() => writeCardsForBrief(user.id, settled).then(() => undefined));
-  }
   page(briefId);
   revalidatePath('/learn/topics');
-  redirect(`/learn/topics/${id}`);
+  redirect('/learn/topics');
 }

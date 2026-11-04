@@ -19,8 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { describePlan } from '../lib/imports/engine';
 import { archiveDateFromName, importLinkedIn } from '../lib/imports/linkedin';
 import { supabaseImportStore } from '../lib/imports/supabase-store';
-
-const OWNER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -28,13 +27,9 @@ async function main(): Promise<void> {
   const dryRun = args.includes('--dry-run');
   const apply = args.includes('--apply');
   const userAt = args.indexOf('--user');
-  const userId = userAt >= 0 ? args[userAt + 1] : OWNER;
+  let userId = userAt >= 0 ? args[userAt + 1] : undefined;
   if (!zip || dryRun === apply) {
     console.error('Usage: npx tsx scripts/import-linkedin.ts <export.zip> --dry-run | --apply [--user <uuid>]');
-    process.exit(1);
-  }
-  if (!/^[0-9a-f-]{36}$/i.test(userId ?? '')) {
-    console.error(`--user ${userId} is not a user id.`);
     process.exit(1);
   }
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -42,8 +37,17 @@ async function main(): Promise<void> {
     console.error('SUPABASE_SERVICE_ROLE_KEY is not set. It is needed to write the import.');
     process.exit(1);
   }
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+  const url = requireSupabaseProjectUrl();
   const client = createClient(url, key, { auth: { persistSession: false } });
+  // Without --user, the import is the owner's (core.app_settings).
+  if (!userId) {
+    const { data } = await client.schema('core').rpc('dev_owner_id');
+    userId = typeof data === 'string' ? data : undefined;
+  }
+  if (!userId || !/^[0-9a-f-]{36}$/i.test(userId)) {
+    console.error(`--user ${userId ?? '(none, and no owner is set)'} is not a user id.`);
+    process.exit(1);
+  }
   const store = supabaseImportStore(client, userId);
 
   const result = await importLinkedIn(store, new Uint8Array(readFileSync(zip)), {

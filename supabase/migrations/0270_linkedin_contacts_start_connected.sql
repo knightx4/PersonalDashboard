@@ -25,7 +25,7 @@ from core.import_keys k
 join core.import_runs r on r.id = k.run_id and r.user_id = k.user_id
 where k.row_id = c.id
   and k.user_id = c.user_id
-  and c.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+  and c.user_id = (select u.id from auth.users u where lower(u.email) = public.owner_email())
   and k.source = 'linkedin'
   and k.kind in ('connections', 'correspondents')
   and c.created_at >= r.created_at

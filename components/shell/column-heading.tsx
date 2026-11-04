@@ -1,3 +1,4 @@
+import { ArrowDownUp } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import Link from '@/components/ui/link';
 import { SearchField } from '@/components/shell/search-field';
@@ -17,6 +18,9 @@ import type { ColumnFilter } from '@/lib/table-view';
  * field that sets the column's param as you type, the way the box above a
  * list sets `q`. A column with no sort gives its `label` and its menu holds
  * the filter alone.
+ *
+ * The sorted column's link turns the sort round (note fd6c7ef2), and carries
+ * a small two-way arrow so the header says it can.
  */
 export function ColumnHeading({
   sort,
@@ -37,9 +41,14 @@ export function ColumnHeading({
     return (
       <Link
         href={sort.href}
-        className={cn('transition-colors duration-quick', sort.chosen ? 'text-accent' : 'hover:text-ink')}
+        aria-label={sort.chosen ? `${word}, ${sort.reversed ? 'reversed' : 'sorted'}: reverse the order` : undefined}
+        className={cn(
+          'inline-flex items-center gap-1 transition-colors duration-quick',
+          sort.chosen ? 'text-accent' : 'hover:text-ink',
+        )}
       >
         {word}
+        {sort.chosen && <ArrowDownUp className="size-3 shrink-0" strokeWidth={1.75} aria-hidden />}
       </Link>
     );
   }
@@ -79,7 +88,11 @@ export function ColumnHeading({
       }
       items={[
         ...(sort
-          ? [{ id: 'sort', label: `Sort by ${word.toLowerCase()}`, href: sort.href, current: sort.chosen }]
+          ? [
+              sort.chosen
+                ? { id: 'sort', label: 'Reverse the order', href: sort.href, current: sort.reversed ?? false }
+                : { id: 'sort', label: `Sort by ${word.toLowerCase()}`, href: sort.href, current: false },
+            ]
           : []),
         ...filter.choices,
       ]}

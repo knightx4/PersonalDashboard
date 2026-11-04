@@ -81,6 +81,7 @@ export function StepTree({
   arrivals = NO_ARRIVALS,
   canRun = true,
   belowNow,
+  byStage = false,
 }: {
   map: GoalMap;
   todoOn: boolean;
@@ -113,6 +114,12 @@ export function StepTree({
   canRun?: boolean;
   /** Drawn under Now, before the other stages: the page's strip of rhythms. */
   belowNow?: ReactNode;
+  /**
+   * Every stage on one card, each open to its steps, with the finished ones
+   * folded at the foot: the Plan tab's By stage view (plan #2778.5), where
+   * What's next already says what is in hand.
+   */
+  byStage?: boolean;
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
@@ -190,10 +197,52 @@ export function StepTree({
         <EmptyState
           icon={ListTree}
           title="No steps yet"
-          description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
+          description={
+            canRun
+              ? 'Press Map it out above and Dash lays the steps out, or add your own. Any step can hold sub-steps of its own.'
+              : 'Break the goal into the things that have to happen. Any step can hold sub-steps of its own.'
+          }
         />
         <StepComposer parentId={map.goal.id} label="Add a step" />
       </section>
+    );
+  }
+
+  if (byStage) {
+    // A finished stage folds under Finished with the finished steps, so the
+    // card opens on the stages still in hand.
+    const placed = [...inNow, ...onMap].sort((a, b) => rows.indexOf(a.row) - rows.indexOf(b.row));
+    const open = placed.filter((one) => one.stage?.state !== 'done');
+    const done = [...placed.filter((one) => one.stage?.state === 'done').map((one) => one.row), ...finished];
+    const doneFold = done.length > 0 && (
+      <div className="border-t border-border px-3 py-1.5">
+        <FinishedFold count={done.length}>
+          {() => (
+            <ul className="-mr-3 -ml-5.5 divide-y divide-border">{done.map((row) => rowOf({ row }))}</ul>
+          )}
+        </FinishedFold>
+      </div>
+    );
+    return (
+      <SiblingMoveProvider move={order.move}>
+        <div className="space-y-6">
+          <StepFinder goalId={map.goal.id} steps={map.steps} />
+          <Card padding="none">
+            {open.length > 0 ? (
+              <ul className="divide-y divide-border">
+                <GoalColumnHeader />
+                {open.map((placed) => rowOf(placed))}
+              </ul>
+            ) : (
+              <p className="px-3 py-2.5 text-ui text-ink-muted">
+                {stages ? 'Every stage is done.' : 'Every step is done or dropped.'}
+              </p>
+            )}
+            {doneFold}
+            {composer}
+          </Card>
+        </div>
+      </SiblingMoveProvider>
     );
   }
 

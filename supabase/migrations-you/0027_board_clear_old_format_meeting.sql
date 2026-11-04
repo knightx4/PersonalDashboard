@@ -7,5 +7,5 @@
 -- row by id, so it does nothing if the row is already gone.
 
 delete from you.board_meetings
-where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where user_id = core.dev_owner_id()
   and id = '50058f3e-6919-4b92-9994-23cd4d7b1286';

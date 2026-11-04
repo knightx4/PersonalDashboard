@@ -631,11 +631,11 @@ describe('the career tools write the rows Material and Settings do', () => {
     const form = new FormData();
     form.set('label', 'Data engineering, Oct 2026');
     form.set('notes', 'For platform roles');
-    form.set('textContent', 'Selvey Knight. Data engineer.');
+    form.set('textContent', 'Alex Rivera. Data engineer.');
     const { byButton, byTool } = await bothWays(materialSeed, () => addResumeVersion({}, form), 'add_resume_version', {
       label: 'Data engineering, Oct 2026',
       notes: 'For platform roles',
-      text_content: 'Selvey Knight. Data engineer.',
+      text_content: 'Alex Rivera. Data engineer.',
     });
     expect(byTool).toEqual(byButton);
   });

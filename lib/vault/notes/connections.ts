@@ -10,7 +10,7 @@ import { RELATED_NOTE_MIN_SIMILARITY } from '@/lib/vault/notes/related';
  * nearest older note to a new course summary was nearly always the course
  * notes it summarised (0.85 to 0.94), and a new job application sat next to
  * the other applications (0.7 and up, see #1114). Telling the person that
- * their MGT 850 summary resembles their MGT 850 notes teaches them to skip the
+ * their Statistics 101 summary resembles their Statistics 101 notes teaches them to skip the
  * panel. The pairs worth reading were the ones across subjects they had not
  * named alike: a well-being course next to a note on following your passion,
  * an operations course next to their notes on The Goal, a note on AI slop next
@@ -27,14 +27,14 @@ import { RELATED_NOTE_MIN_SIMILARITY } from '@/lib/vault/notes/related';
  *   of formulas was the nearest older note to seven different course notes,
  *   and grouped by older note those hubs filled every slot. Asking from both
  *   ends drops them (vault migration 0026 has the numbers);
- * - the two titles share a word (MGT, Galaxy, Property, Application), since a
+ * - the two titles share a word (a course code, a company's name, Application), since a
  *   connection the person already named is one they know about;
  * - both notes are in a Job Applications folder (#1114's finding), which the
  *   title rule misses when the files are named by company;
  * - either note is an index or an export: a title starting with an underscore
  *   (_Index, _Master Summary), or more than EXPORT_CHARS of prose, which is a
- *   paste or a compilation rather than something written (Yale Combined is
- *   383,000 characters).
+ *   paste or a compilation rather than something written (one combined export
+ *   of every course note was 383,000 characters).
  *
  * What is left is grouped by the older note, since the useful thing to say is
  * "these notes this week come back to that one", and each recent note joins

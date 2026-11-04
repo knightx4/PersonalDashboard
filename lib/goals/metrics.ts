@@ -22,10 +22,11 @@ export type MetricPeriod = (typeof METRIC_PERIODS)[number];
 
 /**
  * What a metric counts (plan #2397.1, migration goals 0085): the records of a
- * list, the goal's closed steps, or the files Dash wrote under the goal. Only
- * a list metric has a list and a date field; the others have null in both.
+ * list, the goal's closed steps, the files Dash wrote under the goal, or the
+ * hours logged on it (migration goals 0089). Only a list metric has a list
+ * and a date field; the others have null in both.
  */
-export const METRIC_SOURCES = ['list', 'steps', 'files'] as const;
+export const METRIC_SOURCES = ['list', 'steps', 'files', 'hours'] as const;
 export type MetricSource = (typeof METRIC_SOURCES)[number];
 
 export type Metric = {
@@ -40,6 +41,8 @@ export type Metric = {
   period: MetricPeriod;
   /** How many per period you are aiming for, or null. */
   target: number | null;
+  /** The top of the aim when it is a range, above `target`, or null. */
+  targetHigh?: number | null;
   position: number;
 };
 
@@ -53,6 +56,8 @@ export type MetricInput = {
   dateField: string | null;
   period: MetricPeriod;
   target: number | null;
+  /** The top of a range aim; only with a target, and above it. */
+  targetHigh?: number | null;
 };
 
 /** The highest target a metric takes, as the table's check has it. */
@@ -78,6 +83,13 @@ export function metricInputError(input: MetricInput): { field: keyof MetricInput
   if (input.target !== null) {
     if (!Number.isInteger(input.target) || input.target < 1 || input.target > MAX_TARGET) {
       return { field: 'target', error: 'The target is a whole number of at least 1.' };
+    }
+  }
+  const high = input.targetHigh ?? null;
+  if (high !== null) {
+    if (input.target === null) return { field: 'targetHigh', error: 'Give the low end of the aim first.' };
+    if (!Number.isInteger(high) || high <= input.target || high > MAX_TARGET) {
+      return { field: 'targetHigh', error: 'The top of the aim is a whole number above the low end.' };
     }
   }
   return null;
@@ -151,9 +163,25 @@ export function countDaysByPeriod(options: {
   now: Date;
   timeZone: string;
 }): PeriodCount[] {
+  const { days, ...rest } = options;
+  return sumDaysByPeriod({ ...rest, amounts: days.map((day) => ({ day, amount: 1 })) });
+}
+
+/**
+ * countDaysByPeriod with an amount on each day in place of one: what an hours
+ * metric adds up. A period's `count` is then the sum, which need not be whole.
+ */
+export function sumDaysByPeriod(options: {
+  amounts: { day: string; amount: number }[];
+  period: MetricPeriod;
+  goalStartedAt: string | null;
+  now: Date;
+  timeZone: string;
+}): PeriodCount[] {
   const zone = safeTimeZone(options.timeZone);
   const today = todayIn(zone, options.now);
-  const days = options.days.filter((day) => DAY.test(day));
+  const amounts = options.amounts.filter((a) => DAY.test(a.day) && Number.isFinite(a.amount));
+  const days = amounts.map((a) => a.day);
 
   const starts = days.slice();
   if (options.goalStartedAt) starts.push(dayIn(options.goalStartedAt, zone));
@@ -169,11 +197,16 @@ export function countDaysByPeriod(options: {
   }
 
   const index = new Map(periods.map((p, i) => [p.startsOn, i]));
-  for (const day of days) {
+  for (const { day, amount } of amounts) {
     const at = index.get(periodOf(options.period, day).startsOn);
-    if (at !== undefined) periods[at].count += 1;
+    if (at !== undefined) periods[at].count = roundHours(periods[at].count + amount);
   }
   return periods;
+}
+
+/** Sums of quarter and tenth hours stay exact to the hundredth, so 0.1 + 0.2 shows as 0.3. */
+function roundHours(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 /** A step under the goal as a steps metric reads it (goals.items). */
@@ -207,5 +240,42 @@ export function dashFileDays(files: CountedFile[], timeZone: string): string[] {
     if (file.madeBy !== 'claude' || seen.has(file.id)) return [];
     seen.add(file.id);
     return [dayIn(file.createdAt, zone)];
+  });
+}
+
+/** A progress entry as an hours metric reads it (goals.progress_entries). */
+export type LoggedEntry = {
+  happenedOn: string;
+  quantity: number | null;
+  unit: string | null;
+  /** Set when the entry was taken back; such an entry is not added up. */
+  undoneAt?: string | null;
+};
+
+const HOUR_UNITS = new Set(['h', 'hr', 'hrs', 'hour', 'hours']);
+const MINUTE_UNITS = new Set(['m', 'min', 'mins', 'minute', 'minutes']);
+
+/**
+ * The hours an amount stands for, or null when its unit is not time. Capture
+ * writes what the sentence said, so "2h", "2 hrs" and "120 minutes" all come
+ * to 2.
+ */
+export function hoursOf(quantity: number | null, unit: string | null): number | null {
+  if (quantity === null || !Number.isFinite(quantity) || quantity <= 0 || !unit) return null;
+  const word = unit.trim().toLowerCase().replace(/\.$/, '');
+  if (HOUR_UNITS.has(word)) return quantity;
+  if (MINUTE_UNITS.has(word)) return quantity / 60;
+  return null;
+}
+
+/**
+ * The days an hours metric adds up (migration goals 0089): each live entry
+ * logged in a unit of time, on its own day, in hours.
+ */
+export function loggedHourDays(entries: LoggedEntry[]): { day: string; amount: number }[] {
+  return entries.flatMap((entry) => {
+    if (entry.undoneAt) return [];
+    const hours = hoursOf(entry.quantity, entry.unit);
+    return hours === null ? [] : [{ day: entry.happenedOn, amount: hours }];
   });
 }

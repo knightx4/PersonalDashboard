@@ -43,6 +43,7 @@ import {
   type ProgressEstimate,
   type ProgressTally,
 } from '@/lib/goals/progress';
+import { hoursOf } from '@/lib/goals/metrics';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
 import type { CountSource } from '@/lib/goals/rhythm-sources';
 import { periodOf, progressLine } from '@/lib/goals/rhythms';
@@ -76,6 +77,8 @@ export type CaptureGoal = {
   /** What the goal is measured in; a reading can only be recorded when it has one. */
   unit: string | null;
   target: number | null;
+  /** The names of the goal's Hours logged metrics (goals 0089), so time spent on that work lands here. */
+  tracksHours?: string[];
 };
 
 export type CaptureStep = {
@@ -129,6 +132,7 @@ export function captureContext(
   byGoal: Map<string, StepNode[]>,
   records: Map<string, RhythmRecord>,
   progress: Readonly<Record<string, ItemProgress>> = {},
+  hoursByGoal: ReadonlyMap<string, string[]> = new Map(),
 ): CaptureContext {
   const out: CaptureContext = { goals: [], steps: [] };
   // What Dash prepared for each step, by the id of the step it serves.
@@ -153,6 +157,7 @@ export function captureContext(
       areaName,
       unit: goal.unit,
       target: goal.target,
+      ...(hoursByGoal.get(goal.id)?.length ? { tracksHours: hoursByGoal.get(goal.id) } : {}),
     });
 
     const walk = (nodes: StepNode[], depth: number) => {
@@ -242,7 +247,8 @@ export function captureMessage(
       ? `; measured in ${goal.unit}` +
         (goal.target !== null ? `, target ${formatReading(goal.target, goal.unit)}` : '')
       : '';
-    lines.push(`${goal.ref}: ${goal.title} (area: ${goal.areaName}${measured})`);
+    const hours = goal.tracksHours?.length ? `; tracks hours: ${goal.tracksHours.join(', ')}` : '';
+    lines.push(`${goal.ref}: ${goal.title} (area: ${goal.areaName}${measured}${hours})`);
     for (const step of context.steps.filter((s) => s.goalRef === goal.ref)) {
       const indent = '  '.repeat(step.depth);
       const shape =
@@ -277,6 +283,26 @@ export function goalHintLine(context: CaptureContext, goalId: string | null | un
     `This was written on the page of ${goal.ref} (${goal.title}). File it against that goal ` +
     'unless the sentence plainly concerns another.'
   );
+}
+
+/**
+ * The line telling the model which day a sentence is about, when the box it
+ * was written in let the person pick one (note 2653989d). Null for today, or
+ * for a day progressDay would not accept, so a stale or hand-edited day files
+ * on today as a line without one does.
+ */
+export function dayHintLine(day: string | null | undefined, today: string): string | null {
+  const picked = progressDay(day, today);
+  if (!picked || picked === today) return null;
+  return (
+    `This was logged for ${picked}, not today. Give every progress entry and count the day ${picked}, ` +
+    'unless the sentence plainly names another day.'
+  );
+}
+
+/** The earliest day a progress entry may be logged for, given today. */
+export function earliestProgressDay(today: string): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) - PROGRESS_DAY_MAX_AGE * DAY_MS).toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -469,6 +495,9 @@ export function progressTotal(
 export function asksEstimate(action: ProgressAction, total: ProgressTotal | null): boolean {
   const step = action.step;
   if (!step || step.total || total) return false;
+  // Time spent is a tally of hours, not a share of the step, so there is
+  // nothing to estimate (goals 0089).
+  if (hoursOf(action.quantity, action.unit) !== null) return false;
   return (step.logged ?? 0) === 0;
 }
 

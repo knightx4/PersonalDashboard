@@ -7,10 +7,10 @@ import type { DevProject } from './projects';
  */
 export const WEBSITE_FIXTURE: DevProject = {
   id: 'website',
-  label: 'selveyknight.com',
+  label: 'alexrivera.dev',
   description: 'The personal website',
-  repo: { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' },
-  url: 'https://selveyknight.com',
+  repo: { owner: 'example-owner', repo: 'alexrivera-site', branch: 'main' },
+  url: 'https://alexrivera.dev',
   skill: '.claude/skills/plan/SKILL.md',
   checkCommand: null,
   setUpAt: '2026-10-26T00:00:00Z',

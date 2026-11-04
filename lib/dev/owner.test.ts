@@ -15,10 +15,10 @@ import type { SessionUser } from '@/lib/auth/session-user';
  * ids stand in for the real ones -- what matters is that one of them is the
  * row `public.app_owner()` returns and the other two are not.
  */
-const OWNER: Owner = { userId: 'owner-id', email: 'selveyknight4@gmail.com' };
+const OWNER: Owner = { userId: 'owner-id', email: 'owner@example.com' };
 const OTHER_ACCOUNTS: SessionUser[] = [
-  { id: 'other-id-1', email: 'ckloug4@gmail.com' },
-  { id: 'other-id-2', email: 'averyjadek@gmail.com' },
+  { id: 'other-id-1', email: 'someone@example.com' },
+  { id: 'other-id-2', email: 'another@example.com' },
 ];
 const OWNER_SESSION: SessionUser = { id: OWNER.userId, email: OWNER.email };
 

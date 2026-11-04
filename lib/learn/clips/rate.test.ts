@@ -46,7 +46,7 @@ const clip = (id: string, caption: string): ClipToScore => ({
   id,
   caption,
   idea: 'A point the cutter wrote.',
-  serves: 'Startup Finance',
+  serves: 'Small Business Finance',
   title: `Video for ${caption}`,
   channel: 'A channel',
   transcript: `The words of ${caption}.`,

@@ -15,12 +15,12 @@
  * labelled, and nothing is written without the user agreeing to it.
  */
 import { getJson } from '@/lib/books/providers/http';
+import { appUserAgent } from '@/lib/net/user-agent';
 
 const API_URL = 'https://www.wikidata.org/w/api.php';
 
 /** Wikidata asks API users to identify themselves. */
-const USER_AGENT =
-  'ShoppingManager/1.0 (personal job search tool; +https://github.com/knightx4/ShoppingManager)';
+const USER_AGENT = appUserAgent('ShoppingManager/1.0', 'personal job search tool');
 
 const PROP_INSTANCE_OF = 'P31';
 const PROP_INDUSTRY = 'P452';

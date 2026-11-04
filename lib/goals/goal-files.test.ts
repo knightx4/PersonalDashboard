@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { LinkedFile } from '@/lib/files/files';
-import { goalFileMeta, goalFileRows, stepTitlesIn, unreadWords } from './goal-files';
+import {
+  fileByline,
+  goalFileMeta,
+  goalFileRows,
+  newestFiles,
+  stepTitlesIn,
+  unreadWords,
+} from './goal-files';
 
 const GOAL = '11111111-1111-4111-8111-111111111111';
 const STEP = '22222222-2222-4222-8222-222222222222';
@@ -22,7 +29,13 @@ function file(id: string, origin: string | null, extra: Partial<LinkedFile> = {}
 
 describe('the files on a goal page (plan #1860)', () => {
   const titles = stepTitlesIn([
-    [{ id: STEP, title: 'List the firms hiring', children: [{ id: SUB, title: 'Draft the note', children: [] }] }],
+    [
+      {
+        id: STEP,
+        title: 'List the firms hiring',
+        children: [{ id: SUB, title: 'Draft the note', children: [] }],
+      },
+    ],
   ]);
 
   it('names the step each file was written for, at any depth', () => {
@@ -77,7 +90,24 @@ describe('the files on a goal page (plan #1860)', () => {
       ['read', false],
       ['mine', false],
     ]);
-    expect(unreadWords(rows)).toBe('1 not read');
+    expect(unreadWords(rows)).toBe('1 unread');
     expect(unreadWords(rows.filter((row) => !row.unread))).toBeNull();
+  });
+});
+
+describe('the newest files on the Dashboard (plan #2778.4)', () => {
+  it('puts the last changed first and keeps three', () => {
+    const rows = ['2026-10-01', '2026-11-02', '2026-10-20', '2026-09-01'].map((day, i) => ({
+      fileId: `f${i}`,
+      updatedAt: `${day}T09:00:00Z`,
+    }));
+    expect(newestFiles(rows).map((row) => row.fileId)).toEqual(['f1', 'f2', 'f0']);
+  });
+
+  it('says who wrote each, when, and for which step, in one line', () => {
+    expect(fileByline({ byDash: true, stepTitle: 'Apply for the plan' }, '2 Nov')).toBe(
+      'Dash · 2 Nov · for “Apply for the plan”',
+    );
+    expect(fileByline({ byDash: false, stepTitle: null }, '29 Oct')).toBe('You · 29 Oct');
   });
 });

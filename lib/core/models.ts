@@ -42,6 +42,8 @@ export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
+  /** lib/dash/think.ts, Ask Dash with "Think it through" on (plan #2789.10) */
+  dashThink: OPUS,
   /** lib/ask/reply-check-model.ts, the weekly check of Ask Dash replies that went badly */
   askReplyCheck: HAIKU,
   /** inngest/dev/suggest.ts */
@@ -128,6 +130,15 @@ export const MODELS = {
   learnGraphFromCourse: SONNET,
   /** lib/you/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
   youPersonalityRead: SONNET,
+  /** lib/you/personality/profile-run.ts, Dash's analysis across all the tests; Sonnet like the read of one */
+  youPersonalityProfile: SONNET,
+  /**
+   * lib/you/mentor-reply.ts, a mentor's one-line first text when the reply is
+   * slow to start (plan #2748.4). The reply itself is the model chosen for Dash.
+   */
+  mentorAck: HAIKU,
+  /** lib/you/people-cards.ts, a persona card drafted or redrafted on the People form (plan #2748.11) */
+  personaDraft: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
@@ -264,6 +275,8 @@ export const MODELS = {
   youCourseFileSummary: HAIKU,
   /** lib/week-review/model.ts */
   weekReview: SONNET,
+  /** lib/finances/review/model.ts; one call a month per person (plan #2593.8.2) */
+  moneyReview: SONNET,
 } as const;
 
 export type ModelKey = keyof typeof MODELS;

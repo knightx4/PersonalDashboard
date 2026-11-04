@@ -47,26 +47,26 @@
    * anyway, and the lift has somewhere to move it. Raised is a step above it
    * rather than the same value twice, so a menu over a card reads as lifted
    * off it without a border being asked to say so. Law 11. */
-  --c-canvas: #f7f4ed;
-  --c-surface: #fdfbf5;
-  --c-raised: #fffdf7;
-  --c-sunken: #f2f0ea;
-  --c-border: #e8e5df;
-  --c-border-strong: #d5d1c8;
+  --c-canvas: #f5f1e8;
+  --c-surface: #fffdf8;
+  --c-raised: #ffffff;
+  --c-sunken: #efebe2;
+  --c-border: #e2ddd1;
+  --c-border-strong: #cbc4b5;
 
   --c-page-ground: #f0ece2;
   --c-shell: #e4dfd2;
   --c-shell-ink: #1a1a18;
   --c-shell-muted: #5d5d58;
-  --c-shell-border: #e2dfd7;
-  --c-shell-hover: #eae7df;
+  --c-shell-border: #dbd4c4;
+  --c-shell-hover: #e8e2d4;
 
   --c-ink: #1a1a18;
-  --c-ink-muted: #6b6b66;
+  --c-ink-muted: #62625c;
   /* Decoration only -- placeholders, disabled controls, redundant glyphs.
    * Never anything the reader would miss. See the three-ink rule. */
-  --c-ink-ghost: #85857e;
-  --c-border-control: #85857e;
+  --c-ink-ghost: #7e7e77;
+  --c-border-control: #7e7e77;
 
   --c-accent-base: #4a5fd0;
   --c-accent-hover: #3f52bd;
@@ -87,7 +87,9 @@
   --c-w-goals: #05734e;
   --c-w-goals-tint: #e3f7ec;
   --c-w-you: #9f4f0d;
+  --c-w-finances: #456e2c;
   --c-w-you-tint: #fef0e8;
+  --c-w-finances-tint: #eaf5e4;
   --c-w-dev: #4b5768;
   --c-w-dev-tint: #eef1f5;
 
@@ -222,7 +224,7 @@
    * put in, and it is the only one that overrides it. */
   --c-page: var(--c-page-ground);
   --c-page-ink: var(--c-ink);
-  --c-page-ink-muted: #65655f;
+  --c-page-ink-muted: #5c5c56;
   --c-page-ink-ghost: var(--c-ink-ghost);
   --c-page-border: var(--c-border);
   --c-page-border-strong: var(--c-border-strong);
@@ -243,6 +245,7 @@
   --c-w-news-lit: var(--c-w-news);
   --c-w-goals-lit: var(--c-w-goals);
   --c-w-you-lit: var(--c-w-you);
+  --c-w-finances-lit: var(--c-w-finances);
   --c-w-dev-lit: var(--c-w-dev);
 
   /* The sheet palette, captured here on :root -- where --c-ink and friends
@@ -280,33 +283,33 @@
    * wash already spends, so raising it is not free and is not guessed. */
   --wash-lift: 1;
 
-  --c-fill-ink: #0f1011;
+  --c-fill-ink: #161a23;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
-  --c-canvas: #08090a;
-  --c-page-ground: #08090a;
+  --c-canvas: #0a0c11;
+  --c-page-ground: #0a0c11;
   --c-page-ink-muted: var(--c-ink-muted);
-  --c-surface: #0f1011;
-  --c-raised: #191a1c;
-  --c-sunken: #050506;
-  --c-border: #212225;
-  --c-border-strong: #2e3033;
+  --c-surface: #161a23;
+  --c-raised: #1f2431;
+  --c-sunken: #06070b;
+  --c-border: #2a303d;
+  --c-border-strong: #3a4252;
 
-  --c-shell: #0b0c0d;
-  --c-shell-ink: #f7f8f8;
-  --c-shell-muted: #9096a0;
-  --c-shell-border: #1c1d20;
-  --c-shell-hover: #17181a;
+  --c-shell: #0e1117;
+  --c-shell-ink: #f4f6fa;
+  --c-shell-muted: #9da5b4;
+  --c-shell-border: #222733;
+  --c-shell-hover: #1b1f29;
 
-  --c-ink: #f7f8f8;
-  --c-ink-muted: #9096a0;
-  --c-ink-ghost: #6a707a;
-  --c-border-control: #6a707a;
+  --c-ink: #f4f6fa;
+  --c-ink-muted: #9da5b4;
+  --c-ink-ghost: #737c8d;
+  --c-border-control: #737c8d;
 
   --c-accent-base: #8b9dff;
   --c-accent-hover: #a3b2ff;
-  --c-accent-tint-base: #161a33;
+  --c-accent-tint-base: #1c2244;
 
   --c-w-shopping: #ff8fa8;
   --c-w-shopping-tint: #301620;
@@ -323,7 +326,9 @@
   --c-w-goals: #48dfa1;
   --c-w-goals-tint: #052619;
   --c-w-you: #feb68b;
+  --c-w-finances: #94d66c;
   --c-w-you-tint: #381802;
+  --c-w-finances-tint: #15240d;
   --c-w-dev: #a9b6c8;
   --c-w-dev-tint: #1a1f27;
 
@@ -336,7 +341,7 @@
   --c-danger-tint: #2b1315;
 
   --c-status-lead: #a8a49b;
-  --c-status-lead-tint: #1c1c1e;
+  --c-status-lead-tint: #1f2330;
   --c-status-submitted: #7ea9ff;
   --c-status-submitted-tint: #111a2e;
   --c-status-process: #e8a84e;
@@ -348,7 +353,7 @@
   --c-status-rejected: #ff8b8b;
   --c-status-rejected-tint: #2b1315;
   --c-status-ghosted: #8b9099;
-  --c-status-ghosted-tint: #141516;
+  --c-status-ghosted-tint: #1a1e27;
 
   --grain-opacity: 0.055;
   --grain-blend: overlay;
@@ -516,6 +521,7 @@
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
   --c-w-you-lit: #ffc19c;
+  --c-w-finances-lit: #a0dc7e;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets ----
@@ -625,7 +631,9 @@
   --c-w-goals: #066544;
   --c-w-goals-tint: #d4efe0;
   --c-w-you: #8f4401;
+  --c-w-finances: #3c6026;
   --c-w-you-tint: #ffe4d4;
+  --c-w-finances-tint: #deedd6;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -680,23 +688,23 @@
    * wash already spends, so raising it is not free and is not guessed. */
   --wash-lift: 1;
 
-  --c-fill-ink: #191426;
+  --c-fill-ink: #1e1831;
   color-scheme: dark;
   --c-sheet-scheme: dark;
 
   --c-canvas: #110d1a;
   --c-page-ground: #110d1a;
   --c-page-ink-muted: var(--c-ink-muted);
-  --c-surface: #191426;
-  --c-raised: #241d35;
+  --c-surface: #1e1831;
+  --c-raised: #2b2343;
   --c-sunken: #0b0812;
-  --c-border: #2c2440;
-  --c-border-strong: #3b3153;
+  --c-border: #352c4d;
+  --c-border-strong: #473c64;
 
   --c-shell: #0f0c17;
   --c-shell-ink: #f2eefa;
   --c-shell-muted: #a79fc0;
-  --c-shell-border: #241d35;
+  --c-shell-border: #2b2343;
   --c-shell-hover: #1c1729;
 
   --c-ink: #f2eefa;
@@ -723,7 +731,9 @@
   --c-w-goals: #69e6ae;
   --c-w-goals-tint: #062c1d;
   --c-w-you: #fec4a2;
+  --c-w-finances: #a2de80;
   --c-w-you-tint: #3f1c03;
+  --c-w-finances-tint: #192a0f;
   --c-w-dev: #b3bfcf;
   --c-w-dev-tint: #212832;
 
@@ -827,6 +837,7 @@
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
   --c-w-you-lit: #ffc19c;
+  --c-w-finances-lit: #a0dc7e;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The sheets: smoked glass ----
@@ -895,7 +906,9 @@
   --c-w-goals: #66e4ac;
   --c-w-goals-tint: #0e2c1f;
   --c-w-you: #ffc19c;
+  --c-w-finances: #a0dc7e;
   --c-w-you-tint: #3d1f0a;
+  --c-w-finances-tint: #1c2a14;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -991,6 +1004,7 @@
   --c-w-news-lit: #debf69;
   --c-w-goals-lit: #66e4ac;
   --c-w-you-lit: #ffc19c;
+  --c-w-finances-lit: #a0dc7e;
   --c-w-dev-lit: #bcc7d6;
 
   /* ---- The glass ----
@@ -1049,7 +1063,9 @@
   --c-w-goals: #66e4ac;
   --c-w-goals-tint: #0e2c1f;
   --c-w-you: #ffc19c;
+  --c-w-finances: #a0dc7e;
   --c-w-you-tint: #3d1f0a;
+  --c-w-finances-tint: #1c2a14;
   --c-w-dev: #bcc7d6;
   --c-w-dev-tint: #1f2836;
 
@@ -1132,6 +1148,7 @@
   --c-w-news-lit: #6e5600;
   --c-w-goals-lit: #066544;
   --c-w-you-lit: #8f4401;
+  --c-w-finances-lit: #3c6026;
   --c-w-dev-lit: #434e5f;
 
   /* ---- The glass: frosted white ---- */
@@ -1184,7 +1201,9 @@
   --c-w-goals: #066544;
   --c-w-goals-tint: #d4efe0;
   --c-w-you: #8f4401;
+  --c-w-finances: #3c6026;
   --c-w-you-tint: #ffe4d4;
+  --c-w-finances-tint: #deedd6;
   --c-w-dev: #434e5f;
   --c-w-dev-tint: #e6eaf0;
 
@@ -1215,178 +1234,6 @@
   --grain-blend: multiply;
 }
 
-/* ---------------------------------------------------------------------------
- * POSTER — what the picker calls Lightbox: a printed poster.
- *
- * Paper, one ink, a dark sidebar, and nothing translucent. Every card is drawn
- * with a 2px outline in the ink and a hard offset shadow, and every titled card
- * wears a solid band of colour across its header, cycling through three. The
- * colour lives in the bands and the sidebar's highlight; the cards stay white.
- *
- * This block is the Primary palette. The others in lib/theme/poster.ts write
- * the same tokens over it inline, the way Aurora's skies do, and
- * lib/theme/poster.test.ts holds this block to Primary token for token. The
- * shapes -- outline, shadow, bands, square corners -- are the rules under
- * "The poster" near the foot of this file.
- *
- * Anything not set here is Paper's: the workspace colours, the meanings and
- * the pipeline were all measured on white and on oat already.
- * ------------------------------------------------------------------------- */
-[data-theme='poster'] {
-  color-scheme: light;
-  --c-sheet-scheme: light;
-
-  --c-page-ground: #f3efe6;
-  --c-page: #f3efe6;
-  --c-surface: #ffffff;
-  --c-raised: #ffffff;
-  --c-canvas: #f7f4ec;
-  --c-sunken: #f7f4ec;
-  --c-border: #e7e1d5;
-  --c-page-border: #e7e1d5;
-  --c-border-strong: #111111;
-  --c-page-border-strong: #111111;
-  --c-border-control: #111111;
-  --c-page-border-control: #111111;
-  --c-sheet-outline: #111111;
-  --c-ink: #111111;
-  --c-page-ink: #111111;
-  --c-ink-muted: #4f4b45;
-  --c-page-ink-muted: #4f4b45;
-  --c-ink-ghost: #77726a;
-  --c-page-ink-ghost: #77726a;
-  --c-accent-base: #1f4bd8;
-  --c-accent-hover: #1739a8;
-  --c-accent-tint-base: #e3e9fb;
-  --c-accent-base-lit: #1f4bd8;
-  --c-accent-hover-lit: #1739a8;
-  --c-fill-ink: #ffffff;
-  --c-shell: #111111;
-  --c-shell-ink: #f7f3ea;
-  --c-shell-muted: #b3ada2;
-  --c-shell-border: #262626;
-  --c-shell-hover: #262626;
-  --c-poster-band-1: #1f4bd8;
-  --c-poster-band-1-ink: #ffffff;
-  --c-poster-band-2: #f4c430;
-  --c-poster-band-2-ink: #111111;
-  --c-poster-band-3: #db2e1f;
-  --c-poster-band-3-ink: #ffffff;
-  --c-poster-hi: #f4c430;
-  --c-poster-hi-ink: #111111;
-
-
-  --sheet-edge: 5px 5px 0 var(--c-sheet-outline);
-  --lift-shadow: 7px 7px 0 var(--c-sheet-outline);
-  --grain-opacity: 0;
-}
-
-/* ---------------------------------------------------------------------------
- * POSTER-DARK — Lightbox in dark: the same poster on dark stock.
- *
- * Dark paper, cards a step lighter than it, and the outline and the hard
- * shadow drawn in the paper's own light colour, so the poster reads as light
- * ink printed on black rather than as a dark theme with borders. The bands are
- * the same three colours as the day side, which already carried their own
- * labels, and the sidebar is the darkest thing on screen.
- *
- * This block is Primary's night side; lib/theme/poster.ts holds the other
- * palettes' night sides and lib/theme/poster.test.ts holds this block to
- * Primary's. The workspace colours, the meanings and the pipeline are
- * Darkroom's, which were tuned for light ink on dark panels.
- * ------------------------------------------------------------------------- */
-[data-theme='poster-dark'] {
-  color-scheme: dark;
-  --c-sheet-scheme: dark;
-
-  --c-page-ground: #151412;
-  --c-page: #151412;
-  --c-surface: #201f1c;
-  --c-raised: #201f1c;
-  --c-canvas: #1a1917;
-  --c-sunken: #1a1917;
-  --c-border: #34322e;
-  --c-page-border: #34322e;
-  --c-border-strong: #f3efe6;
-  --c-page-border-strong: #f3efe6;
-  --c-border-control: #f3efe6;
-  --c-page-border-control: #f3efe6;
-  --c-sheet-outline: #f3efe6;
-  --c-ink: #f3efe6;
-  --c-page-ink: #f3efe6;
-  --c-ink-muted: #b9b3a8;
-  --c-page-ink-muted: #b9b3a8;
-  --c-ink-ghost: #8a857c;
-  --c-page-ink-ghost: #8a857c;
-  --c-accent-base: #8fa8ff;
-  --c-accent-hover: #b3c3ff;
-  --c-accent-tint-base: #1d2440;
-  --c-accent-base-lit: #8fa8ff;
-  --c-accent-hover-lit: #b3c3ff;
-  --c-fill-ink: #111111;
-  --c-shell: #0b0b0a;
-  --c-shell-ink: #f3efe6;
-  --c-shell-muted: #a8a297;
-  --c-shell-border: #262421;
-  --c-shell-hover: #262421;
-  --c-poster-band-1: #1f4bd8;
-  --c-poster-band-1-ink: #ffffff;
-  --c-poster-band-2: #f4c430;
-  --c-poster-band-2-ink: #111111;
-  --c-poster-band-3: #db2e1f;
-  --c-poster-band-3-ink: #ffffff;
-  --c-poster-hi: #f4c430;
-  --c-poster-hi-ink: #111111;
-
-
-  --c-page-positive: #6fe0b0;
-  --c-page-caution: #f5b459;
-  --c-page-danger: #ff9d9d;
-  --c-w-shopping: #ffa3b8;
-  --c-w-shopping-tint: #33202c;
-  --c-w-jobs: #c3b0ff;
-  --c-w-jobs-tint: #241f42;
-  --c-w-todo: #6ccdf5;
-  --c-w-todo-tint: #12283a;
-  --c-w-vault: #eda6f6;
-  --c-w-vault-tint: #2e1e3c;
-  --c-w-learn: #6cdbdc;
-  --c-w-learn-tint: #0f2b2b;
-  --c-w-news: #debf69;
-  --c-w-news-tint: #2a2410;
-  --c-w-goals: #66e4ac;
-  --c-w-goals-tint: #0e2c1f;
-  --c-w-you: #ffc19c;
-  --c-w-you-tint: #3d1f0a;
-  --c-w-dev: #bcc7d6;
-  --c-w-dev-tint: #1f2836;
-  --c-positive: #6fe0b0;
-  --c-positive-tint: #102b22;
-  --c-caution: #f5b459;
-  --c-caution-fill: #f5b459;
-  --c-caution-tint: #2d2410;
-  --c-danger: #ff9d9d;
-  --c-danger-tint: #32202a;
-  --c-status-lead: #a3b0c4;
-  --c-status-lead-tint: #212b3a;
-  --c-status-submitted: #8fb4ff;
-  --c-status-submitted-tint: #1a2340;
-  --c-status-process: #f5b459;
-  --c-status-process-tint: #2d2410;
-  --c-status-final: #c3b0ff;
-  --c-status-final-tint: #241f42;
-  --c-status-offer: #6fe0b0;
-  --c-status-offer-tint: #102b22;
-  --c-status-rejected: #ff9d9d;
-  --c-status-rejected-tint: #32202a;
-  --c-status-ghosted: #93a2b8;
-  --c-status-ghosted-tint: #1e2735;
-
-  --sheet-edge: 4px 4px 0 var(--c-sheet-outline);
-  --lift-shadow: 6px 6px 0 var(--c-sheet-outline);
-  --grain-opacity: 0;
-}
-
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -1394,34 +1241,34 @@
     color-scheme: dark;
     --c-sheet-scheme: dark;
 
-    --c-fill-ink: #0f1011;
+    --c-fill-ink: #161a23;
     --c-wash-near: #3a74d6;
     --c-wash-mid: #8260fa;
     --c-wash-far: #dd78e6;
     --c-wash-floor: #175cb0;
-    --c-canvas: #08090a;
-    --c-page-ground: #08090a;
+    --c-canvas: #0a0c11;
+    --c-page-ground: #0a0c11;
     --c-page-ink-muted: var(--c-ink-muted);
-    --c-surface: #0f1011;
-    --c-raised: #191a1c;
-    --c-sunken: #050506;
-    --c-border: #212225;
-    --c-border-strong: #2e3033;
+    --c-surface: #161a23;
+    --c-raised: #1f2431;
+    --c-sunken: #06070b;
+    --c-border: #2a303d;
+    --c-border-strong: #3a4252;
 
-    --c-shell: #0b0c0d;
-    --c-shell-ink: #f7f8f8;
-    --c-shell-muted: #9096a0;
-    --c-shell-border: #1c1d20;
-    --c-shell-hover: #17181a;
+    --c-shell: #0e1117;
+    --c-shell-ink: #f4f6fa;
+    --c-shell-muted: #9da5b4;
+    --c-shell-border: #222733;
+    --c-shell-hover: #1b1f29;
 
-    --c-ink: #f7f8f8;
-    --c-ink-muted: #9096a0;
-    --c-ink-ghost: #6a707a;
-    --c-border-control: #6a707a;
+    --c-ink: #f4f6fa;
+    --c-ink-muted: #9da5b4;
+    --c-ink-ghost: #737c8d;
+    --c-border-control: #737c8d;
 
     --c-accent-base: #8b9dff;
     --c-accent-hover: #a3b2ff;
-    --c-accent-tint-base: #161a33;
+    --c-accent-tint-base: #1c2244;
 
     --c-w-shopping: #ff8fa8;
     --c-w-shopping-tint: #301620;
@@ -1438,7 +1285,9 @@
     --c-w-goals: #48dfa1;
     --c-w-goals-tint: #052619;
     --c-w-you: #feb68b;
+    --c-w-finances: #94d66c;
     --c-w-you-tint: #381802;
+    --c-w-finances-tint: #15240d;
     --c-w-dev: #a9b6c8;
     --c-w-dev-tint: #1a1f27;
 
@@ -1451,7 +1300,7 @@
     --c-danger-tint: #2b1315;
 
     --c-status-lead: #a8a49b;
-    --c-status-lead-tint: #1c1c1e;
+    --c-status-lead-tint: #1f2330;
     --c-status-submitted: #7ea9ff;
     --c-status-submitted-tint: #111a2e;
     --c-status-process: #e8a84e;
@@ -1463,7 +1312,7 @@
     --c-status-rejected: #ff8b8b;
     --c-status-rejected-tint: #2b1315;
     --c-status-ghosted: #8b9099;
-    --c-status-ghosted-tint: #141516;
+    --c-status-ghosted-tint: #1a1e27;
 
     --grain-opacity: 0.055;
     --grain-blend: overlay;
@@ -1523,10 +1372,24 @@
   --c-page-accent: var(--c-w-you-lit);
   --c-accent-tint: var(--c-w-you-tint);
 }
+[data-workspace='finances'] {
+  --c-sheet-accent: var(--c-w-finances);
+  --c-page-accent: var(--c-w-finances-lit);
+  --c-accent-tint: var(--c-w-finances-tint);
+}
 [data-workspace='dev'] {
   --c-sheet-accent: var(--c-w-dev);
   --c-page-accent: var(--c-w-dev-lit);
   --c-accent-tint: var(--c-w-dev-tint);
+}
+/* Chat wears the app's own indigo rather than a hue of its own: it is where
+ * Dash lives, and the indigo is Dash's colour everywhere outside a workspace
+ * (plan #2748.1). So it reads the base accent each theme already sets and
+ * the contrast script already checks. */
+[data-workspace='chat'] {
+  --c-sheet-accent: var(--c-accent-base);
+  --c-page-accent: var(--c-accent-base-lit);
+  --c-accent-tint: var(--c-accent-tint-base);
 }
 
 :root {
@@ -1659,6 +1522,8 @@ body,
   --color-fill-ink: var(--c-fill-ink);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
+  /* Their bubbles in a thread: the pane with a little ink mixed in, so a step darker than it in a light room and a step lighter in a dark one, as the chat reference draws them (#ece8de on #fdfbf5, #2a2925 on #1d1d1a). */
+  --color-them: color-mix(in oklab, var(--c-surface) 92%, var(--c-ink));
   /* The three voices of a conversation (see the voice-* utilities). */
   --color-voice-you: var(--c-ink);
   --color-voice-dash: var(--c-canvas);
@@ -1697,8 +1562,12 @@ body,
   --color-w-goals-tint: var(--c-w-goals-tint);
   --color-w-you: var(--c-w-you);
   --color-w-you-tint: var(--c-w-you-tint);
+  --color-w-finances: var(--c-w-finances);
+  --color-w-finances-tint: var(--c-w-finances-tint);
   --color-w-dev: var(--c-w-dev);
   --color-w-dev-tint: var(--c-w-dev-tint);
+  --color-w-chat: var(--c-accent-base);
+  --color-w-chat-tint: var(--c-accent-tint-base);
 
   --color-positive: var(--c-positive);
   --color-positive-tint: var(--c-positive-tint);
@@ -1743,6 +1612,12 @@ body,
   --text-body--line-height: 1.55;
   --text-title: 20px;
   --text-title--line-height: 1.25;
+  /* A goal's own name at the head of its page, as the approved goal mockup
+   * sets it (plan #2778.11): 24px on a phone, 28px from laptop width. */
+  --text-headline: 24px;
+  --text-headline--line-height: 1.15;
+  --text-headline-lg: 28px;
+  --text-headline-lg--line-height: 1.1;
   --text-figure: 32px;
   --text-figure--line-height: 1.05;
   --text-figure-lg: 48px;
@@ -1768,8 +1643,8 @@ body,
   --radius-pane: 1rem;
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
-  /* Chips, toggle chips and dots: fully round, except where a theme squares
-   * everything (Poster), so a chip keeps the corners of the card it sits on. */
+  /* Chips, toggle chips and dots: fully round. A token rather than a literal
+   * so a theme that squares its corners can square these with them. */
   --radius-pill: 9999px;
 
   /* The easings (plan #1549), mirrored in lib/motion.ts. Soft ease-out for
@@ -2211,8 +2086,7 @@ body::before {
   box-shadow: var(--sheet-edge);
 }
 
-/* A keycap's corner: half a control's, so it follows the theme (square in
- * Poster) without turning an 18px key into a coin where controls are rounder
+/* A keycap's corner: half a control's, so it follows the theme without turning an 18px key into a coin where controls are rounder
  * (Aurora's 12px on an 18px key is a circle). The one radius drawn from a
  * token rather than being one, used by components/ui/kbd.tsx alone. */
 @utility keycap {
@@ -2285,6 +2159,56 @@ body[data-keyhints] .keyhint {
   to {
     opacity: 0.4;
   }
+}
+
+/* A person typing in a thread (plan #2748.6): three dots that rise and dim
+ * in turn, each started a little after the one before. */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.typing-dot {
+  animation: typing-dot calc(var(--motion-moment) * 2) var(--ease-sway) infinite;
+}
+
+/* Their typing arrives, then their text does (plan #2748.10, the moment
+ * "A mentor typing"). The dots rise in where the next bubble will stand; a
+ * bubble that comes in over Realtime rises from the same place, and the dots
+ * rise in again below it while more are coming. Only what arrives while the
+ * thread is open carries these, never the messages read on load. */
+@keyframes typing-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.9);
+  }
+}
+
+@utility typing-in {
+  transform-origin: bottom left;
+  animation: typing-in var(--motion-move) var(--ease-out-soft) both;
+}
+
+/* It starts part way lit, so the dots it replaces never leave the foot of the
+ * thread empty for a frame. */
+@keyframes message-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+}
+
+@utility message-in {
+  transform-origin: bottom left;
+  animation: message-in var(--motion-move) var(--ease-out-soft) both;
 }
 
 a:has([data-link-pending]),
@@ -3106,6 +3030,12 @@ button[aria-busy='true'] {
     animation: none;
   }
 
+  .typing-dot,
+  .typing-in,
+  .message-in {
+    animation: none;
+  }
+
   .goal-fold,
   .goal-fold-in {
     animation: none;
@@ -3362,6 +3292,28 @@ form[data-auto-submit] [data-fallback-submit] {
 .vault-prose.prose-compact h4 {
   font-size: 1em;
   margin-top: 1em;
+}
+
+/* A note inside the thing it serves, such as Dash's how-to inside a step's
+ * card on a goal's Plan tab: the interface's 13px, muted, the list tight, so
+ * it reads smaller than the step's title above it (plan #2778.12). */
+.vault-prose.prose-aside {
+  color: var(--c-ink-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vault-prose.prose-aside > * + * {
+  margin-top: 0.4em;
+}
+
+.vault-prose.prose-aside ul,
+.vault-prose.prose-aside ol {
+  padding-left: 1.125rem;
+}
+
+.vault-prose.prose-aside li + li {
+  margin-top: 3px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -4090,107 +4042,6 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-theme='aurora'] .bg-accent,
 [data-theme='dawn'] .bg-accent {
   box-shadow: 0 0 20px -4px color-mix(in oklab, var(--c-accent-base) 75%, transparent);
-}
-
-/* ---------------------------------------------------------------------------
- * The poster -- Lightbox's shapes.
- *
- * The block above sets the colours; these set what makes it a poster. Square
- * corners everywhere, a 2px ink outline round every sheet and menu, a hard
- * shadow under each, and a band of solid colour across the header of every
- * titled card.
- *
- * The bands cycle through three colours by a card's position among its sibling
- * cards, so three cards in a column come out blue, yellow and red, and a
- * fourth starts again. A card is titled when its first child is a <header> or
- * a CardHeader (`data-card-header`); untitled cards keep the outline and the
- * shadow and take no band, so a grid of small cards does not turn into stripes.
- *
- * Inside a band the ink, the muted ink and the accent are all the band's own
- * label colour, so a heading, its hint and its icon read on yellow and on red
- * alike without any of them knowing which they are on.
- * ------------------------------------------------------------------------- */
-:is([data-theme='poster'], [data-theme='poster-dark']) {
-  --radius-pane: 0;
-  --radius-card: 0;
-  --radius-control: 0;
-  --radius-pill: 0;
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet {
-  border: 2px solid var(--c-sheet-outline);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .popover-panel {
-  border: 2px solid var(--c-sheet-outline);
-  box-shadow: 6px 6px 0 var(--c-sheet-outline);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n + 1 of .sheet) {
-  --band: var(--c-poster-band-1);
-  --band-ink: var(--c-poster-band-1-ink);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n + 2 of .sheet) {
-  --band: var(--c-poster-band-2);
-  --band-ink: var(--c-poster-band-2-ink);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n of .sheet) {
-  --band: var(--c-poster-band-3);
-  --band-ink: var(--c-poster-band-3-ink);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > header:first-child,
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > [data-card-header]:first-child {
-  --c-ink: var(--band-ink);
-  --c-ink-muted: var(--band-ink);
-  --c-accent: var(--band-ink);
-  color: var(--band-ink);
-  background-color: var(--band);
-  border-bottom: 2px solid var(--c-sheet-outline);
-}
-
-/* A band runs edge to edge, so in a padded card it reaches out through the
- * card's padding and takes the same padding back inside itself. */
-:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad-dense > header:first-child {
-  margin: calc(-1 * var(--card-p-dense)) calc(-1 * var(--card-p-dense)) 0.5rem;
-  padding: 0.5rem var(--card-p-dense);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad > header:first-child {
-  margin: calc(-1 * var(--card-p)) calc(-1 * var(--card-p)) 0.75rem;
-  padding: 0.625rem var(--card-p);
-}
-
-:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad-dense > header:first-child,
-:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad > header:first-child,
-:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > [data-card-header]:first-child {
-  padding-bottom: 0.5rem;
-}
-
-/* Where you are: the current row in the sidebar takes the highlight. */
-:is([data-theme='poster'], [data-theme='poster-dark']) .shell-ground a[aria-current='page'] {
-  --c-shell-hover: var(--c-poster-hi);
-  --c-shell-ink: var(--c-poster-hi-ink);
-}
-
-/* The top bar is printed on the same paper, ruled off in the ink. */
-:is([data-theme='poster'], [data-theme='poster-dark']) .page-pane > header {
-  /* The bar normally wears the sidebar's ground and ink; here it is paper,
-   * so it takes the page's ink instead. */
-  --c-shell-ink: var(--c-ink);
-  --c-shell-muted: var(--c-ink-muted);
-  --c-shell-hover: var(--c-sunken);
-  --c-shell-border: var(--c-sheet-outline);
-  background-color: var(--c-page);
-  backdrop-filter: none;
-  border-bottom: 2px solid var(--c-sheet-outline);
-}
-
-/* The primary button sits on its own small shadow, like the cards. */
-:is([data-theme='poster'], [data-theme='poster-dark']) .bg-accent {
-  box-shadow: 2px 2px 0 var(--c-sheet-outline);
 }
 
 /* ---------------------------------------------------------------------------

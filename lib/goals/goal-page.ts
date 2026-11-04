@@ -261,7 +261,7 @@ const FACT_MAX = 220;
  * The first sentence of a result, as plain text: markdown marks taken off,
  * the first paragraph that is not a heading, cut where the first sentence ends: a stop
  * followed by a space and a capital, a digit or a dollar sign, or by the end
- * of the paragraph, so "$118,000.50" and "e.g. this" are not cut.
+ * of the paragraph, so "$95,000.50" and "e.g. this" are not cut.
  */
 export function firstSentence(markdown: string): string {
   const paragraph =
@@ -359,15 +359,27 @@ export function stepPreps(trees: readonly (readonly StepNode[])[]): {
 /* ------------------------------------------------------------ the tabs */
 
 /**
- * The goal page's tabs (plan #1671), the feature page's three in the same
- * order: Overview holds the status card and what feeds the goal, Steps the
- * step tree, Activity the runs, the finished steps and the comments.
+ * The goal page's tabs (plan #2778.4), laid out the same on every goal: the
+ * Dashboard first, with the goal's tiles, its Now / Next / Later strip,
+ * Dash's card and the newest files; Plan, the step tree; Work & files, what
+ * Dash did and every file; History, the steps closed, the runs and the
+ * comments. The goal's lists add their own tabs after Plan (tabsWithLists).
  */
 export const GOAL_TABS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'steps', label: 'Steps' },
-  { id: 'activity', label: 'Activity' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'files', label: 'Work & files' },
+  { id: 'history', label: 'History' },
 ] as const;
+
+/**
+ * How the goal page keeps its tab in the address: the tabs it had before
+ * plan #2778.4 (Overview, Steps, Activity) still open the tab that holds
+ * them now, so an old link or bookmark lands.
+ */
+export const GOAL_TAB_ADDRESS = {
+  former: { overview: 'dashboard', steps: 'plan', activity: 'history' },
+} as const;
 
 export type GoalTab = (typeof GOAL_TABS)[number]['id'];
 
@@ -385,16 +397,16 @@ export type StepTab = (typeof STEP_TABS)[number]['id'];
 
 /**
  * A link from elsewhere on the goal page to a step's row. The rows are on the
- * Steps tab, so the link opens that tab and scrolls to the row; from the
- * Steps tab itself it lands on the same row.
+ * Plan tab, so the link opens that tab and scrolls to the row; from the Plan
+ * tab itself it lands on the same row.
  */
 export function stepAnchor(stepId: string): string {
-  return `?tab=steps#step-${stepId}`;
+  return `?tab=plan#step-${stepId}`;
 }
 
-/** Whether a link on the page goes to a step's row. */
+/** Whether a link on the page goes to a step's row, by its address now or before plan #2778.4. */
 export function isStepAnchor(href: string): boolean {
-  return href.startsWith('?tab=steps#step-') || href.startsWith('#step-');
+  return href.startsWith('?tab=plan#step-') || href.startsWith('?tab=steps#step-') || href.startsWith('#step-');
 }
 
 /** One finished or dropped step, as the Activity tab lists it. */

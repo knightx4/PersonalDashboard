@@ -32,15 +32,15 @@ function stub(tables: Record<string, Row[]>) {
   } as unknown as SchemaClient;
 }
 
-/** Three roles, each with one answer to the Rogo question, worded as asked. */
+/** Three roles, each with one answer to the Hooli question, worded as asked. */
 function world(answers: { n: number; role: number; question: number; text: string; status?: string }[]) {
   const tables: Record<string, Row[]> = {
     roles: [1, 2, 3].map((n) => ({ id: id(70 + n), user_id: ME, title: `Role ${n}` })),
     applications: [1, 2, 3].map((n) => ({ id: id(50 + n), user_id: ME, role_id: id(70 + n) })),
     questions: [
-      { id: id(61), user_id: ME, text: 'Why are you interested in Rogo?' },
-      { id: id(62), user_id: ME, text: '1. Why are you interested in Rogo?' },
-      { id: id(63), user_id: ME, text: 'Why are you interested in Rogo? (max 150 words)' },
+      { id: id(61), user_id: ME, text: 'Why are you interested in Hooli?' },
+      { id: id(62), user_id: ME, text: '1. Why are you interested in Hooli?' },
+      { id: id(63), user_id: ME, text: 'Why are you interested in Hooli? (max 150 words)' },
       { id: id(64), user_id: ME, text: 'Salary expectations?' },
     ],
     application_answers: answers.map((a) => ({
@@ -64,7 +64,7 @@ async function lookup(ctx: AskContext) {
 }
 
 describe('duplicate_answers', () => {
-  it('marks the extra copies of identical answers, the Rogo question on three roles, and says which stays', async () => {
+  it('marks the extra copies of identical answers, the Hooli question on three roles, and says which stays', async () => {
     const result = await lookup(
       world([
         { n: 1, role: 1, question: 1, text: WHY },
@@ -108,7 +108,7 @@ describe('duplicate_answers', () => {
     const result = await lookup(
       world([
         { n: 1, role: 1, question: 1, text: WHY },
-        { n: 2, role: 2, question: 2, text: 'Rogo is hiring the people I want to learn from.' },
+        { n: 2, role: 2, question: 2, text: 'Hooli is hiring the people I want to learn from.' },
         { n: 3, role: 3, question: 3, text: WHY },
       ]),
     );
@@ -151,7 +151,7 @@ describe('propose_delete after duplicate_answers', () => {
     const result = await executeProposal('propose_delete', { table: TABLE, refs: [id(2), id(3)] }, ctx);
     expect(result.ok).toBe(true);
     expect((kept[0].input as { count: number; titles: string[] }).count).toBe(2);
-    expect((kept[0].input as { titles: string[] }).titles).toEqual(['1. Why are you interested in Rogo?', 'Why are you interested in Rogo? (max 150 words)']);
+    expect((kept[0].input as { titles: string[] }).titles).toEqual(['1. Why are you interested in Hooli?', 'Why are you interested in Hooli? (max 150 words)']);
   });
 
   it('refuses a submitted answer even when a lookup returned it', async () => {

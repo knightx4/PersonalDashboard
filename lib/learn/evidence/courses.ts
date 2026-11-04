@@ -48,7 +48,7 @@ export function isTitleOnly(course: CourseSource): boolean {
   return course.notes.length === 0 && !course.catalogue_description?.trim();
 }
 
-/** "MGT 541 Corporate Finance", or the title alone when there is no code. */
+/** "FIN 410 Corporate Finance", or the title alone when there is no code. */
 export function courseName(course: Pick<CourseSource, 'code' | 'title'>): string {
   const code = course.code?.trim();
   return code ? `${code} ${course.title.trim()}` : course.title.trim();
@@ -79,7 +79,7 @@ export function courseText(course: CourseSource): string {
 
 /**
  * How much a grade counts, 0 to 1. Read as the transcript writes it: "A-",
- * "HH" (Yale's high honours), "CR", "TA" (a transfer credit earned with an
+ * "HH" (high honours, as some business schools grade), "CR", "TA" (a transfer credit earned with an
  * A). Anything not recognised, and a missing grade, counts nothing.
  */
 export function gradeFactor(grade: string | null): number {
@@ -113,7 +113,7 @@ export function courseWeight(
   return Math.round(weight * 1000) / 1000;
 }
 
-/** "from MGT 541 Corporate Finance, HH, 2026": the grade as the transcript writes it. */
+/** "from FIN 410 Corporate Finance, HH, 2026": the grade as the transcript writes it. */
 export function courseBasis(
   course: Pick<CourseSource, 'code' | 'title' | 'grade' | 'year'>,
 ): string {

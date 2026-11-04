@@ -19,7 +19,7 @@ set kind = a.kind,
 from (
   select distinct on (subject_id) subject_id, kind, kind_reason, kind_by, kind_model, kind_at
   from learn.aims
-  where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+  where user_id = core.dev_owner_id()
     and subject_id is not null
     and kind is not null
     and kind_by is not null
@@ -27,5 +27,5 @@ from (
   order by subject_id, (archived_at is null) desc, (kind_by = 'person') desc, created_at
 ) a
 where s.id = a.subject_id
-  and s.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+  and s.user_id = core.dev_owner_id()
   and s.kind is null;

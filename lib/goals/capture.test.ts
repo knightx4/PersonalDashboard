@@ -3,6 +3,8 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { askCaptureModel } from './capture-model';
 import {
   addedProgress,
+  dayHintLine,
+  earliestProgressDay,
   asksEstimate,
   CAPTURE_MOVE_TOOLS,
   captureContext,
@@ -539,6 +541,15 @@ describe('readings from capture (plan #930)', () => {
     const message = captureMessage(measured, 'card balance is 4,200 now', '2026-09-24');
     expect(message).toContain('g1: Goal debt (area: The city; measured in $, target $0)');
     expect(message).toContain('g2: Goal city (area: The city)');
+  });
+
+  it('names the hours a goal tracks, so time on that work lands there', () => {
+    const goals = [goal('debt'), goal('city')];
+    const { byGoal } = buildForest(goals.map((g) => g.goal.id), [step('talk', 'city')]);
+    const context = captureContext(goals, byGoal, new Map(), {}, new Map([['city', ['Cleaning']]]));
+    const message = captureMessage(context, '5hr cleaning', '2026-10-28');
+    expect(message).toContain('g2: Goal city (area: The city; tracks hours: Cleaning)');
+    expect(message).toContain('g1: Goal debt (area: The city)');
   });
 
   it('records a number against a goal with a unit, and refuses one without', () => {
@@ -1140,6 +1151,14 @@ describe('asking once how far along a step is (plan #1280)', () => {
     expect(estimateAsked(filed)).toBeNull();
   });
 
+  it('does not ask after time spent, which is a tally of hours (goals 0089)', async () => {
+    const bags = tree({}).steps.find((s) => s.id === 'bags')!;
+    for (const unit of ['hours', 'h', 'minutes']) {
+      const filed = await fileOn(tree({}), { type: 'progress', step: bags.ref, text: 'sorted bags', quantity: 2, unit });
+      expect(estimateAsked(filed)).toBeNull();
+    }
+  });
+
   it('does not ask on a step with a total, one this line sets, or the goal itself', async () => {
     const withTotal = tree({ estimatedTotal: 100, totalUnit: 'bags' });
     const bags = withTotal.steps.find((s) => s.id === 'bags')!;
@@ -1254,5 +1273,23 @@ describe('logging what you did, from Home and a goal (plan #1740)', () => {
     const { deps, asked } = stubs({ actions: [] }, { context: async () => home });
     await fileCapture('cleaned the bathroom', '2026-10-11', deps, null, 'gone');
     expect(asked[0]).not.toContain('written on the page');
+  });
+});
+
+describe('logging for an earlier day (note 2653989d)', () => {
+  it('tells the model the day picked, when it is not today', () => {
+    expect(dayHintLine('2026-10-27', '2026-10-30')).toContain('2026-10-27');
+    expect(dayHintLine('2026-10-30', '2026-10-30')).toBeNull();
+    expect(dayHintLine(null, '2026-10-30')).toBeNull();
+  });
+
+  it('adds nothing for a day in the future or past the oldest a day may go', () => {
+    expect(dayHintLine('2026-10-31', '2026-10-30')).toBeNull();
+    expect(dayHintLine(earliestProgressDay('2026-10-30'), '2026-10-30')).not.toBeNull();
+    expect(dayHintLine('2026-08-01', '2026-10-30')).toBeNull();
+  });
+
+  it('goes back sixty days', () => {
+    expect(earliestProgressDay('2026-10-30')).toBe('2026-08-31');
   });
 });

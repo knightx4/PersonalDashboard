@@ -42,7 +42,7 @@ function clean(raw: unknown): string | null {
 }
 
 /**
- * A number as a person types it: "18,250.40", "$18,250", "-3", "182.5".
+ * A number as a person types it: "9,400.40", "$9,400", "-3", "182.5".
  * Thousands separators, spaces and one leading currency sign are allowed;
  * anything else is refused rather than guessed at.
  */
@@ -133,7 +133,7 @@ export function sortReadings(readings: Reading[]): Reading[] {
 
 const CURRENCY = new Set(['$', '£', '€']);
 
-/** "$18,250.40" for a currency sign, "182.5 lb" for anything else. */
+/** "$9,400.40" for a currency sign, "182.5 lb" for anything else. */
 export function formatReading(value: number, unit: string | null): string {
   const number = formatNumber(Math.abs(value), { maximumFractionDigits: 2 });
   const sign = value < 0 ? '-' : '';

@@ -8,7 +8,7 @@
  * it is the plan step's brief; here it is the goal written out whole, with its
  * steps and the collections it fills, so a question about a step can be
  * answered from the rest of the map. And the reply can do one thing a dev
- * reply cannot: file the facts a comment gives ("the Navient loan is $12,450
+ * reply cannot: file the facts a comment gives ("the Brightline loan is $12,450
  * at 6.8%") into a collection, as a draft you confirm on the step.
  *
  * Anything the reply cannot do from the message and its lookups goes to the

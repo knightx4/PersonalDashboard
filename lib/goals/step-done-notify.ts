@@ -20,7 +20,10 @@
 
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
 import { stepHref } from '@/lib/goals/all-goals';
+import { firstSentence } from '@/lib/goals/first-sentence';
 import { sendToPerson, type PushPayload, type PushPorts, type PushResult } from '@/lib/push/send';
+
+export { firstSentence };
 
 /** A close older than this is not announced. */
 export const NOTIFY_WINDOW_HOURS = 6;
@@ -35,22 +38,6 @@ export type DoneStep = {
   /** The goal the step sits under, for the link; null when it cannot be found. */
   goalId: string | null;
 };
-
-/**
- * The first sentence of Dash's closing text. Dash opens every result with one
- * plain sentence (plan #2376.4); a heading or list marker in front of it is
- * dropped, and a result that is all one run-on line is clipped by the caller.
- */
-export function firstSentence(text: string | null | undefined): string {
-  if (!text) return '';
-  const line = text
-    .split('\n')
-    .map((l) => l.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s*)/, '').replace(/[*_`]/g, '').trim())
-    .find((l) => l.length > 0);
-  if (!line) return '';
-  const match = line.match(/^.+?[.?!](?=\s|$)/);
-  return (match ? match[0] : line).trim();
-}
 
 export function stepDonePayload(step: DoneStep): PushPayload {
   return {

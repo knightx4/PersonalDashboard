@@ -230,7 +230,7 @@ describe('roundsOf', () => {
 
 describe('roundDetail', () => {
   it('says what is in a round instead of how long one conversation was', () => {
-    // The Galaxy afternoon: four conversations, and no honest single duration
+    // The Globex afternoon: four conversations, and no honest single duration
     // to print for the occasion as a whole.
     expect(roundDetail('2 · In person Final Round', 'Recruiter screen', 4, 30)).toBe(
       '2 · In person Final Round · 4 interviews',

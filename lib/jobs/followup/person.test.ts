@@ -101,8 +101,9 @@ describe('how the note goes', () => {
     expect(channelFor({ email: 'a@b.com', relationship: 'friend', status: 'to_contact', linkedinConnection: true })).toBe('linkedin_dm');
   });
 
-  it('sends a connection note to a stranger with no address', () => {
-    expect(channelFor({ email: null, relationship: 'cold', status: 'to_contact', linkedinConnection: false })).toBe('linkedin_connect');
+  it('messages anyone else on LinkedIn, never a connection note', () => {
+    expect(channelFor({ email: null, relationship: 'cold', status: 'to_contact', linkedinConnection: false })).toBe('linkedin_dm');
+    expect(channelFor({ email: 'a@b.com', relationship: 'cold', status: 'to_contact', linkedinConnection: false })).toBe('linkedin_dm');
   });
 });
 

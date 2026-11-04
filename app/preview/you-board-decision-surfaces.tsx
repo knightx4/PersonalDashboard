@@ -1,6 +1,7 @@
 'use client';
 
-import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
+import { OPUS } from '@/lib/core/models';
+import { MeetingView, type MeetingActions } from '@/app/you/council/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
 
@@ -100,7 +101,7 @@ const opening = (advisor: string, over: Turn): Turn =>
     round: 1,
     kind: 'opening',
     blind: true,
-    model: 'claude-opus-5-5',
+    model: OPUS,
     ...over,
   });
 
@@ -466,8 +467,9 @@ export function YouBoardDecisionPreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/board' },
-          { label: title, href: `/you/board/${MEETING}` },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Decisions', href: '/you/council/decisions' },
+          { label: title, href: `/you/council/${MEETING}` },
         ],
       }}
       timezone="Europe/London"

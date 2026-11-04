@@ -107,8 +107,8 @@ export function GoalPanel({
           </fieldset>
         )}
         <p className="text-small text-ink-muted">
-          Dash drafts the topic from the pages this research quoted. Approving it adds it to the goal, and its next
-          cards come from these answers.
+          Dash drafts the topic from the pages this research quoted, in a few minutes, and adds it to the goal. Its
+          next cards come from these answers.
         </p>
         <DashAction
           type="button"
@@ -116,7 +116,7 @@ export function GoalPanel({
           variant={pending ? 'ghost' : 'secondary'}
           pending={pending}
           paid={pending ? undefined : 'app/learn/b/[id]/actions.ts#draftBriefTopics'}
-          what="Cost of drafting the topic twice"
+          what="Cost of drafting the topic"
           hintFirst
           onClick={() =>
             start(async () => {
@@ -126,7 +126,7 @@ export function GoalPanel({
             })
           }
         >
-          {pending ? 'Drafting it twice…' : 'Draft its topic'}
+          {pending ? 'Sending it to Dash…' : 'Draft its topic'}
         </DashAction>
         {error && (
           <p role="alert" className="text-small text-danger">

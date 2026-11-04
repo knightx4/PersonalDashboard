@@ -26,10 +26,10 @@ export interface ActionState {
 }
 
 function revalidateReviewSurfaces(): void {
-  revalidatePath('/shopping/review');
+  revalidatePath('/shopping/orders/review');
   revalidatePath('/shopping/orders');
   revalidatePath('/shopping/inventory');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
   // Layout reads the nav badge count.
   revalidatePath('/', 'layout');
 }
@@ -99,7 +99,7 @@ export async function discardOrderReview(
 
   revalidateReviewSurfaces();
   revalidatePath('/shopping/settings');
-  redirect('/shopping/review');
+  redirect('/shopping/orders/review');
 }
 
 /**
@@ -388,7 +388,7 @@ export async function attachEmailToOrder(
 
   revalidateReviewSurfaces();
   revalidatePath(`/shopping/orders/${orderId}`);
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   return { message: toast };
 }
 

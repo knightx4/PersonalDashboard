@@ -193,6 +193,6 @@ export type AdvisorTab = (typeof ADVISOR_TABS)[number]['id'];
 
 /** Where an advisor's profile lives. */
 export function advisorHref(key: string, tab?: AdvisorTab): string {
-  const base = `/you/board/advisors/${encodeURIComponent(key)}`;
+  const base = `/you/council/advisors/${encodeURIComponent(key)}`;
   return tab && tab !== 'about' ? `${base}?tab=${tab}` : base;
 }

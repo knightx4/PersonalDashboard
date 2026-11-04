@@ -6,6 +6,13 @@ import { none, tool, type ModuleActions } from '@/lib/agent-actions/types';
  * type are the person's own results, which no agent enters for them.
  */
 export const youActions: ModuleActions = {
+  'app/you/ask/actions.ts': {
+    answerQuestion: none('own', "An answer to a question Dash asked is the person's own words; Dash does not answer for them."),
+    skipQuestion: none('own', "Skipping a question Dash asked is the person's own choice."),
+    unskipQuestion: none('own', "Asking for a skipped question again is the person's own choice."),
+    editAnswer: none('own', "An answer is the person's own words; Dash does not rewrite it."),
+    askDash: none('spends', 'Starts a Dash run that writes new questions, a model cost the person chooses to start with the button.'),
+  },
   'app/you/personality/actions.ts': {
     saveBigFiveAction: none('own'),
     saveTypedAction: none(
@@ -15,6 +22,10 @@ export const youActions: ModuleActions = {
     deleteTypedAction: none('deletes'),
     restoreTypedAction: none('theirs'),
     readAgainAction: tool('read_personality_again'),
+    writeProfileAction: none(
+      'spends',
+      'Writes Dash\'s analysis across all the tests, a Sonnet call offered on the Personality tab only when a test has changed since the last one.',
+    ),
   },
   // Transcripts and courses on Work & school, moved from the Vault (plan #1991.3).
   'app/you/work/actions.ts': {
@@ -91,7 +102,7 @@ export const youActions: ModuleActions = {
     ),
   },
   // The person's marks on the board's minutes (plan #2540.3).
-  'app/you/board/review-actions.ts': {
+  'app/you/council/review-actions.ts': {
     answerBoardReview: none(
       'theirs',
       "How a decision turned out is the person's own verdict on it; the advisors' picks are graded, or their forecasts scored, from that answer (plans #2561.8, #2581.10).",
@@ -101,13 +112,41 @@ export const youActions: ModuleActions = {
       "Whether what would reopen a decision has happened is the person's own call on the tab; the Sunday meeting checks it from their rows otherwise (plan #2581.10).",
     ),
   },
-  'app/you/board/make-actions.ts': {
+  'app/you/council/make-actions.ts': {
     makeDecisionHappen: none(
       'theirs',
       'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
     ),
   },
-  'app/you/board/actions.ts': {
+  // Chat's People tab: threads (plan #2748.6), and adding and editing a person (plan #2748.11).
+  'app/chat/actions.ts': {
+    olderMessages: none('page', 'Reads the page of a thread before the oldest one shown; it serves the page.'),
+    readThread: none('own', "Having a thread open is the person's own reading of what a mentor wrote."),
+    savePersonCard: none(
+      'theirs',
+      "Who the person talks to, and how each one sounds and what they care about, is the person's own call on their mentors; Dash does not reshape them unasked.",
+    ),
+    draftPersonCard: none(
+      'spends',
+      'Has Dash draft or redraft a persona card on the People form, one Sonnet call paid for on each press, which the person decides to make by pressing Draft (plan #2748.11).',
+    ),
+    correctPersonMemory: none('theirs', 'Correcting what a mentor remembers is the person correcting what Dash noted about them.'),
+    removePersonMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them; the line is kept, retired.'),
+  },
+  // The Council's notes, talks and memory (you 0037).
+  'app/you/council/council-actions.ts': {
+    readCouncilNotes: none('own', "Marking a mentor's note read is the person's own reading; it is what lets the council write again."),
+    readMentor: none('page', "Opening a mentor's page reads their notes; it serves the page."),
+    reactToCouncilNote: none('theirs', "Whether a mentor's note was useful, or wrong, is the person's verdict on what Dash wrote in that mentor's voice."),
+    makeTodoFromNote: none('theirs', "Making a mentor's note a todo is the person taking up the advice, an approval Dash does not give for them."),
+    sendMentorMessage: none(
+      'spends',
+      "Sends the person's own message to a mentor and starts a Dash session on the board routine to write the reply.",
+    ),
+    setCommitment: none('own', 'Saying a commitment made to a mentor is done is the person\'s own account of what they did.'),
+    forgetMentorMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them.'),
+  },
+  'app/you/council/actions.ts': {
     voteOnDisagreement: none(
       'theirs',
       "Siding with a seat on the board's disagreement is the person's own call; the next meeting reads it and Dash does not vote for them.",
@@ -174,11 +213,28 @@ export const youActions: ModuleActions = {
       "Who sits on a panel is the person's own call on whom to hear from (plan #2561.12).",
     ),
     deleteBoardPanel: none('deletes'),
+    drawAdvisorAvatar: none(
+      'page',
+      'Draws a look the person is trying on in the avatar editor and keeps nothing; it is the editor\'s preview (plan #2581.3).',
+    ),
+    saveAdvisorAvatar: none('own', "How an advisor is drawn is the person's own choice of look (plan #2581.3)."),
+  },
+  // The Talk tab of an advisor's profile (plan #2581.6).
+  'app/you/council/advisors/[key]/talk-actions.ts': {
+    sendToAdvisor: none(
+      'spends',
+      "Sends the person's own message to an advisor and pays for the advisor's reply; in the Claude app the connector's talk_to_advisor runs the same send.",
+    ),
+    forgetAdvisorMemory: none('theirs', 'Having an advisor forget something is the person correcting what Dash noted about them.'),
   },
   'app/you/details/actions.ts': {
+    letterheadAction: none(
+      'page',
+      'Reads their name and contact details for the cover letter PDF the roles page builds in the browser; an agent reads you.details directly.',
+    ),
     saveDetailsForm: none(
       'own',
-      'Your phone, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
+      'Your name, contact details, website, LinkedIn, citizenship, race, gender and sexuality are what you say about yourself; Dash reads them (plan #2124.3) and does not change them. The fields you name yourself it sets by label with set_detail (plan #2531.3).',
     ),
   },
   // Jobs read from the default résumé, on the same tab (plan #1991.4).

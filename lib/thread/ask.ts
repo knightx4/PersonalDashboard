@@ -26,7 +26,8 @@ import { askMessage } from '@/lib/comments/context';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { pageFor } from '@/lib/sources/catalogue';
-import { whyNotRead } from '@/lib/vault/map/rules';
+import { whyNotRead, type VaultRules } from '@/lib/vault/map/rules';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { acknowledgeThreadTurn, addThreadTurn, loadThread, type AnyClient } from './store';
 import { rowText } from './row-text';
 import type { TalkToolCall } from '@/lib/talk/talk';
@@ -101,7 +102,10 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
 
   // A vault note the map turns away (a journal, one carrying a key) is not
   // sent to a model from its thread either.
-  const notRead = parsed.table === 'obsidian.notes' ? noteNotRead(row) : null;
+  const notRead =
+    parsed.table === 'obsidian.notes'
+      ? noteNotRead(row, await loadVaultRules(input.client, input.userId))
+      : null;
   if (notRead) return refuse(`I do not read this note. ${notRead} Your comment is saved.`);
 
   const page = pageFor(parsed.table)?.page;
@@ -134,8 +138,8 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
 }
 
 /** Why a vault note is kept from a model, or null when it may be read. */
-function noteNotRead(row: Readonly<Record<string, unknown>>): string | null {
+function noteNotRead(row: Readonly<Record<string, unknown>>, rules: VaultRules): string | null {
   const path = typeof row.path === 'string' ? row.path : '';
   const body = typeof row.body === 'string' ? row.body : '';
-  return whyNotRead({ path, body })?.detail ?? null;
+  return whyNotRead({ path, body }, rules)?.detail ?? null;
 }

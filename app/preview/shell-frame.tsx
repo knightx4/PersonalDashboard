@@ -23,15 +23,10 @@ type Frame = {
 const FRAMES: Partial<Record<ModuleId, Frame>> = {
   shopping: {
     sections: [
-      { href: '/shopping/dashboard', label: 'Dashboard', icon: 'dashboard' },
-      { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+      { href: '/shopping/orders', label: 'Now', icon: 'orders' },
+      { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', badge: 3 },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-      { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-      { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-      { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-      { href: '/shopping/share', label: 'Share', icon: 'share' },
-      { href: '/shopping/review', label: 'Review', icon: 'review', badge: 3 },
     ],
     settingsHref: '/shopping/settings',
     settingsLabel: 'Shopping settings',
@@ -40,13 +35,11 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
     sections: [
       { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-      { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
       { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
       { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
       { href: '/jobs/material', label: 'Material', icon: 'answers' },
-      { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
     ],
     settingsHref: '/jobs/settings',
     settingsLabel: 'Job search settings',
@@ -65,7 +58,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
       { href: '/you/places', label: 'Places', icon: 'places' },
       { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
       { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-      { href: '/you/board', label: 'Board', icon: 'board' },
+      { href: '/you/council', label: 'Council', icon: 'board' },
     ],
   },
   dev: {

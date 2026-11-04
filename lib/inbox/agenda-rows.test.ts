@@ -62,7 +62,7 @@ describe('agendaInboxRow', () => {
 
   it('keeps the link on the title when there is something else to press', () => {
     const row = agendaInboxRow(
-      entry(item({ completable: true, action: { href: '/shopping/returns', label: 'Returns' } })),
+      entry(item({ completable: true, action: { href: '/shopping/inventory/returns', label: 'Returns' } })),
       ACTIONS,
       { return_deadlines: ALL },
       '2026-03-10',

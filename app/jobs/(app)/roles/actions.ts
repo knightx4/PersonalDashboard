@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
-import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { descriptionUpdate, experienceYearsError, saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { countEvidenceUse, saveAnswerEdit, setCanonicalAnswer } from '@/lib/jobs/answers/edit';
 import { recordHandEditOrigins } from '@/lib/jobs/fact-origins';
 import { isRoleKind } from '@/lib/jobs/role-kind';
@@ -33,6 +33,8 @@ export async function updateRole(
     compMinCents?: number | null;
     compMaxCents?: number | null;
     compSource?: 'posted' | 'recruiter' | 'estimate' | null;
+    experienceMinYears?: number | null;
+    experienceMaxYears?: number | null;
     kind?: string;
   },
 ): Promise<{ error: string | null }> {
@@ -51,6 +53,25 @@ export async function updateRole(
   if (patch.compMinCents !== undefined) update.comp_min_cents = patch.compMinCents;
   if (patch.compMaxCents !== undefined) update.comp_max_cents = patch.compMaxCents;
   if (patch.compSource !== undefined) update.comp_source = patch.compSource;
+  if (patch.experienceMinYears !== undefined || patch.experienceMaxYears !== undefined) {
+    // A save that sets one end is checked against the other as it is stored.
+    let min = patch.experienceMinYears;
+    let max = patch.experienceMaxYears;
+    if (min === undefined || max === undefined) {
+      const { data: stored } = await supabase
+        .from('roles')
+        .select('experience_min_years, experience_max_years')
+        .eq('id', roleId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (min === undefined) min = (stored?.experience_min_years as number | null) ?? null;
+      if (max === undefined) max = (stored?.experience_max_years as number | null) ?? null;
+    }
+    const bad = experienceYearsError(min, max);
+    if (bad) return { error: bad };
+    if (patch.experienceMinYears !== undefined) update.experience_min_years = patch.experienceMinYears;
+    if (patch.experienceMaxYears !== undefined) update.experience_max_years = patch.experienceMaxYears;
+  }
   if (patch.kind !== undefined) {
     if (!isRoleKind(patch.kind)) return { error: 'That is not a kind of role.' };
     update.kind = patch.kind;

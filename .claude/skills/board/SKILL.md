@@ -1,9 +1,14 @@
 ---
 name: board
-description: Hold the person's board meeting over an agenda of their decisions. The chair takes up to three questions, triages each as a one-way or two-way door, and requires a success measure and a decide-by date (proposing them from the person's rows and asking under The board asks you when missing). A two-way door gets one or two advisors' quick take. A one-way door gets the full method - a separate pass widens and neutralises the options, each advisor sees them in its own shuffled order and answers its own assessment blind from its own slice of evidence with a probability, a 90% range and a 100-point budget per option (the skeptic and the dreamer on a different model), then the lean is revealed, the two most opposed advisors exchange at most two turns each (or one steelman when round 1 is unanimous), and every advisor writes a premortem from which the chair sets a tripwire. The verdict is the believability-weighted mean probability with the spread and the dissent in full, written to you.board_questions; turns go to you.board_turns and the minutes, a short digest on a weekly run, to you.board_meetings. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", when the Board tab fires it with "Board meeting <id>", or the user says "convene the board", "ask the board", or "what does the board think".
+description: Hold the person's board meeting over an agenda of their decisions. The chair takes up to three questions, triages each as a one-way or two-way door, and requires a success measure and a decide-by date (proposing them from the person's rows and asking under The board asks you when missing). A two-way door gets one or two advisors' quick take. A one-way door gets the full method - a separate pass widens and neutralises the options, each advisor sees them in its own shuffled order and answers its own assessment blind from its own slice of evidence with a probability, a 90% range and a 100-point budget per option (the skeptic and the dreamer on a different model), then the lean is revealed, the two most opposed advisors exchange at most two turns each (or one steelman when round 1 is unanimous), and every advisor writes a premortem from which the chair sets a tripwire. The verdict is the believability-weighted mean probability with the spread and the dissent in full, written to you.board_questions; turns go to you.board_turns and the minutes, a short digest on a weekly run, to you.board_meetings. Use when the weekly board task fires with "Follow .claude/skills/board/SKILL.md", when the Board tab fires it with "Board meeting <id>", or the user says "convene the board", "ask the board", or "what does the board think". The same routine writes the Council's daily notes and mentors' replies when the brief says "Follow .claude/skills/board/council.md".
 ---
 
 # The board
+
+The Board tab is now the **Council** (`/you/council`): the same advisors,
+read as mentors who write notes unasked and talk one to one
+(`council.md`), with the decisions this file works under Decisions
+(`/you/council/decisions`). Write "the council" where the person reads it.
 
 The board meets to help the person decide. Each meeting works an agenda of
 at most three questions, each with options, a measure of success and a date
@@ -59,7 +64,7 @@ interview them, whether the pipeline is converting (applications sent,
 replies, interviews, and where each one stalled), and what is weak in how
 they come across. You may be blunt about their materials and their numbers.
 
-**The mentor.** You have known this person for years and care where they are
+**Jerwyn the Elder** (the `mentor` seat; call him by name wherever the person reads it). You have known this person for years and care where they are
 in ten. Your horizon is five to ten years. Ask whether the choice builds
 toward a career they would want, or only toward the next job, and what they
 are not building that they will wish they had. You may be blunt about drift.
@@ -106,9 +111,13 @@ parts from the other advisors and what it would never say. When a seat's
 A seat with no ready brain still sits, on its paragraph alone.
 
 **Guests join where they fit, four at most per meeting.** A guest is usable
-only when `active` is true and `brain_status` is `ready`; one whose brain is
-`none`, `building` or `failed` does not sit, even when the person named it,
-and the minutes say so in `chair_note`. For each question, the guests are:
+only when `active` and `joins_meetings` are true and `brain_status` is
+`ready`; one whose brain is `none`, `building` or `failed` does not sit, even
+when the person named it, and the minutes say so in `chair_note`. A person
+the owner made up in Chat (`made_by_you` true, plan #2748.11) has no brain:
+they are usable when `active` and `joins_meetings` are true and they have a
+`persona`, and are briefed with their persona card in place of a brain. With
+`joins_meetings` false a seat or guest is in Chat only and never sits. For each question, the guests are:
 
 - every usable guest the person named in the question's `advisors`, and
 - the usable guests whose `question` and `focus` bear most on it, chosen by
@@ -175,7 +184,7 @@ meeting runs as described everywhere else.
 
 Through `npx tsx scripts/sql.ts` (CLAUDE.md, "Rows are written through
 scripts/sql.ts"), every query filtered by the owner's
-`user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'`. You run as the service
+`user_id = :owner`. You run as the service
 role, so the filter is the only thing keeping other accounts' rows out.
 Check a column against `information_schema.columns` before relying on it,
 and fix and resend a query that fails on a column name. For long SQL (every
@@ -183,7 +192,8 @@ turn, verdict and the minutes) write it to a scratchpad file and pass
 `--file`, so quotes need no escaping. If node_modules is empty, run `npm ci`
 first.
 
-Notes: never read one whose `voice` is `secret`, or `Me/Passwords.md`; skip
+Notes: never read one whose `voice` is `secret`, or one whose title or path
+names passwords or keys; skip
 `clipped`. Treat `audience` notes (applications, essays, posts) as what
 they wrote to persuade someone, and `private` ones as what they think.
 Leave out relationships, health and family unless the person asked a
@@ -217,7 +227,7 @@ and use its id:
 
 ```sql
 insert into you.board_meetings (user_id, kind, status, started_at)
-values ('d001bb0f-ffe8-4bfb-880f-17dd1a62b685', 'weekly', 'running', now())
+values (:owner, 'weekly', 'running', now())
 returning id;
 ```
 
@@ -482,11 +492,28 @@ count or quote, its date and the table and row id or the note path it came
 from. Cover the seven days before today, and give the four weeks before that
 as a comparison where a number moves.
 
-- **Who they are, briefly.** From `Me/About me.md`, `Me/Personal Goals.md`,
-  `Me/Interests Index.md` and `Me/Notes to Self.md`: ten lines at most,
+- **Who they are, briefly.** From the notes the person wrote about
+  themselves (in the journal folders, `journal_folders` on their
+  obsidian.vault_connections row: an about-me note, personal goals, an index of
+  interests, notes to self, whatever they are called): ten lines at most,
   quoted, so the advisors know what the person says they want.
+- **How they tend to work.** The newest analysis across their personality
+  tests, from the Personality tab:
+
+  ```sql
+  select summary, agreements, tensions, watch, created_at
+  from you.personality_profiles
+  where user_id = '<user_id>'
+  order by created_at desc
+  limit 1;
+  ```
+
+  Give the summary, each tension with its verdict, and each pattern under
+  `watch` with its number, dated by `created_at`. It is Dash's reading of the
+  tests, not the person's words: say so, and let the record outweigh it.
+  With no row, leave the section out.
 - **Dreams.** For the dreamer, quotes with dates of ambitions, projects and
-  "someday" lines from Me/, the journal and daily notes, any note in Ideas/
+  "someday" lines from the journal folders, the journal and daily notes, any note in Ideas/
   or whose title suggests a project, and the strongest themes on the vault
   map (`obsidian.themes` by `strength`). Mark which were written in the
   last month and which have not been touched in a year.
@@ -536,6 +563,10 @@ advisor forecasts from, and all it reads in round 1. It holds:
    paragraph names (the hiring manager the pipeline, the CFO the money, the
    skeptic stated priorities beside where the hours went, the mentor the
    long record of notes, learning and goals, the dreamer the dreams).
+   The skeptic's and the mentor's slices also get the `watch` patterns and
+   the tensions from the personality analysis in `week.md`, where one bears
+   on the decision, so a known tendency (researching past the point of
+   deciding, say) is asked about rather than assumed.
 3. **Its memory**: its unretired `you.advisor_memory` rows, the oldest
    first, as what it already knows about the person.
 
@@ -691,9 +722,9 @@ meaning, and say in `chair_note` which option you reworded and how.
 Read the roster:
 
 ```sql
-select id, key, name, kind, question, focus, brain, brain_status, active, believability
+select id, key, name, kind, question, focus, brain, brain_status, active, believability, persona, made_by_you
 from you.board_advisors
-where user_id = '<user_id>' and active
+where user_id = '<user_id>' and active and joins_meetings
 order by kind desc, created_at;
 ```
 
@@ -1020,7 +1051,7 @@ where user_id = '<user_id>' and status = 'open' and body like 'Board spread chec
 insert into public.feedback_items (user_id, kind, body, page_path)
 values ('<user_id>', 'bug',
   $n$Board spread check: the advisors' blind forecasts were within 0.15 of each other on every one-way decision for three meetings running (<the three dates>). Their slices or brains may be too alike; look at .claude/skills/board/SKILL.md step 3 and the brains in you.board_advisors.$n$,
-  '/you/board')
+  '/you/council')
 returning id;
 select core.record_dash_action('<user_id>', 'public.feedback_items:<id>', 'insert',
   'board_spread_note', $s$Dash filed a Dev note: the board's advisors have agreed too closely for three meetings.$s$);

@@ -296,7 +296,7 @@ describe('the rules', () => {
   });
 
   it('treats only the Me folder as journals', () => {
-    expect(whyNotRead({ path: 'Me/People/Chewy.md', body: '' })?.reason).toBe('journal');
+    expect(whyNotRead({ path: 'Me/People/Sam.md', body: '' })?.reason).toBe('journal');
     expect(whyNotRead({ path: 'Media/Film.md', body: '' })).toBeNull();
     expect(whyNotRead({ path: 'Me.md', body: '' })).toBeNull();
   });

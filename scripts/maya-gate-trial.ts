@@ -6,7 +6,7 @@
  *   npx tsx scripts/maya-gate-trial.ts <notes.json> [results.json]
  *
  * The notes file is a JSON array of { id, path, title, body }, exported from
- * obsidian.notes (the query is in docs/trials/2026-09-30-maya-gate.md). The
+ * obsidian.notes (the query was in the trial's write-up, which is not kept). The
  * body may be cut to the first MAYA_GATE_SAMPLE_CHARS characters, since that
  * is all Jev reads. Needs TYPESAFE_API_KEY. The refusals, the question, the
  * state and the line are the ones the hourly job uses (lib/vault/maya/gate.ts),

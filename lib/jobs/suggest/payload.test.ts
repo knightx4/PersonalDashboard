@@ -15,10 +15,10 @@ describe('parsePeoplePayload', () => {
   const entry = (over: Record<string, unknown> = {}) => ({
     person_name: 'Dana Wu',
     person_title: 'Director of Strategic Finance',
-    company: 'Ramp',
-    source_url: 'https://ramp.com/team#dana',
-    search_query: 'Dana Wu Ramp',
-    headline: 'Ask Dana Wu about strategic finance at Ramp',
+    company: 'Globex',
+    source_url: 'https://globex.example/team#dana',
+    search_query: 'Dana Wu Globex',
+    headline: 'Ask Dana Wu about strategic finance at Globex',
     why: 'She moved from FP&A into strategic finance, the step you want.',
     move: '1. Send the note.',
     channel: 'linkedin_connect',
@@ -32,7 +32,7 @@ describe('parsePeoplePayload', () => {
       { people: new Set([personKey('Sam Old')]) },
     );
     expect(out.map((s) => s.personName)).toEqual(['Dana Wu', 'Lee Park']);
-    expect(out[0]).toMatchObject({ sourceUrl: 'https://ramp.com/team', searchQuery: 'Dana Wu Ramp', channel: 'linkedin_connect' });
+    expect(out[0]).toMatchObject({ sourceUrl: 'https://globex.example/team', searchQuery: 'Dana Wu Globex', channel: 'linkedin_connect' });
     expect(out[0].message).toBe('Hi Dana, I read your post on planning cycles.');
   });
 
@@ -75,8 +75,8 @@ describe('parsePeoplePayload', () => {
   });
 
   it('builds the LinkedIn people search', () => {
-    expect(linkedinSearchUrl('FP&A Ramp')).toBe(
-      'https://www.linkedin.com/search/results/people/?keywords=FP%26A%20Ramp',
+    expect(linkedinSearchUrl('FP&A Globex')).toBe(
+      'https://www.linkedin.com/search/results/people/?keywords=FP%26A%20Globex',
     );
   });
 });
@@ -129,7 +129,7 @@ describe('excluded industries', () => {
     expect(isExcluded(words, 'Digital assets', 'Bitwise Asset Management')).toBe(true);
     expect(isExcluded(words, 'Aerospace and defence')).toBe(true);
     expect(isExcluded(words, 'Pharmaceuticals')).toBe(true);
-    expect(isExcluded(words, 'AI software for finance', 'Hebbia', 'Forward Deployed Investor')).toBe(false);
+    expect(isExcluded(words, 'AI software for finance', 'Initech', 'Forward Deployed Investor')).toBe(false);
     expect(isExcluded(words, 'Definitive financial data')).toBe(false);
     expect(isExcluded([], 'Crypto exchange')).toBe(false);
   });
@@ -144,11 +144,11 @@ describe('excluded industries', () => {
       move: '1. Apply.',
     });
     const openings = parseOpeningsPayload(
-      { openings: [opening('Chainalysis', 'Blockchain analytics', 1), opening('Hebbia', 'AI for finance', 2)] },
+      { openings: [opening('Chainalysis', 'Blockchain analytics', 1), opening('Initech', 'AI for finance', 2)] },
       { urls: new Set(), roles: new Set() },
       ['crypto'],
     );
-    expect(openings.map((o) => o.company)).toEqual(['Hebbia']);
+    expect(openings.map((o) => o.company)).toEqual(['Initech']);
 
     const person = (company: string, industry: string, name: string) => ({
       person_name: name,
@@ -161,7 +161,7 @@ describe('excluded industries', () => {
       message: 'Hi.',
     });
     const people = parsePeoplePayload(
-      { suggestions: [person('Anduril', 'Defense technology', 'Ann Lee'), person('Ramp', 'Fintech', 'Bo Chen')] },
+      { suggestions: [person('Anduril', 'Defense technology', 'Ann Lee'), person('Globex', 'Fintech', 'Bo Chen')] },
       { people: new Set() },
       ['defense'],
     );

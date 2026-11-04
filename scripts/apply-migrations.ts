@@ -36,10 +36,9 @@ import {
   unappliedMigrations,
   type MigrationFile,
 } from '../lib/plan/migrations';
+import { supabaseProjectRef } from '../lib/db/project';
 
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF ?? 'asjztutnqxbecruvyrbj';
-const API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/migrations`;
-const QUERY_API = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;
+const MANAGEMENT = 'https://api.supabase.com/v1/projects';
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 const dryRun = process.argv.includes('--dry-run');
@@ -53,6 +52,30 @@ if (!token) {
   process.exit(0);
 }
 
+/**
+ * The project to apply to, named in the environment (lib/db/project.ts) or,
+ * when nothing names it, the one project the access token can see. A token
+ * that sees several needs SUPABASE_PROJECT_REF set to choose between them.
+ */
+async function projectRef(): Promise<string> {
+  const named = supabaseProjectRef();
+  if (named) return named;
+  const projects = (await api('GET', undefined, MANAGEMENT)) as Array<{
+    id?: string;
+    ref?: string;
+  }>;
+  const refs = projects
+    .map((project) => project.ref ?? project.id)
+    .filter((ref): ref is string => !!ref);
+  if (refs.length === 1) return refs[0];
+  throw new Error(
+    `The access token sees ${refs.length} projects. Set SUPABASE_PROJECT_REF to the one this app uses.`,
+  );
+}
+
+let API = '';
+let QUERY_API = '';
+
 async function api(method: 'GET' | 'POST', body?: unknown, url = API): Promise<unknown> {
   const res = await fetch(url, {
     method,
@@ -65,6 +88,9 @@ async function api(method: 'GET' | 'POST', body?: unknown, url = API): Promise<u
 }
 
 async function main(): Promise<number> {
+  const ref = await projectRef();
+  API = `${MANAGEMENT}/${ref}/database/migrations`;
+  QUERY_API = `${MANAGEMENT}/${ref}/database/query`;
   const root = join(process.cwd(), 'supabase');
   const files: MigrationFile[] = readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('migrations'))

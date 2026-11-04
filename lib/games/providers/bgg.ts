@@ -8,6 +8,7 @@
  */
 import { ProviderError, type ProviderFailure } from '@/lib/books/providers/http';
 import type { GameEditionCandidate } from '@/lib/games/types';
+import { appUserAgent } from '@/lib/net/user-agent';
 
 const BASE_URL = 'https://boardgamegeek.com/xmlapi2';
 /** Same API, different edge. Tried when the primary host refuses us. */
@@ -17,8 +18,7 @@ const MIRROR_URL = 'https://api.geekdo.com/xmlapi2';
  * BGG sits behind bot protection that rejects a bare runtime User-Agent —
  * which is exactly what a serverless function sends by default.
  */
-const USER_AGENT =
-  'ShoppingManager/1.0 (personal inventory tool; +https://github.com/knightx4/ShoppingManager)';
+const USER_AGENT = appUserAgent('ShoppingManager/1.0', 'personal inventory tool');
 
 /** BGG answers 202 while it builds a response; the docs say retry. */
 const QUEUE_RETRY_DELAYS_MS = [1200, 2500];

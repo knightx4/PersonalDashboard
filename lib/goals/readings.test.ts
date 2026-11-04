@@ -26,8 +26,8 @@ const day = (iso: string) => iso;
 
 describe('parseNumber', () => {
   it('reads a number as people type it', () => {
-    expect(parseNumber('18,250.40')).toBe(18250.4);
-    expect(parseNumber('$18,250')).toBe(18250);
+    expect(parseNumber('9,400.40')).toBe(9400.4);
+    expect(parseNumber('$9,400')).toBe(9400);
     expect(parseNumber(' 182.5 ')).toBe(182.5);
     expect(parseNumber('-3')).toBe(-3);
     expect(parseNumber('.5')).toBe(0.5);
@@ -109,7 +109,7 @@ describe('parseReadingFields', () => {
 
 describe('formatReading', () => {
   it('puts a currency sign in front and any other unit after', () => {
-    expect(formatReading(18250.4, '$')).toBe('$18,250.4');
+    expect(formatReading(9400.4, '$')).toBe('$9,400.4');
     expect(formatReading(-20, '$')).toBe('-$20');
     expect(formatReading(182.5, 'lb')).toBe('182.5 lb');
     expect(formatReading(3, null)).toBe('3');

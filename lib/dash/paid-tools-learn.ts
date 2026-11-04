@@ -7,9 +7,6 @@ import { loadSubject } from '@/lib/learn/graph/load';
 import { addUnit } from '@/lib/learn/lessons/plan-edit';
 import { planOwnerFor } from '@/lib/learn/lessons/plan-store';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
-import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
-import { settleWanted } from '@/lib/learn/levels/store';
 import { writeQuizQuestionsFor } from '@/lib/learn/quiz/write-run';
 import { summarizeReadingFor } from '@/lib/learn/tracks/summarize-run';
 import type { DashPaidCheckContext, DashPaidPrepared, DashPaidTool } from './registry';
@@ -69,7 +66,7 @@ const draftTopicTool: DashPaidTool = {
   workspace: 'learn',
   definition: {
     name: 'draft_topic',
-    description: `Draft a Learn topic with its ten levels, approved as soon as it is drafted when every row cites a source (otherwise kept as a draft on its page), when they name something they want to know (one topic, such as DCF or Braess's paradox). Pass subject_id to add it to that subject's lens, or for_topic_id when it is a topic another topic's links want. ${QUEUED}`,
+    description: `Queue a Learn topic to be drafted with its ten levels by Dash's routine, which takes a few minutes, approved as soon as it is drafted, when they name something they want to know (one topic, such as DCF or Braess's paradox). Pass subject_id to add it to that subject's lens, or for_topic_id when it is a topic another topic's links want. ${QUEUED}`,
     input_schema: {
       type: 'object',
       properties: {
@@ -90,7 +87,6 @@ const draftTopicTool: DashPaidTool = {
     const name = text(args, 'name');
     if (name.length < 2) return { ok: false, error: 'Name what they want to know.' };
     if (name.length > 300) return { ok: false, error: 'Name one topic, in under 300 characters.' };
-    if (!hasKey()) return NO_KEY;
     const scope = text(args, 'scope').slice(0, 1000) || null;
     const subjectId = text(args, 'subject_id') || null;
     const forTopicId = text(args, 'for_topic_id') || null;
@@ -113,39 +109,24 @@ const draftTopicTool: DashPaidTool = {
     };
   },
   async run(ctx, args) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { ok: false, error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
     const learn = await learnOf(ctx);
     const name = String(args.name);
+    // Queued for the routine (learn 0193), with what was done here once it was drafted.
     const result = await runTopicDraft(learn, ctx.userId, {
       goal: name,
       scope: typeof args.scope === 'string' ? args.scope : null,
-      anthropicApiKey: apiKey,
+      after: {
+        approve: true,
+        ...(typeof args.subjectId === 'string' ? { subjectLens: args.subjectId } : {}),
+        ...(typeof args.forTopicId === 'string' ? { wanted: { topicId: args.forTopicId, name } } : {}),
+      },
     });
     if (!result.ok) return { ok: false, error: result.detail };
-    if (typeof args.forTopicId === 'string') {
-      await settleWanted(learn, ctx.userId, { topicId: args.forTopicId, name, draftId: result.id });
-    }
-    // The draft is kept even if this fails: it is on the map and can be added again.
-    if (typeof args.subjectId === 'string') {
-      await addToSubjectLens(learn, ctx.userId, args.subjectId, result.id).catch((error: unknown) =>
-        console.error('[dash draft_topic] subject lens', error instanceof Error ? error.message : error),
-      );
-    }
-    // The draft is kept even if approving fails: its page says it is held.
-    const approval = await approveDraftedTopic(learn, ctx.userId, result.id).catch((error: unknown) => {
-      console.error('[dash draft_topic] approve', error instanceof Error ? error.message : error);
-      return null;
-    });
     return {
       ok: true,
-      subjectRef: toRef('learn.topics', result.id),
+      subjectRef: toRef('learn.topic_draft_requests', result.requestId),
       op: 'insert',
-      summary: !approval?.approved
-        ? `Dash drafted the topic ${name}, kept as a draft on its page because approving it failed.`
-        : approval.personal > 0
-          ? `Dash drafted and approved the topic ${name}, with ${approval.personal} ${approval.personal === 1 ? 'row' : 'rows'} that name no source marked personal.`
-          : `Dash drafted and approved the topic ${name}.`,
+      summary: `Dash queued the topic ${name} to be drafted in a routine. ${result.detail}`,
     };
   },
 };

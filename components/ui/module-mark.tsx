@@ -172,6 +172,25 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
       </>
     ),
   },
+  bubbles: {
+    // Two speech bubbles: theirs in colour behind, with its tail to the right,
+    // and yours in glass in front, tail to the left, with the three dots of
+    // someone typing. The dots are the one detail; Dash's own mark is the
+    // visor, so the bubbles say "conversation" rather than "assistant".
+    back: (
+      <path d="M13 2.4h4.4a4 4 0 0 1 4 4v1.2a4 4 0 0 1-1.7 3.3l1.3 2.7-3.7-2H13a4 4 0 0 1-4-4V6.4a4 4 0 0 1 4-4Z" />
+    ),
+    front:
+      'M7.2 8.4h5.8a4.6 4.6 0 0 1 4.6 4.6v.8a4.6 4.6 0 0 1-4.6 4.6H8.8l-4.4 3.2v-3.8A4.6 4.6 0 0 1 2.6 13.8v-.8A4.6 4.6 0 0 1 7.2 8.4Z',
+    lines: null,
+    dots: (
+      <>
+        <circle cx={6.3} cy={13.4} r={1.15} />
+        <circle cx={10.1} cy={13.4} r={1.15} />
+        <circle cx={13.9} cy={13.4} r={1.15} />
+      </>
+    ),
+  },
   person: {
     // A bust: the head is the colour, sitting into a pair of glass shoulders,
     // and the V of a collar is what makes the pane shoulders rather than a hill.
@@ -179,6 +198,16 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
     front:
       'M9 12.4h6a6.4 6.4 0 0 1 6.4 6.4v.6a2 2 0 0 1-2 2H4.6a2 2 0 0 1-2-2v-.6A6.4 6.4 0 0 1 9 12.4Z',
     lines: <path d="M9.4 13.6l2.6 2.8 2.6-2.8" />,
+  },
+  wallet: {
+    // A glass wallet with a banknote rising out of it at a slant, and the
+    // clasp's tab and stud on its right edge. The slant is what keeps the
+    // note from reading as Dev's window or Todo's card behind a pane.
+    back: <rect x={7.6} y={2.8} width={13} height={8.4} rx={2} transform="rotate(-12 14.1 7)" />,
+    front:
+      'M6 8.6h12.2a3.2 3.2 0 0 1 3.2 3.2v6a3.2 3.2 0 0 1-3.2 3.2H6a3.2 3.2 0 0 1-3.2-3.2v-6A3.2 3.2 0 0 1 6 8.6Z',
+    lines: <path d="M20.6 12.6h-3.2a2.2 2.2 0 0 0 0 4.4h3.2" />,
+    dots: <circle cx={17.5} cy={14.8} r={0.95} />,
   },
   terminal: {
     back: <rect x={9.4} y={2.6} width={12} height={9.2} rx={2.4} />,

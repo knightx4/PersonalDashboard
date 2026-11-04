@@ -15,7 +15,7 @@ describe('pairing a message with the rounds already booked', () => {
   });
 
   it('pairs a whole schedule stored in the wrong zone', () => {
-    // The real Galaxy superday: the invites carry `Eastern Standard Time`,
+    // The real Globex superday: the invites carry `Eastern Standard Time`,
     // which Intl does not know, so all four are stored four hours early. The
     // gaps between them are still exactly the gaps the body describes.
     const pairs = pairSlots(

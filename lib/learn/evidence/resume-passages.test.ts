@@ -2,25 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { firstLineOf, isRoleLine, isSectionHeader, splitResume } from './resume-passages';
 
 const RESUME = [
-  'ALEX EXAMPLE',
-  'Tel: (555) 000-0000 | Email: alex@example.com | New York, NY',
+  'ALEX RIVERA',
+  'Tel: (555) 000-0000 | Email: alex@example.com | Denver, CO',
   'EDUCATION',
-  'NORTHFIELD SCHOOL OF MANAGEMENT Master of Business Administration (MBA) • Tutor: Accounting, Finance',
-  '• Teaching Assistant: Global Macroeconomy',
-  'New Haven, CT',
+  'RIVERSIDE SCHOOL OF MANAGEMENT Master of Business Administration (MBA) • Peer Tutor: Statistics, Economics',
+  '• Teaching Assistant: Operations Management',
+  'Portland, OR',
   '2024 - 2026',
-  'SOUTHWEST UNIVERSITY Waco, TX',
-  'Master of Accountancy 2016 - 2020',
-  '• GPA: 4.0 / 4.0',
+  'STATE UNIVERSITY Boise, ID',
+  'Master of Science in Accounting 2016 - 2020',
+  "• Dean's List: six semesters",
   'PROFESSIONAL EXPERIENCE',
-  'ACME AUDIT Dallas, TX',
+  'ACME AUDIT Denver, CO',
   'Assurance Senior 2020 - 2023',
-  '• Built an automated revenue testing system from scratch that replaced manual sampling across 100%',
-  'of recognized revenue, cutting testing time from hours to seconds',
-  '• Assessed 10+ financial reporting processes for a first SOX implementation.',
+  '• Wrote a reconciliation workbook that matched inventory counts to the ledger for twelve warehouses,',
+  'replacing a week of manual tie-outs each quarter with one afternoon of review',
+  "• Documented 15 purchasing controls for a client's first internal controls review.",
   'SELECTED PROJECTS',
-  '• Cash Flow Forecasting Platform: Rolling 90-day cash forecast model built for a small company.',
-  'Built-in Monte Carlo simulation quantifies the probability of falling below a threshold.',
+  '• Bakery Budget Model: Monthly spending and sales model built for a family-run bakery.',
+  'Built-in scenario tables show how many months of cash remain under three levels of sales.',
 ].join('\r\n');
 
 describe('splitting a résumé into passages', () => {
@@ -28,12 +28,12 @@ describe('splitting a résumé into passages', () => {
 
   it('makes one passage per bullet and none for the name and contact lines', () => {
     expect(passages.map((p) => p.first_line)).toEqual([
-      'Tutor: Accounting, Finance',
-      'Teaching Assistant: Global Macroeconomy',
-      'GPA: 4.0 / 4.0',
-      'Built an automated revenue testing system from scratch that replaced manual sampling across 100% of recognized revenue,…',
-      'Assessed 10+ financial reporting processes for a first SOX implementation.',
-      'Cash Flow Forecasting Platform: Rolling 90-day cash forecast model built for a small company. Built-in Monte Carlo simu…',
+      'Peer Tutor: Statistics, Economics',
+      'Teaching Assistant: Operations Management',
+      "Dean's List: six semesters",
+      'Wrote a reconciliation workbook that matched inventory counts to the ledger for twelve warehouses, replacing a week of…',
+      "Documented 15 purchasing controls for a client's first internal controls review.",
+      'Bakery Budget Model: Monthly spending and sales model built for a family-run bakery. Built-in scenario tables show how…',
     ]);
     expect(passages.some((p) => p.body.includes('Email'))).toBe(false);
   });
@@ -43,21 +43,21 @@ describe('splitting a résumé into passages', () => {
     expect(revenue.body).toBe(
       [
         'PROFESSIONAL EXPERIENCE',
-        'ACME AUDIT Dallas, TX',
+        'ACME AUDIT Denver, CO',
         'Assurance Senior 2020 - 2023',
-        'Built an automated revenue testing system from scratch that replaced manual sampling across 100% of recognized revenue, cutting testing time from hours to seconds',
+        'Wrote a reconciliation workbook that matched inventory counts to the ledger for twelve warehouses, replacing a week of manual tie-outs each quarter with one afternoon of review',
       ].join('\n'),
     );
   });
 
   it('keeps the role lines for every bullet under the role', () => {
     expect(passages[4].body).toContain('Assurance Senior 2020 - 2023');
-    expect(passages[0].body).toContain('NORTHFIELD SCHOOL OF MANAGEMENT');
+    expect(passages[0].body).toContain('RIVERSIDE SCHOOL OF MANAGEMENT');
   });
 
   it('starts a new entry at a name in capitals, leaving the last one\'s place and dates behind', () => {
     expect(passages[2].body).toBe(
-      ['EDUCATION', 'SOUTHWEST UNIVERSITY Waco, TX', 'Master of Accountancy 2016 - 2020', 'GPA: 4.0 / 4.0'].join('\n'),
+      ['EDUCATION', 'STATE UNIVERSITY Boise, ID', 'Master of Science in Accounting 2016 - 2020', "Dean's List: six semesters"].join('\n'),
     );
   });
 
@@ -75,12 +75,12 @@ describe('splitting a résumé into passages', () => {
 describe('reading a résumé line', () => {
   it('knows a section name from a line in capitals', () => {
     expect(isSectionHeader('PROFESSIONAL EXPERIENCE')).toBe(true);
-    expect(isSectionHeader('EY Dallas, TX')).toBe(false);
+    expect(isSectionHeader('ACME AUDIT Denver, CO')).toBe(false);
   });
 
   it('knows a role line by its dates or place', () => {
     expect(isRoleLine('Assurance Senior 2020 - 2023')).toBe(true);
-    expect(isRoleLine('New Haven, CT')).toBe(true);
+    expect(isRoleLine('Portland, OR')).toBe(true);
     expect(isRoleLine('of recognized revenue, cutting testing time')).toBe(false);
   });
 

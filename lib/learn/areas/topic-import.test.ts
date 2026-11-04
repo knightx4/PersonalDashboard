@@ -101,3 +101,11 @@ describe('fetchAliases', () => {
     await expect(fetchAliases(async () => 'Too many requests', ['A'])).rejects.toThrow(/not one/);
   });
 });
+
+describe('livePorts.get', () => {
+  it('refuses a private address through the checked fetcher', async () => {
+    const { livePorts } = await import('@/lib/learn/areas/topic-import');
+    await expect(livePorts.get('https://127.0.0.1/w/api.php')).rejects.toThrow(/could not be read \(blocked/);
+    await expect(livePorts.get('http://en.wikipedia.org/w/api.php')).rejects.toThrow(/blocked/);
+  });
+});

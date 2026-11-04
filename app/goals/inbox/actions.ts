@@ -3,12 +3,16 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { answerFrom } from '@/lib/core/run-questions';
+import { answerSessionQuestion } from '@/lib/core/session-questions-store';
+import type { AnswerRunState } from '@/components/runs/run-answer';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { snoozeRow, unsnoozeRow } from '@/lib/core/inbox-snooze-store';
 import { dayStartIn, snoozeDay } from '@/lib/core/snooze-days';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
 import { leaveQuestions } from '@/lib/goals/shaping-store';
+import { clearStepNoticeSeen, markStepNoticeSeen } from '@/lib/goals/steps-store';
 import type { TodayKind } from '@/lib/goals/today';
 import { formatDay } from '@/lib/goals/dates';
 import { todayIn } from '@/lib/todo/tasks/model';
@@ -84,4 +88,64 @@ export async function leaveQuestionsAction(form: FormData): Promise<SnoozeState>
   } catch {
     return { error: 'Could not close those questions. Try again.' };
   }
+}
+
+/**
+ * Done on the notice of a step Dash finished (plan #2611.2): the notice is
+ * marked seen, as opening the step marks it, and leaves the Inbox and its
+ * badge. Only a finished step of the signed-in account's that asked to be
+ * announced takes it.
+ */
+// latency: optimistic
+export async function dismissStepNoticeAction(form: FormData): Promise<SnoozeState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    const changed = await markStepNoticeSeen(await createGoalsClient(), id.data, user.id);
+    if (!changed) return { error: 'That notice was already gone.' };
+    revalidatePath('/goals', 'layout');
+    return { message: 'Done.' };
+  } catch {
+    return { error: 'Could not put that notice away. Try again.' };
+  }
+}
+
+/** Undo on that Done: the notice is back in the Inbox. */
+// latency: optimistic
+export async function restoreStepNoticeAction(form: FormData): Promise<SnoozeState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    await clearStepNoticeSeen(await createGoalsClient(), id.data, user.id);
+    revalidatePath('/goals', 'layout');
+    return { message: 'Brought back.' };
+  } catch {
+    return { error: 'Could not bring that notice back. Try again.' };
+  }
+}
+
+/**
+ * Your answer to a session that stopped to ask you something (plan #2800.4).
+ * The form names the session's report in `runId`, the field the shared answer
+ * box posts; the rules, and the way back to the session, are in
+ * lib/core/session-questions-store.ts.
+ */
+// latency: pending
+export async function answerSessionQuestionAction(_prev: AnswerRunState, form: FormData): Promise<AnswerRunState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('runId'));
+  if (!id.success) return { error: 'Could not tell which question that was.' };
+  const parsed = answerFrom(form.get('answer'));
+  if ('refusal' in parsed) return { error: parsed.refusal };
+  const outcome = await answerSessionQuestion({
+    supabase: await createClient(),
+    userId: user.id,
+    progressId: id.data,
+    answer: parsed.answer,
+  });
+  if (!outcome.ok) return { error: outcome.error };
+  revalidatePath('/goals', 'layout');
+  return { answered: parsed.answer, continued: outcome.continued };
 }

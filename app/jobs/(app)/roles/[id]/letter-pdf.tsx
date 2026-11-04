@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { letterheadAction } from '@/app/you/details/actions';
 
 /**
  * Downloads the cover letter as a PDF laid out like the Word letters: today's
  * date and the company above it, the contact line at the foot. Built in the
- * browser, so nothing is stored; pdf-lib loads only when it is pressed.
+ * browser, so nothing is stored; pdf-lib loads only when it is pressed. The
+ * name it is signed with and the contact line are read from the person's
+ * Details tab at that moment.
  */
 export function LetterPdf({ text, company }: { text: string; company: string }) {
   const [busy, setBusy] = useState(false);
@@ -17,17 +20,22 @@ export function LetterPdf({ text, company }: { text: string; company: string }) 
     setBusy(true);
     setError(null);
     try {
-      const { coverLetterPdf, letterFileName } = await import('@/lib/jobs/cover-letter-pdf');
-      const { deviceTimeZone } = await import('@/lib/core/when');
+      const [{ coverLetterPdf, letterFileName }, { deviceTimeZone }, letterhead] =
+        await Promise.all([
+          import('@/lib/jobs/cover-letter-pdf'),
+          import('@/lib/core/when'),
+          letterheadAction(),
+        ]);
       const bytes = await coverLetterPdf({
         letter: text,
         company,
-        timeZone: deviceTimeZone() ?? 'America/New_York',
+        timeZone: deviceTimeZone() ?? 'UTC',
+        letterhead,
       });
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = letterFileName(company);
+      link.download = letterFileName(company, letterhead.signer);
       document.body.appendChild(link);
       link.click();
       link.remove();

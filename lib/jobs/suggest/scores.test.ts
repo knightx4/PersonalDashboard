@@ -17,25 +17,25 @@ import {
 
 const OPENING: OpeningText = {
   title: 'AI Solutions Strategist',
-  company: 'Ramp',
+  company: 'Globex',
   location: 'New York, hybrid',
   why: 'Posted at $176K to $240K plus equity.',
   move: 'Open with the revenue testing tool.',
 };
 
 const CONTEXT: ScoringContext = {
-  evidence: ['Automated revenue testing tool'],
+  evidence: ['Inventory reconciliation workbook'],
   targetTitles: ['Strategic Finance'],
-  applied: ['Associate, Strategic Finance at Ramp'],
+  applied: ['Associate, Strategic Finance at Globex'],
   roles: [
-    { title: 'Associate, Strategic Finance', company: 'Ramp Business Corp', status: 'rejected' },
-    { title: 'AI Strategist', company: 'Hebbia', status: 'drafting' },
+    { title: 'Associate, Strategic Finance', company: 'Globex Business Corp', status: 'rejected' },
+    { title: 'AI Strategist', company: 'Initech', status: 'drafting' },
   ],
   history: [
     {
       id: 'h1',
       title: 'Associate, Strategic Finance',
-      company: 'Ramp Business Corp',
+      company: 'Globex Business Corp',
       status: 'rejected',
       rejectionStage: 'resume_review',
       hasInterview: false,
@@ -82,7 +82,7 @@ describe('openingState', () => {
       applied: 1,
       reached_an_interview: 0,
       still_waiting: 0,
-      examples: ['Associate, Strategic Finance at Ramp Business Corp: rejected at resume review'],
+      examples: ['Associate, Strategic Finance at Globex Business Corp: rejected at resume review'],
     });
     expect(state.your_history_overall).toEqual({ applied: 1, reached_an_interview: 0, still_waiting: 0 });
   });
@@ -90,10 +90,10 @@ describe('openingState', () => {
 
 describe('duplicateByRule', () => {
   it('says no when nothing is on file at the company', () => {
-    expect(duplicateByRule({ ...OPENING, company: 'Pigment' }, CONTEXT)).toEqual({ value: false, confidence: 1 });
+    expect(duplicateByRule({ ...OPENING, company: 'Umbrella Analytics' }, CONTEXT)).toEqual({ value: false, confidence: 1 });
   });
   it('says yes for the same title at the same company', () => {
-    expect(duplicateByRule({ ...OPENING, company: 'Hebbia', title: 'AI  strategist' }, CONTEXT)).toEqual({
+    expect(duplicateByRule({ ...OPENING, company: 'Initech', title: 'AI  strategist' }, CONTEXT)).toEqual({
       value: true,
       confidence: 1,
     });

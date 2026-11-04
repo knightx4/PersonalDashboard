@@ -64,7 +64,7 @@ const STEP = (id: string): EvidenceStep => ({
 const ITEM = (id: string): EvidenceItem => ({
   source: 'gmail',
   id,
-  state: { kind: 'email', from: 'Kroll', subject: `Subject ${id}` },
+  state: { kind: 'email', from: 'Northwind', subject: `Subject ${id}` },
   line: `Email ${id}`,
 });
 
@@ -117,9 +117,9 @@ describe('evidenceSteps', () => {
 
 describe('bearsOnQuestion', () => {
   it('names the step and its done-when, and says what does not count', () => {
-    const q = bearsOnQuestion({ ...STEP('a'), title: 'Apply to Kroll', acceptance: 'Applied.' });
+    const q = bearsOnQuestion({ ...STEP('a'), title: 'Apply to Northwind', acceptance: 'Applied.' });
     expect(q.type).toBe('yes-no');
-    expect(q.question).toContain('"Apply to Kroll" (done when: Applied.)');
+    expect(q.question).toContain('"Apply to Northwind" (done when: Applied.)');
     expect(q.question).toContain('different company, person, account or task');
   });
 });
@@ -127,12 +127,12 @@ describe('bearsOnQuestion', () => {
 describe('filterEvidence', () => {
   it('keeps the pairs Jev does not rule out, and records what each request cost', async () => {
     const fetch = jev((subject, question) =>
-      subject === 'Subject kroll' && question.includes('Step apply') ? 0.9 : 0.05,
+      subject === 'Subject northwind' && question.includes('Step apply') ? 0.9 : 0.05,
     );
     const spend: SpendReport[] = [];
     const result = await filterEvidence({
       steps: [STEP('apply'), STEP('shelf')],
-      items: [ITEM('kroll'), ITEM('newsletter')],
+      items: [ITEM('northwind'), ITEM('newsletter')],
       apiKey: 'key',
       fetch,
       onSpend: (report) => spend.push(report),
@@ -140,7 +140,7 @@ describe('filterEvidence', () => {
     expect(result).toEqual({
       ok: true,
       items: 2,
-      matches: [{ step: STEP('apply'), items: [ITEM('kroll')] }],
+      matches: [{ step: STEP('apply'), items: [ITEM('northwind')] }],
     });
     // One request per item: the item is sent once with both steps' questions.
     expect(fetch).toHaveBeenCalledTimes(2);
@@ -212,10 +212,10 @@ describe('the evidence in the morning brief', () => {
   ];
 
   it('lists each step with the items that bear on it, and tells the session not to search', () => {
-    const lines = evidenceLines([{ step: STEP('apply'), items: [ITEM('kroll')] }], 12);
+    const lines = evidenceLines([{ step: STEP('apply'), items: [ITEM('northwind')] }], 12);
     const text = dailyRunText({ userId: 'u', runId: 'r', steps: [], review, evidence: lines });
     expect(text).toContain('Jev read the 12 new items since the last run');
-    expect(text).toContain('- "Step apply" (goals.items id apply), under the goal "Land a role":\n  - Email kroll');
+    expect(text).toContain('- "Step apply" (goals.items id apply), under the goal "Land a role":\n  - Email northwind');
     expect(text).toContain('Do not search for other evidence');
     expect(text).not.toContain('(in Jobs, Gmail, their calendar or Todo)');
   });

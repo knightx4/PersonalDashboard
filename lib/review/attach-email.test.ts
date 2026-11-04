@@ -31,8 +31,8 @@ describe('lifecycleKindForAttach', () => {
 
   it('reads a confirmation that is really a shipping notice from its subject', () => {
     const kind = (subject: string) => lifecycleKindForAttach('order_confirmation', subject);
-    expect(kind('A shipment from order #431949 is out for delivery!')).toBe('shipping');
-    expect(kind('A shipment from order #11888 is on the way')).toBe('shipping');
+    expect(kind('A shipment from order #550142 is out for delivery!')).toBe('shipping');
+    expect(kind('A shipment from order #10042 is on the way')).toBe('shipping');
     expect(kind('Your Order #6413918145  Has Shipped')).toBe('shipping');
     expect(kind('And it’s off! DHL has your order 🚚')).toBe('shipping');
     expect(kind('Delivery estimate update for your Amazon.com order #114-3630811-7869015')).toBe(

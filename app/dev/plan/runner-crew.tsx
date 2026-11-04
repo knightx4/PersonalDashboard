@@ -168,6 +168,7 @@ function StepBar({
  * template built from the module id would compile to nothing.
  */
 const CAPSULE_HUES: Record<ModuleId, string> = {
+  chat: 'bg-w-chat-tint text-w-chat',
   shopping: 'bg-w-shopping-tint text-w-shopping',
   jobs: 'bg-w-jobs-tint text-w-jobs',
   todo: 'bg-w-todo-tint text-w-todo',
@@ -176,6 +177,7 @@ const CAPSULE_HUES: Record<ModuleId, string> = {
   news: 'bg-w-news-tint text-w-news',
   goals: 'bg-w-goals-tint text-w-goals',
   you: 'bg-w-you-tint text-w-you',
+  finances: 'bg-w-finances-tint text-w-finances',
   dev: 'bg-w-dev-tint text-w-dev',
 };
 

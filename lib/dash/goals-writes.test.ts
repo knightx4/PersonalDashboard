@@ -247,6 +247,63 @@ describe('the Goals writes', () => {
     });
   });
 
+  describe('change_goal approve', () => {
+    it("approves a goal Dash proposed and puts its proposed steps live, as the page's Approve does", async () => {
+      const data = tables();
+      row(data, 'goals.items', GOAL).status = 'proposed';
+      row(data, 'goals.items', STEP).status = 'proposed';
+      const histories: unknown[] = [];
+      const change = await made('change_goal', data, { change: 'approve', goal_ref: GOAL }, histories);
+      expect(row(data, 'goals.items', GOAL)).toMatchObject({ status: 'open' });
+      expect(row(data, 'goals.items', GOAL).approved_at).toBeTruthy();
+      expect(row(data, 'goals.items', STEP)).toMatchObject({ status: 'open' });
+      expect(change.summary).toBe('Dash approved the goal "Run a half marathon". 1 step Dash proposed is now live.');
+      expect(change.undo).toMatchObject({ none: expect.stringMatching(/^Approving opens the goal/) });
+      expect(histories).toEqual([{}]);
+    });
+
+    it('refuses a goal that is approved already', async () => {
+      const data = tables();
+      row(data, 'goals.items', GOAL).approved_at = '2026-10-01T00:00:00Z';
+      expect(await refused('change_goal', data, { change: 'approve', goal_ref: GOAL })).toBe(
+        '"Run a half marathon" is approved already, so nothing was changed.',
+      );
+    });
+  });
+
+  describe('change_goal_step to another goal and onto Todo', () => {
+    it('moves a step under another of their goals, as a goal comment can', async () => {
+      const data = tables();
+      const change = await made('change_goal_step', data, { change: 'move_to_goal', step_ref: STEP, goal_ref: GOAL_2 });
+      expect(row(data, 'goals.items', STEP).parent_id).toBe(GOAL_2);
+      expect(change.summary).toBe('Dash moved the step "Buy shoes" from "Run a half marathon" to "Sleep eight hours", with its sub-steps.');
+      expect(change.input).toMatchObject({ href: `/goals/${GOAL_2}/s/${STEP}` });
+    });
+
+    it('refuses a move to the goal it is already under, and to a goal that is not theirs', async () => {
+      expect(await refused('change_goal_step', tables(), { change: 'move_to_goal', step_ref: STEP, goal_ref: GOAL })).toBe(
+        'That step is under "Run a half marathon" already.',
+      );
+      expect(await refused('change_goal_step', tables(), { change: 'move_to_goal', step_ref: STEP, goal_ref: THEIR_STEP })).toBe(
+        'There is no goal of theirs with that ref. Look it up first.',
+      );
+    });
+
+    it("puts one of their open steps on Todo and takes it off, and refuses one of Dash's", async () => {
+      const data = tables();
+      row(data, 'goals.items', STEP).on_todo = false;
+      const on = await made('change_goal_step', data, { change: 'on_todo', step_ref: STEP });
+      expect(row(data, 'goals.items', STEP).on_todo).toBe(true);
+      expect(on.summary).toBe('Dash put the step "Buy shoes" on Todo.');
+      const off = await made('change_goal_step', data, { change: 'off_todo', step_ref: STEP });
+      expect(row(data, 'goals.items', STEP).on_todo).toBe(false);
+      expect(off.summary).toBe('Dash took the step "Buy shoes" off Todo.');
+
+      row(data, 'goals.items', STEP_2).kind = 'claude';
+      expect(await refused('change_goal_step', data, { change: 'on_todo', step_ref: STEP_2 })).toMatch(/^Only an open step of theirs goes on Todo/);
+    });
+  });
+
   describe('change_goal_step', () => {
     it('edits a step in one write, as the person, and keeps the row as it was', async () => {
       const data = tables();

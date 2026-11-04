@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_messages', 'advisor_persona_versions', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -38,6 +38,33 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r' and not c.relrowsecurity`;
     expect(rows).toEqual([]);
+  });
+});
+
+describe('the analysis across personality tests', () => {
+  // migrations-you/0035_personality_profiles.sql: one row per run, the
+  // newest shown on the Personality tab.
+  it('keeps an analysis for its owner only, and lets no one else write one for them', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_profiles (user_id, results_key, summary, model)
+                 values (${userA}, '2-abc', 'You think before you act.', 'test')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select summary from personality_profiles`)).toEqual([
+      { summary: 'You think before you act.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from personality_profiles`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into personality_profiles (user_id, results_key, summary, model)
+                   values (${userA}, '2-abc', 'Planted.', 'test')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_profiles (user_id, results_key, summary, model, tensions)
+            values (${userA}, '2-abc', 'x', 'test', '{}'::jsonb)`,
+    ).rejects.toThrow();
   });
 });
 
@@ -658,6 +685,92 @@ describe('profile entries', () => {
   });
 });
 
+describe('dash questions', () => {
+  // migrations-you/0033 (plan #2617.1): Dash's questions on the Answer tab
+  // and what the person answered.
+  it('are read and written by their owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into dash_questions (user_id, question, why) values (${userA}, 'What rests you?', 'Few notes on rest.')`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from dash_questions`)).toEqual([]);
+    expect(await asUser(userA, (tx) => tx`select question, status from dash_questions`)).toEqual([
+      { question: 'What rests you?', status: 'open' },
+    ]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_questions (user_id, question) values (${userA}, 'Forged')`),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update dash_questions set answer = 'Not yours'`);
+    await asUser(userB, (tx) => tx`delete from dash_questions`);
+    expect(await admin`select answer from dash_questions where user_id = ${userA}`).toEqual([{ answer: null }]);
+  });
+
+  it('holds an answered question to an answer and a skipped one to its day', async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into dash_questions (user_id, question) values (${userA}, 'Where is home?') returning id`;
+    await expect(admin`update dash_questions set status = 'answered' where id = ${row.id}`).rejects.toThrow();
+    await expect(
+      admin`update dash_questions set status = 'answered', answer = '  ', answered_at = now() where id = ${row.id}`,
+    ).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'skipped' where id = ${row.id}`).rejects.toThrow();
+    await expect(admin`update dash_questions set status = 'gone' where id = ${row.id}`).rejects.toThrow();
+    await admin`update dash_questions set status = 'answered', answer = 'Here', answered_at = now() where id = ${row.id}`;
+  });
+
+  it('gives Dash the answered ones only, the question as the title', async () => {
+    await admin`delete from dash_questions where user_id = ${userA}`;
+    await admin`
+      insert into dash_questions (user_id, question, status, answer, answered_at, skipped_at)
+      values (${userA}, 'What do you read?', 'answered', 'Mostly history.', now(), null),
+             (${userA}, 'Still open?', 'open', null, null, null),
+             (${userA}, 'Skipped?', 'skipped', null, null, now())`;
+    const rows = await admin<{ title: string; my_text: string | null; dash_text: string | null }[]>`
+      select title, my_text, dash_text from core.memory_sources(${userA}::uuid)
+       where source_table = 'you.dash_questions'`;
+    expect(rows).toEqual([{ title: 'Dash asked: What do you read?', my_text: 'Mostly history.', dash_text: null }]);
+    expect(
+      await admin`select 1 from core.memory_sources(${userB}::uuid) where source_table = 'you.dash_questions'`,
+    ).toHaveLength(0);
+  });
+});
+
+describe('dash question runs', () => {
+  // migrations-you/0034_dash_question_runs.sql (plan #2617.3): the run the
+  // Ask button starts, one open at a time, at most five questions each.
+  it('keeps a run to its owner and one open run per person', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into dash_question_runs (user_id) values (${userA}) returning id, status`,
+    );
+    expect(run.status).toBe('queued');
+    expect(await asUser(userB, (tx) => tx`select id from dash_question_runs`)).toEqual([]);
+    await expect(
+      asUser(userB, (tx) => tx`insert into dash_question_runs (user_id) values (${userA})`),
+    ).rejects.toThrow();
+    await expect(admin`insert into dash_question_runs (user_id) values (${userA})`).rejects.toThrow();
+    await admin`update dash_question_runs set status = 'ready', finished_at = now() where id = ${run.id}`;
+    await admin`insert into dash_question_runs (user_id) values (${userA})`;
+  });
+
+  it('refuses a sixth question from one run and a run of another person', async () => {
+    const [run] = await admin<{ id: string }[]>`
+      insert into dash_question_runs (user_id, status) values (${userB}, 'running') returning id`;
+    await admin`
+      insert into dash_questions (user_id, run_id, question)
+      select ${userB}, ${run.id}, 'Question ' || n from generate_series(1, 5) n`;
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userB}, ${run.id}, 'Sixth')`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question)
+            select ${userB}, ${run.id}, 'Batch ' || n from generate_series(1, 2) n`,
+    ).rejects.toThrow(/at most five/);
+    await expect(
+      admin`insert into dash_questions (user_id, run_id, question) values (${userA}, ${run.id}, 'Not theirs')`,
+    ).rejects.toThrow();
+  });
+});
+
 describe('board meetings', () => {
   // migrations-you/0020_board_meetings.sql (plan #2540.1): the board's
   // minutes and the person's votes, answers and ticks on them.
@@ -853,5 +966,229 @@ describe('advisor chats, memory and forecasts', () => {
       () => turn(1, true, { A: 0.5 }, { A: { low: 0, high: 1 } }, { A: 99.5, B: 0.5 }),
     ];
     for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+});
+
+describe('mentor threads: episodes, receipts and recall', () => {
+  // migrations-you/0038_advisor_threads.sql (plan #2748.2).
+  let chatA = '';
+
+  beforeAll(async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, persona, colour, made_by_you)
+      values (${userA}, 'thread_mentor', 'Thread mentor', 'guest', 'What next?', 'Warm and blunt.', '#3b82f6', true)
+      returning id`;
+    const [chat] = await admin<{ id: string }[]>`
+      insert into you.advisor_chats (user_id, advisor_id) values (${userA}, ${advisor.id}) returning id`;
+    chatA = chat.id;
+  });
+
+  it('groups messages into episodes that end after three quiet hours', async () => {
+    const write = (role: string, kind: string, at: string, text: string) =>
+      asUser(
+        userA,
+        (tx) => tx`insert into advisor_messages (user_id, chat_id, role, kind, text, created_at)
+                   values (${userA}, ${chatA}, ${role}, ${kind}, ${text}, ${at}::timestamptz) returning id`,
+      );
+    const [first] = await write('person', 'reply', '2026-01-01T09:00:00Z', 'Should I take the offer?');
+    await write('advisor', 'ack', '2026-01-01T09:00:05Z', 'Hm.');
+    const [last] = await write('advisor', 'reply', '2026-01-01T11:59:00Z', 'Sleep on the salary question.');
+    const [next] = await write('advisor', 'text_first', '2026-01-01T15:00:00Z', 'Thought of you this morning.');
+
+    const episodes = await admin<
+      { started_at: Date; ended_at: Date; first_message_id: string; last_message_id: string; message_count: number }[]
+    >`select started_at, ended_at, first_message_id, last_message_id, message_count
+        from you.advisor_episodes where chat_id = ${chatA} order by started_at`;
+    expect(episodes).toHaveLength(2);
+    expect(episodes[0]).toMatchObject({ first_message_id: first.id, last_message_id: last.id, message_count: 3 });
+    expect(episodes[0].ended_at.toISOString()).toBe('2026-01-01T11:59:00.000Z');
+    expect(episodes[1]).toMatchObject({ first_message_id: next.id, last_message_id: next.id, message_count: 1 });
+  });
+
+  it('finds an old message by its words', async () => {
+    const found = await asUser(
+      userA,
+      (tx) => tx`select text from advisor_messages
+                 where chat_id = ${chatA} and search @@ websearch_to_tsquery('english', 'salaries')`,
+    );
+    expect(found).toEqual([{ text: 'Sleep on the salary question.' }]);
+  });
+
+  it("keeps episodes to their owner, and refuses another account's or a bad shape", async () => {
+    expect(await asUser(userB, (tx) => tx`select id from advisor_episodes`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_episodes (user_id, chat_id, started_at, ended_at)
+                   values (${userB}, ${chatA}, now(), now())`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update advisor_chats set typing_until = now() + interval '1 minute'`);
+    expect(await admin`select typing_until from you.advisor_chats where id = ${chatA}`).toEqual([{ typing_until: null }]);
+    const bad = [
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text) values (${userA}, ${chatA}, 'person', 'ack', 'ok')`,
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text) values (${userA}, ${chatA}, 'advisor', 'note', 'x')`,
+      () => admin`update you.board_advisors set colour = 'blue' where user_id = ${userA} and key = 'thread_mentor'`,
+      () => admin`update you.board_advisors set colour = '#3B82F6' where user_id = ${userA} and key = 'thread_mentor'`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+});
+
+describe('council notes and runs', () => {
+  // migrations-you/0037_council.sql: notes the mentors write unasked, capped
+  // so they never pile up unread, and the runs that write them.
+  const receipts = admin.json([{ label: 'A role', link: '/jobs' }]);
+  const advisors: string[] = [];
+
+  beforeAll(async () => {
+    for (let n = 0; n < 8; n += 1) {
+      const [row] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${userA}, ${`council_${n}`}, ${`Mentor ${n}`}, 'guest', 'What now?')
+        returning id`;
+      advisors.push(row.id);
+    }
+  });
+
+  it('keeps notes and runs to their owner only', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice') returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into council_notes (user_id, advisor_id, run_id, text, receipts)
+                 values (${userA}, ${advisors[0]}, ${run.id}, 'Answer Brex today.', ${receipts})`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from council_notes`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from council_runs`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into council_notes (user_id, advisor_id, text, receipts)
+                   values (${userB}, ${advisors[1]}, 'Planted.', ${receipts})`,
+      ),
+    ).rejects.toThrow();
+    // A second advice round while one is open is refused.
+    await expect(
+      asUser(userA, (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice')`),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a note without a receipt, a second unread note from a mentor, and a fourth in a day', async () => {
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text) values (${userA}, ${advisors[1]}, 'No receipt.')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[0]}, 'Again.', ${receipts})`,
+    ).rejects.toThrow(/already has an unread note/);
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[1]}, 'Two.', ${receipts})`;
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[2]}, 'Three.', ${receipts})`;
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[3]}, 'Four.', ${receipts})`,
+    ).rejects.toThrow(/three notes today/);
+  });
+});
+
+describe('mentor texts: caps and quiet hours', () => {
+  // migrations-you/0039_council_texts.sql (plan #2748.7): the daily round's
+  // texts hold the caps 0037 held on notes, and none is sent at night.
+  let user = '';
+  const chats: string[] = [];
+  // A zone where it is midday now, so a text dated now() is outside quiet hours.
+  const middayZone = () => {
+    const offset = 12 - new Date().getUTCHours();
+    return offset === 0 ? 'Etc/GMT' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
+  };
+  const text = (n: number, at?: string) =>
+    at
+      ? admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, created_at)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.', ${at}::timestamptz) returning id`
+      : admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.') returning id`;
+  const quiet = async (at: string) =>
+    (await admin<{ q: boolean }[]>`select you.quiet_hours(${user}, ${at}::timestamptz) as q`)[0].q;
+  const setZone = (zone: string) =>
+    admin`insert into core.account_settings (user_id, timezone) values (${user}, ${zone})
+          on conflict (user_id) do update set timezone = excluded.timezone`;
+
+  beforeAll(async () => {
+    user = await createUser('you-texts@example.com');
+    for (let n = 0; n < 8; n += 1) {
+      const [a] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${user}, ${`texter_${n}`}, ${`Texter ${n}`}, 'guest', 'What now?') returning id`;
+      const [c] = await admin<{ id: string }[]>`
+        insert into you.advisor_chats (user_id, advisor_id) values (${user}, ${a.id}) returning id`;
+      chats.push(c.id);
+    }
+  });
+
+  it("knows quiet hours in the person's zone, and refuses a text inside them", async () => {
+    await setZone('America/New_York');
+    expect(await quiet('2026-01-05T02:59:00Z')).toBe(false); // 21:59
+    expect(await quiet('2026-01-05T03:00:00Z')).toBe(true); // 22:00
+    expect(await quiet('2026-01-05T12:59:00Z')).toBe(true); // 07:59
+    expect(await quiet('2026-01-05T13:00:00Z')).toBe(false); // 08:00
+    await expect(text(7, '2026-01-05T04:00:00Z')).rejects.toThrow(/Quiet hours/);
+    await text(7, '2026-01-05T15:00:00Z');
+
+    // A zone Postgres does not know reads as UTC rather than failing.
+    await setZone('Mars/Olympus');
+    expect(await quiet('2026-01-05T23:00:00Z')).toBe(true);
+    expect(await quiet('2026-01-05T12:00:00Z')).toBe(false);
+  });
+
+  it('refuses a second unread text from a mentor until the thread is read, and a fourth in a day', async () => {
+    await setZone('America/New_York');
+    await expect(text(7, '2026-01-05T16:00:00Z')).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_chats set last_read_at = '2026-01-05T15:30:00Z' where id = ${chats[7]}`;
+    await text(7, '2026-01-05T16:00:00Z');
+
+    await setZone(middayZone());
+    await text(0);
+    await expect(text(0)).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_messages set read_at = now() where chat_id = ${chats[0]}`;
+    await text(1);
+    await text(2);
+    await expect(text(3)).rejects.toThrow(/three texts today/);
+  });
+
+  it('never caps a reply or an ack', async () => {
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'reply', 'Answering you.')`;
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'ack', 'Hm.')`;
+  });
+});
+
+describe('earlier persona cards', () => {
+  // migrations-you/0040_people_cards.sql (plan #2748.11).
+  it('keeps a card the person replaced to its owner only', async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'cards', 'Cards', 'seat', 'Ten years on?', ${admin.json({ style: 'notionists', seed: 'cards' })})
+      returning id`;
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                 values (${userA}, ${advisor.id}, 'Blunt and short.')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select persona from advisor_persona_versions`)).toEqual([
+      { persona: 'Blunt and short.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_persona_versions`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                   values (${userA}, ${advisor.id}, 'Forged.')`,
+      ),
+    ).rejects.toThrow();
   });
 });

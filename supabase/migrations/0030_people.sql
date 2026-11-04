@@ -110,7 +110,7 @@ comment on column public.orders.person_id is
 insert into core.people (user_id, name, is_default, colour)
 select
   ea.user_id,
-  -- Local part, tidied: "selvey.knight4" -> "Selvey Knight4". Ugly for some
+  -- Local part, tidied: "alex.rivera4" -> "Alex Rivera4". Ugly for some
   -- addresses and trivially renameable, which beats inventing a name.
   initcap(regexp_replace(split_part(ea.email_address, '@', 1), '[._+-]+', ' ', 'g')),
   -- The oldest mailbox on the account is the account owner's, and becomes the

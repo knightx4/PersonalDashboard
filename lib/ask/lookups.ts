@@ -864,14 +864,14 @@ export async function todosLookup(ctx: AskContext, input: Input): Promise<AskToo
 // goals: each goal's newest verdict
 // ---------------------------------------------------------------------------
 
-type GoalRow = { id: string; title: string; status: string; due_on: string | null };
+type GoalRow = { id: string; title: string; status: string; due_on: string | null; area_id: string | null };
 
 export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToolResult> {
   const withProposed = input.include_proposed === true;
   const client = await ctx.db('goals');
   const { data, error } = await client
     .from('items')
-    .select('id, title, status, due_on')
+    .select('id, title, status, due_on, area_id')
     .eq('user_id', ctx.userId)
     .eq('level', 'goal')
     .is('archived_at', null)
@@ -879,6 +879,16 @@ export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToo
     .order('position', { ascending: true });
   if (error) throw new Error(`goals: ${error.message}`);
   const goals = (data ?? []) as GoalRow[];
+  const { data: areaData, error: areaError } = await client
+    .from('areas')
+    .select('id, name')
+    .eq('user_id', ctx.userId)
+    .is('archived_at', null)
+    .order('position', { ascending: true });
+  if (areaError) throw new Error(`goal areas: ${areaError.message}`);
+  const areas = (areaData ?? []) as { id: string; name: string }[];
+  const areaName = new Map(areas.map((a) => [a.id, a.name]));
+  const byArea: Record<string, number> = {};
   const latest = await loadLatestReviews(client as GoalsSupabaseClient, {
     userId: ctx.userId,
     now: ctx.now,
@@ -889,6 +899,8 @@ export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToo
     const review = latest.get(goal.id);
     const verdict = review ? VERDICT_LABELS[review.verdict] : 'Not reviewed in four weeks';
     byVerdict[verdict] = (byVerdict[verdict] ?? 0) + 1;
+    const area = (goal.area_id && areaName.get(goal.area_id)) || null;
+    byArea[area ?? 'No area'] = (byArea[area ?? 'No area'] ?? 0) + 1;
     return {
       table: 'goals.items',
       ref: goal.id,
@@ -896,6 +908,7 @@ export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToo
       href: `/goals/${goal.id}`,
       detail: {
         status: goal.status,
+        area,
         due_on: goal.due_on,
         verdict,
         reviewed_on: review?.createdAt.slice(0, 10) ?? null,
@@ -909,8 +922,8 @@ export async function goalsLookup(ctx: AskContext, input: Input): Promise<AskToo
   return {
     ok: true,
     rows,
-    totals: { goals: goals.length, by_verdict: byVerdict },
-    note: `The verdict is the newest from the daily goals review in the last four weeks. ${matchedNote(goals.length, rows.length)}.`,
+    totals: { goals: goals.length, by_verdict: byVerdict, by_area: byArea },
+    note: `Their areas, in order: ${areas.map((a) => a.name).join(', ') || 'none'}. Each goal names its area. The verdict is the newest from the daily goals review in the last four weeks. ${matchedNote(goals.length, rows.length)}.`,
   };
 }
 
@@ -1009,12 +1022,14 @@ const RECALL_LANDING: Record<string, string> = {
   'learn.feed_cards': '/learn/now',
   'public.order_items': '/shopping/orders',
   'public.plan_items': '/dev/plan',
+  'you.dash_questions': '/you/ask',
 };
 
 /** What kind of thing each source is, for the model reading the result. */
 const RECALL_KINDS: Record<string, string> = {
   'obsidian.notes': 'Vault note',
   'you.transcripts': 'Transcript (courses taken)',
+  'you.dash_questions': 'Their answer to a question Dash asked',
   'job_search.thoughts': 'Job search thoughts',
   'job_search.notes': 'Job search note',
   'job_search.interviews': 'Interview notes',
@@ -1042,7 +1057,7 @@ const key = (table: string, ref: string) => `${table}\u0000${ref}`;
  */
 function threadHref(ref: string): string | null {
   if (ref.includes(':')) return refHref(ref);
-  return isUuid(ref) ? `/ask/${ref}` : null;
+  return isUuid(ref) ? `/chat/dash/${ref}` : null;
 }
 
 /**

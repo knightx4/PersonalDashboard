@@ -10,7 +10,7 @@ import type { IdeaPair, PairIdea } from '@/lib/learn/map/idea-pairs';
  */
 
 const SAAS = { id: 's-saas', name: 'SaaS and subscription business metrics' };
-const FINANCE = { id: 's-finance', name: 'Startup Finance / FP&A' };
+const FINANCE = { id: 's-finance', name: 'Small Business Finance' };
 const MODELLING = { id: 's-model', name: 'Financial modeling in Excel for operators' };
 
 function idea(id: string, rest: Omit<PairIdea, 'id'>): PairIdea {

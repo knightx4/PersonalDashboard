@@ -8,6 +8,7 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { whyNotRead } from '@/lib/vault/map/rules';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { MAYA_QUESTION_MAX } from '@/lib/vault/maya/thought-model';
 import { MAYA_REPLY_MODEL, MAYA_REPLY_OPERATION, replyInThread } from '@/lib/vault/maya/reply';
 import { appendReply, loadThread, noteRef, renameQuestion, saveSummary, type MayaMessage } from '@/lib/vault/maya/store';
@@ -49,7 +50,7 @@ function asTurn(message: MayaMessage): TalkTurn {
  *
  * The person's words are kept before Maya is asked, so a failed answer loses
  * nothing: the reply stays in the thread and the error says why. A note that
- * has since become one the vault does not read (moved into Me, or now holding
+ * has since become one the vault does not read (moved into a journal folder, or now holding
  * a key) is not sent; Maya answers from its thought and the thread alone.
  */
 // latency: pending
@@ -77,8 +78,11 @@ export async function replyToMaya(id: string, raw: string): Promise<MayaReplyRes
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { turns: kept, error: 'This deployment has no ANTHROPIC_API_KEY, so Maya cannot reply.' };
 
-  const [note] = await loadNotesByIds(vault, [thread.noteId]).catch(() => []);
-  const readable = note && !whyNotRead(note) ? { title: note.title, body: note.body } : null;
+  const [[note], rules] = await Promise.all([
+    loadNotesByIds(vault, [thread.noteId]).catch(() => []),
+    loadVaultRules(vault, user.id),
+  ]);
+  const readable = note && !whyNotRead(note, rules) ? { title: note.title, body: note.body } : null;
   const thought = thread.messages.find((message) => message.kind === 'thought') ?? null;
 
   const dash = await threadDashInRequest(user.id);

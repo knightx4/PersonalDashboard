@@ -414,7 +414,7 @@ describe('the acceptance criteria', () => {
   });
 
   it('flags a recruiter domain to learn when the company matched by name, not by it', () => {
-    // The EliseAI case: a recruiter's own address (emma@meetelise.com) is not
+    // The Contoso case: a recruiter's own address (emma@contoso.example) is not
     // among the domains recorded for the company (only the ATS confirmation's
     // ashbyhq.com is), so every one of her emails matched only by name and
     // never taught the company its own recruiter's domain -- so the next one,
@@ -424,7 +424,7 @@ describe('the acceptance criteria', () => {
       message({
         threadId: null,
         classification: 'scheduling',
-        fromAddress: 'emma@meetelise.com',
+        fromAddress: 'emma@contoso.example',
         replyToAddress: null,
         subject: 'Interview Confirmation',
         extractedCompany: 'Linear',
@@ -439,7 +439,7 @@ describe('the acceptance criteria', () => {
         kind: 'existing',
         id: 'c-linear',
         name: 'Linear',
-        domainToLearn: 'meetelise.com',
+        domainToLearn: 'contoso.example',
       });
     }
   });

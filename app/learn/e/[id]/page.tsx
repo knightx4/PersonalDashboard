@@ -9,6 +9,10 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { EssayView } from './essay-view';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
+import { requireUser } from '@/lib/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
+import { siteName } from '@/lib/you/details';
+import { getDetails } from '@/lib/you/details-store';
 
 export const dynamic = 'force-dynamic';
 /** Research on the essay frames, searches, reads and writes up in one press, which can take a couple of minutes. */
@@ -39,6 +43,16 @@ async function readAttached(id: string) {
   }
 }
 
+/** Their website from the Details tab, for the Publish card; none if it cannot be read. */
+async function readSite(): Promise<string | null> {
+  try {
+    const user = await requireUser();
+    return siteName((await getDetails(await createYouClient(), user.id)).website_url);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const essay = await read((await params).id);
   return { title: essay ? essayTitle(essay.draftBody, essay.path) : 'Essay' };
@@ -56,10 +70,11 @@ export default async function EssayPage({
   const asked = (await searchParams).view;
   const view = Array.isArray(asked) ? asked[0] : asked;
   if (!essay) notFound();
-  const [notes, research, attachedNotes] = await Promise.all([
+  const [notes, research, attachedNotes, site] = await Promise.all([
     readNotes(essay.id, essay.draftBody),
     createLearnClient().then((supabase) => loadEssayResearch(supabase, essay.id)),
     readAttached(essay.id),
+    readSite(),
   ]);
   return (
     <EssayView
@@ -69,6 +84,7 @@ export default async function EssayPage({
       attachedNotes={attachedNotes}
       initialView={view === 'notes' || view === 'draft' ? view : null}
       path={await rowSubject(toRef('learn.essays', essay.id))}
+      site={site}
     />
   );
 }

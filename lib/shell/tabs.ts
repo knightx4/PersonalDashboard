@@ -31,35 +31,39 @@ export type WorkspaceTab = Omit<NavSection, 'badge'> & {
 };
 
 export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab[]>> = {
+  // People first, the mentors' threads; Dash is Ask Dash's list of chats,
+  // which moved here from /ask (plan #2748.1).
+  chat: [
+    { href: '/chat', label: 'People', icon: 'chatPeople', exact: true, alsoMatches: ['/chat/people/'] },
+    { href: '/chat/dash', label: 'Dash', icon: 'chatDash' },
+  ],
   home: [
     { href: '/home', label: 'Now', icon: 'home', exact: true, alsoMatches: ['/home/week'] },
     { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
   ],
+  // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
+  // the orders list is the page Shopping lands on now. A month of opens
+  // (plan #1496.8) folded Review into Now (/shopping/orders/review) and
+  // Returns into Inventory (/shopping/inventory/returns), each lit by the tab
+  // it sits under, and took Sell and Share out of the bar: their pages and
+  // rows are kept, reached from Inventory's rail and by address.
   shopping: [
-    { href: '/shopping/dashboard', label: 'Now', icon: 'dashboard' },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
-    { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+    { href: '/shopping/orders', label: 'Now', icon: 'orders' },
+    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-    { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-    { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
-    { href: '/shopping/recurring', label: 'Recurring', icon: 'recurring' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-    { href: '/shopping/share', label: 'Share', icon: 'share' },
   ],
   jobs: [
     { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
     // The review queue keeps its address and lights the Inbox.
     { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'] },
-    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-    // Who to tell about each application, and the note to them.
-    { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
+    // Back to the view you left it on (note 978314f8).
+    { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
     { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
     { href: '/jobs/material', label: 'Material', icon: 'answers' },
-    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   ],
   todo: [
     { href: '/todo', label: 'Now', icon: 'agenda', exact: true },
@@ -136,6 +140,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     // Everything on you across the goals. Its count is put on by the layout.
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
+    // The hours logged on every goal with an Hours logged metric, together.
+    { href: '/goals/hours', label: 'Hours', icon: 'goalsHours', exact: true },
   ],
   you: [
     { href: '/you/personality', label: 'Personality', icon: 'personality' },
@@ -143,7 +149,16 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/you/places', label: 'Places', icon: 'places' },
     { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
     { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-    { href: '/you/board', label: 'Board', icon: 'board' },
+    // Dash's questions about you and your answers (plan #2617.2).
+    { href: '/you/ask', label: 'Ask', icon: 'answer', exact: true },
+    { href: '/you/council', label: 'Council', icon: 'board' },
+  ],
+  // Accounts first, with net worth at its top (plan #2593.6): what you hold,
+  // then where the money went, then what keeps charging.
+  finances: [
+    { href: '/finances/accounts', label: 'Accounts', icon: 'accounts' },
+    { href: '/finances/spending', label: 'Spending', icon: 'dashboard' },
+    { href: '/finances/recurring', label: 'Recurring', icon: 'recurring' },
   ],
   // Now, then the Inbox of questions a session needs answered. Then three
   // lists: what is being built (the plan leads, as the page worked from most

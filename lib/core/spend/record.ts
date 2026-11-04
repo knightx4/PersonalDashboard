@@ -30,6 +30,7 @@ export type SpendModule =
   | 'news'
   | 'goals'
   | 'you'
+  | 'finances'
   | 'core';
 
 export type SpendRecord = {

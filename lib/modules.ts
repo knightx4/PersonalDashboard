@@ -13,6 +13,7 @@
  */
 
 export type ModuleId =
+  | 'chat'
   | 'shopping'
   | 'jobs'
   | 'vault'
@@ -21,6 +22,7 @@ export type ModuleId =
   | 'news'
   | 'goals'
   | 'you'
+  | 'finances'
   | 'dev';
 
 export type AppModule = {
@@ -78,6 +80,15 @@ export type AppModule = {
    */
   alwaysHome?: true;
   /**
+   * On for every account, with no checkbox to turn it off.
+   *
+   * Chat is the one (plan #2748.1): Ask Dash lives under its Dash tab, and
+   * Dash had a row of its own in the switcher that nobody could hide. Reading
+   * it into every account's list, rather than writing it into each account's
+   * enabled_modules, means no account loses Dash on the day it moved.
+   */
+  alwaysOn?: true;
+  /**
    * The workspace's own settings page, and a line saying what is on it.
    * Account's Workspaces tab builds its list of settings links from these, so
    * a workspace that has a settings page is never left out of it (plan #1924).
@@ -110,6 +121,8 @@ export type MarkShape =
   | 'envelope'
   | 'summit'
   | 'person'
+  | 'bubbles'
+  | 'wallet'
   | 'terminal';
 
 export interface MarkKey {
@@ -137,9 +150,24 @@ export interface MarkKey {
 
 export const MODULES: readonly AppModule[] = [
   {
+    id: 'chat',
+    prefix: '/chat',
+    // People, the first tab: the mentors' threads. Ask Dash is the Dash tab
+    // at /chat/dash, and /ask redirects there (next.config.ts).
+    home: '/chat',
+    label: 'Chat',
+    description: 'Texts with your mentors, and your chats with Dash',
+    accent: '--color-w-chat',
+    alwaysOn: true,
+    // The app's own indigo, as globals.css gives the workspace: Chat is where
+    // Dash lives. The deep stop is the paper theme's --c-accent-base.
+    key: { shape: 'bubbles', from: '#a5b4fc', to: '#4a5fd0' },
+  },
+  {
     id: 'shopping',
     prefix: '/shopping',
-    home: '/shopping/dashboard',
+    // The orders list, since Spending moved to Finances (plan #2593.1).
+    home: '/shopping/orders',
     label: 'Shopping',
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
@@ -239,6 +267,23 @@ export const MODULES: readonly AppModule[] = [
     // the caution amber at 49; the contrast check's accent-to-meaning
     // distance is what keeps You's colour reading as a place, not a warning.
     key: { shape: 'person', from: '#fb923c', to: '#c2410c' },
+  },
+  {
+    id: 'finances',
+    prefix: '/finances',
+    // Accounts, every account held with net worth at the top (plan #2593.6).
+    // Spending and Recurring moved here from Shopping (plan #2593.1); the old
+    // Shopping paths redirect (next.config.ts).
+    home: '/finances/accounts',
+    label: 'Finances',
+    description: 'Accounts, spending and recurring payments',
+    accent: '--color-w-finances',
+    // Green, at OKLCH hue 135: the widest gap left on the circle, between
+    // News' gold at 90 and Goals' emerald at 162, and the colour of money.
+    // It is a deep leaf green rather than the lime both Goals and You moved
+    // away from. The deep stop is the paper theme's --c-w-finances.
+    key: { shape: 'wallet', from: '#8fd46a', to: '#456e2c' },
+    settings: { href: '/finances/settings', hint: 'Linked bank, card and brokerage accounts' },
   },
   {
     id: 'dev',
@@ -347,7 +392,17 @@ export function switchableModules(
   isOwner: boolean,
 ): readonly ModuleId[] {
   const allowed = moduleIdsFor(isOwner);
-  return (enabled ?? allowed).filter((id) => allowed.includes(id));
+  return (enabled ? withAlwaysOn(enabled) : allowed).filter((id) => allowed.includes(id));
+}
+
+/**
+ * An account's chosen workspaces with every `alwaysOn` one added: Chat, which
+ * has no checkbox and is never written into enabled_modules. They go first,
+ * as Dash's row sat above the workspaces; the rest keep the account's order.
+ */
+export function withAlwaysOn(enabled: readonly ModuleId[]): ModuleId[] {
+  const always = MODULES.filter((module) => module.alwaysOn && !enabled.includes(module.id)).map((module) => module.id);
+  return [...always, ...enabled];
 }
 
 export function moduleById(id: ModuleId | null): AppModule | null {

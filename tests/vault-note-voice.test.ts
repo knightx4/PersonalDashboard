@@ -47,19 +47,19 @@ beforeAll(async () => {
     insert into vault_connections (user_id, repo_owner, repo_name, branch, access_token)
     values (${userB}, 'b', 'b-vault', 'main', 'encrypted') returning id`;
 
-  await note(userA, connectionA, 'Me/Passwords.md', 'Bank and email, see below.');
+  await note(userA, connectionA, 'Personal/Passwords.md', 'Bank and email, see below.');
   await note(userA, connectionA, 'Pending/Side project.md', `${PROSE}\n\nKEY=sk-ant-api03-${'Ab1'.repeat(12)}`);
   await note(userA, connectionA, 'Pending/Login.md', `${PROSE}\npassword: hunter2`);
   await note(userA, connectionA, 'Bulk/Bulk - Wiki/OpenAI.md');
   await note(userA, connectionA, 'Bulk/Resources/Books/Antifragile.md');
-  await note(userA, connectionA, 'Career/Job Applications/Stripe.md');
-  await note(userA, connectionA, 'Pending/Plaid Cover Letter.md');
-  await note(userA, connectionA, 'Pending/Edra.md', PROSE, { tags: ['career', 'application'] });
-  await note(userA, connectionA, 'Yale/Course Summaries/MGT 401.md');
+  await note(userA, connectionA, 'Career/Job Applications/Halvorsen.md');
+  await note(userA, connectionA, 'Pending/Northwind Cover Letter.md');
+  await note(userA, connectionA, 'Pending/Acme.md', PROSE, { tags: ['career', 'application'] });
+  await note(userA, connectionA, 'Templates/Weekly review.md');
   await note(userA, connectionA, 'Bulk/Mini-Essays.md');
-  await note(userA, connectionA, 'Me/Journal.md');
-  await note(userA, connectionA, 'Me/Empty.md', 'ok');
-  await note(userB, connectionB, 'Me/Passwords.md', 'theirs');
+  await note(userA, connectionA, 'Personal/Morning routine.md');
+  await note(userA, connectionA, 'Personal/Empty.md', 'ok');
+  await note(userB, connectionB, 'Personal/Passwords.md', 'theirs');
 });
 
 afterAll(async () => {
@@ -72,23 +72,23 @@ describe('note voice (plan #2413.3)', () => {
     const [{ n }] = await admin<{ n: number }[]>`select tag_voice_by_rule(${userA}::uuid) as n`;
     expect(n).toBe(10);
     expect(await voices(userA)).toEqual({
-      'Me/Passwords.md': 'secret',
+      'Personal/Passwords.md': 'secret',
       'Pending/Side project.md': 'secret',
       'Pending/Login.md': 'secret',
       'Bulk/Bulk - Wiki/OpenAI.md': 'clipped',
       'Bulk/Resources/Books/Antifragile.md': 'clipped',
-      'Career/Job Applications/Stripe.md': 'audience',
-      'Pending/Plaid Cover Letter.md': 'audience',
-      'Pending/Edra.md': 'audience',
-      'Yale/Course Summaries/MGT 401.md': 'reference',
+      'Career/Job Applications/Halvorsen.md': 'audience',
+      'Pending/Northwind Cover Letter.md': 'audience',
+      'Pending/Acme.md': 'audience',
+      'Templates/Weekly review.md': 'reference',
       'Bulk/Mini-Essays.md': null,
-      'Me/Journal.md': null,
-      'Me/Empty.md': 'private',
+      'Personal/Morning routine.md': null,
+      'Personal/Empty.md': 'private',
     });
-    expect((await voices(userB))['Me/Passwords.md']).toBeNull();
+    expect((await voices(userB))['Personal/Passwords.md']).toBeNull();
 
     const due = await admin<{ path: string }[]>`select path from voice_due_notes(${userA}::uuid, null, 50)`;
-    expect(due.map((d) => d.path).sort()).toEqual(['Bulk/Mini-Essays.md', 'Me/Journal.md']);
+    expect(due.map((d) => d.path).sort()).toEqual(['Bulk/Mini-Essays.md', 'Personal/Morning routine.md']);
   });
 
   it('does not move updated_at, and makes a note due again when it moves', async () => {
@@ -101,7 +101,7 @@ describe('note voice (plan #2413.3)', () => {
       select updated_at from notes where id = ${ids['Bulk/Bulk - Wiki/OpenAI.md']}`;
     expect(after.updated_at.getTime()).toBe(before.updated_at.getTime());
 
-    await admin`update notes set path = 'Me/OpenAI.md' where id = ${ids['Bulk/Bulk - Wiki/OpenAI.md']}`;
+    await admin`update notes set path = 'Personal/OpenAI.md' where id = ${ids['Bulk/Bulk - Wiki/OpenAI.md']}`;
     const [moved] = await admin<{ voice_due: boolean }[]>`
       select voice_due from notes where id = ${ids['Bulk/Bulk - Wiki/OpenAI.md']}`;
     expect(moved.voice_due).toBe(true);
@@ -111,7 +111,7 @@ describe('note voice (plan #2413.3)', () => {
     const memory = await admin<{ source_ref: string }[]>`
       select source_ref from core.memory_sources(${userA}::uuid) where source_table = 'obsidian.notes'`;
     const refs = memory.map((m) => m.source_ref);
-    expect(refs).toContain('Me/Journal.md');
+    expect(refs).toContain('Personal/Morning routine.md');
     expect(refs).not.toContain('Pending/Side project.md');
     expect(refs).not.toContain('Pending/Login.md');
 
@@ -134,11 +134,11 @@ describe('note voice (plan #2413.3)', () => {
       admin`insert into position_sources (user_id, position_id, note_id, quote, blob_sha)
             values (${userA}, ${positionId}, ${ids[path]}, 'A quote.', 'sha')`;
     const argued = await position('Argued');
-    await source(argued, 'Career/Job Applications/Stripe.md');
-    await source(argued, 'Pending/Plaid Cover Letter.md');
+    await source(argued, 'Career/Job Applications/Halvorsen.md');
+    await source(argued, 'Pending/Northwind Cover Letter.md');
     const held = await position('Held');
-    await source(held, 'Pending/Plaid Cover Letter.md');
-    await source(held, 'Me/Journal.md');
+    await source(held, 'Pending/Northwind Cover Letter.md');
+    await source(held, 'Personal/Morning routine.md');
 
     const rows = await admin<{ position_id: string; audience_notes: number; only_for_audience: boolean }[]>`
       select position_id, audience_notes, only_for_audience from position_voices where user_id = ${userA}`;

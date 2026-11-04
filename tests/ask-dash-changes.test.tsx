@@ -13,7 +13,7 @@ import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/ask',
+  usePathname: () => '/chat/dash',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -184,10 +184,10 @@ describe('the changes Dash made, on the Ask page', () => {
   it('links each standing change to its row, and each to the question it came from', () => {
     expect(html).toContain('href="/shopping/inventory/i1"');
     expect(html).toContain('href="/todo/all?status=all&amp;focus=todo-row"');
-    expect(html).toContain('href="/ask/c3"');
+    expect(html).toContain('href="/chat/dash/c3"');
     // Each link carries its pending marker (components/ui/link.tsx) before </a>.
     expect(html).toMatch(/>I sent the kettle back(?:<span hidden=""><\/span>)?<\/a>/);
-    expect(html).toContain('href="/ask/c2"');
+    expect(html).toContain('href="/chat/dash/c2"');
     expect(html).toMatch(/>a question(?:<span hidden=""><\/span>)?<\/a>/);
   });
 

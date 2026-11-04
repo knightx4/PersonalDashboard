@@ -1,20 +1,20 @@
 'use client';
 
-import type { AskStart } from '@/app/you/board/ask-board';
-import type { StartStart } from '@/app/you/board/start-meeting';
-import { BoardListView, type BoardListActions } from '@/app/you/board/board-list-view';
+import type { AskStart } from '@/app/you/council/ask-board';
+import type { StartStart } from '@/app/you/council/start-meeting';
+import { BoardListView, type BoardListActions } from '@/app/you/council/board-list-view';
 import {
   sortAdvisors,
   type BoardAdvisor,
   type BoardDecision,
   type BoardQuestion,
 } from '@/lib/you/board-questions';
-import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/board/board-skeleton';
+import { BoardListSkeleton, BoardMeetingSkeleton } from '@/app/you/council/board-skeleton';
 import {
   MeetingView,
   type MeetingActions,
   type MeetingOpen,
-} from '@/app/you/board/[id]/meeting-view';
+} from '@/app/you/council/[id]/meeting-view';
 import type { BoardPanel } from '@/lib/you/board-panels';
 import type { PersonAsk } from '@/lib/you/board-asks';
 import type { DecisionReview } from '@/lib/you/board-reviews';
@@ -83,7 +83,7 @@ const meeting = (over: Partial<BoardMeeting> = {}): BoardMeeting => ({
 
 const minutes = parseMinutes({
   since:
-    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the board read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
+    'You sided with the mentor on publishing first and answered that the résumé, more than the roles, is what fails at screening. So this week the council read the two sends that went out after the essay, and the résumé you rewrote on Thursday ([Résumé, finance first](/vault/n/Jobs/Resume.md)). The question from last week is settled; the money point is not, because no number has been entered yet.',
   disagreements: [
     {
       key: 'd1',
@@ -102,7 +102,7 @@ const minutes = parseMinutes({
         },
         {
           seat: 'skeptic',
-          stance: 'arguing against the board’s shared view',
+          stance: 'arguing against the council’s shared view',
           text: 'Both of you assume the résumé was the problem. The two replies came from companies you had already spoken to in September, so they may be warm leads, and the rewrite may have changed nothing.',
           receipts: [{ label: 'September notes', link: '/vault/n/Jobs/September.md' }],
         },
@@ -111,7 +111,7 @@ const minutes = parseMinutes({
     {
       key: 'd2',
       note: 'Back from last week because it has no vote yet.',
-      point: 'Does the hour in the studio come before the money numbers are entered?',
+      point: 'Does the hour in the workshop come before the money numbers are entered?',
       positions: [
         {
           seat: 'cfo',
@@ -120,17 +120,17 @@ const minutes = parseMinutes({
         },
         {
           seat: 'dreamer',
-          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the studio hour waited for it.',
-          receipts: [{ label: 'About me', link: '/vault/n/Me/About%20me.md' }],
+          text: 'Yes. You do the dull step straight after making something. Last week the statement sat unopened all week while the workshop hour waited for it.',
+          receipts: [{ label: 'Morning routine', link: '/vault/n/Journal/Morning%20routine.md' }],
         },
       ],
     },
   ],
   dream: {
-    text: 'The song stays on the table. In [Personal goals](/vault/n/Me/Personal%20Goals.md) you wrote that you wanted to put something out, anything, even if it is not very good. Last Wednesday you opened the project and saved a forty-second loop, and it is the first file in that folder since June.',
+    text: 'The council game stays on the table. In [What I want next](/vault/n/Journal/What%20I%20want%20next.md) you wrote that you wanted to finish something, anything, even if it is not very good. Last Wednesday you opened the project and wrote a one-page rules draft, and it is the first file in that folder since June.',
     thread:
-      'Thirty minutes on Wednesday. Add one more part to the loop and export it, whatever state it is in.',
-    receipts: [{ label: 'Make a song and put it out', link: '/goals' }],
+      'Thirty minutes on Wednesday. Add one more rule to the draft and print it, whatever state it is in.',
+    receipts: [{ label: 'Make a board game and play it with friends', link: '/goals' }],
   },
   question:
     'If the recruiter says the first line still reads as a builder of tools, what would you lead with instead?',
@@ -143,13 +143,13 @@ const minutes = parseMinutes({
     },
     {
       key: 'r2',
-      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/shopping/recurring).',
+      what: 'Open the card statement and have Dash put the balance, rate and minimum on its row in [Recurring](/finances/recurring).',
       day: '2026-11-02',
       seats: ['cfo'],
     },
     {
       key: 'r3',
-      what: 'Thirty minutes in the studio on Wednesday 4 Nov: one more part, then export.',
+      what: 'Thirty minutes in the workshop on Wednesday 4 Nov: one more rule, then print.',
       day: '2026-11-04',
       seats: ['dreamer'],
     },
@@ -164,7 +164,7 @@ const minutes = parseMinutes({
     },
     { seat: 'skeptic', text: 'Neither reply turns into a scheduled interview by 8 Nov.' },
     { seat: 'cfo', text: 'The card row still has no minimum on 8 Nov.' },
-    { seat: 'dreamer', text: 'A second export is in the song folder by 8 Nov.' },
+    { seat: 'dreamer', text: 'A second draft is in the game folder by 8 Nov.' },
   ],
   graded: [
     {
@@ -193,9 +193,9 @@ const minutes = parseMinutes({
     },
     {
       seat: 'dreamer',
-      text: 'The song step is still unanswered on 1 Nov.',
+      text: 'The council game step is still unanswered on 1 Nov.',
       grade: 'cant_tell',
-      fact: 'A loop was saved, but the step was not answered.',
+      fact: 'A draft was saved, but the step was not answered.',
     },
   ],
   memos_note:
@@ -226,7 +226,7 @@ const minutes = parseMinutes({
       memo: 'Both replies were from companies you had spoken to before. What makes you sure it was the résumé?',
       rebuttal: {
         to: null,
-        stance: 'arguing against the board’s shared view',
+        stance: 'arguing against the council’s shared view',
         text: 'Everyone is reading two warm replies as proof. Send three cold applications first and see.',
       },
     },
@@ -236,16 +236,16 @@ const minutes = parseMinutes({
       prediction: 'The card row still has no minimum on 8 Nov.',
       rebuttal: {
         to: 'dreamer',
-        text: 'The studio hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
+        text: 'The workshop hour costs nothing in cash. The ten minutes with the statement are the only thing due this week.',
       },
     },
     {
       seat: 'dreamer',
-      memo: 'A loop exists. It is forty seconds long and it is the first thing in that folder since June.',
-      prediction: 'A second export is in the song folder by 8 Nov.',
+      memo: 'A rules draft exists. It is one page long and it is the first thing in that folder since June.',
+      prediction: 'A second draft is in the game folder by 8 Nov.',
       rebuttal: {
         to: 'cfo',
-        text: 'The statement was opened last time only after you had made something. Put it after the studio, not before.',
+        text: 'The statement was opened last time only after you had made something. Put it after the workshop, not before.',
       },
     },
   ],
@@ -271,7 +271,7 @@ const calledMinutes = parseMinutes({
         {
           seat: 'mentor',
           stance: 'Take it, keep applying',
-          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend studio hour.',
+          text: 'Keep the search at two applications a week. Three months of real work is worth more than three months of waiting. It would change if the contract ended the weekend workshop hour.',
           receipts: [],
         },
         {
@@ -284,13 +284,13 @@ const calledMinutes = parseMinutes({
           seat: 'cfo',
           stance: 'Take it',
           text: 'Three months of pay covers the card and moves the runway from five months to eight. It would change if the rate came in under $38 an hour.',
-          receipts: [{ label: 'Recurring', link: '/shopping/recurring' }],
+          receipts: [{ label: 'Recurring', link: '/finances/recurring' }],
         },
         {
           seat: 'dreamer',
-          stance: 'Keep searching, with the song kept',
-          text: 'The song stays on the table either way. It would change if the contract allowed one free morning a week.',
-          receipts: [{ label: 'Personal goals', link: '/vault/n/Me/Personal%20Goals.md' }],
+          stance: 'Keep searching, with the game kept',
+          text: 'The council game stays on the table either way. It would change if the contract allowed one free morning a week.',
+          receipts: [{ label: 'What I want next', link: '/vault/n/Journal/What%20I%20want%20next.md' }],
         },
       ],
     },
@@ -320,8 +320,9 @@ const subject = {
   ref: null,
   path: [
     { label: 'You', href: '/you' },
-    { label: 'Board', href: '/you/board' },
-    { label: 'Board meeting 1 Nov 2026', href: `/you/board/${ID}` },
+    { label: 'Council', href: '/you/council' },
+    { label: 'Decisions', href: '/you/council/decisions' },
+    { label: 'Council meeting 1 Nov 2026', href: `/you/council/${ID}` },
   ],
 };
 
@@ -368,11 +369,11 @@ export function YouBoardMeetingPreview({
           {
             label:
               state === 'ready'
-                ? 'Board meeting 1 Nov 2026'
+                ? 'Council meeting 1 Nov 2026'
                 : state === 'called'
                   ? CALLED_DECISION
-                  : 'Board meeting',
-            href: `/you/board/${ID}`,
+                  : 'Council meeting',
+            href: `/you/council/${ID}`,
           },
         ],
       }}
@@ -415,7 +416,7 @@ const rows: BoardMeetingRow[] = [
 /** The roster as migrations-you/0022 seeds it: five seats and seven guests. */
 const advisors: BoardAdvisor[] = sortAdvisors([
   { key: 'hiring_manager', name: 'Hiring manager', kind: 'seat', focus: null },
-  { key: 'mentor', name: 'Mentor', kind: 'seat', focus: null },
+  { key: 'mentor', name: 'Jerwyn the Elder', kind: 'seat', focus: null },
   { key: 'skeptic', name: 'Skeptic', kind: 'seat', focus: null },
   { key: 'cfo', name: 'CFO', kind: 'seat', focus: null },
   { key: 'dreamer', name: 'Dreamer', kind: 'seat', focus: null },

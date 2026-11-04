@@ -62,6 +62,14 @@ export function parseMetricForm(
     }
     target = Number(targetText);
   }
+  const highText = text(get('targetHigh'));
+  let targetHigh: number | null = null;
+  if (highText) {
+    if (!/^\d+$/.test(highText)) {
+      return { ok: false, field: 'targetHigh', error: 'The top of the aim is a whole number above the low end.' };
+    }
+    targetHigh = Number(highText);
+  }
   const period = text(get('period'));
   // A form without the choice of what to count counts a list, as every form did before plan #2397.
   const sourceText = text(get('source')) || 'list';
@@ -77,6 +85,7 @@ export function parseMetricForm(
       ? (period as MetricPeriod)
       : ('' as MetricPeriod),
     target,
+    targetHigh,
   };
 
   // The list comes first: the date only means something once the list is right.
@@ -106,9 +115,9 @@ export function parseMetricForm(
 export function metricLine(metric: Metric, lists: MetricList[]): string {
   if (metric.source !== 'list') {
     return [
-      metric.source === 'steps' ? 'Steps closed' : 'Dash files',
+      { steps: 'Steps closed', files: 'Dash files', hours: 'Hours logged' }[metric.source],
       metric.period === 'week' ? 'weekly' : 'monthly',
-      metric.target !== null ? `aim ${metric.target}` : null,
+      aimLine(metric),
     ]
       .filter(Boolean)
       .join(' · ');
@@ -119,7 +128,13 @@ export function metricLine(metric: Metric, lists: MetricList[]): string {
     list ? list.name : 'A list no longer on this goal',
     list ? (date ? date.label : 'a date no longer in the list') : null,
     metric.period === 'week' ? 'weekly' : 'monthly',
-    metric.target !== null ? `aim ${metric.target}` : null,
+    aimLine(metric),
   ];
   return parts.filter(Boolean).join(' · ');
+}
+
+/** "aim 5", or "aim 10–15" for a range; null with no aim. */
+function aimLine(metric: Metric): string | null {
+  if (metric.target === null) return null;
+  return metric.targetHigh ? `aim ${metric.target}–${metric.targetHigh}` : `aim ${metric.target}`;
 }

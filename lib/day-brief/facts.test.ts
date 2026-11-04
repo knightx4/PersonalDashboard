@@ -8,6 +8,8 @@ import {
   agendaCandidates,
   agendaFacts,
   briefDay,
+  cardCandidates,
+  type CardRow,
   candidatesSince,
   chargeCandidates,
   collectCandidates,
@@ -294,7 +296,7 @@ describe('chargeCandidates', () => {
         kind: 'bill',
         key: 'bill:new',
         title: 'Car loan',
-        href: '/shopping/recurring',
+        href: '/finances/recurring',
         event: 'bill',
         dueOn: TODAY,
         dueIn: 0,
@@ -320,7 +322,7 @@ describe('chargeCandidates', () => {
         kind: 'price-rise',
         key: 'price-rise:up',
         title: 'Spotify',
-        href: '/shopping/recurring',
+        href: '/finances/recurring',
         amountCents: 1500,
         previousAmountCents: 1200,
         currency: 'USD',
@@ -444,5 +446,52 @@ describe('collectCandidates', () => {
 
   it('keeps the first kind given for the same thing', async () => {
     expect(await collectCandidates([Promise.resolve([reply]), [todo, bill]])).toEqual([reply, bill]);
+  });
+});
+
+describe('cardCandidates', () => {
+  const card = (over: Partial<CardRow> = {}): CardRow => ({
+    id: 'a1',
+    name: 'Sapphire',
+    mask: '4417',
+    currency: 'USD',
+    next_payment_due_on: '2026-10-01',
+    minimum_payment_cents: 3_500,
+    statement_balance_cents: 41_200,
+    ...over,
+  });
+
+  it('names a card due within five days, with the statement balance and the minimum', () => {
+    const [c] = cardCandidates([card()], TODAY);
+    expect(c).toMatchObject({
+      kind: 'card',
+      key: 'card:a1:2026-10-01',
+      title: 'Sapphire ··4417',
+      href: '/finances/accounts/a1',
+      dueIn: 3,
+      amountCents: 41_200,
+      amountIs: 'statement',
+      minimumCents: 3_500,
+    });
+  });
+  it('keeps today and the fifth day, and leaves out the sixth, a past date and no date', () => {
+    const days = ['2026-09-28', '2026-10-03', '2026-10-04', '2026-09-27', null];
+    const out = cardCandidates(
+      days.map((d, i) => card({ id: `c${i}`, next_payment_due_on: d })),
+      TODAY,
+    );
+    expect(out.map((c) => c.key)).toEqual(['card:c0:2026-09-28', 'card:c1:2026-10-03']);
+  });
+  it('falls back to the minimum, and skips a card that owes nothing or has no figure', () => {
+    const out = cardCandidates(
+      [
+        card({ id: 'm', statement_balance_cents: null }),
+        card({ id: 'paid', statement_balance_cents: 0 }),
+        card({ id: 'none', statement_balance_cents: null, minimum_payment_cents: null }),
+      ],
+      TODAY,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ amountCents: 3_500, amountIs: 'minimum', minimumCents: null });
   });
 });

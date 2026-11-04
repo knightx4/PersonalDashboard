@@ -1,8 +1,0 @@
-{
-  "classification": "scheduling",
-  "ats": "unknown",
-  "tier": "subject_heuristic",
-  "company": "Galaxy",
-  "role": "Assoc/VP, Assistant Controller",
-  "note": "Real mail. A request for times, so scheduling: nothing is booked yet. Greenhouse sends it but the From is the recruiter at the company, so the ATS domain never appears in a header we read. 'Interview Availability Request' is the subject shape a request for times actually takes."
-}

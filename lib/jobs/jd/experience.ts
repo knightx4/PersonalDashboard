@@ -123,3 +123,16 @@ export function experienceRange(ask: Pick<ExperienceAsk, 'min' | 'max'>): string
   if (ask.max === ask.min) return `${ask.min} year${ask.min === 1 ? '' : 's'}`;
   return `${ask.min}–${ask.max} years`;
 }
+
+/**
+ * The years the Experience row leads with: what the person typed when they
+ * typed a minimum, otherwise the range read from the description. A typed
+ * maximum with no minimum is not a range, so it falls back to the read one.
+ */
+export function experienceShown(
+  typed: { min: number | null; max: number | null },
+  read: Pick<ExperienceAsk, 'min' | 'max'> | null,
+): { range: string; typed: boolean } | null {
+  if (typed.min !== null) return { range: experienceRange({ min: typed.min, max: typed.max }), typed: true };
+  return read ? { range: experienceRange(read), typed: false } : null;
+}

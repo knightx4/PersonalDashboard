@@ -1,4 +1,5 @@
 import type { JevResult, JevYesNoAnswer } from '@/lib/jev/wire';
+import { DEFAULT_VAULT_RULES, type VaultRules } from '@/lib/vault/map/rules';
 import { gateRefusal, gateVerdict, type GateNote, type GateOutcome } from './gate';
 
 /**
@@ -88,8 +89,10 @@ export type GateRunPorts = {
   ask(userId: string, note: GateCandidate): Promise<JevResult<JevYesNoAnswer>>;
   /** Automatic threads this person has had opened since `since`. */
   automaticSince(userId: string, since: Date): Promise<number>;
+  /** The person's private folders (loadVaultRules), once per person per run. */
+  rules?(userId: string): Promise<VaultRules>;
   /** Have Maya write on the note and store it as an automatic thread. */
-  think(userId: string, note: GateCandidate): Promise<ThinkResult>;
+  think(userId: string, note: GateCandidate, rules: VaultRules): Promise<ThinkResult>;
   /** Upsert on (note_id, blob_sha). */
   record(userId: string, rows: GateCheckRow[]): Promise<void>;
   /** Milliseconds since the run started; tests fix it. */
@@ -141,11 +144,12 @@ export async function runMayaGateFor(
   result.read = pending.length;
 
   const enabled = await ports.jevEnabled(userId);
+  const rules = (await ports.rules?.(userId)) ?? DEFAULT_VAULT_RULES;
   const rows: GateCheckRow[] = [];
   const passers: { note: GateCandidate; row: GateCheckRow }[] = [];
 
   for (const note of pending) {
-    if (gateRefusal(note)) {
+    if (gateRefusal(note, rules)) {
       rows.push({ noteId: note.id, blobSha: note.blobSha, outcome: 'skip', probability: null, jevModel: null });
       continue;
     }
@@ -183,7 +187,7 @@ export async function runMayaGateFor(
       result.deferred += 1;
       continue;
     }
-    const thought = await ports.think(userId, note);
+    const thought = await ports.think(userId, note, rules);
     if (thought.ok) {
       room -= 1;
       result.thoughts += 1;

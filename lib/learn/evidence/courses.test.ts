@@ -13,8 +13,8 @@ import {
 
 const course = (over: Partial<CourseSource> = {}): CourseSource => ({
   course_id: 'c1',
-  school: 'Yale University',
-  code: 'MGT 541',
+  school: 'Riverside School of Management',
+  code: 'FIN 410',
   title: 'Corporate Finance',
   term: 'Spring 2026',
   year: 2026,
@@ -66,7 +66,7 @@ describe('how much a course is worth with age', () => {
 describe("a course's text", () => {
   it('opens with the course and puts the summary before the other notes', () => {
     const text = courseText(course({ notes: ['# Summary', 'Lecture notes'] }));
-    expect(text.startsWith('MGT 541 Corporate Finance (Yale University, Spring 2026)')).toBe(true);
+    expect(text.startsWith('FIN 410 Corporate Finance (Riverside School of Management, Spring 2026)')).toBe(true);
     expect(text.indexOf('# Summary')).toBeLessThan(text.indexOf('Lecture notes'));
   });
 
@@ -86,7 +86,7 @@ describe("a course's text", () => {
 describe('the links a match makes', () => {
   it('says which course, the grade and the year', () => {
     expect(courseBasis(course({ grade: 'A', year: 2025 }))).toBe(
-      'from MGT 541 Corporate Finance, A, 2025',
+      'from FIN 410 Corporate Finance, A, 2025',
     );
     expect(courseBasis(course({ code: null, grade: null, year: null }))).toBe(
       'from Corporate Finance',
@@ -111,7 +111,7 @@ describe('the links a match makes', () => {
         source_id: 'c1',
         similarity: 0.72,
         weight: 1,
-        basis: 'from MGT 541 Corporate Finance, A, 2026',
+        basis: 'from FIN 410 Corporate Finance, A, 2026',
       },
     ]);
   });

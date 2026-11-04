@@ -22,6 +22,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import { VAULT_CLASS_ON_JEV } from '@/lib/vault/map/jev-question';
 import { runSweepSlice, type SweepNoteRow, type SweepPorts } from '@/lib/vault/map/sweep';
 import { loadNearestThemeNames, loadThemeNames } from '@/lib/vault/map/themes';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 
 /**
  * One call of the map sweep's clock: work every running sweep for a few
@@ -449,6 +450,8 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
   // Jev classifies the notes only once the switch is on and for an account
   // that agreed to send its notes to TypeSafe (plan #1168).
   const jevEnabled = VAULT_CLASS_ON_JEV && (await jevEnabledFor(core, userId));
+  // The person's private folders, read once for the slice.
+  const rules = await loadVaultRules(supabase, userId);
 
   const ports: SweepPorts = {
     async notesAfter(afterPath, limit) {
@@ -513,6 +516,7 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
         anthropicApiKey: apiKey,
         onSpend: (report) => spend.push(report),
         jevEnabled,
+        rules,
       }),
 
     accept: (proposal) =>
@@ -595,7 +599,7 @@ async function workSweep(supabase: VaultSupabaseClient, sweep: SweepRow) {
     },
   };
 
-  const result = await runSweepSlice({ afterPath: sweep.after_path, ports, budgetMs: SWEEP_BUDGET_MS });
+  const result = await runSweepSlice({ afterPath: sweep.after_path, ports, budgetMs: SWEEP_BUDGET_MS, rules });
   await ports.afterBatch?.();
 
   const finishedAt = new Date().toISOString();

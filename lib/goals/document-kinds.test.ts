@@ -33,7 +33,7 @@ const firstAnswer = {
   as_of: '2026-09-02',
   records: [
     { name: 'Direct Unsubsidized', balance: 20500, first_payment: null },
-    { name: 'Grad PLUS', balance: 31000, first_payment: '2026-06-10' },
+    { name: 'Graduate loan', balance: 31000, first_payment: '2026-06-10' },
   ],
   extra: [
     { label: 'Loan ID', from: 'Loan ID', type: 'text', options: null, identifies: true, values: ['DU-1', 'GP-1'], why: 'Matches next month’s export.' },
@@ -44,7 +44,7 @@ const firstAnswer = {
     {
       label: 'Repayment Begin Date',
       field: 'first_payment',
-      note: 'For Grad PLUS loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date.',
+      note: 'For graduate loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date.',
     },
   ],
   kind: {
@@ -75,7 +75,7 @@ describe('a kind of document learned on the first read and used on the second', 
     ]);
 
     // The person adds Loan ID and Next payment due, leaves Principal out, and
-    // puts the Grad PLUS first payment right.
+    // puts the graduate loan's first payment right.
     const fields: CollectionField[] = [
       ...loans,
       { key: 'loan_id', label: 'Loan ID', type: 'text', id: true },
@@ -110,7 +110,7 @@ describe('a kind of document learned on the first read and used on the second', 
     expect(write?.name).toBe('NSLDS loan export');
     expect(write?.skipped).toEqual(['Outstanding Principal']);
     expect(write?.fieldNotes.first_payment).toBe(
-      'Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for Grad PLUS loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date. Corrected by hand for GP-1: the reader gave 2026-06-10, the right value was 2026-12-18.',
+      'Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for graduate loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date. Corrected by hand for GP-1: the reader gave 2026-06-10, the right value was 2026-12-18.',
     );
     expect(write?.fieldNotes.next_payment_due).toBe('Filled from "Next Payment Due Date".');
   });
@@ -122,7 +122,7 @@ describe('a kind of document learned on the first read and used on the second', 
     recognise: 'A text export from studentaid.gov headed "File Request Date", one block per loan.',
     fieldNotes: {
       first_payment:
-        'Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for Grad PLUS loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date.',
+        'Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for graduate loans this is the last disbursement date; the first payment falls in the month of the Next Payment Due Date.',
       gone: 'A note for a field the form no longer has.',
     },
     skipped: ['Outstanding Principal'],
@@ -140,7 +140,7 @@ describe('a kind of document learned on the first read and used on the second', 
     expect(prompt).toContain('Kind: "NSLDS loan export"');
     expect(prompt).toContain('Recognise it by: A text export from studentaid.gov');
     expect(prompt).toContain(
-      '- First payment (first_payment): Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for Grad PLUS loans',
+      '- First payment (first_payment): Filled from "Repayment Begin Date". Trap: "Repayment Begin Date": for graduate loans',
     );
     expect(prompt).toContain('do not list in extra: Outstanding Principal');
     expect(prompt).not.toContain('A note for a field the form no longer has.');
@@ -161,7 +161,7 @@ describe('a kind of document learned on the first read and used on the second', 
           as_of: '2026-10-02',
           records: [
             { name: 'Direct Unsubsidized', balance: 20600, first_payment: null, loan_id: 'DU-1', next_payment_due: null },
-            { name: 'Grad PLUS', balance: 31150, first_payment: '2026-12-18', loan_id: 'GP-1', next_payment_due: '2026-12-18' },
+            { name: 'Graduate loan', balance: 31150, first_payment: '2026-12-18', loan_id: 'GP-1', next_payment_due: '2026-12-18' },
           ],
           // The reader lists the principal again; the kind leaves it out.
           extra: [

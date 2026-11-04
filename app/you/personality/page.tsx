@@ -6,6 +6,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { createYouClient } from '@/lib/you/auth/server';
 import { latestBigFive, type BigFiveResult, type TypedResult } from '@/lib/you/personality/model';
 import { loadPersonalityResults } from '@/lib/you/personality/store';
+import { profileState } from '@/lib/you/personality/profile';
+import { loadPersonalityProfile } from '@/lib/you/personality/profile-run';
 import { loadTraitThemes } from '@/lib/you/personality/trait-themes-load';
 import { PersonalitySection } from './personality-section';
 
@@ -18,7 +20,8 @@ export const dynamic = 'force-dynamic';
  * the types typed in from other tests with a read of each, and earlier
  * results folded beneath. This was the personality section of Learn's Know
  * page (plan #1634) until it moved here. The test and the typed-in types
- * are edited at /you/personality/test, a press away.
+ * are edited at /you/personality/test, a press away. Above them all, Dash's
+ * analysis across the tests, offered again only when a test has changed.
  *
  * A failed read of the results takes the page to the workspace's error
  * screen, since the results are all the tab holds. Themes that could not be
@@ -26,7 +29,11 @@ export const dynamic = 'force-dynamic';
  */
 export default async function PersonalityPage() {
   const user = await requireUser();
-  const results = await loadPersonalityResults(await createYouClient());
+  const you = await createYouClient();
+  const [results, profile] = await Promise.all([
+    loadPersonalityResults(you),
+    loadPersonalityProfile(you),
+  ]);
   const latest = latestBigFive(results);
   const earlier = results.filter(
     (r): r is BigFiveResult => r.kind === 'big_five' && r.id !== latest?.id,
@@ -41,7 +48,13 @@ export default async function PersonalityPage() {
   return (
     <PageColumn>
       <PageHeader title="Personality" description="Your results from each test, side by side." />
-      <PersonalitySection latest={latest} earlier={earlier} typed={typed} themes={themes} />
+      <PersonalitySection
+        latest={latest}
+        earlier={earlier}
+        typed={typed}
+        themes={themes}
+        profile={{ profile, state: profileState(results, profile) }}
+      />
     </PageColumn>
   );
 }

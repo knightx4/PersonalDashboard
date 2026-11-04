@@ -12,7 +12,7 @@
 --
 --   items.acts   on a `claude` step, one sentence naming what working it
 --                does outside the goal's map ("Sends the hardship request to
---                Nelnet from your Gmail"). Null for a step whose work stays
+--                Northstar from your Gmail"). Null for a step whose work stays
 --                inside the map: research, a draft, a calculation.
 --
 -- A write that says it is Claude's may only put a step with `acts` in as

@@ -5,7 +5,7 @@ import { z } from 'zod';
  *
  * Nothing here calls a model or the database, so each rule can be tested on
  * its own. They are the trials' findings written as code: the 75-note trial
- * (docs/trials/2026-09-19-map-75-notes.md) changed two routing rules, and
+ * (a trial write-up, not kept in the repository because it quoted the person's own data) changed two routing rules, and
  * KNOWLEDGE-SPEC.md ("What the sweep must not read") adds two refusals.
  *
  * The learn module's classifier in lib/learn/vault still has four classes and
@@ -16,17 +16,52 @@ import { z } from 'zod';
 // ------------------------------------------------------------ what is not read
 
 /**
- * Folders whose notes are journals. The person's answer on plan #752: skip
- * everything in `Me/`. Matched on the first path segment, case as written.
+ * The folders of a vault whose notes are never sent to a model. Each person
+ * sets their own on the vault settings page; they are kept on
+ * obsidian.vault_connections (journal_folders, excluded_folders) and read by
+ * loadVaultRules in ./vault-rules.ts.
+ *
+ * Both lists match a note's path as a folder prefix, ignoring case, so
+ * `Journal` covers `journal/2026-10-01.md` and `Career/Job Applications`
+ * covers that folder without the rest of `Career`. A note at the vault's top
+ * level is in no folder and matches neither.
+ *
+ * - journalFolders: folders whose notes are journals.
+ * - excludedFolders: folders the person asked the map to leave out.
  */
-export const JOURNAL_FOLDERS = ['Me'] as const;
+export type VaultRules = {
+  journalFolders: readonly string[];
+  excludedFolders: readonly string[];
+};
 
 /**
- * Folders the person asked the map to leave out, matched as a path prefix so
- * a nested folder can be named without the rest of its parent. Job
- * applications are cover letters and forms, not what the person thinks about.
+ * The rules for a person who has set none, equal to the column defaults in
+ * supabase/migrations-vault/0041_vault_private_folders.sql. A call that cannot
+ * read the person's own rules uses these, so the guard is never off.
  */
-export const EXCLUDED_FOLDERS = ['Career/Job Applications'] as const;
+export const DEFAULT_VAULT_RULES: VaultRules = {
+  journalFolders: ['Me', 'Journal', 'Journals', 'Diary', 'Private'],
+  excludedFolders: [],
+};
+
+/** A folder as typed, without slashes or spaces around its segments. */
+export function cleanFolder(folder: string): string {
+  return folder
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join('/');
+}
+
+/** The first of `folders` that holds `path`, as the person wrote it. */
+function folderHolding(path: string, folders: readonly string[]): string | null {
+  const lower = path.toLowerCase();
+  for (const folder of folders) {
+    const clean = cleanFolder(folder);
+    if (clean && lower.startsWith(`${clean.toLowerCase()}/`)) return clean;
+  }
+  return null;
+}
 
 /**
  * Strings shaped like an API key. A note carrying one is never sent to a
@@ -44,13 +79,20 @@ export type NotRead = { reason: NotReadReason; detail: string };
  *
  * The path is read here and nowhere after: the privacy page promises a note's
  * folder and path never reach a model.
+ *
+ * `rules` are the person's own (loadVaultRules); left out, the defaults apply.
  */
-export function whyNotRead(note: { path: string; body: string }): NotRead | null {
-  const folder = note.path.split('/')[0];
-  if (note.path.includes('/') && (JOURNAL_FOLDERS as readonly string[]).includes(folder)) {
+export function whyNotRead(
+  note: { path: string; body: string },
+  rules: VaultRules = DEFAULT_VAULT_RULES,
+): NotRead | null {
+  const journal = folderHolding(note.path, rules.journalFolders);
+  if (journal) {
+    // Named as the path spells it, which is what the person sees in the vault.
+    const folder = note.path.slice(0, journal.length);
     return { reason: 'journal', detail: `Not read: notes in ${folder}/ are journals.` };
   }
-  const excluded = EXCLUDED_FOLDERS.find((prefix) => note.path.startsWith(`${prefix}/`));
+  const excluded = folderHolding(note.path, rules.excludedFolders);
   if (excluded) {
     return { reason: 'excluded', detail: `Not read: ${excluded}/ is left out of the map.` };
   }

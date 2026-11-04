@@ -12,7 +12,7 @@ describe('refusalFor', () => {
   it('names the permission a refused workflow-runs read is short of', () => {
     const said = refusalFor(
       403,
-      '/repos/knightx4/PersonalDashboard/actions/runs?head_sha=a405587&per_page=100',
+      '/repos/example-owner/PersonalDashboard/actions/runs?head_sha=a405587&per_page=100',
     );
     expect(said).toContain('Actions: Read');
     expect(said).toContain('GITHUB_READ_TOKEN');
@@ -22,18 +22,18 @@ describe('refusalFor', () => {
 
   it('names Contents for the commit listing', () => {
     expect(
-      refusalFor(404, '/repos/knightx4/PersonalDashboard/commits?sha=main&per_page=100'),
+      refusalFor(404, '/repos/example-owner/PersonalDashboard/commits?sha=main&per_page=100'),
     ).toContain('Contents: Read');
   });
 
   it('asks for no particular permission where it does not know which', () => {
-    const said = refusalFor(403, '/repos/knightx4/PersonalDashboard/activity?per_page=100');
-    expect(said).toContain('knightx4/PersonalDashboard');
+    const said = refusalFor(403, '/repos/example-owner/PersonalDashboard/activity?per_page=100');
+    expect(said).toContain('example-owner/PersonalDashboard');
     expect(said).not.toContain(': Read"');
   });
 
   it('says an expired token is expired rather than unpermitted', () => {
-    const said = refusalFor(401, '/repos/knightx4/PersonalDashboard/activity');
+    const said = refusalFor(401, '/repos/example-owner/PersonalDashboard/activity');
     expect(said).toContain('401');
     expect(said).toMatch(/expired/);
   });
@@ -71,7 +71,7 @@ describe('listPushes', () => {
     expect(error).toBeNull();
     expect(pushes).toEqual([{ ref: 'main', sha: 'abc1234', at: '2026-09-17T11:50:00Z' }]);
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toContain('/repos/knightx4/PersonalDashboard/activity');
+    expect(url).toContain('/repos/example-owner/PersonalDashboard/activity');
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer ghp_test');
     vi.unstubAllEnvs();
   });
@@ -409,7 +409,7 @@ describe('refreshMainCheck', () => {
     expect(result).toEqual({ sha: MERGE, conclusion: 'failed', error: null, reason: null });
     // The deploy and migration readings beside it have tests of their own.
     expect(written(upsert)).toMatchObject({
-      repo: 'knightx4/PersonalDashboard',
+      repo: 'example-owner/PersonalDashboard',
       head_sha: MERGE,
       conclusion: 'failed',
       checked_at: new Date(NOW).toISOString(),
@@ -459,7 +459,7 @@ describe('refreshMainCheck', () => {
                 name: 'CI',
                 status: 'completed',
                 conclusion: 'failure',
-                html_url: 'https://github.com/knightx4/PersonalDashboard/actions/runs/42',
+                html_url: 'https://github.com/example-owner/PersonalDashboard/actions/runs/42',
               },
             ],
           }),
@@ -474,7 +474,7 @@ describe('refreshMainCheck', () => {
     expect(result.reason).toBe('Failed at check › Test.');
     const row = written(upsert);
     expect(row.reason).toBe('Failed at check › Test.');
-    expect(row.run_url).toBe('https://github.com/knightx4/PersonalDashboard/actions/runs/42');
+    expect(row.run_url).toBe('https://github.com/example-owner/PersonalDashboard/actions/runs/42');
     vi.unstubAllEnvs();
   });
 
@@ -732,9 +732,9 @@ describe('commitSubjects', () => {
 describe('refreshCommitChecks for a project step', () => {
   const WEBSITE = {
     id: 'website',
-    label: 'selveyknight.com',
-    owner: 'knightx4',
-    repo: 'selveyknightwebsite',
+    label: 'alexrivera.dev',
+    owner: 'example-owner',
+    repo: 'alexrivera-site',
     branch: 'main',
   };
 
@@ -756,7 +756,7 @@ describe('refreshCommitChecks for a project step', () => {
 
     expect(result).toEqual({ checked: 1, error: null });
     const asked = fetchFn.mock.calls.map(([url]) => String(url));
-    expect(asked.every((url) => url.includes('/repos/knightx4/selveyknightwebsite/'))).toBe(true);
+    expect(asked.every((url) => url.includes('/repos/example-owner/alexrivera-site/'))).toBe(true);
     const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ conclusion: string }>>>;
     expect(rows[0].conclusion).toBe('passed');
     vi.unstubAllEnvs();
@@ -773,7 +773,7 @@ describe('refreshCommitChecks for a project step', () => {
       [WEBSITE],
     );
     const fetchFn = vi.fn(async (url: string) => {
-      if (String(url).includes('selveyknightwebsite')) {
+      if (String(url).includes('alexrivera-site')) {
         return new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 });
       }
       return String(url).includes('/actions/runs')
@@ -788,7 +788,7 @@ describe('refreshCommitChecks for a project step', () => {
     });
 
     expect(result.checked).toBe(1);
-    expect(result.error).toContain('knightx4/selveyknightwebsite');
+    expect(result.error).toContain('example-owner/alexrivera-site');
     const [[rows]] = upsert.mock.calls as unknown as Array<Array<Array<{ commit_sha: string }>>>;
     expect(rows.map((row) => row.commit_sha)).toEqual([BRANCH.slice(0, 7)]);
     vi.unstubAllEnvs();
@@ -815,18 +815,18 @@ describe('refreshMainCheck for a project', () => {
       supabase: { from: () => ({ upsert }), rpc } as never,
       now: Date.parse('2026-09-18T21:40:00.000Z'),
       fetch: fetchFn as never,
-      repo: { owner: 'knightx4', repo: 'selveyknightwebsite', branch: 'main' },
+      repo: { owner: 'example-owner', repo: 'alexrivera-site', branch: 'main' },
     });
 
     expect(result).toMatchObject({ sha: MERGE, conclusion: 'passed', error: null });
     const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
     expect(row).toMatchObject({
-      repo: 'knightx4/selveyknightwebsite',
+      repo: 'example-owner/alexrivera-site',
       unapplied_migrations: null,
       migrations_error: null,
     });
     const asked = fetchFn.mock.calls.map(([url]) => String(url));
-    expect(asked.every((url) => url.includes('/repos/knightx4/selveyknightwebsite/'))).toBe(true);
+    expect(asked.every((url) => url.includes('/repos/example-owner/alexrivera-site/'))).toBe(true);
     expect(rpc).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
@@ -850,8 +850,8 @@ describe('refreshProjectMainChecks', () => {
       from: (table: string) => {
         if (table === 'plan_main_checks') return { upsert };
         const node = chain([
-          { id: 'website', label: 'Site', owner: 'knightx4', repo: 'selveyknightwebsite' },
-          { id: 'old', label: 'Old', owner: 'knightx4', repo: 'old-site', archived_at: '2026-01-01' },
+          { id: 'website', label: 'Site', owner: 'example-owner', repo: 'alexrivera-site' },
+          { id: 'old', label: 'Old', owner: 'example-owner', repo: 'old-site', archived_at: '2026-01-01' },
         ]);
         const plainEq = node.eq as () => unknown;
         node.eq = (...args: unknown[]) => {
@@ -872,7 +872,7 @@ describe('refreshProjectMainChecks', () => {
     expect(read).toBe(1);
     expect(eq).toHaveBeenCalledWith('user_id', 'owner-1');
     const [[row]] = upsert.mock.calls as unknown as Array<Array<Record<string, unknown>>>;
-    expect(row.repo).toBe('knightx4/selveyknightwebsite');
+    expect(row.repo).toBe('example-owner/alexrivera-site');
     vi.unstubAllEnvs();
   });
 

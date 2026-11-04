@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { planLiveness } from './tree';
 import {
   betweenStepsRefusal,
   FEATURE_IDLE_AFTER_MINUTES,
@@ -263,7 +264,9 @@ describe('runEndedNote', () => {
 });
 
 /** A claim on a step, as the tree hands it over. */
-function claim(over: Partial<{ status: string; startedAt: string | null }> = {}) {
+function claim(
+  over: Partial<{ status: string; startedAt: string | null; comment: string | null }> = {},
+) {
   return { status: 'in_progress', startedAt: minutesAgo(30), ...over };
 }
 
@@ -341,6 +344,35 @@ describe('refusalStanding', () => {
 });
 
 describe('claimLiveness', () => {
+  it('reads a built step as no claim, however old, so its feature can be sent', () => {
+    const built = claim({
+      startedAt: minutesAgo(60 * 5),
+      comment: 'Earlier note.\n\nBuilt 2026-09-17: on branch plan/9.',
+    });
+    const liveness = claimLiveness(built, run({ reading: reading(1, 5) }), NOW);
+    expect(liveness).toBeNull();
+    expect(
+      sendOverClaim({ number: 1, liveness, run: run(), now: NOW, confirmed: false }),
+    ).toEqual({ send: true });
+  });
+
+  it('leaves a feature with only built steps under it free to be sent', () => {
+    const steps = [
+      { id: 'a', ...claim({ startedAt: minutesAgo(300), comment: 'Built 2026-09-17: x.' }) },
+      { id: 'b', ...claim({ startedAt: minutesAgo(5) }) },
+    ];
+    const liveness = planLiveness(steps, {}, NOW);
+    expect(Object.keys(liveness)).toEqual(['b']);
+    expect(steps.filter((step) => claimIsLive(liveness[step.id] ?? null)).map((s) => s.id)).toEqual([
+      'b',
+    ]);
+  });
+
+  it('still reads a step as claimed when the Built line is not its last paragraph', () => {
+    const reopened = claim({ comment: 'Built 2026-09-17: x.\n\nPicked up again.' });
+    expect(claimLiveness(reopened, run({ reading: reading(1, 5) }), NOW)).toBe('working');
+  });
+
   it('is nothing at all on a step nobody has claimed', () => {
     for (const status of ['not_started', 'blocked', 'done', 'dropped', 'proposed']) {
       expect(claimLiveness(claim({ status }), run(), NOW)).toBeNull();

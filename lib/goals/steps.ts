@@ -140,6 +140,11 @@ export type Step = {
    * closes it as done (goals migration 0083, plan #2376). Absent reads as off.
    */
   notifyOnDone?: boolean;
+  /**
+   * When you first saw the notice of this step finishing, by opening it or
+   * dismissing it in the Goals Inbox (goals 0090, plan #2611); null until then.
+   */
+  noticeSeenAt?: string | null;
 };
 
 /**

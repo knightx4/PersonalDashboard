@@ -34,7 +34,7 @@ import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
  * naming a row can only name a row a lookup returned, as citations do.
  *
  * Three limits stop the looking, and when one is reached the next call is
- * made to answer with what it has: eight lookups, an input token budget, and
+ * made to answer with what it has: MAX_LOOKUPS lookups, an input token budget, and
  * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
  *
@@ -61,13 +61,21 @@ export const MAX_LOOKUPS = 12;
  * cache read counted at a tenth, as it is priced (budgetTokens). Counted in
  * full, the rules and tools alone, about 76,000 tokens by October 2026,
  * spent the budget in two calls: "what roles have I applied to at
- * Concourse" was told to answer after three lookups, with nothing found yet.
+ * Northwind" was told to answer after three lookups, with nothing found yet.
  */
 export const INPUT_BUDGET = 150_000;
 
 /** What one call spends of INPUT_BUDGET: fresh input and cache writes in full, cache reads at a tenth. */
-export function budgetTokens(usage: { inputTokens: number; cachedInputTokens: number; cacheWriteTokens: number }): number {
-  return usage.inputTokens + usage.cacheWriteTokens + Math.ceil(usage.cachedInputTokens / 10);
+export function budgetTokens(
+  usage: { inputTokens: number; cachedInputTokens: number; cacheWriteTokens: number },
+  previousPrompt = 0,
+): number {
+  // Text the last call already sent and this one writes to the cache is read again, not new:
+  // a pasted PDF was billed as fresh input on call 1 and as a cache write on call 2, and spent
+  // the budget after two lookups (27 October 2026).
+  const fresh = usage.inputTokens + usage.cacheWriteTokens;
+  const again = Math.min(previousPrompt, fresh);
+  return fresh - again + Math.ceil((usage.cachedInputTokens + again) / 10);
 }
 /**
  * Time spent looking before it must answer. Ask runs in app/api/ask/route.ts,
@@ -184,6 +192,13 @@ export type DashVoice = {
   acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
+  /**
+   * How hard the model thinks, sent as `output_config.effort` (plan
+   * #2789.10, Ask's "Think it through"). Absent: the model's own default.
+   */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Time spent looking before it must answer; TIME_BUDGET_MS when absent. */
+  timeBudgetMs?: number;
 };
 
 /** Where the conversation is happening. */
@@ -298,7 +313,7 @@ const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them 
 /**
  * Sent beside the refused lookups when the model was told to answer and
  * looked something up instead. With the tool results alone, the call after
- * them came back with a single token and no words (the Concourse question,
+ * them came back with a single token and no words (the Northwind question,
  * 21 October 2026).
  */
 const ANSWER_IN_WORDS = 'Write your answer to them now, in words, from what you have found. Say plainly what you could not check.';
@@ -719,6 +734,12 @@ export type DashRun = {
   files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
+  /**
+   * System text that changes from one answer to the next, sent after the
+   * date and outside the cache: a mentor's memory and the person's day
+   * (plan #2748.4), while the voice's system holds what stays the same.
+   */
+  contextBlocks?: readonly string[];
   execute: DashExecutor;
   /** Absent: every proposal is refused. */
   propose?: DashProposer;
@@ -772,6 +793,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const tools = voiceTools(voice);
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
+  const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
+  // Widened: the installed SDK's types predate output_config.
+  const effort = (voice.effort ? { output_config: { effort: voice.effort } } : {}) as Record<string, never>;
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
   // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
@@ -895,6 +919,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
   if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
+  for (const text of input.contextBlocks ?? []) if (text.trim()) system.push({ type: 'text', text });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
@@ -936,6 +961,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   }
   let lookups = 0;
   let inputTokens = 0;
+  let previousPrompt = 0;
   // Set when a voice that chooses stopped without its answer: the next round must give it.
   let asked = false;
   // Set once a refusal made before any lookup has been sent back (LOOK_FIRST).
@@ -951,7 +977,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         ? 'lookups'
         : inputTokens >= INPUT_BUDGET
           ? 'budget'
-          : now() - started >= TIME_BUDGET_MS
+          : now() - started >= timeBudget
             ? 'time'
             : null;
     const mustAnswer = limit !== null || asked || round === MAX_LOOKUPS + 1;
@@ -963,6 +989,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         {
           model,
           max_tokens: maxTokens,
+          ...effort,
           system,
           tools,
           tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
@@ -979,7 +1006,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
-    inputTokens += budgetTokens(usage);
+    inputTokens += budgetTokens(usage, previousPrompt);
+    previousPrompt = usage.inputTokens + usage.cacheWriteTokens + usage.cachedInputTokens;
     if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
@@ -1152,6 +1180,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
               {
                 model,
                 max_tokens: maxTokens,
+                ...effort,
                 system,
                 tools,
                 tool_choice: { type: 'none' },

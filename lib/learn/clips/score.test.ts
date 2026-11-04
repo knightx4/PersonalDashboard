@@ -22,7 +22,7 @@ import { clipWords, fingerprintOf, scoreClips } from './score-run';
  */
 
 const PROFILE: LearnerProfile = {
-  tracks: [{ id: 'subject-1', name: 'Startup Finance', note: null, frontier: ['Cash flow timing'], settled: 3 }],
+  tracks: [{ id: 'subject-1', name: 'Small Business Finance', note: null, frontier: ['Cash flow timing'], settled: 3 }],
   goals: [{ id: 'goal-1', title: 'Raise a seed round', detail: null }],
   ideas: [],
 };

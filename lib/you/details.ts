@@ -1,12 +1,26 @@
 /**
  * The person's own details (plan #2124.1): you.details, one row each, as the
- * Details tab and Dash's tools read it. Six values, each optional and kept as
- * they wrote it (supabase/migrations-you/0007_details.sql).
+ * Details tab and Dash's tools read it. Ten values, each optional and kept as
+ * they wrote it (supabase/migrations-you/0007_details.sql). The name, email,
+ * phone and mailing address are what a cover letter is signed with
+ * (supabase/migrations-you/0031_details_name_address.sql), and the website
+ * is where a published essay is linked (0032).
  *
  * No server imports, so the client form and the gallery can use it.
  */
 
-export const DETAIL_KEYS = ['phone', 'linkedin_url', 'citizenship', 'race', 'gender', 'sexuality'] as const;
+export const DETAIL_KEYS = [
+  'full_name',
+  'email',
+  'phone',
+  'mailing_address',
+  'website_url',
+  'linkedin_url',
+  'citizenship',
+  'race',
+  'gender',
+  'sexuality',
+] as const;
 
 export type DetailKey = (typeof DETAIL_KEYS)[number];
 
@@ -18,15 +32,19 @@ export const CUSTOM_LABEL_MAX = 80;
 export const CUSTOM_VALUE_MAX = 500;
 export const CUSTOM_ID_MAX = 64;
 
-/** The six details, null for one they have not given, and the fields of their own. */
+/** The fixed details, null for one they have not given, and the fields of their own. */
 export type Details = Record<DetailKey, string | null> & { custom_fields: CustomField[] };
 
-/** The six as the form sends them. */
+/** The fixed details as the form sends them. */
 export type SixDetails = Record<DetailKey, string | null>;
 
 /** What the Details tab calls each one, in the order it lists them. */
 export const DETAIL_LABELS: Record<DetailKey, string> = {
+  full_name: 'Full name',
+  email: 'Email',
   phone: 'Phone',
+  mailing_address: 'Mailing address',
+  website_url: 'Website',
   linkedin_url: 'LinkedIn',
   citizenship: 'Citizenship',
   race: 'Race',
@@ -46,12 +64,51 @@ export function linkedinHref(value: string): string {
   return `https://${trimmed.replace(/^[a-z][a-z0-9+.-]*:\/*/i, '')}`;
 }
 
+/**
+ * What a letter is signed with, from their details: the name under the
+ * sign-off, and the contact line at its foot (address, phone and email, in
+ * that order, each left out when they have not given it). Null when they have
+ * given none of them, so a letter with no details carries no contact line.
+ */
+export type Letterhead = { signer: string | null; contact: string | null };
+
+export function letterheadFrom(
+  details: Pick<Details, 'full_name' | 'email' | 'phone' | 'mailing_address'>,
+): Letterhead {
+  const contact = [details.mailing_address, details.phone, details.email]
+    .map((part) => part?.replace(/\s+/g, ' ').trim() ?? '')
+    .filter(Boolean)
+    .join('   ');
+  return { signer: details.full_name?.trim() || null, contact: contact || null };
+}
+
+/**
+ * Their website as the essay Publish card names it: the host and path with no
+ * scheme ("alexrivera.dev"), or null when they have not given one or what they
+ * typed is not an http(s) address.
+ */
+export function siteName(website: string | null | undefined): string | null {
+  const typed = website?.trim();
+  if (!typed) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(typed) ? typed : `https://${typed}`);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return `${url.host}${url.pathname}`.replace(/\/+$/, '');
+  } catch {
+    return null;
+  }
+}
+
 /** The columns a row is read with. */
 export const DETAIL_COLUMNS = `${DETAIL_KEYS.join(', ')}, custom_fields`;
 
 /** The most characters each detail may hold, matching the table's checks. */
 export const DETAIL_MAX: Record<DetailKey, number> = {
+  full_name: 200,
+  email: 200,
   phone: 200,
+  mailing_address: 500,
+  website_url: 500,
   linkedin_url: 500,
   citizenship: 200,
   race: 200,
@@ -61,7 +118,11 @@ export const DETAIL_MAX: Record<DetailKey, number> = {
 
 export const EMPTY_DETAILS: Details = {
   custom_fields: [],
+  full_name: null,
+  email: null,
   phone: null,
+  mailing_address: null,
+  website_url: null,
   linkedin_url: null,
   citizenship: null,
   race: null,
@@ -72,7 +133,7 @@ export const EMPTY_DETAILS: Details = {
 /** A row as stored; any column may be missing from a partial read. */
 export type DetailsRow = Partial<Record<DetailKey, string | null>> & { custom_fields?: unknown };
 
-/** What a save may carry: any of the six, and the whole list of own fields. */
+/** What a save may carry: any of the fixed details, and the whole list of own fields. */
 export type DetailsPatch = Partial<Record<DetailKey, string | null>> & { custom_fields?: unknown };
 
 export function detailsFromRow(row: DetailsRow | null | undefined): Details {

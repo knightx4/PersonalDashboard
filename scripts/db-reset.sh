@@ -16,6 +16,7 @@
 #   supabase/migrations-news        -> news,       the newsletter module
 #   supabase/migrations-goals       -> goals,      the goals module
 #   supabase/migrations-you         -> you,        the you module
+#   supabase/migrations-finances    -> finances,   the finances module
 #
 # They are separate directories rather than one because the sets were numbered
 # independently and each starts at 0001 -- and the job_search versions are
@@ -110,5 +111,10 @@ for f in "$ROOT/supabase/migrations-goals"/*.sql; do apply_file "$f"; done
 # later migrations move in come from learn and obsidian.
 echo "==> migrations-you (you)"
 for f in "$ROOT/supabase/migrations-you"/*.sql; do apply_file "$f"; done
+
+# finances after public: its transactions point at public.orders and
+# public.recurring_payments, and nothing points back.
+echo "==> migrations-finances (finances)"
+for f in "$ROOT/supabase/migrations-finances"/*.sql; do apply_file "$f"; done
 
 echo "==> done"

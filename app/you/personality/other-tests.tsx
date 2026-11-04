@@ -14,13 +14,17 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import {
+  ENNEAGRAM_TYPES,
   NOTE_MAX,
   TEST_NAME_MAX,
   TYPED_KINDS,
   TYPED_VALUE_MAX,
+  type TypedField,
   type TypedKind,
   type TypedResult,
 } from '@/lib/you/personality/model';
+import { EnneagramChart } from './enneagram-chart';
+import { ThemeList } from './theme-list';
 import { deleteTypedAction, restoreTypedAction, saveTypedAction } from './actions';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { IconButton } from '@/components/ui/icon-button';
@@ -35,7 +39,7 @@ import { IconButton } from '@/components/ui/icon-button';
  * the toast offers it back for six seconds.
  */
 
-type FieldName = 'testName' | 'typedValue' | 'takenAt' | 'note';
+type FieldName = TypedField;
 
 function byDay(a: TypedResult, b: TypedResult): number {
   return b.takenAt.localeCompare(a.takenAt) || b.createdAt.localeCompare(a.createdAt);
@@ -127,6 +131,8 @@ export function OtherTests({
                 {row.note ? (
                   <p className="mt-1 break-words text-small text-ink">{row.note}</p>
                 ) : null}
+                {row.typeScores ? <EnneagramChart scores={row.typeScores} className="mt-3" /> : null}
+                {row.themes ? <ThemeList themes={row.themes} className="mt-3" /> : null}
               </div>
               <Tooltip label="Delete this result" align="end" className="shrink-0">
                 <IconButton
@@ -188,6 +194,7 @@ function TypedForm({
   const [typedValue, setTypedValue] = useState('');
   const [takenAt, setTakenAt] = useState(today);
   const [note, setNote] = useState('');
+  const [typeScores, setTypeScores] = useState<string[]>(() => ENNEAGRAM_TYPES.map(() => ''));
   const [error, setError] = useState<{ text: string; field?: FieldName } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -197,7 +204,14 @@ function TypedForm({
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     startTransition(async () => {
-      const outcome = await saveTypedAction({ kind, testName, typedValue, takenAt, note });
+      const outcome = await saveTypedAction({
+        kind,
+        testName,
+        typedValue,
+        takenAt,
+        note,
+        typeScores: kind === 'enneagram' ? typeScores : undefined,
+      });
       if ('error' in outcome) {
         setError({ text: outcome.error, field: outcome.field });
         return;
@@ -264,6 +278,40 @@ function TypedForm({
           />
         </Field>
       </div>
+
+      {kind === 'enneagram' ? (
+        <fieldset aria-describedby="typed-scores-help">
+          <legend className="text-small font-medium text-ink-muted">
+            Your score for each type, if the test gave them
+          </legend>
+          <p id="typed-scores-help" className="mt-0.5 text-small text-ink-muted">
+            0 to 100. With all nine in, the result above can stay blank: the highest type fills it.
+          </p>
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-9">
+            {ENNEAGRAM_TYPES.map((type, i) => (
+              <label key={type} className="flex flex-col items-center gap-1 text-small text-ink-muted">
+                <span>{type}</span>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={100}
+                  step="any"
+                  aria-label={`Score for type ${type}`}
+                  value={typeScores[i]}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setTypeScores((current) => current.map((v, j) => (j === i ? value : v)));
+                  }}
+                  className="text-center tabular-nums"
+                  disabled={pending}
+                />
+              </label>
+            ))}
+          </div>
+          {errorFor('typeScores') ? <FieldError>{errorFor('typeScores')}</FieldError> : null}
+        </fieldset>
+      ) : null}
 
       <Field id="typed-note" label="A line of your own, if you like" error={errorFor('note')}>
         <Textarea

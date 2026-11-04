@@ -4,16 +4,16 @@ import {
   AdvisorsView,
   type AddStart,
   type AdvisorActions,
-} from '@/app/you/board/advisors/advisors-view';
+} from '@/app/you/council/advisors/advisors-view';
 import { PREVIEW_PANELS } from './you-board-surfaces';
-import { BoardListSkeleton } from '@/app/you/board/board-skeleton';
-import { PanelView } from '@/app/you/board/advisors/panels/[id]/panel-view';
+import { BoardListSkeleton } from '@/app/you/council/board-skeleton';
+import { PanelView } from '@/app/you/council/advisors/panels/[id]/panel-view';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
 import { avatarFor } from '@/lib/you/advisor-avatar';
-import type { Drawn } from '@/app/you/board/avatar-editor';
-import { ProfileView, type ProfileActions } from '@/app/you/board/advisors/[key]/profile-view';
-import { TalkTab, type TalkActions, type TalkData } from '@/app/you/board/advisors/[key]/talk-view';
-import { AdvisorTalkSkeleton } from '@/app/you/board/advisors/[key]/talk-skeleton';
+import type { Drawn } from '@/app/you/council/avatar-editor';
+import { ProfileView, type ProfileActions } from '@/app/you/council/advisors/[key]/profile-view';
+import { TalkTab, type TalkActions, type TalkData } from '@/app/you/council/advisors/[key]/talk-view';
+import { AdvisorTalkSkeleton } from '@/app/you/council/advisors/[key]/talk-skeleton';
 import type { Brain } from '@/lib/you/board-brain';
 import { advisorHref, type AdvisorDecision, type AdvisorTab } from '@/lib/you/board-profile';
 import { trackRecords, type TrackRecord } from '@/lib/you/board-scoring';
@@ -46,6 +46,8 @@ function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'nam
     updatedAt: '2026-10-30T09:00:00Z',
     avatar: avatarFor(over.key, null),
     assessment: null,
+    madeByYou: false,
+    hasPersona: true,
     ...over,
   };
 }
@@ -63,8 +65,8 @@ const seats: RosterAdvisor[] = [
   }),
   advisor({
     key: 'mentor',
+    name: 'Jerwyn the Elder',
     assessment: 'Career capital in ten years',
-    name: 'Mentor',
     kind: 'seat',
     brainStatus: 'none',
     sources: 0,
@@ -230,8 +232,8 @@ export function YouBoardAdvisorsPreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Mentors', href: '/you/council/advisors' },
         ],
       }}
     />
@@ -262,9 +264,9 @@ export function YouBoardPanelPreview({ state = 'ready' }: { state?: 'ready' | 'e
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
-          { label: 'Advisors', href: '/you/board/advisors' },
-          { label: panel.name, href: `/you/board/advisors/panels/${panel.id}` },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Mentors', href: '/you/council/advisors' },
+          { label: panel.name, href: `/you/council/advisors/panels/${panel.id}` },
         ],
       }}
     />
@@ -441,8 +443,8 @@ export function YouBoardAdvisorProfilePreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/board' },
-          { label: 'Roster', href: '/you/board/advisors' },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Mentors', href: '/you/council/advisors' },
           { label: advisor.name, href: advisorHref(advisor.key) },
         ],
       }}

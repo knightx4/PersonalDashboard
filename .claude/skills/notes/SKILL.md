@@ -55,7 +55,7 @@ fault — fall back to the Supabase MCP tools against `feedback_items` and do
 not spend the session diagnosing it.
 
 Read and write rows with `npx tsx scripts/sql.ts` (CLAUDE.md), not the
-connector's `execute_sql`. Project ref: `asjztutnqxbecruvyrbj`. `feedback_items` is in `public`. Most of the app's own
+connector's `execute_sql`. Project ref: `npx tsx scripts/project-ref.ts` prints it. `feedback_items` is in `public`. Most of the app's own
 tables are not: they are in a schema per workspace, such as `todo.`,
 `job_search.`, `goals.`, `learn.`, `news.` and `core.`, and the vault's are in
 `obsidian.`.

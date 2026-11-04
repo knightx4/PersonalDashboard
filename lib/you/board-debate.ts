@@ -527,8 +527,7 @@ export async function loadMeetingDebate(
   if (questions.error)
     throw new Error(`Reading the meeting's questions failed: ${questions.error.message}`);
   if (turns.error) throw new Error(`Reading the meeting's debate failed: ${turns.error.message}`);
-  if (advisors.error)
-    throw new Error(`Reading the board's advisors failed: ${advisors.error.message}`);
+  if (advisors.error) throw new Error(`Reading the council's advisors failed: ${advisors.error.message}`);
   return debateFrom(
     (questions.data ?? []) as Record<string, unknown>[],
     (turns.data ?? []) as Record<string, unknown>[],

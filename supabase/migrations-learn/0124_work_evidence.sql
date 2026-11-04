@@ -3,7 +3,7 @@
 -- An idea you used at work gets a link in learn.evidence_links (learn 0121)
 -- to the passage of your history that shows it. The history is the latest
 -- résumé (job_search.resume_versions) and the notes in the vault's Career
--- folder: the summary of your time at EY, the interview talking points and
+-- folder: the summary of a past job, the interview talking points and
 -- the rest, and the job application notes under Career/Job Applications.
 --
 -- learn.work_passages, one row per passage of a few sentences:

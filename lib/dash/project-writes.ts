@@ -8,6 +8,9 @@ import {
   repositoryByName,
 } from '@/lib/plan/project-add';
 import { loadDevProjects, PROJECT_COLUMNS } from '@/lib/plan/projects';
+import { insertPlanItem } from '@/lib/plan/insert-item';
+import { nextPlanPosition } from '@/lib/plan/position';
+import { MODULE_IDS } from '@/lib/modules';
 import { sameAs } from './runs';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
@@ -95,6 +98,86 @@ async function addProject(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   };
 }
 
+const MAX_TITLE = 200;
+const MAX_DETAIL = 4000;
+const STEP_TABLE = 'public.plan_items';
+
+/**
+ * A step on the plan, as the plan page's Add and a comment's add_step write
+ * it: always `proposed`, which is no work until the person approves it on the
+ * page. Nothing here sets a status, assignee or priority. With `under` it
+ * hangs beneath that step and takes its workspace; without, it goes at the top
+ * of the named workspace (or the app as a whole).
+ */
+async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  const title = typeof args.title === 'string' ? args.title.trim() : '';
+  if (!title) throw new Refused('title is missing: say what the step is in a short line.');
+  if (title.length > MAX_TITLE) {
+    throw new Refused(`That title is longer than a step's name can be (${MAX_TITLE} characters). Put the rest in detail.`);
+  }
+  const detail = typeof args.detail === 'string' && args.detail.trim() ? args.detail.trim() : null;
+  if (detail && detail.length > MAX_DETAIL) {
+    throw new Refused(`That detail is longer than a step's can be (${MAX_DETAIL} characters).`);
+  }
+  const db = await ctx.db('public');
+
+  let parentId: string | null = null;
+  let scope: string | null = null;
+  if (args.under !== undefined && args.under !== null && args.under !== '') {
+    const number = Number(String(args.under).replace(/^#/, '').split('.')[0]);
+    const ref = typeof args.under === 'string' && /^[0-9a-f-]{36}$/i.test(args.under) ? args.under : null;
+    let query = db.from('plan_items').select('id, module').eq('user_id', ctx.userId);
+    query = ref ? query.eq('id', ref) : query.eq('number', number);
+    const { data } = await query.maybeSingle();
+    const parent = data as { id: string; module: string | null } | null;
+    if (!parent) throw new Refused(`No step on the plan is numbered ${String(args.under)}. Look it up with read_dev_row or find_dev_text.`);
+    parentId = parent.id;
+    scope = parent.module;
+  } else if (typeof args.module === 'string' && args.module.trim()) {
+    scope = args.module.trim();
+    if (!(MODULE_IDS as readonly string[]).includes(scope)) {
+      throw new Refused(`"${scope}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
+    }
+  }
+
+  const position = await nextPlanPosition(db, ctx.userId, scope as never, parentId);
+  const written = await insertPlanItem(db, {
+    userId: ctx.userId,
+    module: scope,
+    parentId,
+    title,
+    detail,
+    status: 'proposed',
+    kind: 'build',
+    position,
+  });
+  if ('error' in written) throw new Error(written.error);
+  const href = `/dev/plan/${written.number}`;
+  const ref = toRef(STEP_TABLE, written.id);
+  const after =
+    ((await db.from('plan_items').select('*').eq('user_id', ctx.userId).eq('id', written.id).maybeSingle())
+      .data as Record<string, unknown> | null) ?? null;
+  const input: PostChangeInput = {
+    verb: 'Added the step',
+    what: `#${written.number} ${title}`,
+    rest: ', proposed for you to approve',
+    href,
+    where: 'Open the step',
+    paths: ['/dev/plan', href],
+  };
+  return {
+    ok: true,
+    kind: 'add_plan_step' satisfies PostChangeKind,
+    input: input as unknown as Record<string, unknown>,
+    subjectRef: ref,
+    op: 'insert',
+    before: null,
+    after,
+    summary: `Dash added the plan step #${written.number} "${title}" as a proposal. It is not work until you approve it.`,
+    row: { table: STEP_TABLE, ref: written.id, title: `#${written.number} ${title}`, href },
+  };
+}
+
 /** Runs a write, turning a refusal or a failure into the sentence the model reads. Never throws. */
 function guarded(name: string, run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>) {
   return async (ctx: DashWriteContext, input: unknown): Promise<DashWriteResult> => {
@@ -117,10 +200,28 @@ const INPUT: Anthropic.Tool['input_schema'] = {
     repository: {
       type: 'string',
       description:
-        'The repository as owner/name ("knightx4/recipes"), a github.com link, or just its name as they said it ("recipes").',
+        'The repository as owner/name ("alex-rivera/recipes"), a github.com link, or just its name as they said it ("recipes").',
     },
   },
   required: ['repository'],
+  additionalProperties: false,
+};
+
+const STEP_INPUT: Anthropic.Tool['input_schema'] = {
+  type: 'object',
+  properties: {
+    title: { type: 'string', description: 'What the step is, in a short line of their words.' },
+    detail: { type: 'string', description: 'Everything else they said about it: why, where, what done looks like. Keep every detail they gave.' },
+    module: {
+      type: 'string',
+      description: 'The workspace it belongs to, by id (dev, jobs, goals and so on); leave it out for the app as a whole. Ignored when under is given.',
+    },
+    under: {
+      type: 'string',
+      description: 'The number of a step it belongs beneath ("2483" or "#2483.5"), when they say it is part of that one. It takes that step\'s workspace.',
+    },
+  },
+  required: ['title'],
   additionalProperties: false,
 };
 
@@ -136,5 +237,16 @@ export const PROJECT_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       input_schema: INPUT,
     },
     apply: guarded(NAME, addProject),
+  },
+  {
+    name: 'add_plan_step',
+    kind: 'write',
+    runs: sameAs(['lib/comments/act.ts#addStep', 'lib/plan/insert-item.ts#insertPlanItem']),
+    definition: {
+      name: 'add_plan_step',
+      description: `Add a step to the build plan in Dev, when they ask for one ("add a step to move the Overnight panel to Home"). It arrives as a proposal for them to approve on the plan page; it is not built and nothing starts. Write the title in a short line and put everything they said in detail. ${DONE_NOTE}`,
+      input_schema: STEP_INPUT,
+    },
+    apply: guarded('add_plan_step', addPlanStep),
   },
 ];

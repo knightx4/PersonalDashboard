@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  chatChips,
   chatGroup,
   chatQuery,
   chatTitleFrom,
   chatWorkspaces,
-  chipsThatFit,
   containsPattern,
   dayIn,
   groupChats,
@@ -128,24 +126,5 @@ describe('searching the chats (plan #1899.6)', () => {
     expect(snippet?.endsWith('…')).toBe(true);
     expect(matchSnippet(body, 'Lisbon')).toBeNull();
     expect(matchSnippet('Catan', 'catan')).toBe('Catan');
-  });
-});
-
-describe('chipsThatFit', () => {
-  it('shows every chip when they all fit, without More', () => {
-    expect(chipsThatFit([50, 50, 50], 162, 40, 6)).toBe(3);
-  });
-
-  it('shows the whole chips that fit beside More, and none cut', () => {
-    expect(chipsThatFit([50, 50, 50], 152, 40, 6)).toBe(2);
-    expect(chipsThatFit([50, 50, 50], 151, 40, 6)).toBe(1);
-    expect(chipsThatFit([50, 50, 50], 100, 40, 6)).toBe(1);
-    expect(chipsThatFit([120], 100, 40, 6)).toBe(0);
-  });
-});
-
-describe('chatChips', () => {
-  it('lists each workspace any chat used once', () => {
-    expect(chatChips([chat({ workspaces: ['todo', 'jobs'] }), chat({ workspaces: ['jobs'] })])).toEqual(['jobs', 'todo']);
   });
 });

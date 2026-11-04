@@ -134,11 +134,11 @@ export function changePaths(change: DashChange): string[] {
       return ['/goals', `/goals/${change.input.parentId}`];
     case 'mark_returned':
       return [
-        '/shopping/returns',
+        '/shopping/inventory/returns',
         '/shopping/inventory',
         `/shopping/inventory/${change.input.id}`,
         '/shopping/orders',
-        '/shopping/dashboard',
+        '/finances/spending',
       ];
     case 'start_watch':
       return ['/home'];
@@ -162,8 +162,8 @@ export function changePaths(change: DashChange): string[] {
       return [
         '/shopping/inventory',
         '/shopping/sell',
-        '/shopping/returns',
-        '/shopping/dashboard',
+        '/shopping/inventory/returns',
+        '/finances/spending',
         ...rows.flatMap((row) => (typeof row.id === 'string' ? [`/shopping/inventory/${row.id}`] : [])),
       ];
     }

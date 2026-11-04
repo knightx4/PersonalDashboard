@@ -371,9 +371,14 @@ export function ChipSelect({
  */
 export function ChipInput({
   className,
+  inputClassName,
   icon,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { icon?: React.ReactNode }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  icon?: React.ReactNode;
+  /** For the input itself, such as a phone's 44px press height. */
+  inputClassName?: string;
+}) {
   return (
     <span
       className={cn(
@@ -395,6 +400,7 @@ export function ChipInput({
           // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
           'text-base text-ink outline-none sm:text-ui',
           'placeholder:text-ink-ghost',
+          inputClassName,
         )}
         {...props}
       />

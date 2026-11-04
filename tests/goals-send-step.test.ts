@@ -103,7 +103,7 @@ const ITEMS = [
     title: 'List every loan with its rate',
     acceptance: 'A table of every loan, its balance and its rate.',
   }),
-  item({ id: 'm', level: 'step', parent_id: 'p', kind: 'mine', title: 'Log in to Edfinancial', position: 20 }),
+  item({ id: 'm', level: 'step', parent_id: 'p', kind: 'mine', title: 'Log in to Brightline', position: 20 }),
   item({
     id: 'q',
     level: 'step',
@@ -158,7 +158,7 @@ describe('sendGoalStep', () => {
     expect(text).toContain('Done when: A table of every loan, its balance and its rate.');
     expect(text).toContain('The goal: "Pay off student debt" (goals.items id g).');
     expect(text).toContain('Where the step sits: "Get the numbers".');
-    expect(text).toContain('"Log in to Edfinancial"');
+    expect(text).toContain('"Log in to Brightline"');
     expect(text).toContain('goals.runs id run-1');
   });
 
@@ -194,13 +194,13 @@ describe('sendGoalStep', () => {
     const { client, calls } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
     const fetch = okFetch();
     const result = await sendGoalStep({ client, userId: USER, stepId: 'm', routine, surface: 'thread', mode: 'prepare', now: NOW, fetch });
-    expect(result).toEqual({ ok: true, job: 'prepare', title: 'Log in to Edfinancial', runId: 'run-1' });
+    expect(result).toEqual({ ok: true, job: 'prepare', title: 'Log in to Brightline', runId: 'run-1' });
     expect(calls.find((c) => c.op === 'insert')?.values).toMatchObject({ job: 'prepare', item_id: 'm' });
     // The step itself is not written: it stays yours and open until the run stores what it prepared.
     expect(calls.some((c) => c.op === 'update' && c.table === 'items')).toBe(false);
     const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     const text = (JSON.parse(init.body as string) as { text: string }).text;
-    expect(text).toContain('The step: "Log in to Edfinancial" (goals.items id m)');
+    expect(text).toContain('The step: "Log in to Brightline" (goals.items id m)');
   });
 
   it('refuses to prepare a Claude step', async () => {

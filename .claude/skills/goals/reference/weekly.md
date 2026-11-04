@@ -13,7 +13,7 @@ verdicts: each goal's status is the morning run's ("Reviewing each goal").
 ### Researching the help each goal asks for
 
 The brief then lists each open goal that asks for weekly help, with the kinds
-it asks for from `goals.items.help_kinds` and the note on each ("Brooklyn,
+it asks for from `goals.items.help_kinds` and the note on each ("Eastside,
 weeknights"), and the goal's live rhythms. A goal that asks for nothing gets
 nothing, whatever rhythms it has. A week when no goal asks for help is a
 review and nothing else.
@@ -35,26 +35,46 @@ where user_id = '<user>'
 order by created_at desc limit 200;
 ```
 
+Before searching for events, volunteering or courses, find where the person
+lives. Read it from their rows, in this order, and use the first that gives
+a place:
+
+1. A city the note on the help kind names.
+2. Their current home on You's Places tab, the row with no `moved_out`:
+   `select name, city, region, country from you.places where user_id =
+   '<user>' and moved_out is null order by moved_in desc limit 1`.
+3. `home_location` on their Jobs profile: `select home_location from
+   job_search.profiles where id = '<user>'`.
+4. A place the goal or its area names in its title, detail or done-when.
+
+Search for that city and, where the note names one, that neighbourhood. If
+none of these gives a place, research only what does not need one (reading,
+online courses, remote job leads) and say in the summary that the run found
+no city to search. Times are in the person's time zone,
+`core.account_settings.timezone`.
+
 Work one kind at a time, for every goal that asks for it, using the note as
 the brief for what to look for. Each kind has its own sources and its own
 rule for dates:
 
-- **events**: talks, meetups, performances and classes in New York City in
-  the coming seven to ten days. Eventbrite, Meetup, museum and library
-  calendars (NYPL, Brooklyn Public Library, Queens Public Library), NYC Parks
-  and org newsletters. Every one needs `happens_on`, and `starts_at` when
-  the time is known, in New York time with its offset.
-- **volunteering**: openings in New York City the person could sign up for
-  now. NYC Service, VolunteerMatch, Idealist, New York Cares and the
-  organisations' own pages. An opening with no single date takes the first
-  date it can be done as `happens_on`.
+- **events**: talks, meetups, performances and classes in the person's city
+  in the coming seven to ten days. Eventbrite, Meetup, the city's museum and
+  public library calendars, its parks department, and the newsletters of
+  local organisations the goal names. Every one needs `happens_on`, and
+  `starts_at` when the time is known, in the person's time zone with its
+  offset.
+- **volunteering**: openings in the person's city they could sign up for
+  now. VolunteerMatch, Idealist, the city's own volunteer service or
+  volunteer centre where it has one, and the organisations' own pages. An
+  opening with no single date takes the first date it can be done as
+  `happens_on`.
 - **reading**: books, long articles and papers that fit the goal and the
   note. Publishers' pages, library catalogues, the authors' own sites and
   reviews in the major papers. Link the thing itself, or its library or
   publisher page. No date: leave `happens_on` null. When the person's Learn
   module is the better home for it, say so in `detail`.
-- **courses**: courses and workshops open for enrolment, in person in New
-  York City or online. University extension schools, the libraries' free
+- **courses**: courses and workshops open for enrolment, in person in the
+  person's city or online. University extension schools, the libraries' free
   classes, Coursera, edX and the organisers' pages. `happens_on` is the
   start date, or null for one taken at your own pace.
 - **job_leads**: open roles that fit the goal and the note. Company career
@@ -74,6 +94,8 @@ Then write the finds:
    volunteer opening for a goal with a live rhythm. `run_id` is this run. The
    database refuses a row with no kind or a kind outside the five.
 
+   For a person whose current home is in Springfield (an invented city):
+
    ```sql
    set local goals.actor = 'claude';
    set local goals.run_id = '<the run id>';
@@ -82,8 +104,8 @@ Then write the finds:
    values
      ('<user>', '<rhythm id>', '<the run id>', 'events', 'Talk: …',
       'One or two plain sentences on why it fits.', 'https://…',
-      'Brooklyn Public Library, Central', 'BPL events', '2026-10-01', '2026-10-01T18:30:00-04:00'),
-     ('<user>', '<goal id>', '<the run id>', 'reading', 'The Power Broker, Robert Caro',
+      'Springfield Public Library, Central', 'Springfield library events', '2026-10-01', '2026-10-01T18:30:00-04:00'),
+     ('<user>', '<goal id>', '<the run id>', 'reading', 'The Death and Life of Great American Cities, Jane Jacobs',
       'Why it fits the note.', 'https://…', null, 'Penguin Random House', null, null);
    ```
 

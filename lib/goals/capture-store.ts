@@ -103,7 +103,28 @@ export async function loadCaptureContext(
   };
   for (const nodes of byGoal.values()) collect(nodes);
   const progress = summariseProgress(await loadProgressEntries(client, stepIds));
-  return captureContext(goals, byGoal, records, progress);
+  return captureContext(goals, byGoal, records, progress, await loadHoursNames(client, userId));
+}
+
+/**
+ * The names of each goal's live Hours logged metrics (goals 0089), by goal
+ * id, so filing knows which goal time on applying or cleaning belongs to. A
+ * failed read leaves them out rather than stopping the filing.
+ */
+async function loadHoursNames(client: GoalsSupabaseClient, userId: string): Promise<Map<string, string[]>> {
+  const { data, error } = await client
+    .from('metrics')
+    .select('goal_id, name')
+    .eq('user_id', userId)
+    .eq('source', 'hours')
+    .is('archived_at', null)
+    .order('position');
+  const byGoal = new Map<string, string[]>();
+  if (error) return byGoal;
+  for (const row of (data ?? []) as { goal_id: string; name: string }[]) {
+    byGoal.set(row.goal_id, [...(byGoal.get(row.goal_id) ?? []), row.name]);
+  }
+  return byGoal;
 }
 
 /** What a move did, and the row its record names. */

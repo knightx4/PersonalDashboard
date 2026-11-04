@@ -1,7 +1,7 @@
 /**
  * Check whether a step that changed a screen may close (plan #1534).
  *
- *   npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>"]
+ *   npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]]
  *
  * <step> is the outline the plan reads (`1073.4`) or the stored number. An
  * outline is looked up in plan_item_outlines, so it needs DATABASE_URL;
@@ -38,6 +38,15 @@
  * or printed, while any of them differs or is missing
  * (`lib/plan/ui-settle-diff.ts`). The rounds come from ui_checks with
  * DATABASE_URL, and from `.preview-shots/checks/` without it.
+ *
+ * With `--compare` (plan #2815.3) it does that shooting itself. The surfaces
+ * the critic has judged on the step, and any its title, detail or done-when
+ * links as /preview?s=<id>, are left for the critic. Every other surface its
+ * files reach that has not passed is shot on this checkout and on origin/main
+ * (scripts/ui-guard-compare.ts), and those that look the same are settled
+ * with the reason `SAME_AS_MAIN_REASON`. It prints only the surfaces the
+ * critic still has to see, and how long building, shooting and comparing
+ * took. Without DATABASE_URL it prints the settle for the connector.
  */
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
@@ -57,6 +66,9 @@ import {
   settleRefusal,
   surfacesToCompare,
 } from '../lib/plan/ui-settle-diff';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
+import { compareReport, SAME_AS_MAIN_REASON, splitSurfaces } from '../lib/plan/ui-compare';
+import { compareWithMain } from './ui-guard-compare';
 
 function arg(flag: string): string | null {
   const i = process.argv.indexOf(flag);
@@ -78,8 +90,10 @@ function reachableDatabase(): string | null {
 
 function connect(target: string) {
   if (target === 'https') {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
-    return httpsSql(restTransport(rest, process.env.SUPABASE_SERVICE_ROLE_KEY as string)) as unknown as ReturnType<typeof postgres>;
+    const rest = requireSupabaseProjectUrl();
+    return httpsSql(
+      restTransport(rest, process.env.SUPABASE_SERVICE_ROLE_KEY as string),
+    ) as unknown as ReturnType<typeof postgres>;
   }
   return postgres(target, { max: 1, prepare: false, onnotice: () => {} });
 }
@@ -124,12 +138,19 @@ async function placeStep(written: string): Promise<{ step: number; outline: stri
 async function main(): Promise<void> {
   const stepArg = process.argv
     .slice(2)
-    .find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--commit' && all[i - 1] !== '--settle');
+    .find(
+      (a, i, all) =>
+        !a.startsWith('--') && !['--commit', '--settle', '--workers'].includes(all[i - 1] ?? ''),
+    );
   const accept = process.argv.includes('--accept');
+  const compare = process.argv.includes('--compare');
   const settle = process.argv.includes('--settle') ? (arg('--settle') ?? '') : null;
   const written = (stepArg ?? '').trim().replace(/^#/, '');
   if (!/^\d+(?:\.\d+)*$/.test(written) || Number(written) === 0) {
-    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>"]');
+    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]]');
+  }
+  if ([accept, compare, process.argv.includes('--settle')].filter(Boolean).length > 1) {
+    fail('Give one of --accept, --settle and --compare.');
   }
   if (settle !== null && !settle.trim()) fail('--settle needs the reason: --settle "<why>".');
   const { step, outline } = await placeStep(written);
@@ -148,6 +169,10 @@ async function main(): Promise<void> {
   console.log(`${name} serves: ${surfaces.join(', ')}`);
 
   const databaseUrl = reachableDatabase();
+  if (compare) {
+    await compareRun({ name, step, files, surfaces, databaseUrl });
+    return;
+  }
   if (settle !== null) {
     // A surface the critic has not judged through three rounds is settled only
     // when its shots match main's (plan #2215.4).
@@ -212,6 +237,71 @@ async function main(): Promise<void> {
   const refusal = uiCheckRefusal({ step, outline, files, surfaces, checks });
   if (refusal) fail(refusal);
   console.log(`Every surface has passed: ${name} may close.`);
+}
+
+/**
+ * `--compare`: the named surfaces left for the critic, the rest shot on both
+ * checkouts, the identical ones settled and the changed ones listed.
+ */
+async function compareRun(input: {
+  name: string;
+  step: number;
+  files: string[];
+  surfaces: string[];
+  databaseUrl: string | null;
+}): Promise<void> {
+  const { name, step, files, surfaces, databaseUrl } = input;
+  const checks = databaseUrl ? await stepRounds(databaseUrl, step) : localCheckRounds(step, process.cwd());
+  const text = databaseUrl ? await stepText(databaseUrl, step) : '';
+  const { named, reached } = splitSurfaces(surfaces, text, checks);
+  if (!databaseUrl) {
+    console.log("Without DATABASE_URL the step's own words cannot be read, so only surfaces the critic judged count as named.");
+  }
+  const workersArg = Number(arg('--workers') ?? '3');
+  const workers = Number.isFinite(workersArg) && workersArg >= 1 ? Math.min(Math.floor(workersArg), 5) : 3;
+  if (reached.length === 0) {
+    console.log(
+      named.length === 0
+        ? `Every surface ${name} serves has passed: nothing to compare.`
+        : `Nothing reached through a shared file is left to compare. For the critic: ${named.join(', ')}.`,
+    );
+    return;
+  }
+  const { comparisons, newOnBranch, timings } = await compareWithMain({
+    root: process.cwd(),
+    files,
+    reached,
+    workers,
+  });
+  const report = compareReport({ name, step, named, comparisons, newOnBranch, timings });
+  console.log(report.text);
+  if (report.settled.length === 0) return;
+  const statement = uiSettleSql(step, report.settled, SAME_AS_MAIN_REASON);
+  if (!databaseUrl) {
+    console.log('\nRun this through the Supabase connector. It settles the surfaces that look the same.\n');
+    console.log(statement);
+    return;
+  }
+  const sql = connect(databaseUrl);
+  try {
+    const rows = await sql.unsafe(statement);
+    console.log(`Settled ${rows.length} surface${rows.length === 1 ? '' : 's'} that look the same as on main.`);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/** The step's title, detail and done-when, which name the surfaces it set out to change. */
+async function stepText(databaseUrl: string, step: number): Promise<string> {
+  const sql = connect(databaseUrl);
+  try {
+    const rows = await sql<{ title: string | null; detail: string | null; acceptance: string | null }[]>`
+      select p.title, p.detail, p.acceptance from plan_items p where p.number = ${step} limit 1`;
+    const row = rows[0];
+    return row ? [row.title, row.detail, row.acceptance].filter(Boolean).join('\n') : '';
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
 /** The step's recorded rounds in ui_checks, under the account whose plan it is on. */

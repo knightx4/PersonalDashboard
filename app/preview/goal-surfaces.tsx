@@ -301,17 +301,12 @@ export function GoalSubStepSurface() {
 }
 
 /**
- * A step's page open on Activity, its comment counted on the tab's label
- * (plans #2373.1 and #2373.2): Call the card company, with Dash's last run
- * and the one comment in its thread.
+ * A step's page open on Overview, its thread under Comments at the foot
+ * with the count beside the heading (note 42b3d858): Call the card company,
+ * with Dash's last run and the one comment in its thread.
  */
 export function GoalStepCommentsSurface() {
-  return (
-    <>
-      <SetTab tab="activity" />
-      <StepPage map={map} stepId="call" todoOn={false} tab="activity" runs={CALL_RUN} history={CALL_HISTORY} />
-    </>
-  );
+  return <StepPage map={map} stepId="call" todoOn={false} runs={CALL_RUN} history={CALL_HISTORY} />;
 }
 
 /** Dash's runs on Call the card company, as its Activity tab lists them (plan #2373.3). */
@@ -401,6 +396,21 @@ export function GoalStepProposedSurface() {
 export function GoalDashStepSurface() {
   return (
     <StepPage map={goalMapWith({ fees: { notifyOnDone: true } })} stepId="fees" todoOn={false} />
+  );
+}
+
+/**
+ * The goal's list with every row opened and the switch on for Compare the
+ * transfer fees (plan #2611.3): it shows on that open Dash step only, not on
+ * the done or proposed Dash steps or on the steps that are yours.
+ */
+export function GoalDashRowSurface() {
+  return (
+    <StepTree
+      map={goalMapWith({ fees: { notifyOnDone: true, parentId: GOAL, position: 5 } })}
+      todoOn={false}
+      opened
+    />
   );
 }
 

@@ -282,14 +282,30 @@ export function liveHandlers(deps: PreparationDeps): Partial<Record<PreparationS
       if (error) throw new Error(`Reading the topics already drafted failed: ${error.message}`);
       return ((data ?? []) as { asked: string | null }[]).map((t) => t.asked);
     },
-    async draft(territory, budgetMs) {
-      if (!deps.anthropicApiKey) throw new Error('No ANTHROPIC_API_KEY is set.');
-      // No catalogue: the compiled territory already carries its documents as its texts.
+    async draft(territory, runId) {
+      // Queued for the routine (learn 0193); the key is only for the structure pull, which a compiled territory skips.
       const tick = await draftTerritoryTick({ learn, jobs: deps.jobs }, userId, territory, {
-        anthropicApiKey: deps.anthropicApiKey,
-        budgetMs,
+        anthropicApiKey: deps.anthropicApiKey ?? '',
+        preparationId: runId,
       });
-      return { drafted: tick.drafted, failed: tick.failed };
+      if (tick.fired && !tick.fired.ok) console.error('[learn prepare] routine', tick.fired.detail);
+      return { queued: tick.queued, failed: tick.failed };
+    },
+    async pending(runId) {
+      const { data, error } = await learn
+        .from('topic_draft_requests')
+        .select('id, goal, status, error')
+        .eq('user_id', userId)
+        .eq('preparation_id', runId)
+        .in('status', ['queued', 'drafting', 'failed']);
+      if (error) throw new Error(`Reading the drafts waiting for Dash failed: ${error.message}`);
+      const rows = (data ?? []) as { id: string; goal: string; status: string; error: string | null }[];
+      return {
+        waiting: rows.filter((r) => r.status !== 'failed').map((r) => r.goal),
+        failed: rows
+          .filter((r) => r.status === 'failed')
+          .map((r) => ({ id: r.id, ask: r.goal, detail: r.error ?? 'Dash could not draft it.' })),
+      };
     },
     async targets(lensId, topics) {
       const asks = topics.map((t) => t.ask);

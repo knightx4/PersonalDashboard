@@ -97,8 +97,8 @@ export async function sendGoalStep(input: {
   mode?: SendMode | 'ask';
   /** What they wrote when they asked (an @dash comment, plan #1003), passed into the brief. */
   asked?: string;
-  /** Where `asked` was written: a comment, or the box beside Ask Dash on the row. */
-  askedOn?: 'comment' | 'row';
+  /** Where `asked` was written: a comment, the box beside Ask Dash on the row, or Ask Dash's chat. */
+  askedOn?: 'comment' | 'row' | 'chat';
   /** What was said on the row before that comment, passed in with it. */
   thread?: readonly { author: string; body: string }[];
   /** Where the run was started, for the record of each step it holds (plan #1573). */

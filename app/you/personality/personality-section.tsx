@@ -18,6 +18,10 @@ import {
   type ReadStatus,
   type TypedResult,
 } from '@/lib/you/personality/model';
+import { EnneagramChart } from './enneagram-chart';
+import { ThemeList } from './theme-list';
+import { ProfilePanel } from './profile-panel';
+import type { PersonalityProfile, ProfileState } from '@/lib/you/personality/profile';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
 import { Note } from '@/components/ui/note';
@@ -172,6 +176,8 @@ function TypedSlot({ slot, now }: { slot: Slot; now: number }) {
               <div key={t.id} className="space-y-1">
                 <p className="text-body font-medium text-ink">{t.typedValue}</p>
                 {t.note ? <p className="text-small text-ink-muted">{t.note}</p> : null}
+                {t.typeScores ? <EnneagramChart scores={t.typeScores} className="py-2" /> : null}
+                {t.themes ? <ThemeList themes={t.themes} className="py-2" /> : null}
                 <Disclosure title={`Dash on ${t.typedValue}`} meta={readMeta(t, status)}>
                   <PersonalityReadPanel
                     resultId={t.id}
@@ -206,6 +212,7 @@ export function PersonalitySection({
   earlier,
   typed,
   themes,
+  profile,
   now,
 }: {
   latest: BigFiveResult | null;
@@ -214,6 +221,8 @@ export function PersonalitySection({
   typed: TypedResult[];
   /** Null when the themes could not be matched. */
   themes: TraitThemes | null;
+  /** Dash's analysis across the tests and whether to offer it again; left out, no section. */
+  profile?: { profile: PersonalityProfile | null; state: ProfileState };
   /**
    * The time the page is drawn, which says whether a read is still coming.
    * The gallery passes a fixed one; the page leaves it to the clock.
@@ -223,6 +232,7 @@ export function PersonalitySection({
   const at = now ?? clock();
   return (
     <div id="personality" className="max-w-2xl space-y-4">
+      {profile ? <ProfilePanel profile={profile.profile} state={profile.state} /> : null}
       <TestSection
         title="Big Five"
         meta={latest ? `Taken ${formatDay(latest.takenAt, true)}` : undefined}

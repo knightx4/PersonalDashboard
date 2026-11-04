@@ -573,6 +573,18 @@ export function ApplicationReviewRow({
             Exclude {row.companyName}
           </Button>
         )}
+        {row.gmailHref && (
+          <GmailAnchor
+            href={row.gmailHref}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={cn(linkVariants({ tone: 'quiet' }), 'press-area inline-flex items-center gap-1 text-small')}
+          >
+            <span className="sm:hidden">Gmail</span>
+            <span className="hidden sm:inline">Open in Gmail</span>
+            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+          </GmailAnchor>
+        )}
       </footer>
     </>
   );

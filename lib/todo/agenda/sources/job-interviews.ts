@@ -96,7 +96,7 @@ export const jobInterviewsSource: AgendaSource = {
     // a day context belongs to exactly one day and a round that ran over two
     // of them must appear in both. Four conversations on one afternoon are one
     // occasion; printed four times over, as they were, the agenda said the
-    // Galaxy superday was four separate things to make room for.
+    // Globex superday was four separate things to make room for.
     return byDay(interviews).flatMap((onOneDay) =>
       roundsOf(
         onOneDay,

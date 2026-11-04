@@ -24,7 +24,7 @@ const sent: ApplicationMoveInput = {
   createdAt: '2026-08-30T10:00:00Z',
   roleId: 'role-1',
   roleTitle: 'Product Manager',
-  companyName: 'EliseAI',
+  companyName: 'Contoso',
 };
 
 describe('an application through Waiting and the agenda', () => {
@@ -36,7 +36,7 @@ describe('an application through Waiting and the agenda', () => {
     const groups = groupWaiting(applicationWaits(rows));
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].name).toBe('EliseAI');
+    expect(groups[0].name).toBe('Contoso');
     expect(groups[0].entries.map((entry) => entry.title)).toEqual(['Product Manager']);
     expect(groups[0].entries[0].ref).toBe('job_search.applications:app-1');
     expect(applicationItems(rows)).toEqual([]);
@@ -59,7 +59,7 @@ describe('an application through Waiting and the agenda', () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       source: 'applications',
-      title: 'Reply to EliseAI',
+      title: 'Reply to Contoso',
       day: null,
       onYouSince: '2026-09-10T09:00:00Z',
       link: { href: '/jobs/roles/role-1', label: 'Product Manager' },
@@ -78,12 +78,12 @@ describe('an application through Waiting and the agenda', () => {
       ],
     );
     expect(applicationItems(rows)).toEqual([]);
-    expect(groupWaiting(applicationWaits(rows))[0].name).toBe('EliseAI');
+    expect(groupWaiting(applicationWaits(rows))[0].name).toBe('Contoso');
   });
 
   it('puts an offer on you even with no event', () => {
     const rows = applicationMoves([{ ...sent, status: 'offer' }], []);
-    expect(applicationItems(rows)[0].title).toBe('Answer the EliseAI offer');
+    expect(applicationItems(rows)[0].title).toBe('Answer the Contoso offer');
   });
 });
 

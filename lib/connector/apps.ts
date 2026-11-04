@@ -60,6 +60,8 @@ const TOOL_LABELS: Record<string, string> = {
   search: 'Searched',
   open_row: 'Opened a row',
   spend_by_merchant: 'Read spending by merchant',
+  accounts: 'Read accounts and balances',
+  balance_history: 'Read balance history',
   job_applications: 'Read job applications',
   todos: 'Read todos',
   goal_status: 'Read goals',

@@ -1,11 +1,13 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import { LOOKUP_NOT_RUN, type TalkToolCall, type TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
+import { MOCKUP_TOOL } from './mockup';
+import { THOUGHT_CALL } from './thought';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
 import { NEWS_CHANGE_KINDS } from '@/lib/ask/news-changes';
-import { GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
+import { GOAL_RUN_CHANGE_KINDS, GOALS_CHANGE_KINDS } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS } from '@/lib/ask/shopping-changes';
 import { VAULT_CHANGE_KINDS } from '@/lib/ask/vault-changes';
 import { JOBS_CHANGE_KINDS } from '@/lib/ask/jobs-changes';
@@ -103,6 +105,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   ...YOU_CHANGE_KINDS,
   ...NEWS_CHANGE_KINDS,
   ...GOALS_CHANGE_KINDS,
+  ...GOAL_RUN_CHANGE_KINDS,
   ...SHOPPING_CHANGE_KINDS,
   ...VAULT_CHANGE_KINDS,
   ...JOBS_CHANGE_KINDS,
@@ -149,6 +152,8 @@ export function isShownLookup(name: string): boolean {
     !name.startsWith('propose_') &&
     name !== 'hand_off' &&
     name !== CHART_TOOL &&
+    name !== MOCKUP_TOOL &&
+    name !== THOUGHT_CALL &&
     !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name) &&
     !PAID_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
   );
@@ -190,6 +195,12 @@ export function lookupLabel(name: string, input: unknown): string {
       const shop = quoted(field(input, 'merchant'));
       return shop ? `Adding up spending at ${shop}` : 'Adding up spending';
     }
+    case 'accounts':
+      return 'Checking accounts and balances';
+    case 'balance_history': {
+      const account = quoted(field(input, 'account'));
+      return account ? `Reading the balance history of ${account}` : 'Reading net worth over time';
+    }
     case 'job_applications':
       return 'Checking job applications';
     case 'todos':
@@ -211,6 +222,14 @@ export function lookupLabel(name: string, input: unknown): string {
     case 'read_spec': {
       const spec = field(input, 'spec');
       return typeof spec === 'string' && spec ? `Reading the ${spec} spec` : 'Reading a spec';
+    }
+    case 'read_code': {
+      const path = quoted(field(input, 'path'));
+      return path ? `Reading ${path} in the code` : 'Reading the code';
+    }
+    case 'search_code': {
+      const q = quoted(field(input, 'query'));
+      return q ? `Searching the code for ${q}` : 'Searching the code';
     }
     case 'read_dev_row': {
       const kind = field(input, 'kind');

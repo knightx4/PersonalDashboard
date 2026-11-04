@@ -1,13 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { numbered, performancesFromText, sourcesFromText, type DraftSources } from '@/lib/learn/levels/draft-sources';
 import { runTopicDraft } from '@/lib/learn/levels/draft-run';
-import { approveDraftedTopic } from '@/lib/learn/briefs/topics-store';
 import { roleRequirementSource } from '@/lib/learn/levels/role-sources';
 
 /**
@@ -22,7 +20,8 @@ import { roleRequirementSource } from '@/lib/learn/levels/role-sources';
  * row.
  */
 
-export type DraftState = { error?: string };
+/** `queued` is what the press says once the topic is with the routine (learn 0193). */
+export type DraftState = { error?: string; queued?: string };
 
 const GoalInput = z
   .string()
@@ -37,9 +36,6 @@ export async function draftTopicFromGoal(_prev: DraftState, formData: FormData):
   const user = await requireUser();
   const goal = GoalInput.safeParse(formData.get('goal') ?? '');
   if (!goal.success) return { error: goal.error.issues[0]?.message ?? 'Could not read that goal.' };
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: 'Drafting a topic needs ANTHROPIC_API_KEY to be set.' };
 
   let sources: DraftSources;
   try {
@@ -57,19 +53,13 @@ export async function draftTopicFromGoal(_prev: DraftState, formData: FormData):
   }
 
   const supabase = await createLearnClient();
-  let id: string;
   try {
-    const result = await runTopicDraft(supabase, user.id, { goal: goal.data, sources, anthropicApiKey: apiKey });
+    // Approved as soon as the routine keeps it, as the press used to here.
+    const result = await runTopicDraft(supabase, user.id, { goal: goal.data, sources, after: { approve: true } });
     if (!result.ok) return { error: result.detail };
-    id = result.id;
+    revalidatePath('/learn/topics');
+    return { queued: result.detail };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Drafting the topic failed.' };
   }
-  // The draft is kept even if approving fails: its page says it is held.
-  await approveDraftedTopic(supabase, user.id, id).catch((error: unknown) =>
-    console.error('[learn topics] approve on draft', error instanceof Error ? error.message : error),
-  );
-
-  revalidatePath('/learn/topics');
-  redirect(`/learn/topics/${id}`);
 }

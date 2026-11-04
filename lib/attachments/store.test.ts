@@ -6,7 +6,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { attachmentPath, type UploadedAttachment } from './rules';
 import { listAttachments, recordAttachments, removeAttachmentsFor } from './store';
 
-const USER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+const USER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
 type Row = Record<string, unknown>;
 

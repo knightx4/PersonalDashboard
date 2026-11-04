@@ -11,6 +11,8 @@ import { describeRun, type SyncProgress, type SyncRunSummary } from '@/lib/vault
 import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
+import { PrivateFoldersForm } from './private-folders-form';
+import { DEFAULT_VAULT_RULES, type VaultRules } from '@/lib/vault/map/rules';
 import { formatClock } from '@/lib/core/when';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -46,12 +48,15 @@ export function VaultSettingsView({
   runs,
   writeAccess,
   progress,
+  rules = DEFAULT_VAULT_RULES,
 }: {
   connection: VaultConnectionSummary | null;
   count: number | null;
   runs: SyncRunSummary[];
   writeAccess: WriteAccess;
   progress: SyncProgress | null;
+  /** The person's private folders (loadVaultRules); the gallery passes none. */
+  rules?: VaultRules;
 }) {
   if (!connection) {
     return (
@@ -97,6 +102,12 @@ export function VaultSettingsView({
               progress={progress}
             />
           ),
+        },
+        {
+          id: 'private',
+          title: 'Private folders',
+          hint: 'Notes in these folders stay in the vault and are never sent to a model.',
+          content: <PrivateFoldersForm rules={rules} />,
         },
         {
           id: 'connection',

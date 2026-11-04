@@ -95,7 +95,7 @@ select r.user_id, r.id, 'comp',
     when 'estimate' then 'guess'
   end
 from roles r
-where r.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where r.user_id = null::uuid /* the owner's id when this ran on the live database; a new install has no owner yet */
   and (r.comp_min_cents is not null or r.comp_max_cents is not null or r.comp_source is not null)
 on conflict do nothing;
 
@@ -108,14 +108,14 @@ cross join lateral (values
   ('seniority', r.seniority is not null and btrim(r.seniority) <> ''),
   ('posting_status', r.posting_status <> 'unknown')
 ) as f (field, present)
-where r.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where r.user_id = null::uuid /* the owner's id when this ran on the live database; a new install has no owner yet */
   and f.present
 on conflict do nothing;
 
 insert into fact_origins (user_id, company_id, field, origin)
 select c.user_id, c.id, 'stage', 'unknown'
 from companies c
-where c.user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where c.user_id = null::uuid /* the owner's id when this ran on the live database; a new install has no owner yet */
   and c.stage is not null and btrim(c.stage) <> ''
 on conflict do nothing;
 

@@ -64,10 +64,10 @@ move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note, change_video,
 add_to_brief and attach_vault_note, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event, change_agenda_row and add_todos, and in
-You add_place, change_place, save_job, save_about_me, set_detail and ask_board (a question for their board), and in News mark_issue_unread,
+You add_place, change_place, save_job, save_about_me, set_detail and ask_board (a question for their council), and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
-change_goal_link, change_goal_form, change_goals_inbox and change_goal_list, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+change_goal_link, change_goal_form, change_goals_inbox, change_goal_list and change_goal_dashboard, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,

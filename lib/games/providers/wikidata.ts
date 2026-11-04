@@ -8,12 +8,12 @@
  * up with the same canonical id BGG would have given us.
  */
 import { getJson } from '@/lib/books/providers/http';
+import { appUserAgent } from '@/lib/net/user-agent';
 
 const API_URL = 'https://www.wikidata.org/w/api.php';
 
 /** Wikidata asks API users to identify themselves. */
-const USER_AGENT =
-  'ShoppingManager/1.0 (personal inventory tool; +https://github.com/knightx4/ShoppingManager)';
+const USER_AGENT = appUserAgent('ShoppingManager/1.0', 'personal inventory tool');
 
 /** instance-of values that mean "this is a game we care about". */
 const GAME_CLASSES = new Set([

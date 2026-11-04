@@ -72,8 +72,8 @@ covers a direction means you leave that direction alone.
    something, and contributing something of their own. For money or health it
    means the separate outcomes (the debt, the fund, the habit).
 2. **Each one a goal, not a step.** It takes weeks or months and has several
-   steps under it. "Go to a community board meeting" is a step; "Be a regular
-   at your community board" is a goal.
+   steps under it. "Go to a planning commission meeting" is a step; "Be a regular
+   at the planning commission" is a goal.
 3. **A title that says what will be true**, in under about eight words, and
    an `acceptance` that can be checked: a count, a date, a thing that exists.
    "Know ten people working on housing or transit by name" rather than "build
@@ -108,8 +108,12 @@ known as a question beneath it.
 
 Use web search where current facts make a goal concrete: the organisations,
 groups, meetings and publications that exist in the person's city for this
-area. Name them in the `detail` or the first move ("Join Open Plans' volunteer
-list"), not in the title.
+area. Take the city from their rows (their current home in `you.places`, the
+one with no `moved_out`, else `home_location` on `job_search.profiles`), not
+from a guess. Name what you find in the `detail` or the first move ("Join
+Springfield Streets' volunteer list"), not in the title.
+
+The example below is for a person living in Springfield, an invented city.
 
 ```sql
 set local goals.actor = 'claude';
@@ -117,15 +121,15 @@ set local goals.run_id = '<the run id>';
 with g as (
   insert into goals.items (user_id, level, area_id, title, acceptance, detail, activity, status, position)
   values ('<user>', 'goal', '<area id>',
-          'Be a regular at your community board',
-          'You have attended six full board or committee meetings and spoken at one.',
-          'Community boards are where land use and street changes are argued first, and the same people come every month. Assumes you live in one board''s district.',
+          'Be a regular at the planning commission',
+          'You have attended six commission or committee meetings and spoken at one.',
+          'Springfield''s planning commission is where land use and street changes are argued first, and the same people come every month.',
           'active', 'proposed', 10)
   returning id
 )
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance, status, position)
 select '<user>', 'step', id, 'mine',
-       'Go to this month''s land use committee meeting',
+       'Go to this month''s planning commission meeting',
        'You attended and wrote down two things that were argued.',
        'proposed', 10
 from g
@@ -134,23 +138,26 @@ returning id;
 
 ### A worked shape: Get plugged into the city / urbanism scene
 
+For the same person in Springfield:
+
 1. **Know how the city's planning fights work**: done when you can explain
-   ULURP, the zoning text amendments of the last two years and one open fight
-   in your borough. First move: a `claude` step for a two-page primer with
-   the reading list, and a link to Learn where a course fits better.
+   how a rezoning gets approved, the zoning changes of the last two years and
+   one open fight in your neighbourhood. First move: a `claude` step for a
+   two-page primer with the reading list, and a link to Learn where a course
+   fits better.
 2. **Know ten people in the scene by name**: done when ten people working on
    housing, transit or planning would recognise you. Inside it, a `rhythm`
    of one urbanism event a week, which the weekly run feeds with events; the
    events are the way there, not the goal. First move: yours, write down the
    three you already know.
-3. **Be a regular at your community board**: as in the example above.
+3. **Be a regular at the planning commission**: as in the example above.
 4. **Volunteer steadily with one advocacy group**: done when you have put in
-   ten sessions with one of Open Plans, Transportation Alternatives, Open New
-   York or the like. First move: a `claude` step comparing three groups'
-   volunteer asks.
+   ten sessions with one of Springfield Streets, the Springfield Transit
+   Riders Union, Springfield Neighbors for Housing or the like. First move:
+   a `claude` step comparing three groups' volunteer asks.
 5. **Put something of your own into the conversation**: a testimony, an
    op-ed, a map or a talk, published or given. Unless the person has said
-   what they would want to make, start with testimony at the community board
+   what they would want to make, start with testimony at the planning commission
    (goal 3 already puts them in the room) and say so in the `detail`; do not
    ask them to choose a format.
 

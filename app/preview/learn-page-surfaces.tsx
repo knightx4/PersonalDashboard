@@ -170,6 +170,7 @@ const conceptMaterial: ClaimMaterialView = {
       lengthChars: 5200,
       tStartSeconds: 724,
       tEndSeconds: 1110,
+      openUrl: 'https://www.youtube.com/watch?v=example1&t=724',
       item: {
         id: 'item1',
         title: 'Elasticity and total revenue',
@@ -190,6 +191,7 @@ const conceptMaterial: ClaimMaterialView = {
       lengthChars: 3100,
       tStartSeconds: null,
       tEndSeconds: null,
+      openUrl: 'https://openstax.org/books/principles-economics-3e/pages/5-1#Price_elasticity_of_demand',
       item: {
         id: 'item2',
         title: 'Principles of Economics, chapter 5: Elasticity',
@@ -299,7 +301,11 @@ const dcfEvidence: EvidenceLink[] = [
   },
 ];
 
-export function LearnConceptEvidenceSurface() {
+export function LearnConceptEvidenceSurface({
+  material = { material: [], absence: null },
+}: {
+  material?: ClaimMaterialView;
+} = {}) {
   return (
     <ConceptPageView
       view={{
@@ -312,13 +318,21 @@ export function LearnConceptEvidenceSurface() {
       }}
       probes={[]}
       opening={null}
-      material={{ material: [], absence: null }}
+      material={material}
       notes={[]}
       evidence={dcfEvidence}
       timezone={ZONE}
       now={NOW}
     />
   );
+}
+
+/**
+ * The same idea once everything found for it has been read or given up on
+ * (plan #2741.1): the list is left out and the line under the button says why.
+ */
+export function LearnConceptAllConsumedSurface() {
+  return <LearnConceptEvidenceSurface material={{ material: [], absence: 'all-consumed' }} />;
 }
 
 // ---- Reading lists -----------------------------------------------------------

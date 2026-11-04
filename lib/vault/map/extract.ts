@@ -24,6 +24,7 @@ import {
   whyNotRead,
   type MapVerdict,
   type NotRead,
+  type VaultRules,
 } from '@/lib/vault/map/rules';
 import { MAX_EXISTING_THEMES } from '@/lib/vault/map/themes';
 import { MODELS } from '@/lib/core/models';
@@ -216,10 +217,12 @@ export async function proposeNoteMap(input: {
   onSpend?: SpendSink;
   /** Classify on Jev first (plan #1168); see classifyForMap. */
   jevEnabled?: boolean;
+  /** The person's private folders (loadVaultRules); the defaults when left out. */
+  rules?: VaultRules;
 }): Promise<ProposeResult> {
   const { note } = input;
 
-  const notRead = whyNotRead(note);
+  const notRead = whyNotRead(note, input.rules);
   if (notRead) return { ok: false, reason: 'not-read', notRead, detail: notRead.detail };
 
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });

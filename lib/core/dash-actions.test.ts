@@ -202,7 +202,7 @@ describe('undoDashAction', () => {
   });
 
   describe('a Dev project Dash added (plan #2553.6)', () => {
-    const added: Row = { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: null };
+    const added: Row = { id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'recipes', archived_at: null };
 
     function projectSetup(project: Row) {
       const tables: Tables = {
@@ -270,6 +270,14 @@ describe('planUndo', () => {
 
   it('does not count a moved updated_at as a change', () => {
     expect(planUndo(base, { ...TASK_AFTER, updated_at: '2026-10-03T10:00:00Z' }, false).ok).toBe(true);
+  });
+
+  it('checks and puts back only the columns a narrow record keeps, as a dashboard change does (plan #2778.9)', () => {
+    const tiles = [{ type: 'rooms' }];
+    const narrow = { ...base, kind: 'change_goal_dashboard', beforeValues: { dashboard: null }, afterValues: { dashboard: tiles } };
+    const goal = { ...TASK_AFTER, title: 'Reworded since', dashboard: [{ type: 'rooms' }] };
+    expect(planUndo(narrow, goal, false)).toEqual({ ok: true, plan: { op: 'update', values: { dashboard: null } } });
+    expect(planUndo(narrow, { ...goal, dashboard: [] }, false).ok).toBe(false);
   });
 
   it('refuses an action with no values kept', () => {

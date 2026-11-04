@@ -8,20 +8,20 @@ const word = (input: Parameters<typeof applicationMove>[0]) => {
 };
 
 describe('applicationMove', () => {
-  const base = { companyName: 'EliseAI', lastEvent: null };
+  const base = { companyName: 'Contoso', lastEvent: null };
 
   it('says a sent application is waiting on the company', () => {
     expect(word({ ...base, status: 'submitted', lastEvent: 'submitted' })).toBe(
-      'Waiting on EliseAI',
+      'Waiting on Contoso',
     );
     expect(word({ ...base, status: 'acknowledged', lastEvent: 'confirmation' })).toBe(
-      'Waiting on EliseAI',
+      'Waiting on Contoso',
     );
     expect(word({ ...base, status: 'in_process', lastEvent: 'interview_completed' })).toBe(
-      'Waiting on EliseAI',
+      'Waiting on Contoso',
     );
     expect(word({ ...base, status: 'final_round', lastEvent: 'follow_up_sent' })).toBe(
-      'Waiting on EliseAI',
+      'Waiting on Contoso',
     );
   });
 

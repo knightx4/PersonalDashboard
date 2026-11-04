@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromRow, parseTypedInput, type ResultRow } from './model';
+import { enneagramLine, fromRow, themesFrom, parseTypedInput, type ResultRow } from './model';
 
 const TODAY = '2026-10-07';
 
@@ -16,6 +16,8 @@ describe('parseTypedInput (plan #1633)', () => {
         typedValue: 'intj-a',
         takenAt: '2024-03-14',
         note: null,
+        typeScores: null,
+        themes: null,
       },
     });
     const enneagram = parseTypedInput(
@@ -59,6 +61,76 @@ describe('parseTypedInput (plan #1633)', () => {
   });
 });
 
+describe('Enneagram scores', () => {
+  const NINE = ['64', '60', '82', '35', '100', '18', '98', '45', '99'];
+
+  it('keeps all nine and fills a blank result with the top type', () => {
+    expect(
+      parseTypedInput({ kind: 'enneagram', typedValue: ' ', takenAt: TODAY, typeScores: NINE }, TODAY),
+    ).toMatchObject({
+      input: { typedValue: '5', typeScores: [64, 60, 82, 35, 100, 18, 98, 45, 99] },
+    });
+  });
+
+  it('keeps a typed result beside the scores, and takes none at all', () => {
+    expect(
+      parseTypedInput({ kind: 'enneagram', typedValue: '5w4', takenAt: TODAY, typeScores: NINE }, TODAY),
+    ).toMatchObject({ input: { typedValue: '5w4' } });
+    expect(
+      parseTypedInput(
+        { kind: 'enneagram', typedValue: '5', takenAt: TODAY, typeScores: Array(9).fill('') },
+        TODAY,
+      ),
+    ).toMatchObject({ input: { typeScores: null } });
+  });
+
+  it('asks for every score once one is in, each from 0 to 100', () => {
+    const some = [...NINE];
+    some[2] = '';
+    some[6] = '';
+    expect(
+      parseTypedInput({ kind: 'enneagram', typedValue: '5', takenAt: TODAY, typeScores: some }, TODAY),
+    ).toEqual({ error: expect.stringContaining('Missing: 3, 7'), field: 'typeScores' });
+    const high = [...NINE];
+    high[0] = '101';
+    expect(
+      parseTypedInput({ kind: 'enneagram', typedValue: '5', takenAt: TODAY, typeScores: high }, TODAY),
+    ).toEqual({ error: expect.stringContaining('type 1'), field: 'typeScores' });
+  });
+
+  it('ignores scores sent with another kind of test', () => {
+    expect(
+      parseTypedInput({ kind: 'mbti', typedValue: 'INTJ', takenAt: TODAY, typeScores: NINE }, TODAY),
+    ).toMatchObject({ input: { typeScores: null } });
+  });
+
+  it('ranks highest first, a tie keeping the lower type first', () => {
+    expect(enneagramLine([10, 50, 10, 0, 50, 0, 0, 0, 0])).toBe(
+      '2 at 50, 5 at 50, 1 at 10, 3 at 10, 4 at 0, 6 at 0, 7 at 0, 8 at 0, 9 at 0',
+    );
+  });
+});
+
+describe('themesFrom', () => {
+  it('reads ranked themes with their detail, and refuses a theme with no name', () => {
+    expect(
+      themesFrom([{ name: 'Learner', domain: 'Strategic Thinking', blind_spots: ['Too much', 3] }]),
+    ).toEqual([
+      {
+        name: 'Learner',
+        domain: 'Strategic Thinking',
+        summary: null,
+        score: null,
+        insights: [],
+        blindSpots: ['Too much'],
+        actions: [],
+      },
+    ]);
+    expect(themesFrom([{ domain: 'Executing' }])).toBeNull();
+    expect(themesFrom([])).toBeNull();
+  });
+});
+
 describe('fromRow', () => {
   it('reads a typed-in row with its note', () => {
     const row: ResultRow = {
@@ -79,6 +151,9 @@ describe('fromRow', () => {
       read_model: null,
       read_at: null,
     };
-    expect(fromRow(row)).toMatchObject({ kind: 'enneagram', typedValue: '5w4', note: 'From a book.' });
+    expect(fromRow(row)).toMatchObject({ kind: 'enneagram', typedValue: '5w4', note: 'From a book.', typeScores: null });
+    const scores = [64, 60, 82, 35, 100, 18, 98, 45, 99];
+    expect(fromRow({ ...row, type_scores: scores })).toMatchObject({ typeScores: scores });
+    expect(fromRow({ ...row, type_scores: [1, 2] })).toMatchObject({ typeScores: null });
   });
 });

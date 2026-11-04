@@ -107,7 +107,7 @@ const GOAL = item({
   level: 'goal',
   area_id: 'area',
   title: 'Get plugged into city life',
-  help_kinds: [{ kind: 'events', note: 'Brooklyn, weeknights' }],
+  help_kinds: [{ kind: 'events', note: 'Eastside, weeknights' }],
 });
 const LEARNING = item({
   id: 'l',
@@ -152,7 +152,7 @@ const PAST = {
   detail: null,
   url: 'https://example.test/jazz',
   place: 'Bryant Park',
-  source: 'NYC Parks',
+  source: 'Springfield Parks',
   happens_on: '2026-09-27',
   starts_at: null,
   reaction: 'going',
@@ -198,7 +198,7 @@ describe('runGoalsWeekly', () => {
     expect(url).toContain('/routines/trig_goals/fire');
     const text = (JSON.parse(init.body as string) as { text: string }).text;
     expect(text).toContain('goals.runs id run-1');
-    expect(text).toContain('Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Brooklyn, weeknights');
+    expect(text).toContain('Goal "Get plugged into city life" (goals.items id g) asks for:\n- events: Eastside, weeknights');
     expect(text).toContain('"Go to one city event" (goals.items id r1)');
     expect(text).toContain('Goal "Learn how cities are planned" (goals.items id l) asks for:\n- reading');
     expect(text).not.toContain('Goal "Sleep by eleven" (goals.items id q) asks for');

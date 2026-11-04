@@ -12,7 +12,7 @@ set search_path = news, public, extensions;
 
 create table news.preferences (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  -- As the person wrote it: "NYC", "New York City", "Brooklyn". Handed to the
+  -- As the person wrote it: "PDX", "Portland", "Southeast Portland". Handed to the
   -- model as written, which reads any of those.
   local_area text,
   updated_at timestamptz not null default now(),

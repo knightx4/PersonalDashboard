@@ -10,6 +10,8 @@ import { OPEN_PATH, parseRef, refHref } from '@/lib/core/refs';
 import { COMMENT_MAX } from '@/lib/goals/comments';
 import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { askDashOnRow } from '@/lib/thread/ask';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { askDashOnRole } from '@/lib/jobs/role-thread/ask';
 import { addThreadTurn, removeThreadTurn, THREAD_ROW_NOT_YOURS } from '@/lib/thread/store';
 
 /**
@@ -67,6 +69,33 @@ export async function addRowComment(_prev: RowCommentState, form: FormData): Pro
   if (!mentionsDash(body.data)) {
     redraw(ref);
     return { message: 'Saved.' };
+  }
+
+  // The cover letter's thread is on its application (note f0a52da9). It is
+  // answered as a role is, so Dash can write the letter into it.
+  if (parsed.table === 'job_search.applications') {
+    const jobs = await createJobsClient();
+    const { data: application } = await jobs
+      .from('applications')
+      .select('role_id')
+      .eq('id', parsed.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (application) {
+      const asked = await askDashOnRole({
+        client: jobs,
+        userId: user.id,
+        roleId: application.role_id as string,
+        applicationId: parsed.id,
+        commentId: writtenId,
+        question: questionFrom(body.data),
+        apiKey: process.env.ANTHROPIC_API_KEY ?? null,
+        dash: await requestDashDeps(user.id),
+        dashThread: await threadDashInRequest(user.id),
+      });
+      redraw(ref);
+      return { message: asked.ok ? asked.message : asked.error };
+    }
   }
 
   const asked = await askDashOnRow({

@@ -50,6 +50,10 @@ const PUBLIC_PATHS = [
   // authenticated by an HMAC over the fields it signs, checked in
   // lib/news/providers/mailgun.ts before anything is read out of the body.
   '/api/news/inbound',
+  // Plaid's webhooks about linked bank Items (plan #2593.3). Plaid carries no
+  // session; the route checks the Plaid-Verification JWT, its age and the
+  // body's hash before anything is read, and answers 401 otherwise.
+  '/api/finances/plaid/webhook',
   // The shared case page. Authorized by an unguessable, expiring slug and read
   // through one security definer function that checks both; see
   // supabase/migrations-job-search/0017_public_case_page.sql.
@@ -76,7 +80,16 @@ const PUBLIC_PATHS = [
   '/api/ask/voice',
 ];
 
+/**
+ * A note from a project's own app (docs/PROJECT-NOTES.md). The app carries a
+ * token Dash gave it, never the cookie; the route checks the token and
+ * answers 401 without one. Only the notes route itself, so nothing else under
+ * /api/projects turns public by accident.
+ */
+const PROJECT_NOTES_PATH = /^\/api\/projects\/[a-z][a-z0-9-]{0,39}\/notes$/;
+
 function isPublic(pathname: string): boolean {
+  if (PROJECT_NOTES_PATH.test(pathname)) return true;
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

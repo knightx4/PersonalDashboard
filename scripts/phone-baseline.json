@@ -9,8 +9,7 @@
     "targets": 1
   },
   "dev-ui": {
-    "targets": 55,
-    "contrast": 3
+    "targets": 55
   },
   "goals-all": {
     "targets": 3
@@ -30,10 +29,10 @@
   "goals-page-top": {
     "targets": 2
   },
-  "goals-steps-opened": {
+  "goals-steps-dash-row": {
     "targets": 4
   },
-  "jobs-interviews": {
+  "goals-steps-opened": {
     "targets": 4
   },
   "jobs-pipeline-dense": {
@@ -77,9 +76,6 @@
   },
   "shopping-item-details": {
     "targets": 1
-  },
-  "shopping-recurring": {
-    "targets": 9
   },
   "timeline-page": {
     "targets": 1

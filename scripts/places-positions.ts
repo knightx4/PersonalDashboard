@@ -19,13 +19,14 @@ import { existsSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { config as loadEnvFile } from 'dotenv';
 import { placePosition } from '../lib/you/place-position';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 for (const file of ['.env.local', '.env']) {
   if (existsSync(file)) loadEnvFile({ path: file, quiet: true });
 }
 
 const dryRun = process.argv.includes('--dry-run');
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+const url = requireSupabaseProjectUrl();
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!key) {
   console.error('SUPABASE_SERVICE_ROLE_KEY is not set. It is needed to read every account’s places.');

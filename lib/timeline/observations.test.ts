@@ -110,10 +110,10 @@ describe('taking event ids out of what the person reads', () => {
   it('removes bracketed ids, ranges and lists with their brackets', () => {
     expect(
       stripEventLabels(
-        'The week of 2026-09-14 combined 4 interviews (including four Galaxy Digital onsites just after) with a burst of 71 notes, most being course notes (E317-E380) rather than job related notes.',
+        'The week of 2026-09-14 combined 4 interviews (including four Globex Digital onsites just after) with a burst of 71 notes, most being course notes (E317-E380) rather than job related notes.',
       ),
     ).toBe(
-      'The week of 2026-09-14 combined 4 interviews (including four Galaxy Digital onsites just after) with a burst of 71 notes, most being course notes rather than job related notes.',
+      'The week of 2026-09-14 combined 4 interviews (including four Globex Digital onsites just after) with a burst of 71 notes, most being course notes rather than job related notes.',
     );
     expect(stripEventLabels('You wrote 3 notes [E1, E2 and E5], then 2 more (E7 to E8).')).toBe(
       'You wrote 3 notes, then 2 more.',
@@ -124,7 +124,7 @@ describe('taking event ids out of what the person reads', () => {
   it('gives null when an id is left in the running text', () => {
     expect(
       stripEventLabels(
-        'Task completions and note writing only show up in the last three weeks of the period, alongside a run of four onsite interviews at Galaxy Digital on 2026-09-15 (E298-E301) and recruiter screens like E268 and E247.',
+        'Task completions and note writing only show up in the last three weeks of the period, alongside a run of four onsite interviews at Globex Digital on 2026-09-15 (E298-E301) and recruiter screens like E268 and E247.',
       ),
     ).toBeNull();
     expect(stripEventLabels('You did 2 things (see E4).')).toBeNull();

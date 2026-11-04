@@ -13,7 +13,13 @@
  *                                [--priority 1|2|3] [--size s|m|l]
  *                                [--detail "…"] [--done-when "…"]
  *                                [--proposed] [--idea <id prefix>]
- *                                [--kind decision|setup] [--from <n>]
+ *                                [--kind decision|setup] [--from <n>] [--because "…"]
+ *                                [--mockup <html file> [--link <page>] | --no-mockup "<why>"]
+ *                                # a decision about a screen takes --mockup (#2810.3):
+ *                                # each data-option="A" element is photographed at 390 and 1280
+ *   npx tsx scripts/plan.ts mockup <n> --mockup <html file> [--link <page>]
+ *                                # --from: the answered decision, or the built step
+ *                                # whose finding (--because) made this step
  *                                # under an approved feature a step is ready
  *                                # to build, stamped with the session that
  *                                # added it; --proposed holds it for the person
@@ -63,6 +69,11 @@
  *                                # setup job (needs) or a ready step; never on
  *                                # the person directly
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
+ *   npx tsx scripts/plan.ts revise <n> --from <built step> --because "what it found"
+ *                                [--title "…"] [--detail "…"] [--done-when "…"]
+ *                                # rewrite a step nobody has started, under the same
+ *                                # feature, from what building an earlier step found;
+ *                                # the old wording stays in its comment
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
  *                                # ending a run with the step neither closed nor
@@ -72,6 +83,10 @@
  *                                [--option "…" ...]   # one line on the run fired at <n> (or
  *                                # the feature above it), shown live on the run's page; a
  *                                # question takes 1-10 options and parks the run on you
+ *   npx tsx scripts/plan.ts progress <n> --state working|waiting|done|stopped --action "…"
+ *                                [--needs "…"] [--project <id>] [--thread <id>] [--session <id>]
+ *                                # what this session is doing on <n> now, for the project
+ *                                # pages and Dev; --needs says what it waits on you for
  *   npx tsx scripts/plan.ts response <n>   # your answer to the run's last question, or
  *                                # "No answer yet"; what a session that asked reads back
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
@@ -100,6 +115,8 @@
  * the brief -- is lib/plan/tree.ts and lib/plan/brief.ts, the same code the
  * page runs, so the two cannot disagree about what is next.
  */
+// First: names the repository before lib/plan/github.ts reads it.
+import './app-repository';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import postgres from 'postgres';
@@ -121,6 +138,8 @@ import {
   storedScopeOf,
   type DevProject,
 } from '../lib/plan/projects';
+import { builtBeneathExpiries, endsWithBuiltLine } from '../lib/plan/built';
+import { landNowLine } from '../lib/plan/land';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
@@ -130,6 +149,7 @@ import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
+import { ProgressInputError, currentSessionId, progressRpcArgs, readProgress } from '../lib/plan/session-progress';
 import { branchesContaining } from '../lib/plan/branches';
 import {
   needsLines,
@@ -140,7 +160,14 @@ import {
   setupHome,
   setupStartRefusal,
 } from '../lib/plan/needs';
-import { addsAsProposal, currentSession, reshapeStamp, sessionStamp } from '../lib/plan/origin';
+import {
+  addsAsProposal,
+  buildStamp,
+  currentSession,
+  reshapeStamp,
+  sessionStamp,
+} from '../lib/plan/origin';
+import { reviseRefusal, revisedComment } from '../lib/plan/revise';
 import {
   CHECK_BACK_COLUMNS,
   checkBackFrom,
@@ -197,6 +224,10 @@ import {
   type PlanNode,
   type PlanSection,
 } from '../lib/plan/tree';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
+import { createClient } from '@supabase/supabase-js';
+import { PLAN_MOCKUPS_BUCKET, mockupRefusal, mockupStoragePath, optionLettersIn } from '../lib/plan/mockups';
+import { shootMockup, type MockupShot } from './mockup-shoot';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -210,7 +241,7 @@ function connect() {
   // A cloud session's proxy carries HTTPS and not Postgres, so there each
   // statement goes through the REST API instead (lib/db/https-sql.ts).
   if (key && (process.env.CLAUDE_CODE_REMOTE === 'true' || !url)) {
-    const rest = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://asjztutnqxbecruvyrbj.supabase.co';
+    const rest = requireSupabaseProjectUrl();
     return httpsSql(restTransport(rest, key)) as unknown as ReturnType<typeof postgres>;
   }
   if (!url) {
@@ -274,6 +305,50 @@ async function checkRowWriting(
 
 const argv = process.argv.slice(2);
 
+/**
+ * Photograph a mockup file and keep the pictures with a question (plan
+ * #2810.3). Shots are taken first, so a file that cannot be photographed fails
+ * before anything is written; the upload and the rows follow. A row is written
+ * per option and width, replacing the one already there.
+ */
+async function photographMockup(file: string): Promise<{ html: string; shots: MockupShot[] }> {
+  let html: string;
+  try {
+    html = readFileSync(file, 'utf8');
+  } catch {
+    fail(`Cannot read the mockup file ${file}.`);
+  }
+  const shots = await shootMockup(file, optionLettersIn(html));
+  return { html, shots };
+}
+
+async function keepMockup(
+  sql: Sql,
+  userId: string,
+  item: { id: string; number: number },
+  file: string,
+  link: string | null,
+  shots: MockupShot[],
+): Promise<void> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) fail('SUPABASE_SERVICE_ROLE_KEY is needed to upload the mockup pictures.');
+  const storage = createClient(requireSupabaseProjectUrl(), key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }).storage.from(PLAN_MOCKUPS_BUCKET);
+  for (const shot of shots) {
+    const path = mockupStoragePath(userId, item.number, shot.optionLetter, shot.width);
+    const { error } = await storage.upload(path, shot.png, { contentType: 'image/png', upsert: true });
+    if (error) fail(`Uploading ${path} failed: ${error.message}. Attach it with: plan.ts mockup ${item.number} --mockup ${file}`);
+    await sql`
+      insert into plan_item_mockups (user_id, item_id, option_letter, width, storage_path, link, html_path)
+      values (${userId}, ${item.id}, ${shot.optionLetter}, ${shot.width}, ${path}, ${link}, ${file})
+      on conflict (item_id, coalesce(option_letter, ''), width)
+      do update set storage_path = excluded.storage_path, link = excluded.link, html_path = excluded.html_path`;
+  }
+  const letters = [...new Set(shots.map((s) => s.optionLetter ?? 'whole'))].join(', ');
+  console.log(`Kept ${shots.length} mockup pictures with #${item.number} (${letters}, at 390 and 1280).`);
+}
+
 function arg(flag: string): string | null {
   const index = argv.indexOf(flag);
   return index > -1 ? (argv[index + 1] ?? null) : null;
@@ -329,9 +404,6 @@ function currentBranch(): string | null {
   }
 }
 
-/** The dated line `built` writes, which `land` looks for as the step's last. */
-const BUILT_LINE = /^Built \d{4}-\d{2}-\d{2}\b/;
-
 /**
  * Why a step may not close as done against this commit, or null when it may.
  *
@@ -383,6 +455,21 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/** The id of the feature at the top of a step's chain (the step itself when it is one). */
+async function rootId(sql: Sql, userId: string, number: number): Promise<string | null> {
+  const rows = await sql<{ id: string }[]>`
+    with recursive up as (
+      select id, parent_id, 0 as depth from plan_items
+      where user_id = ${userId} and number = ${number}
+      union all
+      select p.id, p.parent_id, up.depth + 1 from plan_items p
+      join up on p.id = up.parent_id
+      where p.user_id = ${userId} and up.depth < 50
+    )
+    select id from up order by depth desc limit 1`;
+  return rows[0]?.id ?? null;
 }
 
 /** The scope a step's root feature is filed under: a workspace, a project, or null. */
@@ -1078,6 +1165,16 @@ async function main(): Promise<void> {
      * where a routine on the account would otherwise be scheduled: this one is
      * on the Dash tab, and any session can finish it.
      */
+    /** Attach (or replace) the mockup pictures on a question already written. */
+    if (command === 'mockup') {
+      const file = arg('--mockup');
+      if (!target || !file) fail('mockup <n> --mockup <file.html> [--link <published page>]');
+      const item = await byNumber(sql, userId, target);
+      const photographed = await photographMockup(file);
+      await keepMockup(sql, userId, item, file, arg('--link'), photographed.shots);
+      return;
+    }
+
     if (command === 'check-back') {
       const title = target?.trim();
       if (!title) fail('Give it: check-back "<what to look at>" --after 2h [--detail "…"].');
@@ -1237,6 +1334,21 @@ async function main(): Promise<void> {
       const kind = arg('--kind') ?? 'build';
       if (!isPlanKind(kind)) fail('Kind is build, decision or setup.');
 
+      // A question about a screen carries a picture of each option (#2810.3).
+      const mockupFile = arg('--mockup');
+      const mockupLink = arg('--link');
+      const noMockup = arg('--no-mockup');
+      const missingMockup = mockupRefusal({
+        kind,
+        title,
+        detail: arg('--detail'),
+        mockup: mockupFile,
+        noMockupReason: noMockup,
+      });
+      if (missingMockup) fail(missingMockup);
+      if (mockupFile && kind !== 'decision') fail('--mockup goes with --kind decision.');
+      const photographed = mockupFile ? await photographMockup(mockupFile) : null;
+
       const [last] = parent
         ? await sql<{ position: number }[]>`
             select position from plan_items where user_id = ${userId} and parent_id = ${parent.id}
@@ -1279,13 +1391,30 @@ async function main(): Promise<void> {
       // is read off the decision's own answer rather than retyped by whoever
       // is adding the step, so a session cannot paraphrase an answer into
       // something that was never said.
+      //
+      // A built step under the same feature can be the source too: what
+      // building it found is often what makes the next piece of work clear.
+      // There is no answer to quote then, so the finding is given with
+      // --because and shown on the row as the session's words.
       const fromNumber = arg('--from');
       let comment: string | null = null;
       if (fromNumber) {
         const from = await byNumber(sql, userId, fromNumber);
-        if (from.kind !== 'decision') fail(`${ref(from.number)} is not a decision.`);
-        if (!from.resolution) fail(`${ref(from.number)} has not been answered yet.`);
-        comment = reshapeStamp(typed(from.number), from.resolution);
+        if (from.kind === 'decision') {
+          if (!from.resolution) fail(`${ref(from.number)} has not been answered yet.`);
+          comment = reshapeStamp(typed(from.number), from.resolution);
+        } else if (from.kind === 'build') {
+          const built = from.status === 'done' || (from.status === 'in_progress' && from.commitSha);
+          if (!built) fail(`${ref(from.number)} has not been built yet.`);
+          const because = arg('--because')?.trim();
+          if (!because) fail(`Say what ${ref(from.number)} found with --because "…".`);
+          if (!parent || (await rootId(sql, userId, from.number)) !== (await rootId(sql, userId, parent.number))) {
+            fail(`${ref(from.number)} is not under the same feature as the new step.`);
+          }
+          comment = buildStamp(typed(from.number), because);
+        } else {
+          fail(`${ref(from.number)} is a ${from.kind}: --from takes a decision or a built step.`);
+        }
       }
 
       // A step a session writes ready under an approved feature says so, on
@@ -1310,6 +1439,7 @@ async function main(): Promise<void> {
         returning id, number`;
       // Read again, so the new row is named by the outline it just took.
       await loadOutlines(sql, userId, true);
+      if (photographed && mockupFile) await keepMockup(sql, userId, row, mockupFile, mockupLink, photographed.shots);
 
       const ideaPrefix = arg('--idea');
       if (ideaPrefix) {
@@ -1593,6 +1723,63 @@ async function main(): Promise<void> {
       return;
     }
 
+    // What this session is doing now (plan #2800.1): its row in
+    // core.session_progress for this step, rewritten on each call, which the
+    // project pages and Dev show while it works. The same write as the Dash
+    // connector's report_progress, for a builder with no connector loaded.
+    // The run is the newest one fired at the step or above it, when there is one.
+    if (command === 'progress') {
+      let report;
+      try {
+        report = readProgress({
+          session_id: arg('--session') ?? currentSessionId(process.env),
+          state: arg('--state'),
+          action: arg('--action'),
+          needs: arg('--needs'),
+          project: arg('--project'),
+          thread_id: arg('--thread'),
+          plan_item_id: item.id,
+        });
+      } catch (error) {
+        if (error instanceof ProgressInputError) fail(error.message);
+        throw error;
+      }
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date }[]
+      >`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      const a = progressRpcArgs(userId, { ...report, planRunId: run?.id ?? null });
+      await sql`
+        select id from core.report_session_progress(
+          ${a.p_user_id}::uuid, ${a.p_session_id}, ${a.p_state}, ${a.p_action}, ${a.p_needs},
+          ${a.p_plan_run_id}::uuid, ${a.p_plan_item_id}::uuid, ${a.p_thread_id}::uuid, ${a.p_project})`;
+      console.log(
+        `${ref(item.number)} progress (${report.state}): ${report.action}` +
+          (report.needs ? `\nNeeds: ${report.needs}` : ''),
+      );
+      return;
+    }
+
     // The person's answer to the question the run asked (plan #1824): what a
     // session that asked with `activity --kind question` reads back to carry
     // on. Prints the answer, or says there is none yet.
@@ -1761,6 +1948,26 @@ async function main(): Promise<void> {
       console.log(
         `${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`,
       );
+      // A batch lands once its feature holds four built steps, so a long
+      // feature ships in pieces rather than all at the end (plan #2815.2).
+      const root = await rootId(sql, userId, item.number);
+      if (root) {
+        const under = await sql<{ number: number; comment: string | null }[]>`
+          with recursive tree as (
+            select id from plan_items where id = ${root} and user_id = ${userId}
+            union all
+            select p.id from plan_items p join tree on p.parent_id = tree.id
+            where p.user_id = ${userId}
+          )
+          select p.number, p.comment from plan_items p
+          where p.id in (select id from tree) and p.user_id = ${userId}
+            and p.status = 'in_progress' and p.commit_sha is not null`;
+        const feature = await sql<{ number: number }[]>`
+          select number from plan_items where id = ${root} and user_id = ${userId}`;
+        const count = under.filter((row) => endsWithBuiltLine(row.comment)).length;
+        const line = feature[0] ? landNowLine(ref(feature[0].number), count) : null;
+        if (line) console.log(line);
+      }
       await checkRowWriting(sql, userId, item, { note });
       return;
     }
@@ -1780,12 +1987,11 @@ async function main(): Promise<void> {
         )
         select id, number, comment, commit_sha from plan_items
         where id in (select id from tree) and user_id = ${userId}
-          and status = 'in_progress' and commit_sha is not null
+          and status in ('in_progress', 'not_started') and commit_sha is not null
         order by position, created_at`;
-      const built = rows.filter((row) => {
-        const paragraphs = String(row.comment ?? '').split(/\n\n/);
-        return BUILT_LINE.test(paragraphs[paragraphs.length - 1]?.trim() ?? '');
-      });
+      // A step the sweep took back before #2815.1 is not started, with a
+      // claim-expired line under its Built one; it lands like any other.
+      const built = rows.filter((row) => builtBeneathExpiries(row.comment as string | null));
       if (built.length === 0) fail(`Nothing under ${ref(item.number)} is marked built.`);
 
       const stamp = new Date().toISOString().slice(0, 10);
@@ -1816,6 +2022,64 @@ async function main(): Promise<void> {
 
     // Closing or parking a step always records why. A status with no reason
     // is how a plan becomes something nobody trusts.
+    // Rewrite a step nobody has started, because of what building an earlier
+    // step under the same feature found (lib/plan/revise.ts has the limits).
+    // The row keeps what it said before in its comment, under a stamp naming
+    // the step whose build caused it, so the person sees why and can put it
+    // back.
+    if (command === 'revise') {
+      const fromNumber = arg('--from');
+      if (!fromNumber) {
+        fail('revise <step> --from <built step> --because "what it found" [--title …] [--detail …] [--done-when …]');
+      }
+      const from = await byNumber(sql, userId, fromNumber);
+      const change = { title: arg('--title'), detail: arg('--detail'), doneWhen: arg('--done-when') };
+      const finding = arg('--because');
+      const target = {
+        kind: item.kind,
+        status: item.status,
+        parent_id: item.parentId,
+        title: item.title,
+        acceptance: item.acceptance,
+        detail: item.detail,
+        comment: item.comment,
+      };
+      const sameFeature =
+        (await rootId(sql, userId, item.number)) === (await rootId(sql, userId, from.number));
+      const refusal = reviseRefusal({
+        target,
+        targetRef: ref(item.number),
+        source: { kind: from.kind, status: from.status, commit_sha: from.commitSha },
+        sourceRef: ref(from.number),
+        sameFeature,
+        change,
+        finding,
+      });
+      if (refusal) fail(refusal);
+      const comment = revisedComment({
+        comment: item.comment,
+        target,
+        change,
+        sourceOutline: typed(from.number),
+        finding: finding ?? '',
+        date: new Date().toISOString().slice(0, 10),
+      });
+      await sql`
+        update plan_items
+        set title = coalesce(${change.title}, title),
+            detail = coalesce(${change.detail}, detail),
+            acceptance = coalesce(${change.doneWhen}, acceptance),
+            comment = ${comment}
+        where id = ${item.id} and user_id = ${userId}`;
+      console.log(`${ref(item.number)} revised from ${ref(from.number)}'s build.`);
+      await checkRowWriting(sql, userId, item, {
+        title: change.title ?? undefined,
+        detail: change.detail ?? undefined,
+        doneWhen: change.doneWhen ?? undefined,
+      });
+      return;
+    }
+
     if (command === 'done' || command === 'block' || command === 'drop') {
       // A block says two things and they have different lifetimes. What the
       // step needs is one sentence that is true until somebody supplies it, so

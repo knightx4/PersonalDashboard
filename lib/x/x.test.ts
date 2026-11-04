@@ -55,7 +55,7 @@ function account(over: Partial<XAccountRow> = {}): XAccountRow {
     id: 'a1',
     user_id: 'u1',
     x_user_id: '42',
-    handle: 'selvey',
+    handle: 'alexrivera',
     access_token: encryptToken('old-access', KEY),
     refresh_token: encryptToken('old-refresh', KEY),
     token_expires_at: new Date(NOW + 60 * 60 * 1000).toISOString(),
@@ -118,8 +118,8 @@ describe('the code exchange', () => {
   });
 
   it('reads who the token is', async () => {
-    const me = await fetchXMe('at', async () => json(200, { data: { id: '42', username: 'selvey', name: 'S' } }));
-    expect(me).toEqual({ id: '42', username: 'selvey', name: 'S' });
+    const me = await fetchXMe('at', async () => json(200, { data: { id: '42', username: 'alexrivera', name: 'S' } }));
+    expect(me).toEqual({ id: '42', username: 'alexrivera', name: 'S' });
   });
 });
 
@@ -184,18 +184,18 @@ describe('freshXAccessToken', () => {
 
 describe('what the tab shows', () => {
   it('says the keys are missing before anything else', () => {
-    expect(xConnectionView({ handle: 'selvey', status: 'active', last_synced_at: null }, false, 1816)).toEqual({
+    expect(xConnectionView({ handle: 'alexrivera', status: 'active', last_synced_at: null }, false, 1816)).toEqual({
       state: 'unconfigured',
       setupStep: 1816,
     });
     expect(xConnectionView(null, true, 1816)).toEqual({ state: 'none' });
-    expect(xConnectionView({ handle: 'selvey', status: 'disconnected', last_synced_at: null }, true, 1816)).toEqual({
+    expect(xConnectionView({ handle: 'alexrivera', status: 'disconnected', last_synced_at: null }, true, 1816)).toEqual({
       state: 'disconnected',
-      handle: 'selvey',
+      handle: 'alexrivera',
     });
-    expect(xConnectionView({ handle: 'selvey', status: 'active', last_synced_at: null }, true, 1816)).toEqual({
+    expect(xConnectionView({ handle: 'alexrivera', status: 'active', last_synced_at: null }, true, 1816)).toEqual({
       state: 'connected',
-      handle: 'selvey',
+      handle: 'alexrivera',
       lastSyncedAt: null,
       problem: null,
       canPost: false,
@@ -204,7 +204,7 @@ describe('what the tab shows', () => {
   });
 
   it('offers posting only to a sign-in that carries tweet.write (plan #2072)', () => {
-    const row = { handle: 'selvey', status: 'active' as const, last_synced_at: null };
+    const row = { handle: 'alexrivera', status: 'active' as const, last_synced_at: null };
     const view = (scope: string | null) => xConnectionView({ ...row, scope }, true, 1816);
     expect(view('tweet.read users.read offline.access')).toMatchObject({ canPost: false });
     expect(view('tweet.read tweet.write users.read offline.access')).toMatchObject({ canPost: true });
@@ -212,7 +212,7 @@ describe('what the tab shows', () => {
   });
 
   it('offers images only to a sign-in that also carries media.write', () => {
-    const row = { handle: 'selvey', status: 'active' as const, last_synced_at: null };
+    const row = { handle: 'alexrivera', status: 'active' as const, last_synced_at: null };
     const view = (scope: string | null) => xConnectionView({ ...row, scope }, true, 1816);
     expect(view('tweet.read tweet.write users.read offline.access')).toMatchObject({ canPost: true, canPostImages: false });
     expect(view('tweet.read tweet.write users.read media.write offline.access')).toMatchObject({ canPostImages: true });

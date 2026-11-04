@@ -12,6 +12,11 @@ A project whose row names a routine of its own, with that routine's id set
 on the deployment, goes to that routine instead; the website keeps one until
 a step of its has been built end to end through this routine (#2553.4).
 
+A project with no routine of its own is not sent to a routine at all: its
+run is queued for the projects dispatcher, which starts a session on the
+project's repository (project-dispatch.md beside this file). What follows
+is the brief that session gets, and the old shared routine's prompt.
+
 The routine checks out this repository, not the project's. The turn the app
 sends opens with `projectPreamble` (`lib/plan/handover.ts`), which names the
 project's repository and tells the session to add it. The plan rows stay in
@@ -51,7 +56,7 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
 3. **Commit a CLAUDE.md** to the project's branch if it has none, short:
    how to install and run it, the check command, that each step merges to
    that branch and is pushed, and that its plan rows live in the dashboard
-   (knightx4/PersonalDashboard), read and written with that checkout's
+   (this repository), read and written with that checkout's
    `scripts/plan.ts`. Leave an existing CLAUDE.md alone unless it
    contradicts what you found; then add to it rather than rewriting it.
 4. **Record it.** `npx tsx scripts/plan.ts project-ready <project id> --check
@@ -60,21 +65,22 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
    says why. Every brief after this one tells the session to run the command
    before it merges. When plan.ts cannot reach the database, send
    `update dev_projects set check_command = '<command>', set_up_at = now()
-   where user_id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685' and id = '<project id>'`
+   where user_id = :owner and id = '<project id>'`
    through `npx tsx scripts/sql.ts`.
 5. **Write up what only the person can supply** with `needs … --for <the
    step>`: push access the session was refused, a secret the checks need
    (name it and where it goes), or the GitHub App not installed on the
    repository. One setup step each, with the detail saying exactly where to
    go. When one of these stops the CLAUDE.md commit, the step waits on it
-   instead of closing.
+   instead of closing. Never write one asking the person to try, listen to
+   or check what a step built: put what is unverified in the closing note.
 6. **Close the step** with `done <n> --commit <sha>` naming the CLAUDE.md
    commit, or the head of the branch you read when it already had one, and a
    note saying what the check command is and what could not be settled.
 
 ## Setting up the routine
 
-1. On claude.ai, create a routine on knightx4/PersonalDashboard with the
+1. On claude.ai, create a routine on this repository with the
    **Supabase** connector attached. It needs no schedule of its own, and no
    project repository: each session adds the one its step names.
 2. Paste the prompt below as its instructions.
@@ -92,17 +98,17 @@ this repository.
 ## The prompt
 
 ```
-You build plan steps for the Dev projects of knightx4/PersonalDashboard: repositories other than this one, whose features and steps are rows in plan_items with module set to the project's id.
+You build plan steps for the Dev projects of this repository: repositories other than this one, whose features and steps are rows in plan_items with module set to the project's id.
 
 The turn after this one names the project's repository, the step and the file to follow. Read that file and follow it. Where this prompt and that file disagree, the file is right.
 
 Before anything else:
-1. Call add_repo for the repository the turn names, asking for push access.
-2. Clone it beside this checkout, not inside it.
+1. Find the repository the turn names. When it is one of this routine's repositories it is already checked out under /home/user/<repo>: use that checkout and skip to 4.
+2. Otherwise call add_repo for it, asking for push access, and clone it beside this checkout, not inside it.
 3. Call register_repo_root on the clone.
 4. Build there: the code, the commits, the checks and the merge to its main branch are that repository's. Its own plan skill, which the turn names, says how a step is built in it.
 
-If add_repo is refused, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "<the remedy, as one line>" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
+If the repository is not checked out and add_repo is refused or not among your tools, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "Add <owner/repo> to the Plan step builder routine" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
 
 Keep this checkout for the plan rows: claim, close, block and write run lines with npx tsx scripts/plan.ts here, which reads the database for every project. Never commit to this repository from a project's run.
 
@@ -114,8 +120,9 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 
 ## Environment (Claude Code on the web)
 
+- If this repository (knightx4/PersonalDashboard) is not checked out, clone it first.
 - If this checkout's node_modules is empty, run `npm ci` here first: scripts/plan.ts needs it.
-- scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to user_id d001bb0f-ffe8-4bfb-880f-17dd1a62b685; always filter by that id.
+- scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to the owner; always filter by `user_id = :owner`, which scripts/sql.ts fills in.
 - Use plain git fetch origin in each repository.
 
 ## Reporting

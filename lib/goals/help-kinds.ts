@@ -3,7 +3,7 @@
  *
  * Each goal names the help the weekly run should find for it, from a fixed
  * set, with a note on what to look for: the city goal asks for events and
- * volunteer openings, "Brooklyn, weeknights". Stored on the goal as
+ * volunteer openings, "Eastside, weeknights". Stored on the goal as
  * goals.items.help_kinds, a JSON array of { kind, note } in the order they
  * were chosen (supabase/migrations-goals/0019). The database refuses a kind
  * not listed here, a kind twice, and a note over HELP_NOTE_MAX, so the two
@@ -92,7 +92,7 @@ export function parseHelpKindFields(
   return { ok: true, value };
 }
 
-/** One line for the goal page: "Events (Brooklyn, weeknights), Reading". */
+/** One line for the goal page: "Events (Eastside, weeknights), Reading". */
 export function helpKindsLine(choices: HelpKindChoice[]): string {
   return choices
     .map(({ kind, note }) => (note ? `${HELP_KIND_LABELS[kind]} (${note})` : HELP_KIND_LABELS[kind]))

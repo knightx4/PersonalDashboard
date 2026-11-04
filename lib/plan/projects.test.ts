@@ -23,12 +23,12 @@ const ARCHIVED = { ...WEBSITE_FIXTURE, id: 'old-site', label: 'Old site', archiv
 /** The website's row as dev_projects holds it (migration 0282). */
 const WEBSITE_ROW = {
   id: 'website',
-  label: 'selveyknight.com',
+  label: 'alexrivera.dev',
   description: 'The personal website',
-  owner: 'knightx4',
-  repo: 'selveyknightwebsite',
+  owner: 'example-owner',
+  repo: 'alexrivera-site',
   branch: 'main',
-  url: 'https://selveyknight.com',
+  url: 'https://alexrivera.dev',
   skill: '.claude/skills/plan/SKILL.md',
   check_command: null,
   set_up_at: '2026-10-26T00:00:00Z',
@@ -51,32 +51,29 @@ describe('project rows', () => {
     ]);
   });
 
-  it('goes to the shared projects routine when the row names no variables', () => {
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+  it('goes to the projects dispatcher when the row names no variables', () => {
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
     const plain = projectFromRow({ ...WEBSITE_ROW, id: 'blog', routine_id_env: null, routine_token_env: null })!;
     expect(plain.routineEnv).toBeNull();
-    expect(projectRoutine(plain)).toEqual({ id: 'trig_projects', token: 'projects-token' });
+    expect(projectRoutine(plain)).toEqual({ id: 'projects-dispatcher', token: 'projects-dispatcher' });
   });
 
   it("prefers a project's own routine while its id is set, and falls back once it is not", () => {
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', 'trig_projects');
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', 'projects-token');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
     vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
     vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'site-token');
     expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'trig_site', token: 'site-token' });
     vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
-    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'trig_projects', token: 'projects-token' });
+    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'projects-dispatcher', token: 'projects-dispatcher' });
   });
 
-  it('never falls back to the plan routine or the shared token', () => {
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_ID', '');
-    vi.stubEnv('CLAUDE_PROJECTS_ROUTINE_TOKEN', '');
+  it('never sends a project to the plan routine, which builds in this repository', () => {
     vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_plan');
-    vi.stubEnv('CLAUDE_FEATURE_ROUTINE_ID', 'trig_feature');
-    vi.stubEnv('CLAUDE_API_KEY', 'shared');
-    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: null, token: null });
+    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'plan-token');
+    expect(projectRoutine(WEBSITE_FIXTURE).id).toBe('projects-dispatcher');
   });
 });
 
@@ -166,7 +163,7 @@ describe('plan scopes', () => {
   });
 
   it('labels a project by its row and a workspace by its name', () => {
-    expect(planScopeLabel('website', PROJECT_FIXTURES)).toBe('selveyknight.com');
+    expect(planScopeLabel('website', PROJECT_FIXTURES)).toBe('alexrivera.dev');
     expect(planScopeLabel('website', [])).toBe('website');
     expect(planScopeLabel('jobs', [])).toBe('Job search');
     expect(planScopeLabel(null, [])).toBe('The app as a whole');
@@ -185,8 +182,8 @@ describe('plan scopes', () => {
 
   it('builds the website in its own repository', () => {
     expect(projectById(PROJECT_FIXTURES, 'website')?.repo).toEqual({
-      owner: 'knightx4',
-      repo: 'selveyknightwebsite',
+      owner: 'example-owner',
+      repo: 'alexrivera-site',
       branch: 'main',
     });
   });

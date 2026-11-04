@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
 import { cn } from '@/lib/cn';
-import type { Tab } from '@/lib/tabs';
+import type { Tab, TabAddress } from '@/lib/tabs';
 
 /**
  * The tabbed detail pattern (docs/UI-QUALITY-SPEC.md, Part 4): one thing's
@@ -49,9 +49,11 @@ export function TabbedDetail({
   detailCount,
   properties,
   tabs,
+  address,
   label,
   children,
   className,
+  titleSize = 'title',
 }: {
   /** What the page is about and the path down to it, as PageHeader takes it. */
   subject: Subject;
@@ -85,11 +87,19 @@ export function TabbedDetail({
   /** The facts, as `PropertyList` holding `Property`s; the rest of them when `glance` is given. */
   properties: React.ReactNode;
   tabs: readonly Tab[];
+  /** How the page keeps its tab in the address, such as the ids its tabs used to go by. */
+  address?: TabAddress;
   /** Names the row of tabs for a screen reader, such as "Feature". */
   label: string;
   /** The open tab's content, and only that tab's. */
   children: React.ReactNode;
   className?: string;
+  /**
+   * How large the title is set. `headline` is the goal page's, 24px bold on a
+   * phone and 28px from laptop width, as its approved mockup has it (plan
+   * #2778.11); every other page keeps the title step.
+   */
+  titleSize?: 'title' | 'headline';
 }) {
   return (
     <DetailLayout
@@ -127,7 +137,12 @@ export function TabbedDetail({
                 {lead && (
                   <div className="-mx-1.5 flex shrink-0 items-center self-center">{lead}</div>
                 )}
-                <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+                <h1
+                  className={cn(
+                    'min-w-0 flex-1 font-display tracking-tight text-ink [overflow-wrap:anywhere]',
+                    titleSize === 'headline' ? 'text-headline font-bold sm:text-headline-lg' : 'text-title',
+                  )}
+                >
                   {title}
                 </h1>
                 {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -154,7 +169,7 @@ export function TabbedDetail({
         )
       }
     >
-      <Tabs tabs={tabs} label={label} className="mb-5" />
+      <Tabs tabs={tabs} address={address} label={label} className="mb-5" />
       {children}
     </DetailLayout>
   );

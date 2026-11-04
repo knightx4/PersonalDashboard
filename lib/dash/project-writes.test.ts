@@ -13,8 +13,8 @@ const ME = '00000000-0000-4000-8000-0000000000aa';
 const tool = PROJECT_WRITE_TOOLS.find((t) => t.name === 'add_project')!;
 
 const REPOS = [
-  { name: 'recipes', owner: { login: 'knightx4' }, pushed_at: '2026-10-20T00:00:00Z', default_branch: 'main' },
-  { name: 'pointtracker', owner: { login: 'knightx4' }, pushed_at: '2026-01-13T00:00:00Z' },
+  { name: 'recipes', owner: { login: 'example-owner' }, pushed_at: '2026-10-20T00:00:00Z', default_branch: 'main' },
+  { name: 'pointtracker', owner: { login: 'example-owner' }, pushed_at: '2026-01-13T00:00:00Z' },
 ];
 
 let tables: FakeTables;
@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', async (url: string | URL) => {
     const path = String(url).replace('https://api.github.com', '');
     if (path.startsWith('/user/repos')) return new Response(JSON.stringify(REPOS));
-    const one = REPOS.find((repo) => path === `/repos/knightx4/${repo.name}`);
+    const one = REPOS.find((repo) => path === `/repos/example-owner/${repo.name}`);
     return one ? new Response(JSON.stringify(one)) : new Response('{}', { status: 404 });
   });
 });
@@ -44,7 +44,7 @@ describe('add_project', () => {
     const result = await tool.apply(ctx(), { repository: 'recipes' });
     expect(result).toMatchObject({ ok: true, kind: 'add_project', op: 'insert', subjectRef: 'public.dev_projects:recipes' });
     expect(tables['public.dev_projects']).toEqual([
-      expect.objectContaining({ id: 'recipes', user_id: ME, owner: 'knightx4', repo: 'recipes' }),
+      expect.objectContaining({ id: 'recipes', user_id: ME, owner: 'example-owner', repo: 'recipes' }),
     ]);
   });
 
@@ -54,7 +54,7 @@ describe('add_project', () => {
     if (result.ok) expect(result.summary).toMatch(/under Set up/);
     expect(tables['public.plan_items'].map((row) => row.title)).toEqual([
       'Set up',
-      'Make knightx4/recipes ready for Dash to build in',
+      'Make example-owner/recipes ready for Dash to build in',
     ]);
   });
 
@@ -66,10 +66,37 @@ describe('add_project', () => {
 
   it('puts back an archived project as an update', async () => {
     tables['public.dev_projects'] = [
-      { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
+      { id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
     ];
-    const result = await tool.apply(ctx(), { repository: 'knightx4/recipes' });
+    const result = await tool.apply(ctx(), { repository: 'example-owner/recipes' });
     expect(result).toMatchObject({ ok: true, op: 'update' });
     expect(tables['public.dev_projects'][0].archived_at).toBeNull();
+  });
+});
+
+describe('add_plan_step', () => {
+  const step = PROJECT_WRITE_TOOLS.find((t) => t.name === 'add_plan_step')!;
+
+  it('writes a proposed step at the top of the named workspace', async () => {
+    tables['public.plan_items'] = [];
+    const result = await step.apply(ctx(), { title: 'Move the Overnight panel to Home', detail: 'It runs all day now; rename it.', module: 'dev' });
+    expect(result).toMatchObject({ ok: true, kind: 'add_plan_step', op: 'insert' });
+    expect(tables['public.plan_items']).toEqual([
+      expect.objectContaining({ user_id: ME, title: 'Move the Overnight panel to Home', status: 'proposed', module: 'dev', parent_id: null }),
+    ]);
+  });
+
+  it('refuses an unknown workspace and a missing title, writing nothing', async () => {
+    tables['public.plan_items'] = [];
+    expect((await step.apply(ctx(), { title: 'x', module: 'cooking' })).ok).toBe(false);
+    expect((await step.apply(ctx(), { title: ' ' })).ok).toBe(false);
+    expect(tables['public.plan_items']).toEqual([]);
+  });
+
+  it('hangs under a numbered step and takes its workspace', async () => {
+    tables['public.plan_items'] = [{ id: 'p1', user_id: ME, number: 2483, module: 'jobs', position: 10 }];
+    await step.apply(ctx(), { title: 'Child', under: '#2483' });
+    const child = tables['public.plan_items'].find((row) => row.title === 'Child');
+    expect(child).toMatchObject({ parent_id: 'p1', module: 'jobs', status: 'proposed' });
   });
 });

@@ -135,6 +135,8 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
       'jobs-pipeline-focus',
       'jobs-pipeline-table',
       'jobs-pipeline-column-menu',
+      'jobs-pipeline-views',
+      'jobs-pipeline-display',
       'jobs-pipeline-dense',
       'jobs-roles-table',
       'jobs-pipeline-filtered',

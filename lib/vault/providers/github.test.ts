@@ -7,7 +7,7 @@ import {
   VaultSourceError,
 } from '@/lib/vault/providers/types';
 
-const config = { owner: 'knightx4', repo: 'vault', branch: 'main', token: 'ghp_test' };
+const config = { owner: 'example-owner', repo: 'vault', branch: 'main', token: 'ghp_test' };
 
 type StubResponse = { status?: number; body?: unknown; text?: string; headers?: Record<string, string> };
 
@@ -375,7 +375,7 @@ describe('writeNote', () => {
     expect(result).toEqual({ blobSha: 'new-blob', commitSha: 'new-commit' });
     expect(sent).toHaveLength(1);
     expect(sent[0].method).toBe('PUT');
-    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Daily/Caf%C3%A9%20notes.md');
+    expect(sent[0].url).toBe('https://api.github.com/repos/example-owner/vault/contents/Daily/Caf%C3%A9%20notes.md');
     expect(sent[0].body).toEqual({
       message: 'Edit Café notes from Dash',
       content: Buffer.from('Hello — world\n', 'utf8').toString('base64'),
@@ -390,7 +390,7 @@ describe('writeNote', () => {
     const source = new GithubVaultSource({ ...config, subpath: '/Vault/' });
     await source.writeNote('Ideas.md', 'x', 'old', 'Edit Ideas from Dash');
 
-    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Vault/Ideas.md');
+    expect(sent[0].url).toBe('https://api.github.com/repos/example-owner/vault/contents/Vault/Ideas.md');
   });
 
   it.each([409, 422])('raises VaultConflictError when the SHA is stale (%i)', async (status) => {
@@ -435,7 +435,7 @@ describe('writeNote', () => {
 
     expect(result).toEqual({ blobSha: 'blob-1', commitSha: 'commit-1' });
     expect(sent[0].method).toBe('PUT');
-    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Vault/Inbox/Idea.md');
+    expect(sent[0].url).toBe('https://api.github.com/repos/example-owner/vault/contents/Vault/Inbox/Idea.md');
     expect(sent[0].body).not.toHaveProperty('sha');
 
     stubWrite({ status: 422, body: { message: '"sha" wasn\'t supplied.' } });
@@ -483,7 +483,7 @@ describe('canWrite', () => {
     expect(await new GithubVaultSource(config).canWrite()).toBe(true);
     expect(sent).toEqual([
       {
-        url: 'https://api.github.com/repos/knightx4/vault/git/refs',
+        url: 'https://api.github.com/repos/example-owner/vault/git/refs',
         method: 'POST',
         body: { ref: 'refs/heads/dash-write-check', sha: '0'.repeat(40) },
       },

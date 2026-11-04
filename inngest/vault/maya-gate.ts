@@ -9,6 +9,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { MAYA_GATE_QUESTION, mayaGateState, type GateOutcome } from '@/lib/vault/maya/gate';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import {
   runMayaGateFor,
   type GateCandidate,
@@ -111,6 +112,8 @@ export function mayaGatePorts(vault: VaultSupabaseClient, started = Date.now()):
 
     jevEnabled: (userId) => jevEnabledFor(core, userId),
 
+    rules: (userId) => loadVaultRules(vault, userId),
+
     async ask(userId, note) {
       const spend: SpendReport[] = [];
       const result = await askJev({
@@ -134,12 +137,13 @@ export function mayaGatePorts(vault: VaultSupabaseClient, started = Date.now()):
       return count ?? 0;
     },
 
-    async think(userId, note) {
+    async think(userId, note, rules) {
       const spend: SpendReport[] = [];
       const written = await writeThought({
         vault,
         userId,
         noteId: note.id,
+        rules,
         anthropicApiKey,
         onSpend: (report) => spend.push(report),
       });

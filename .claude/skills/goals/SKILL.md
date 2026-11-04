@@ -35,9 +35,14 @@ every read and write to the `user_id` in the brief.
 The skills fired this way so far:
 
 - `company-research`: research on one company, into `job_search.company_research`.
+- `dash-questions`: up to five new questions about the person for the Answer
+  tab of You, into `you.dash_questions` under the `you.dash_question_runs` row
+  the brief names (`dashQuestionsBrief` in `lib/you/dash-questions-run.ts`).
 - `insights`: three to five deep insights about the person for the Insights
   tab of You, into `you.insights` under the `you.insight_runs` row the brief
   names (`insightsBrief` in `lib/you/insights.ts`).
+- `learn-drafts`: the Learn topics waiting to be drafted, into `learn.topics`
+  through `npm run learn:drafts` (`learn.topic_draft_requests`, learn 0193).
 
 ## How you read and write
 
@@ -85,7 +90,7 @@ select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'close_st
 
 When the step you close is a Dash step, its text opens with one plain
 sentence of what Dash did or found, such as "Found three Saturday volunteer
-sessions in Brooklyn, and the earliest is on 4 November." The notification
+sessions in Springfield, and the earliest is on 4 November." The notification
 shows that sentence with the step's title (`reference/working-steps.md`,
 step 3).
 
@@ -263,13 +268,15 @@ for it before your first write:
 
 | Job | Read |
 |---|---|
-| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`. An errand also needs `working-steps.md`. |
+| `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`, `dashboards.md`. An errand also needs `working-steps.md`. |
+| `goal` with a `question` on its run row (a question handed from a chat) | `question.md`, `pulling-in.md`, `deciding.md`, `files.md`, `working-steps.md` ("Files") |
 | `goal` with a comment in the brief | `requests.md` ("Replying to a comment"), then whatever the comment asks for: `working-steps.md` for work you do, `records.md` for facts to file |
 | `area` | `pulling-in.md`, `area.md`, `deciding.md` |
 | `reshape` | `reshape.md`, `deciding.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps", and "Moving a step that has sat for a week" for a drop on the person's answer), `step-states.md` |
 | `step`, `phase` | `requests.md`, `working-steps.md`, `deciding.md` |
 | `prepare` | `prep.md`, `working-steps.md` (for files and for Jobs) |
-| `daily` | `morning.md`, `tending.md`, `prep.md`, `working-steps.md`, `records.md`, `deciding.md`, `step-states.md` |
+| `daily` | `morning.md`, `tending.md`, `prep.md`, `working-steps.md`, `records.md`, `deciding.md`, `step-states.md`, and `dashboards.md` when the brief lists goals with no dashboard |
+| `goal` whose brief asks for the dashboard | `dashboards.md` |
 | `weekly` | `weekly.md`, `working-steps.md` ("Files") |
 | `raise` | nothing more: "Flagging something on a goal" is below, with "What you may change" |
 
@@ -279,7 +286,7 @@ not in this file, find it here and read it:
 | Section | File |
 |---|---|
 | Pulling in from the other modules (Where to look, How to search, Search by meaning from a row you found, What is already on the goal, Writing what you found, Using it, Something the catalogue does not list) | `reference/pulling-in.md` |
-| Mapping a goal (Blind spots, Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
+| Mapping a goal (Blind spots, Stages and sub-steps, Information steps, Lists the goal needs, Weekly help, The dashboard, A goal that is several goals, Titles, the worked shape, An errand) | `reference/mapping.md` |
 | Filing a document you were given, Pre-filling from Gmail, Answers on an information step | `reference/records.md` |
 | Decide first, ask last; Questions; Provisional steps | `reference/deciding.md` |
 | Planning an area (Reading the area, What to propose, Afterwards) | `reference/area.md` |
@@ -292,6 +299,8 @@ not in this file, find it here and read it:
 | A step of yours to prepare, A Dash step before yours | `reference/prep.md` |
 | The weekly run, Researching the help each goal asks for, Suggesting steps, The week's notes | `reference/weekly.md` |
 | What goes in a file | `reference/files.md` |
+| A question handed to a goal | `reference/question.md` |
+| Laying out a goal's dashboard (The rule, The tiles, Templates by kind of goal) | `reference/dashboards.md` |
 | The catalogue of sources | `reference/sources.md` |
 
 Read a whole file when you need one section of it: the sections in a file
@@ -305,7 +314,7 @@ may not change the person's own steps, or turn a proposal into a live step.
 Approving is the person's move, on the goal's page; it opens everything you
 proposed under the goal at once.
 
-**After it is approved:** add steps as `open`, split one into sub-steps, move a step under another step of the
+**After it is approved:** add steps as `open`, split one into sub-steps when the person asks you to break it down (never on your own), move a step under another step of the
 same goal, reorder by `position`, point a step at a collection, make a step
 wait on another, block a step on the person (see "Blocked and waiting
 steps"), merge two steps that ask for the same thing (see "Merging
@@ -358,8 +367,8 @@ set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
 insert into goals.items (user_id, level, parent_id, kind, title, acceptance, acts, status, position)
 values ('<user>', 'step', '<parent id>', 'claude', 'Send the hardship request',
-        'The request is in Nelnet''s inbox and the sent email is linked here.',
-        'Sends the hardship request drafted above to help@nelnet.net from your Gmail.',
+        'The request is in Northstar''s inbox and the sent email is linked here.',
+        'Sends the hardship request drafted above to help@northstar.example from your Gmail.',
         'proposed', 40);
 ```
 
@@ -399,7 +408,7 @@ no history trigger here, so no actor or run settings are needed.
 ```sql
 insert into public.raised_items (user_id, module, goal_id, title, detail, ask, source)
 values ('<user>', 'goals', '<goal id>',
-        '<what happened, in one line: Nelnet moved your due date to the 28th>',
+        '<what happened, in one line: Northstar moved your due date to the 28th>',
         '<where you saw it and what it changes: the September statement; autopay still runs on the 15th>',
         '<what you want from them, if anything: Move autopay to the 28th?>',
         'goals run <run id>')
@@ -439,7 +448,7 @@ for the home, with no `item_id`, covering every goal.
 600. Write it for someone glancing at the top of the page:
 
 - Where the goal stands against its done-when, with the figure when there is
-  one ("Balance is $18,250, down $1,400 this month").
+  one ("Balance is $9,400, down $700 this month").
 - What changed since the last note: what you did, what they did, what came in.
   Link a file you wrote or revised.
 - What is waiting on them, most important first, by name ("Answer *Which lane

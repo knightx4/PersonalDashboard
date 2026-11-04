@@ -258,7 +258,7 @@ cross join (values
     'Does this keep your word and your reputation intact under pressure?',
     'Duty, restraint, character, and knowing when to step back.')
 ) as a (key, name, kind, question, focus)
-where u.id = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685'
+where u.id = core.dev_owner_id()
 on conflict (user_id, key) do nothing;
 
 notify pgrst, 'reload schema';

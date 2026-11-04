@@ -1,7 +1,8 @@
 'use client';
 
 import { useId, useState, useTransition } from 'react';
-import { X } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { CardSection } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
@@ -19,6 +20,7 @@ import {
   findFollowUp,
   redraftFollowUp,
   removeFollowUpPerson,
+  saveFollowUpChannel,
   saveFollowUpNote,
   writeOwnFollowUp,
 } from './actions';
@@ -34,6 +36,9 @@ const CHANNEL_WORDS: Record<string, string> = {
   event: 'In person',
   other: 'Message',
 };
+
+/** The ways a note can go, in the order the picker offers them: a LinkedIn message first. */
+const NOTE_CHANNELS = ['linkedin_dm', 'email', 'linkedin_connect', 'intro', 'event', 'other'] as const;
 
 export type CompanyContact = { id: string; name: string; title: string | null };
 
@@ -55,8 +60,11 @@ export function FollowUpCard({
   contacts = [],
   timezone,
   heading = 'People to reach out to',
+  channelMenuOpen = false,
 }: {
   initial: FollowUp;
+  /** For the gallery: the first note's channel menu drawn open. */
+  channelMenuOpen?: boolean;
   /** The person's contacts at the company, to link one by hand. */
   contacts?: readonly CompanyContact[];
   timezone: string;
@@ -123,6 +131,7 @@ export function FollowUpCard({
                   onRun={(kind, call) => run(kind, call)}
                   onPatch={(patch) => patchPerson(person.contactId, patch)}
                   onError={setError}
+                  channelMenuOpen={channelMenuOpen && person === followUp.people.find((p) => p.draft)}
                 />
               </li>
             ))}
@@ -232,6 +241,7 @@ function PersonBlock({
   onRun,
   onPatch,
   onError,
+  channelMenuOpen,
 }: {
   person: OutreachPerson;
   applicationId: string;
@@ -242,6 +252,7 @@ function PersonBlock({
   onRun: (kind: string, call: () => Promise<Result>) => void;
   onPatch: (patch: Partial<OutreachPerson>) => void;
   onError: (text: string | null) => void;
+  channelMenuOpen: boolean;
 }) {
   const draft = person.draft;
   // Keyed on the note by the list, so a fresh draft from the server (Write it
@@ -250,6 +261,18 @@ function PersonBlock({
   const [, startTransition] = useTransition();
   const key = (kind: string) => `${kind}:${person.contactId}`;
   const reach = person.linkedinUrl ?? linkedinSearchUrl(`${person.name} ${company}`);
+
+  function changeChannel(channel: string) {
+    if (!draft) return;
+    const before = draft.channel;
+    onError(null);
+    onPatch({ draft: { ...draft, channel } });
+    void saveFollowUpChannel(draft.id, channel).then((result) => {
+      if (!result.error) return;
+      onPatch({ draft: { ...draft, channel: before } });
+      onError(`Not changed: ${result.error}`);
+    });
+  }
 
   function markSent() {
     if (!draft) return;
@@ -306,8 +329,32 @@ function PersonBlock({
 
       {draft && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-small text-ink-muted">{CHANNEL_WORDS[draft.channel] ?? 'Message'}, not sent yet</span>
+          <div className="flex items-center justify-between gap-3">
+            {/* How it goes is yours to pick (note a790ab92); Dash starts it as a LinkedIn message. */}
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1 text-small text-ink-muted">
+              <ActionMenu
+                label={`How the note to ${person.name} goes`}
+                align="start"
+                defaultOpen={channelMenuOpen}
+                triggerClassName="-ml-1.5 h-auto w-auto gap-1 px-1.5 py-0.5 text-small text-ink-muted"
+                trigger={
+                  <>
+                    <span>{CHANNEL_WORDS[draft.channel] ?? 'Message'}</span>
+                    <ChevronDown className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+                  </>
+                }
+                items={NOTE_CHANNELS.map((channel) => ({
+                  id: channel,
+                  label: CHANNEL_WORDS[channel],
+                  current: channel === draft.channel,
+                  disabled: busy,
+                  onSelect: () => {
+                    if (channel !== draft.channel) changeChannel(channel);
+                  },
+                }))}
+              />
+              <span>not sent yet</span>
+            </span>
             <CopyText text={text} what="note" />
           </div>
           <Textarea

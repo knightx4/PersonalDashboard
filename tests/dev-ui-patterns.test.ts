@@ -31,7 +31,7 @@ const entries = list
   }));
 
 describe('the page patterns on /dev/ui', () => {
-  it('holds the seven from the spec', () => {
+  it('holds the eight from the spec', () => {
     expect(entries.map((e) => e.name)).toEqual([
       'list and detail',
       'deck',
@@ -40,6 +40,7 @@ describe('the page patterns on /dev/ui', () => {
       'main plus rail',
       'tabbed sections',
       'conversation',
+      'messaging',
     ]);
   });
 

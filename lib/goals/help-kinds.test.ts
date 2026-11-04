@@ -43,14 +43,14 @@ describe('the city goal', () => {
   const city = form([
     ['goalId', GOAL_ID],
     ['kind', 'events'],
-    ['note:events', 'Brooklyn, weeknights'],
+    ['note:events', 'Eastside, weeknights'],
     ['kind', 'volunteering'],
-    ['note:volunteering', ' Brooklyn, weeknights '],
+    ['note:volunteering', ' Eastside, weeknights '],
     // A note beside a kind left unticked is not saved.
     ['note:reading', 'Anything'],
   ]);
 
-  it('can be set to events and volunteer openings with the note "Brooklyn, weeknights"', async () => {
+  it('can be set to events and volunteer openings with the note "Eastside, weeknights"', async () => {
     writes.length = 0;
     goalLive = true;
     const state = await setHelpKindsAction({}, city);
@@ -60,8 +60,8 @@ describe('the city goal', () => {
       {
         goalId: GOAL_ID,
         choices: [
-          { kind: 'events', note: 'Brooklyn, weeknights' },
-          { kind: 'volunteering', note: 'Brooklyn, weeknights' },
+          { kind: 'events', note: 'Eastside, weeknights' },
+          { kind: 'volunteering', note: 'Eastside, weeknights' },
         ],
       },
     ]);
@@ -73,7 +73,7 @@ describe('the city goal', () => {
     if (!parsed.ok) return;
     expect(readHelpKinds(JSON.parse(JSON.stringify(parsed.value)))).toEqual(parsed.value);
     expect(helpKindsLine(parsed.value)).toBe(
-      'Events (Brooklyn, weeknights), Volunteer openings (Brooklyn, weeknights)',
+      'Events (Eastside, weeknights), Volunteer openings (Eastside, weeknights)',
     );
   });
 });
@@ -115,14 +115,14 @@ describe('readHelpKinds', () => {
   it('skips what it does not know and keeps the first of a repeated kind', () => {
     expect(
       readHelpKinds([
-        { kind: 'events', note: 'Brooklyn' },
-        { kind: 'events', note: 'Queens' },
+        { kind: 'events', note: 'Eastside' },
+        { kind: 'events', note: 'Westside' },
         { kind: 'parties' },
         'reading',
         { kind: 'reading', note: '  ' },
       ]),
     ).toEqual([
-      { kind: 'events', note: 'Brooklyn' },
+      { kind: 'events', note: 'Eastside' },
       { kind: 'reading', note: null },
     ]);
     expect(readHelpKinds(null)).toEqual([]);

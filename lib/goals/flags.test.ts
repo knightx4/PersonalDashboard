@@ -25,7 +25,7 @@ const FLAG = '22222222-2222-2222-2222-222222222222';
 const flag = (over: Partial<GoalFlag> = {}): GoalFlag => ({
   id: FLAG,
   goalId: GOAL,
-  title: 'Nelnet moved your due date to the 28th',
+  title: 'Northstar moved your due date to the 28th',
   detail: 'The September statement shows the new date. Autopay still runs on the 15th.',
   ask: null,
   status: 'open',
@@ -41,7 +41,7 @@ describe('flags under Waiting on you', () => {
       {
         kind: 'flag',
         id: FLAG,
-        title: 'Nelnet moved your due date to the 28th',
+        title: 'Northstar moved your due date to the 28th',
         goalId: GOAL,
         goalTitle: 'Pay off student debt',
       },
@@ -75,7 +75,7 @@ describe('the brief an answer starts', () => {
       answer: 'Yes, move it and tell me when it is done.',
     });
     expect(text).toContain('Work on one goal: "Pay off student debt"');
-    expect(text).toContain('Nelnet moved your due date to the 28th');
+    expect(text).toContain('Northstar moved your due date to the 28th');
     expect(text).toContain('Asked: Move autopay to the 28th?');
     expect(text).toContain('Found it on the statement.');
     expect(text).toContain('## Their answer\n\nYes, move it and tell me when it is done.');
@@ -131,7 +131,7 @@ const goalsClient = {
 const stored = {
   id: FLAG,
   goal_id: GOAL,
-  title: 'Nelnet moved your due date to the 28th',
+  title: 'Northstar moved your due date to the 28th',
   detail: null,
   ask: null,
   status: 'open',

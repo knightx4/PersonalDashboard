@@ -6,6 +6,7 @@ import { MODELS } from '@/lib/core/models';
 import { IPIP_ITEM_COUNT } from '@/lib/you/personality/ipip';
 import type { BigFiveResult, PersonalityRead, TypedResult } from '@/lib/you/personality/model';
 import type { TraitThemes } from '@/lib/you/personality/trait-themes';
+import type { PersonalityProfile } from '@/lib/you/personality/profile';
 
 /**
  * The Big Five test (plan #1632) in the surface gallery: the list with the
@@ -62,6 +63,8 @@ const TYPED: TypedResult[] = [
     kind: 'mbti',
     testName: 'Myers-Briggs',
     typedValue: 'INTJ',
+    typeScores: null,
+    themes: null,
     takenAt: '2024-03-14',
     createdAt: '2026-10-07T18:30:00Z',
     note: 'From the official assessment at work. I came out as INTP the first time, years ago.',
@@ -73,6 +76,8 @@ const TYPED: TypedResult[] = [
     kind: 'enneagram',
     testName: 'Enneagram',
     typedValue: '5w4',
+    typeScores: [64, 60, 82, 35, 100, 18, 98, 45, 99],
+    themes: null,
     takenAt: '2025-11-02',
     createdAt: '2026-10-07T18:31:00Z',
     note: null,
@@ -84,11 +89,45 @@ const TYPED: TypedResult[] = [
     kind: 'other',
     testName: 'CliftonStrengths, the full thirty-four themes report from the team offsite',
     typedValue: 'Learner, Intellection, Strategic, Input, Achiever',
+    typeScores: null,
+    themes: [
+      {
+        name: 'Learner',
+        domain: 'Strategic Thinking',
+        summary: 'You have a great desire to learn and want to continuously improve.',
+        score: null,
+        insights: ['You study everything involved in a situation before you act on it.'],
+        blindSpots: ['Learning for its own sake can pull time from what your goals need.'],
+        actions: ['Give each new subject a reason tied to a goal.'],
+      },
+      { name: 'Intellection', domain: 'Strategic Thinking', summary: 'You enjoy deep thinking.', score: null, insights: [], blindSpots: [], actions: [] },
+      { name: 'Strategic', domain: 'Strategic Thinking', summary: null, score: null, insights: [], blindSpots: [], actions: [] },
+      { name: 'Input', domain: 'Strategic Thinking', summary: null, score: null, insights: [], blindSpots: [], actions: [] },
+      { name: 'Achiever', domain: 'Executing', summary: null, score: null, insights: [], blindSpots: [], actions: [] },
+    ],
     takenAt: '2019-06-21',
     createdAt: '2026-10-07T18:32:00Z',
     note: null,
     read: null,
     readFailedAt: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000014',
+    kind: 'other',
+    testName: 'DISC',
+    typedValue: 'Support',
+    takenAt: '2026-10-01',
+    createdAt: '2026-10-07T18:33:00Z',
+    note: null,
+    read: null,
+    readFailedAt: null,
+    typeScores: null,
+    themes: [
+      { name: 'Support', domain: null, summary: 'Is helpful and shows care for others.', score: 96, insights: [], blindSpots: [], actions: [] },
+      { name: 'Influence', domain: null, summary: 'Engages others and shares enthusiasm.', score: 78, insights: [], blindSpots: [], actions: [] },
+      { name: 'Clarity', domain: null, summary: 'Works steadily within systems.', score: 76, insights: [], blindSpots: [], actions: [] },
+      { name: 'Drive', domain: null, summary: 'Takes charge to get things done.', score: 56, insights: [], blindSpots: [], actions: [] },
+    ],
   },
 ];
 
@@ -138,7 +177,7 @@ const THEMES: TraitThemes = {
   ],
   agreeableness: [
     { id: '00000000-0000-4000-8000-000000000104', name: 'Friendship' },
-    { id: '00000000-0000-4000-8000-000000000105', name: 'Helping my brother through his first year at university' },
+    { id: '00000000-0000-4000-8000-000000000105', name: 'Volunteering at the Springfield food bank' },
     { id: '00000000-0000-4000-8000-000000000106', name: 'Trust' },
   ],
   conscientiousness: [
@@ -146,7 +185,7 @@ const THEMES: TraitThemes = {
     { id: '00000000-0000-4000-8000-000000000108', name: 'Weekly review' },
   ],
   emotional_stability: [
-    { id: '00000000-0000-4000-8000-000000000109', name: 'Anxiety' },
+    { id: '00000000-0000-4000-8000-000000000109', name: 'Stress before deadlines' },
     { id: '00000000-0000-4000-8000-000000000110', name: 'Stoicism' },
     { id: '00000000-0000-4000-8000-000000000111', name: 'Sleep' },
   ],
@@ -184,7 +223,7 @@ const READ: PersonalityRead = {
       note: {
         id: '00000000-0000-4000-8000-000000000201',
         title: 'On socialising and conversation',
-        path: 'Me/On socialising and conversation.md',
+        path: 'Journal/On socialising and conversation.md',
       },
     },
     {
@@ -193,17 +232,17 @@ const READ: PersonalityRead = {
       note: {
         id: '00000000-0000-4000-8000-000000000202',
         title: 'Notes to self',
-        path: 'Me/Notes to self.md',
+        path: 'Journal/Notes to self.md',
       },
     },
     {
       stance: 'agrees',
-      text: 'Intellect is your highest trait, and the note opens with reading philosophy late at night and keeping three books going at once.',
-      note: { id: '00000000-0000-4000-8000-000000000203', title: 'About me', path: 'Me/About me.md' },
+      text: 'Intellect is your highest trait, and the note opens with keeping three books going at once and a new subject every month.',
+      note: { id: '00000000-0000-4000-8000-000000000203', title: 'Reading list', path: 'Reading/Reading list.md' },
     },
     {
       stance: 'agrees',
-      text: 'Low Emotional stability matches what you wrote about lying awake replaying a conversation and rehearsing what you should have said.',
+      text: 'Low Emotional stability matches what you wrote about checking a finished report three times the night before it is due.',
       note: {
         id: '00000000-0000-4000-8000-000000000204',
         title: 'Why I keep a list of the books I will probably never finish, and why that is fine',
@@ -235,6 +274,45 @@ const TYPED_READ: TypedResult[] = [
   TYPED[1]!,
 ];
 
+/* Dash's analysis across the tests, at the top of the tab. */
+
+const PROFILE: PersonalityProfile = {
+  id: '00000000-0000-4000-8000-000000000301',
+  resultsKey: 'stale',
+  summary:
+    'Your tests agree that you think before you act and get your energy from ideas more than people. Where they split is how you treat people: the type tests call you detached, while DISC and your Agreeableness put care for others near the top, and your notes side with the second.',
+  agreements: [
+    {
+      text: 'Ideas come first for you: Intellect is your highest Big Five trait at 90, and Learner and Intellection lead your strengths.',
+      tests: ['Big Five', 'CliftonStrengths', 'Enneagram'],
+    },
+    {
+      text: 'You recharge alone. Extraversion is 23, and Myers-Briggs and the Enneagram both put you on the inward side.',
+      tests: ['Big Five', 'Myers-Briggs', 'Enneagram'],
+    },
+  ],
+  tensions: [
+    {
+      text: 'Myers-Briggs calls you a thinking type who keeps feelings out of decisions; DISC puts Support at 96 and your Agreeableness is 70.',
+      tests: ['Myers-Briggs', 'DISC', 'Big Five'],
+      verdict: 'Your note on the food bank says helping is what makes a week feel worth it, which sides with Support.',
+      note: {
+        id: '00000000-0000-4000-8000-000000000105',
+        title: 'Volunteering at the Springfield food bank',
+        path: 'Journal/Volunteering at the Springfield food bank.md',
+      },
+    },
+  ],
+  watch: [
+    {
+      text: 'Input and Learner warn of gathering more than you use. Your reading list bears it out.',
+      evidence: 'Learn readings: 15 saved and not started, 3 finished.',
+    },
+  ],
+  model: MODELS.youPersonalityProfile,
+  createdAt: '2026-10-07T18:45:00Z',
+};
+
 /** The Personality tab's header, as app/you/personality/page.tsx draws it. */
 function TabHeader() {
   return <PageHeader title="Personality" description="Your results from each test, side by side." />;
@@ -249,6 +327,7 @@ export function YouPersonalitySurface() {
         earlier={EARLIER}
         typed={TYPED_READ}
         themes={THEMES}
+        profile={{ profile: PROFILE, state: 'changed' }}
         now={NOW}
       />
     </>
@@ -275,7 +354,7 @@ export function YouPersonalityEmptySurface() {
   return (
     <>
       <TabHeader />
-      <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} now={NOW} />
+      <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} profile={{ profile: null, state: 'none' }} now={NOW} />
     </>
   );
 }

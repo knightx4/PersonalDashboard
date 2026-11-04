@@ -29,9 +29,9 @@ Before each step, report it on the run row with `now_on` the step's title
    The first sentence is what the goal page shows under "What Dash found",
    so make it the takeaway, naming the place or date it turns on. Write every
    place as a markdown link with its full address
-   (`[transalt.org/volunteer](https://transalt.org/volunteer)`), not a bare
-   name, and put the one the person should open first before any other: the
-   page puts that link beside the finding.
+   (`[springfieldstreets.org/volunteer](https://springfieldstreets.org/volunteer)`),
+   not a bare name, and put the one the person should open first before any
+   other: the page puts that link beside the finding.
 3. File it. Whatever the step produced by writing, a list, a draft, a
    note, a comparison or a plan, is a **file** under the goal ("Files"),
    at any length: `goals.file_result` writes it, links it from the step and
@@ -57,7 +57,7 @@ Before each step, report it on the run row with `now_on` the step's title
    step's title, so it has to make sense alone: plain words, past tense, one
    sentence under 140 characters, the finding itself and not "Done" or "See
    the file". Anything longer follows it. For example: "Found three
-   Saturday volunteer sessions in Brooklyn, and the earliest is on 4
+   Saturday volunteer sessions in Springfield, and the earliest is on 4
    November." Then the two or three sentences and the link.
 
    ```sql
@@ -87,12 +87,14 @@ Before each step, report it on the run row with `now_on` the step's title
    and its own first move, so the person can switch by editing the step
    rather than reading the result again:
 
+   For a person in Springfield, an invented city, with invented groups:
+
    ```
-   Decided: Transportation Alternatives first, because it is one 30-minute session with a fixed date.
-   Join the Volunteer Info Session on Zoom: [transalt.org/volunteer](https://transalt.org/volunteer).
+   Decided: Springfield Streets first, because it is one 30-minute session with a fixed date.
+   Join the Volunteer Info Session on Zoom: [springfieldstreets.org/volunteer](https://springfieldstreets.org/volunteer).
    Other options:
-   - Open Plans: email hello@openplans.org naming a campaign ([openplans.org/get-involved](https://openplans.org/get-involved)).
-   - Open New York: join as a member, then go to a New Member Meeting ([opennewyork.org](https://opennewyork.org)).
+   - Springfield Transit Riders Union: email hello@springfieldriders.org naming a campaign ([springfieldriders.org/get-involved](https://springfieldriders.org/get-involved)).
+   - Springfield Neighbors for Housing: join as a member, then go to a New Member Meeting ([springfieldhousing.org](https://springfieldhousing.org)).
    ```
 
    Ask a question instead only when it passes that section's test. Under a
@@ -156,22 +158,22 @@ insert into job_search.suggestions
   (user_id, kind, company_name, person_name, person_title, source_url, search_query,
    headline, why, move, channel, message, found_in, goal_item_id, model)
 values
-  ('<user>', 'reach_out', 'Alvarez & Marsal', 'Jonathan Massey', 'Director, Transaction Advisory',
-   'https://www.linkedin.com/in/…', 'Jonathan Massey Alvarez & Marsal',
-   'Jonathan Massey, Director at Alvarez & Marsal',
-   'Yale SOM, and at the firm whose due diligence opening fits your EY years best.',
-   'Send the note on LinkedIn. If he answers, ask for twenty minutes on how the team hires.',
-   'linkedin_connect', '<the message>', 'Goal step: Find Yale SOM alumni at your target companies',
+  ('<user>', 'reach_out', 'Fabrikam', 'Jordan Ellis', 'Director, Transaction Advisory',
+   'https://www.linkedin.com/in/…', 'Jordan Ellis Fabrikam',
+   'Jordan Ellis, Director at Fabrikam',
+   'State University, and at the firm whose due diligence opening fits your Halvorsen & Co. years best.',
+   'Send the note on LinkedIn. If they answer, ask for twenty minutes on how the team hires.',
+   'linkedin_connect', '<the message>', 'Goal step: Find State University alumni at your target companies',
    '<step id>', 'goals run')
 on conflict do nothing;
 
 insert into job_search.suggestions
   (user_id, kind, company_name, headline, why, move, url, location, found_in, goal_item_id, model)
 values
-  ('<user>', 'apply', 'Kroll', 'Senior Associate, Technical Accounting Advisory',
-   'Clears the $130,000 floor and uses the technical accounting work from EY.',
+  ('<user>', 'apply', 'Northwind', 'Senior Associate, Technical Accounting Advisory',
+   'Clears the $105,000 floor and uses the technical accounting work from Halvorsen & Co.',
    'Read the posting. Save it as a lead, then lead the resume with the revenue-testing project.',
-   'https://…', 'New York', 'Goal step: Open roles at accounting advisory firms', '<step id>', 'goals run')
+   'https://…', 'Springfield', 'Goal step: Open roles at accounting advisory firms', '<step id>', 'goals run')
 on conflict do nothing;
 ```
 
@@ -213,7 +215,7 @@ set local goals.run_id = '<the run id>';
 select goals.file_result(
   '<step id>',
   'Your applications by role family',
-  'FP&A and accounting answer and interview best; strategic finance is 43% of the volume at average conversion.',
+  'Operations roles answer and interview best; product roles are 40% of the volume at average conversion.',
   $f$<the markdown>$f$,
   null  -- change_note: one sentence on what changed, when this is a new version
 );
@@ -256,7 +258,7 @@ name the comment in `change_note`.
 ```sql
 update core.files
 set body = '<the new markdown>', summary = '<the new answer>',
-    change_note = 'Added the October applications; FP&A reply rate is now 61%.'
+    change_note = 'Added the October applications; the operations reply rate is now 50%.'
 where id = '<file id>' and user_id = '<user>';
 ```
 

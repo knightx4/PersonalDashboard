@@ -1,7 +1,7 @@
 /**
  * Links in what Dash wrote on a step.
  *
- * A result names places as bare domains ("Sign up at transalt.org/volunteer")
+ * A result names places as bare domains ("Sign up at springfieldstreets.org/volunteer")
  * as often as it writes them as links, and markdown only turns a full
  * https:// address into a link. So the page turns the bare ones into links
  * before it draws the result, and takes the first place a result points to as
@@ -30,8 +30,8 @@ const TRAILING = /[.,;:!?'"’”]+$/;
 const KEEP = /(`[^`]*`|\[[^\]]*\]\([^)]*\)|<https?:\/\/[^>]+>|https?:\/\/[^\s)<>]+)/gi;
 
 /**
- * The result with each bare domain written as a link: `transalt.org/volunteer`
- * becomes `[transalt.org/volunteer](https://transalt.org/volunteer)`. Links
+ * The result with each bare domain written as a link: `springfieldstreets.org/volunteer`
+ * becomes `[springfieldstreets.org/volunteer](https://springfieldstreets.org/volunteer)`. Links
  * already written, full addresses, email addresses and code are left alone.
  */
 export function linkBareDomains(markdown: string): string {

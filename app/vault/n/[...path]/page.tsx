@@ -27,6 +27,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { whyNotRead } from '@/lib/vault/map/rules';
+import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { loadNoteThread } from '@/lib/vault/maya/store';
 import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
@@ -120,9 +121,9 @@ export default async function NotePage({
   // An empty vault keeps the column and the button away entirely; a search that
   // matched nothing must not, or the box that got you there would go with it.
   const hasVault = groups.length > 0 || Boolean(search);
-  const notRead = whyNotRead(note);
-
   const user = await requireUser();
+  const notRead = whyNotRead(note, await loadVaultRules(supabase, user.id));
+
   const [{ timezone }, linkedTasks, mayaThread, comments] = await Promise.all([
     loadAccountSettings(user.id),
     loadTasksFor(user.id, 'note', note.id),

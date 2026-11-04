@@ -57,13 +57,13 @@ describe('the block', () => {
   const to = from + 'Dash’s sentence.'.length;
 
   it('writes the header, the person, Dash and the closing line in the v0.2 format', () => {
-    const { block, ranges } = authorshipBlock(text, [dash(from, to)], { self: 'Selvey' });
+    const { block, ranges } = authorshipBlock(text, [dash(from, to)], { self: 'Alex' });
     const total = graphemeStarts(text).length;
     const hash = createHash('sha256').update(text).digest('hex').slice(0, 32);
     expect(block.split('\n')).toEqual([
       '---',
       `Annotations: 0,${total} SHA-256 ${hash}`,
-      `@Selvey: 0,${from} ${to},${total - to}`,
+      `@Alex: 0,${from} ${to},${total - to}`,
       `&Dash <claude-sonnet-5-5>: ${from},${to - from}`,
       '...',
     ]);
@@ -75,7 +75,7 @@ describe('the block', () => {
   });
 
   it('reads back what it writes, as the Obsidian plugin reads it, and checks the hash', () => {
-    const { block } = authorshipBlock(text, [dash(from, to)], { self: 'Selvey' });
+    const { block } = authorshipBlock(text, [dash(from, to)], { self: 'Alex' });
     const file = `${text}\n\n${block}\n`;
     const read = readAuthorshipBlock(file)!;
     expect(read.text).toBe(text);
@@ -91,7 +91,7 @@ describe('the block', () => {
   });
 
   it('notices an edit made elsewhere', () => {
-    const { block } = authorshipBlock(text, [dash(from, to)], { self: 'Selvey' });
+    const { block } = authorshipBlock(text, [dash(from, to)], { self: 'Alex' });
     const edited = readAuthorshipBlock(`${text.replace('Mine again', 'Theirs')}\n\n${block}\n`)!;
     expect(blockMatches(edited)).toBe(false);
   });

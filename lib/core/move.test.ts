@@ -13,12 +13,12 @@ describe('moves', () => {
   });
 
   it('names who a waiting row is waiting on', () => {
-    expect(moveWord({ state: 'waiting', waitingOn: 'recruiter at EliseAI' })).toBe(
-      'Waiting on recruiter at EliseAI',
+    expect(moveWord({ state: 'waiting', waitingOn: 'recruiter at Contoso' })).toBe(
+      'Waiting on recruiter at Contoso',
     );
     expect(
-      moveWord({ state: 'waiting', waitingOn: { ref: 'job_search.companies:1', title: 'EliseAI' } }),
-    ).toBe('Waiting on EliseAI');
+      moveWord({ state: 'waiting', waitingOn: { ref: 'job_search.companies:1', title: 'Contoso' } }),
+    ).toBe('Waiting on Contoso');
     expect(moveWord({ state: 'waiting', waitingOn: ' ' })).toBe('Waiting');
     expect(moveLabel({ state: 'dash_working' })).toMatchObject({ word: 'Dash is on it', tone: 'info' });
   });

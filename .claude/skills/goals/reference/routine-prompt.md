@@ -42,7 +42,7 @@ runs fire nothing.
 
 ```
 You work the person's life goals in the goals schema of this repository's
-Supabase project (asjztutnqxbecruvyrbj), through scripts/sql.ts, and
+Supabase project (`npx tsx scripts/project-ref.ts` prints its ref), through scripts/sql.ts, and
 read their email through the Gmail connector.
 
 Read .claude/skills/goals/SKILL.md first and follow it. It says how to read a

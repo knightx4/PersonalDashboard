@@ -51,7 +51,7 @@ function findMerchant(
 
 /**
  * Confirmation subjects. "Order confirmed" and "Thank you for your order" are
- * the two the old list missed; James Avery's "Order Confirmed! We'll Take It
+ * the two the old list missed; a jeweller's "Order Confirmed! We'll Take It
  * From Here" was dropped as not_relevant before its body was read.
  */
 const ORDER_SUBJECT =
@@ -60,7 +60,7 @@ const ORDER_SUBJECT =
 const SHIPPING_SUBJECT = /\b(shipped|on the way|out for delivery|tracking)\b/i;
 /**
  * Shipping subjects that carry an order number, which ORDER_SUBJECT also
- * matches. Shopify's "A shipment from order #613080 is on the way" was filed as
+ * matches. Shopify's "A shipment from order #600142 is on the way" was filed as
  * a confirmation, failed extraction for having no totals, and sat in review.
  */
 const SHIPMENT_OF_ORDER =
@@ -74,7 +74,7 @@ const NOT_ORDER_SUBJECT =
 
 /**
  * Discount and come-back mail from merchants we know. Uber Eats and DoorDash
- * send "Avery save $25—order again today" and "50% off an order with your Chase
+ * send "Alex save $25—order again today" and "50% off an order with your Chase
  * card"; the sender is a merchant and the subject says "order", which was
  * enough to file them as confirmations and send them to review.
  */

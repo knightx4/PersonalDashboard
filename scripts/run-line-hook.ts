@@ -41,6 +41,7 @@ import {
   type AutoLine,
   type AutoLineState,
 } from '../lib/plan/auto-line';
+import { requireSupabaseProjectUrl } from '../lib/db/project';
 
 type HookInput = {
   session_id?: string;
@@ -107,14 +108,11 @@ function loadState(path: string): AutoLineState {
   }
 }
 
-/** The project's REST endpoint, when the environment does not name one. */
-const PROJECT_URL = 'https://asjztutnqxbecruvyrbj.supabase.co';
-
 /** What writing a run's lines came to: written, or the run takes no more. */
 type Written = 'written' | 'over' | 'missing';
 
 async function writeOverHttps(key: string, runId: string, lines: AutoLine[]): Promise<Written> {
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || PROJECT_URL).replace(/\/$/, '');
+  const base = requireSupabaseProjectUrl();
   const response = await fetch(`${base}/rest/v1/rpc/write_run_lines`, {
     method: 'POST',
     headers: {

@@ -1,6 +1,7 @@
 import { coreSources } from '@/lib/core/sources';
 import { devSources } from '@/lib/dev/sources';
 import { filesSources } from '@/lib/files/sources';
+import { financesSources } from '@/lib/finances/sources';
 import { goalsSources } from '@/lib/goals/sources';
 import { shoppingSources } from '@/lib/inventory/sources';
 import { jobsSources } from '@/lib/jobs/sources';
@@ -29,6 +30,9 @@ const WORKSPACE_SOURCES: readonly (readonly [ModuleId | null, ModuleSources])[] 
   ['shopping', shoppingSources],
   ['goals', goalsSources],
   ['you', youSources],
+  // Finances' workspace id arrives with #2593.1; until then its tables sit
+  // under no workspace.
+  ['finances', financesSources],
   // Files and core belong to no one workspace.
   [null, filesSources],
   [null, coreSources],
@@ -70,6 +74,7 @@ export const SOURCE_SCHEMAS: readonly string[] = [
   'news',
   'goals',
   'you',
+  'finances',
 ];
 
 /**

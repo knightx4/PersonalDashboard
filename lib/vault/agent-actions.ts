@@ -46,5 +46,9 @@ export const vaultActions: ModuleActions = {
     connectVault: none('account'),
     disconnectVault: none('account'),
     rescanVault: none('page'),
+    savePrivateFolders: none(
+      'setting',
+      'Which folders are never sent to a model is the person\'s privacy choice, so they make it themselves.',
+    ),
   },
 };

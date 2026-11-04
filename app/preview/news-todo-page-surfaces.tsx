@@ -167,7 +167,7 @@ const tasks: Task[] = [
 
 const anchors = new Map<string, Anchor>([
   ['t2', { label: 'Quant developer at Halloran-Achterberg', href: '/jobs/roles/r1' }],
-  ['t3', { label: 'Kettle, Argos order 1182-4410', href: '/shopping/returns' }],
+  ['t3', { label: 'Kettle, Argos order 1182-4410', href: '/shopping/inventory/returns' }],
 ]);
 
 const parents = new Map<string, string>([['t4', 'Get ready for Lisbon']]);
@@ -295,7 +295,7 @@ const waiting: Waiting = {
           detail: '£34.99',
           why: 'The parcel was handed in; the refund has not arrived.',
           since: '2026-10-02T15:00:00Z',
-          link: { href: '/shopping/returns', label: 'Open the return' },
+          link: { href: '/shopping/inventory/returns', label: 'Open the return' },
         },
         {
           key: 'r2',

@@ -13,9 +13,11 @@ import {
   parseTypedInput,
   type BigFiveResult,
   type TypedDraft,
+  type TypedField,
   type TypedResult,
 } from '@/lib/you/personality/model';
 import { todayIn } from '@/lib/todo/tasks/model';
+import { runPersonalityProfile } from '@/lib/you/personality/profile-run';
 import {
   readPersonalityAfterResponse,
   runPersonalityRead,
@@ -49,7 +51,7 @@ export async function saveBigFiveAction(answers: number[]): Promise<SaveBigFiveS
 
 export type SaveTypedState =
   | { result: TypedResult }
-  | { error: string; field?: 'testName' | 'typedValue' | 'takenAt' | 'note' };
+  | { error: string; field?: TypedField };
 
 async function typedSave(
   draft: TypedDraft,
@@ -111,6 +113,8 @@ export async function restoreTypedAction(removed: TypedResult): Promise<SaveType
       typedValue: removed.typedValue,
       takenAt: removed.takenAt,
       note: removed.note ?? undefined,
+      typeScores: removed.typeScores ?? undefined,
+      themes: removed.themes,
     },
     { id: removed.id, read: false },
   );
@@ -134,4 +138,19 @@ export async function readAgainAction(resultId: string): Promise<ReadAgainState>
     console.error('[you personality] read again', error instanceof Error ? error.message : error);
     return { error: 'Dash could not read it just now. Try again.' };
   }
+}
+
+export type WriteProfileState = { ok: true } | { error: string };
+
+/**
+ * Write Dash's analysis across all your tests, from its button on the
+ * Personality tab, which shows only when there is none yet or a test changed
+ * since the last. Waited on: the page shows the analysis when it returns.
+ */
+// latency: pending
+export async function writeProfileAction(): Promise<WriteProfileState> {
+  const user = await requireUser();
+  const outcome = await runPersonalityProfile(await createYouClient(), user.id);
+  revalidatePath('/you/personality', 'layout');
+  return outcome.ok ? { ok: true } : { error: 'Dash could not write the analysis just now. Try again.' };
 }

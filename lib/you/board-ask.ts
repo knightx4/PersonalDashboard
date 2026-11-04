@@ -21,7 +21,7 @@ import {
  */
 
 export const QUEUED_WHILE_RUNNING =
-  'A board meeting is already running, so your question is saved for Sunday. Press Ask now on it once that meeting ends.';
+  'A council meeting is already running, so your question is saved for Sunday. Press Ask now on it once that meeting ends.';
 
 /**
  * Fire a called meeting about one question. The question stays queued with no

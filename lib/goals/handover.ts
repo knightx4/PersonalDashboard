@@ -247,14 +247,18 @@ export function sendRunText(input: {
    * box beside Ask Dash on the row.
    */
   asked?: string;
-  /** Where `asked` was written; a comment unless the row says otherwise. */
-  askedOn?: 'comment' | 'row';
+  /** Where `asked` was written: a comment unless it says the row, or Ask Dash's chat. */
+  askedOn?: 'comment' | 'row' | 'chat';
   /** What was said on the row before that comment, oldest first. */
   thread?: readonly { author: string; body: string }[];
 }): string {
   const { target, job, collections } = input;
   const from =
-    input.asked && input.askedOn !== 'row' ? 'a comment on its row' : 'its row on the goal page';
+    input.askedOn === 'chat'
+      ? 'Ask Dash'
+      : input.asked && input.askedOn !== 'row'
+        ? 'a comment on its row'
+        : 'its row on the goal page';
   const { goal, step, above, siblings } = target;
   const noun = job === 'phase' ? 'phase' : 'step';
 

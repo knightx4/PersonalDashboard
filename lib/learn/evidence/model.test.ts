@@ -37,12 +37,12 @@ describe("an idea's evidence", () => {
 
   it('keeps the source and the basis for the card', () => {
     const [link] = evidenceFromRows([
-      row({ source_kind: 'course', source_id: 'c9', basis: 'from MGT 541 Corporate Finance, A, 2025' }),
+      row({ source_kind: 'course', source_id: 'c9', basis: 'from FIN 410 Corporate Finance, A, 2025' }),
     ]);
     expect(link).toMatchObject({
       sourceKind: 'course',
       sourceId: 'c9',
-      basis: 'from MGT 541 Corporate Finance, A, 2025',
+      basis: 'from FIN 410 Corporate Finance, A, 2025',
     });
   });
 });

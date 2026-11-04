@@ -240,6 +240,23 @@ describe('the learn fetch boundary', () => {
   });
 });
 
+describe('the learn direct fetch boundary', () => {
+  const CALL = `export const load = (url: string) => fetch(url);\n`;
+
+  it('blocks a direct fetch in a learn file', async () => {
+    expect(await lint('lib/learn/areas/__boundary_probe.ts', CALL)).toMatch(
+      /no-restricted-syntax/,
+    );
+  });
+
+  it('allows it in the providers and in the prepare kick', async () => {
+    expect(await lint('lib/learn/providers/__boundary_probe.ts', CALL)).not.toMatch(
+      /no-restricted-syntax/,
+    );
+    expect(await lint('lib/learn/prepare/kick.ts', CALL)).not.toMatch(/no-restricted-syntax/);
+  });
+});
+
 /**
  * A calendar file is read in one place.
  *

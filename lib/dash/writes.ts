@@ -32,6 +32,7 @@ import { TODO_WRITE_TOOLS } from './todo-writes';
 import { YOU_WRITE_TOOLS } from './you-writes';
 import { NEWS_WRITE_TOOLS } from './news-writes';
 import { GOALS_WRITE_TOOLS } from './goals-writes';
+import { GOAL_RUN_WRITE_TOOLS } from './goal-run-writes';
 import { SHOPPING_WRITE_TOOLS } from './shopping-writes';
 import { VAULT_WRITE_TOOLS } from './vault-writes';
 import { JOBS_WRITE_TOOLS } from './jobs-writes';
@@ -511,7 +512,11 @@ async function closeGoalStep(ctx: DashWriteContext, args: Args): Promise<DashWri
   const before = await readSubject(ctx.db, ref);
   let closed: boolean;
   try {
-    closed = await setStepStatus(await ctx.goals({ actor: 'claude' }), id, 'done');
+    // On the person's session, as setGoalDoneWhen is: they asked for this close in
+    // their own words, so the evidence rule goals.items_evidence_check holds a
+    // run acting alone to (0050) does not apply. Written as Dash's, the
+    // connector's close_goal_step was refused 3 times on 3 November 2026.
+    closed = await setStepStatus(await ctx.goals({}), id, 'done');
   } catch (error) {
     // The goals guard's refusals are sentences, such as a goal not yet approved.
     throw new Refused(`It could not be closed: ${error instanceof Error ? error.message : 'the database refused it'}`);
@@ -1282,6 +1287,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...NEWS_WRITE_TOOLS,
   // Goals' areas and goals, which the connector offers too (plan #1894.7.1).
   ...GOALS_WRITE_TOOLS,
+  // Starting the goals routine on a goal or a step, in the app only.
+  ...GOAL_RUN_WRITE_TOOLS,
   // Shopping's one-item and list changes, which the connector offers too (plan #1894.5.1).
   ...SHOPPING_WRITE_TOOLS,
   // The Vault's notes, themes and Maya questions, and a course (plan #1894.9.3).

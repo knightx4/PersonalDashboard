@@ -23,7 +23,7 @@
 -- whole point is that it is read on the ticks where nothing is running.
 --
 -- Keyed by repository rather than by account, and that is the honest shape:
--- whether main is green is a fact about knightx4/PersonalDashboard, not about
+-- whether main is green is a fact about this repository, not about
 -- whoever is looking at it. A `user_id` here would mean the same sha and the
 -- same conclusion written once per account, and two accounts disagreeing about
 -- the colour of one commit -- which is a bug the column would invent. So the

@@ -265,7 +265,7 @@ date, the briefs and the Inbox count.
 **The dock.** Now, Inbox, the switcher, the third section, More. The same
 five positions in every room, so the thumb learns one layout.
 
-Section addresses stay what they are (`/shopping/dashboard`, `/jobs`,
+Section addresses stay what they are (`/finances/spending`, `/jobs`,
 `/goals`); only the names in the column and the dock change. `/jobs/review`
 and `/shopping/review` keep their paths, lose their own entries and light
 the Inbox, which lists each queue as a row.

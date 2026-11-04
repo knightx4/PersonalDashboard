@@ -135,8 +135,8 @@ describe('draftFromExtraction', () => {
     const draft = draftFromExtraction({
       extraction: null,
       email: {
-        subject: 'Fwd: Order Confirmation #1RGJRCL',
-        fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>',
+        subject: 'Fwd: Order Confirmation #1FAKE42',
+        fromAddress: 'Jordan Lee <jordan.lee@example.net>',
         date: new Date('2026-09-20T02:00:00Z'),
         text: [
           'For the records.',
@@ -144,8 +144,8 @@ describe('draftFromExtraction', () => {
           '---------- Forwarded message ---------',
           'From: Target <orders@e.target.com>',
           'Date: Fri, Sep 18, 2026 at 9:14 AM',
-          'Subject: Order Confirmation #1RGJRCL',
-          'To: <samantha.kuo@gmail.com>',
+          'Subject: Order Confirmation #1FAKE42',
+          'To: <jordan.lee@example.net>',
           '',
           'Thanks for your order.',
         ].join('\n'),
@@ -162,16 +162,16 @@ describe('draftFromExtraction', () => {
     const draft = draftFromExtraction({
       extraction: null,
       email: {
-        subject: 'Fw: Your order #827907000579 is out for delivery!',
-        fromAddress: 'Samantha Kuo <kuosamantha@yahoo.com>',
+        subject: 'Fw: Your order #820000000142 is out for delivery!',
+        fromAddress: 'Jordan Lee <jordan.lee@example.org>',
         date: new Date('2026-09-20T02:00:00Z'),
         text: [
           '',
           '________________________________',
           'From: Hen & Heifer <hello@henandheifer.com>',
           'Sent: Thursday, September 17, 2026 4:02 PM',
-          'To: kuosamantha@yahoo.com',
-          'Subject: Your order #827907000579 is out for delivery!',
+          'To: jordan.lee@example.org',
+          'Subject: Your order #820000000142 is out for delivery!',
           '',
           'Your package is on its way.',
         ].join('\n'),
@@ -187,12 +187,12 @@ describe('draftFromExtraction', () => {
   it('keeps the sender of an email that quotes nothing', () => {
     const draft = draftFromExtraction({
       extraction: null,
-      email: { ...email, subject: 'Re: my order', fromAddress: 'Samantha Kuo <samantha.kuo@gmail.com>' },
+      email: { ...email, subject: 'Re: my order', fromAddress: 'Jordan Lee <jordan.lee@example.net>' },
       merchants,
       categoryIdsBySlug,
       timezone: 'UTC',
     });
-    expect(draft.merchantName).toBe('Samantha Kuo');
+    expect(draft.merchantName).toBe('Jordan Lee');
   });
 });
 

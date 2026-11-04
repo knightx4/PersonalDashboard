@@ -150,9 +150,11 @@ it as the goal's file and revise it instead.
    are open, and closes itself once they are all done or dropped (a trigger,
    `migrations-goals/0040`); never close a phase yourself. A merge is the
    exception to both halves: see "Merging duplicate steps".
-2. **Sub-steps under each phase.** Two to five, each one sitting of work, each
-   with its own `acceptance`. A sub-step bigger than one sitting gets
-   sub-steps of its own.
+2. **Steps under each phase.** Two to five, each with its own `acceptance`.
+   One level only: a step never gets sub-steps of its own when you map a
+   goal. A step bigger than one sitting stays one step, with the pieces as
+   lines in its `detail`. Break a step into sub-steps only when the person
+   asks you to ("break this down", a comment, Ask Dash on the step).
 3. **`position` in tens** (10, 20, 30) at every level, so the person's own
    steps can go between yours.
 
@@ -232,7 +234,7 @@ for a health goal.
    field, check what it says against the row's status and its other dates.
    A start date that falls before the status began, or a due date on a row
    whose status says nothing is due yet, means the label names something
-   else. In an NSLDS loan export, "Repayment Begin Date" on a Grad PLUS loan
+   else. In an NSLDS loan export, "Repayment Begin Date" on a graduate loan
    is the date of its last disbursement: the loan's status is still in
    school or in grace, and the first payment is the next due date. Name the
    field for what it holds, not for the label, and write what you found in
@@ -336,7 +338,7 @@ insert into goals.document_kinds (user_id, collection_id, name, recognise,
                                   field_notes, skipped, last_read_at)
 values ('<user>', '<collection id>', 'NSLDS loan export',
         'A text export from studentaid.gov headed "File Request Date", one block per loan.',
-        '{"next_due": "Filled from \"Next Payment Due Date\". Trap: \"Repayment Begin Date\": for Grad PLUS loans this is the last disbursement date; the first payment falls on the Next Payment Due Date."}'::jsonb,
+        '{"next_due": "Filled from \"Next Payment Due Date\". Trap: \"Repayment Begin Date\": for graduate loans this is the last disbursement date; the first payment falls on the Next Payment Due Date."}'::jsonb,
         '[]'::jsonb, now())
 returning id;
 ```
@@ -358,7 +360,7 @@ returning id;
      reader does not suggest them again.
    - `senders` lists who sends documents of this kind, when they arrive by
      email: an address, a domain or a name, up to ten, as Gmail's `from:`
-     takes them (`["Edfinancial", "edfinancial.com"]`). The morning run
+     takes them (`["Brightline", "brightline.example"]`). The morning run
      searches Gmail for new ones from these ("Reading new statements from
      Gmail"). Leave it `[]` for a document that is not emailed.
 
@@ -467,7 +469,7 @@ which you looked for and did not find.
 
 Each goal can ask the weekly run for help of up to five kinds: `events`,
 `volunteering` (volunteer openings), `reading`, `courses` and `job_leads`,
-each with a note on what to look for ("Brooklyn, weeknights"). The person's
+each with a note on what to look for ("Eastside, weeknights"). The person's
 choice is `help_kinds`; yours is a proposal in `proposed_help_kinds`, which
 the goal page shows under Weekly help with Approve, Change and Turn down.
 
@@ -483,8 +485,9 @@ nothing, even when you would have chosen differently.
    no kind helps, such as paying off a loan, gets no proposal; leave it
    empty.
 2. **Write a note for each** that narrows the search the way the goal and its
-   context do: the neighbourhood, the evenings they are free, the topic, the
-   kind of role. Under 200 characters. Leave it null only when the goal says
+   context do: the neighbourhood (from their current home, the row in
+   `you.places` with no `moved_out`), the evenings they are free, the topic,
+   the kind of role. Under 200 characters. Leave it null only when the goal says
    nothing that narrows it.
 3. **Write the proposal on the goal row**, in the order HELP_KINDS lists them
    (`lib/goals/help-kinds.ts`):
@@ -493,7 +496,7 @@ nothing, even when you would have chosen differently.
    set local goals.actor = 'claude';
    set local goals.run_id = '<the run id>';
    update goals.items
-   set proposed_help_kinds = '[{"kind": "events", "note": "Urbanism talks and meetups, Brooklyn, weeknights"},
+   set proposed_help_kinds = '[{"kind": "events", "note": "Urbanism talks and meetups, Eastside, weeknights"},
                                {"kind": "volunteering", "note": "Street safety and transit advocacy"}]'
    where id = '<goal id>' and user_id = '<user>';
    ```
@@ -501,6 +504,12 @@ nothing, even when you would have chosen differently.
 Never write `help_kinds` or `help_kinds_settled_at`. A guard refuses a write
 of yours to either, and refuses a proposal on a goal whose help is settled.
 Say in the run's summary which kinds you proposed and why.
+
+### The dashboard
+
+Once the map and its lists are written, lay out the goal's dashboard when it
+has none: pick the template for its kind and save it through the script, as
+`dashboards.md` says. Lay it out after the lists, so its tiles can read them.
 
 ### A goal that is several goals
 
@@ -573,8 +582,8 @@ down to fit:
   propose `met` in the morning review once its done-when holds.
 
 A worked shape, *Give Sam a live electronic show for her birthday*, due 9
-October: a `claude` step shortlisting live shows in New York from October to
+October: a `claude` step shortlisting live shows in Springfield from October to
 December (worked in the same run, written up as a file), *Buy two tickets
-to Madeon at Pacha, 14 Nov* (the person's, due 6 October, on Todo, with the
+to the Lumen Hall show, 14 Nov* (the person's, due 6 October, on Todo, with the
 runner-up shows listed under it), and *Give Sam the tickets on her
 birthday*, due 9 October.

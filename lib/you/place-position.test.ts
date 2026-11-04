@@ -12,7 +12,11 @@ const where = (city: string | null, region: string | null = null, country: strin
 /** Rough bounding boxes, enough to tell one state from another. */
 const STATES = {
   TX: { lat: [25.8, 36.5], lon: [-106.7, -93.5] },
-  CT: { lat: [40.9, 42.1], lon: [-73.8, -71.7] },
+  CO: { lat: [36.9, 41.1], lon: [-109.1, -102.0] },
+  ID: { lat: [41.9, 49.1], lon: [-117.3, -111.0] },
+  OR: { lat: [41.9, 46.3], lon: [-124.7, -116.4] },
+  IL: { lat: [36.9, 42.6], lon: [-91.6, -87.0] },
+  ME: { lat: [42.9, 47.5], lon: [-71.1, -66.9] },
   NY: { lat: [40.4, 45.1], lon: [-79.8, -71.8] },
 } as const;
 
@@ -29,12 +33,12 @@ function inState(position: ReturnType<typeof placePosition>, state: keyof typeof
 
 describe('placePosition', () => {
   it.each([
-    ['San Antonio', 'TX'],
-    ['Fair Oaks Ranch', 'TX'],
+    ['Boise', 'ID'],
+    ["Coeur d'Alene", 'ID'],
     ['Waco', 'TX'],
-    ['Dallas', 'TX'],
-    ['New Haven', 'CT'],
-    ['Brooklyn', 'NY'],
+    ['Denver', 'CO'],
+    ['Portland', 'OR'],
+    ['Chicago', 'IL'],
   ] as const)('puts %s, %s, USA in its state', (city, state) => {
     expect(inState(placePosition(where(city, state, 'USA')), state)).toBe(true);
   });
@@ -47,18 +51,19 @@ describe('placePosition', () => {
 
   it('never places a city in a region that does not have one of that name', () => {
     expect(placePosition(where('Waco', 'CT', 'USA'))).toBeNull();
-    expect(placePosition(where('Brooklyn', 'TX', 'USA'))).toBeNull();
+    expect(placePosition(where('Boise', 'TX', 'USA'))).toBeNull();
   });
 
   it('keeps the region apart when two states share a city name', () => {
-    const ohio = placePosition(where('Brooklyn', 'OH', 'USA'));
-    expect(ohio).not.toBeNull();
-    expect(inState(ohio, 'NY')).toBe(false);
+    const maine = placePosition(where('Portland', 'ME', 'USA'));
+    expect(maine).not.toBeNull();
+    expect(inState(maine, 'OR')).toBe(false);
+    expect(inState(maine, 'ME')).toBe(true);
   });
 
   it('takes the largest of the name when no region is given', () => {
-    expect(inState(placePosition(where('Dallas')), 'TX')).toBe(true);
-    expect(inState(placePosition(where('San Antonio', null, 'USA')), 'TX')).toBe(true);
+    expect(inState(placePosition(where('Denver')), 'CO')).toBe(true);
+    expect(inState(placePosition(where('Portland', null, 'USA')), 'OR')).toBe(true);
   });
 
   it('places nothing for an empty or unknown city, or a country it does not know', () => {
@@ -129,8 +134,8 @@ describe('positionForSave', () => {
 
   it('moves the position with the city, and clears it for a city it cannot place', () => {
     const placed = before({ latitude: waco.latitude, longitude: waco.longitude });
-    expect(positionForSave(placed, where('Dallas', 'TX', 'USA'))).toEqual(
-      placePosition(where('Dallas', 'TX', 'USA')),
+    expect(positionForSave(placed, where('Austin', 'TX', 'USA'))).toEqual(
+      placePosition(where('Austin', 'TX', 'USA')),
     );
     expect(positionForSave(placed, where('Nowhere In Particular', 'TX', 'USA'))).toEqual({
       latitude: null,

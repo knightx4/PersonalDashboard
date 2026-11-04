@@ -85,7 +85,7 @@ describe('extractRequirements', () => {
  */
 const PASTED = `Who We Are:
 
-Galaxy is a global leader in digital assets, growing the economy that runs on code.
+Globex is a global leader in digital assets, growing the economy that runs on code.
 
 What You’ll Do:
 

@@ -51,7 +51,7 @@ describe('classifyMessage', () => {
   it('marks Shopify-style Order N confirmed subjects as order_confirmation', () => {
     const result = classifyMessage({
       fromAddress: 'Ms Betters <hello@msbetters.us>',
-      subject: 'Order 5781 confirmed',
+      subject: 'Order 9042 confirmed',
       merchants: [],
     });
     expect(result.classification).toBe('order_confirmation');
@@ -66,7 +66,7 @@ describe('classifyMessage', () => {
     'Purchase confirmation',
   ])('marks "%s" from an unknown sender as order_confirmation', (subject) => {
     const result = classifyMessage({
-      fromAddress: 'James Avery Artisan Jewelry <order-info@email.jamesavery.com>',
+      fromAddress: 'Fabrikam Jewelry <order-info@email.fabrikamjewelry.com>',
       subject,
       merchants: [],
     });
@@ -75,7 +75,7 @@ describe('classifyMessage', () => {
 
   it('still reads "Order Shipped!" as shipping', () => {
     const result = classifyMessage({
-      fromAddress: 'order-info@email.jamesavery.com',
+      fromAddress: 'order-info@email.fabrikamjewelry.com',
       subject: 'Order Shipped!',
       merchants: [],
     });
@@ -119,16 +119,16 @@ describe('classifyMessage on the review queue', () => {
     ['D: Ye’s return to Chicago #ye #kanyewest #chicago', 'TikTok <notification@service.tiktok.com>'],
     ['Tonight at 8: Will Fanbase not return?', 'Chatter <hello@go.chattersocial.io>'],
     ['Did you ever cancel that old subscription?', 'ChatGPT <noreply@email.openai.com>'],
-    ['Elevator Car 1 - service is on the way', '475 Clermont <no-reply@modernmsg.com>'],
+    ['Elevator Car 1 - service is on the way', '12 Elm Residences <no-reply@modernmsg.com>'],
     ['Stop tracking who still owes you', 'SignUpGenius <info@signupgenius.com>'],
-    ['Introducing Shipped by Profound ', 'Nick Lafferty <nick@tryprofound.com>'],
+    ['Introducing Shipped by Profound ', 'Sam Novak <sam@tryprofound.com>'],
     ['Time to confirm or modify your rental return', 'Enterprise <No-Reply@enterprise.com>'],
     ['Your equipment return details', 'Xfinity <online.communications@alerts.comcast.net>'],
     ["You're receiving a refund", 'Xfinity <online.communications@alerts.comcast.net>'],
     ['Why Wait for the IRS? Get Up to $4,000 Today With a Tax Refund Advance Loan', 'Investopedia <Investopedia@mail.investopedia.com>'],
     ['A Return to Leisure', 'Buck Mason <help@buckmason.com>'],
     ['Signed, sealed, and delivered in a snap', 'Adobe Acrobat <mail@e.adobe.com>'],
-    ['Avery save $25—order again today.', 'Uber Eats <uber@uber.com>'],
+    ['Alex save $25—order again today.', 'Uber Eats <uber@uber.com>'],
     ['$25 off makes your order more affordable', 'Uber Eats <uber@uber.com>'],
     ['Skip the umbrella—just order in.', 'Uber Eats <noreply@uber.com>'],
     ['Get up to $25 worth of free food before it’s too late. Sit down and order up before it’s gone.', 'Uber Eats <uber@uber.com>'],
@@ -147,31 +147,31 @@ describe('classifyMessage on the review queue', () => {
 
   it.each([
     ['Ordered: 1 Cosmetics item', '"Amazon.com" <auto-confirm@amazon.com>', 'order_confirmation'],
-    ['Order Confirmation for Avery from Lucky Lab', 'DoorDash Order <no-reply@doordash.com>', 'order_confirmation'],
-    ['Adjustment to your order from CAVA (The Drag)', 'no-reply@doordash.com', 'order_confirmation'],
-    ['Order #613080 confirmed', 'Gold Hinge <store+1@t.shopifyemail.com>', 'order_confirmation'],
-    ['Thanks for shopping with us! Here\'s your order #:102003572839771.', 'Target <orders@oe1.target.com>', 'order_confirmation'],
-    ['Pottery Barn Teen Order Confirmation #362062684729', 'Pottery Barn Teen <PotteryBarnTeen@o.pbteen.com>', 'order_confirmation'],
-    ['Fwd: Your order #8028 is ready for pickup — hen & heifer', 'Samantha Kuo <samantha.kuo@gmail.com>', 'order_confirmation'],
-    ['A shipment from order #613080 is on the way', 'Gold Hinge <store+1@t.shopifyemail.com>', 'shipping'],
-    ['A shipment from order #1533287 is out for delivery', 'Clean Skin Club <wecare@cleanskinclub.com>', 'shipping'],
+    ['Order Confirmation for Alex from Corner Bistro', 'DoorDash Order <no-reply@doordash.com>', 'order_confirmation'],
+    ['Adjustment to your order from CAVA (Main Street)', 'no-reply@doordash.com', 'order_confirmation'],
+    ['Order #600142 confirmed', 'Gold Hinge <store+1@t.shopifyemail.com>', 'order_confirmation'],
+    ['Thanks for shopping with us! Here\'s your order #:102000000000142.', 'Target <orders@oe1.target.com>', 'order_confirmation'],
+    ['Pottery Barn Teen Order Confirmation #360000000142', 'Pottery Barn Teen <PotteryBarnTeen@o.pbteen.com>', 'order_confirmation'],
+    ['Fwd: Your order #8042 is ready for pickup — hen & heifer', 'Jordan Lee <jordan.lee@example.net>', 'order_confirmation'],
+    ['A shipment from order #600142 is on the way', 'Gold Hinge <store+1@t.shopifyemail.com>', 'shipping'],
+    ['A shipment from order #1500142 is out for delivery', 'Clean Skin Club <wecare@cleanskinclub.com>', 'shipping'],
     ['Your order has been shipped! Shopify Store', '"1800ceiling.com" <tracking@shipstation.com>', 'shipping'],
-    ['Your order from @sydddbushman has been shipped', 'Depop <bought@alerts.depop.com>', 'shipping'],
+    ['Your order from @vintage_seller has been shipped', 'Depop <bought@alerts.depop.com>', 'shipping'],
     ['And it’s off! DHL has your order 🚚', 'Etsy <email@email.etsy.com>', 'shipping'],
-    ['Get ready for something special! An item from order #102003572839771 is about to ship.', 'Target <orders@oe.target.com>', 'shipping'],
-    ['Delivery estimate update for your Amazon.com order #114-3630811-7869015', '"Amazon.com" <no-reply@amazon.com>', 'shipping'],
+    ['Get ready for something special! An item from order #102000000000142 is about to ship.', 'Target <orders@oe.target.com>', 'shipping'],
+    ['Delivery estimate update for your Amazon.com order #114-5550142-0000002', '"Amazon.com" <no-reply@amazon.com>', 'shipping'],
     ['Your Package Has Shipped', 'UPS <pkginfo@ups.com>', 'shipping'],
-    ['Your Order #6413918145  Has Shipped', 'Allbirds <hello@info.allbirds.com>', 'shipping'],
+    ['Your Order #6400000142  Has Shipped', 'Allbirds <hello@info.allbirds.com>', 'shipping'],
     ['Your Order\'s On The Way! 🚚', 'Velvet Caviar <hi@velvetcaviar.com>', 'shipping'],
-    ['Your Etsy Order Shipped (Receipt #4128656010)', 'Etsy Shipping Notifications <no-reply@account.etsy.com>', 'shipping'],
+    ['Your Etsy Order Shipped (Receipt #4100000142)', 'Etsy Shipping Notifications <no-reply@account.etsy.com>', 'shipping'],
     ['Ding dong! Your special delivery is on the way✨', 'Etsy Shipping Notifications <no-reply@account.etsy.com>', 'shipping'],
-    ['An item has arrived from order #102003572839771!', 'Target <orders@oe.target.com>', 'delivery'],
+    ['An item has arrived from order #102000000000142!', 'Target <orders@oe.target.com>', 'delivery'],
     ['UPS Update: Package Delivered', 'UPS <pkginfo@ups.com>', 'delivery'],
-    ['Mark & Graham Delivery Confirmation #362173885967', '"Mark & Graham" <MarkandGraham@o.markandgraham.com>', 'delivery'],
-    ['A package has been delivered!', 'Texas Longhorns Official Team Shop <shop@s.fanaticsretailgroup.com>', 'delivery'],
-    ['Your Babyboo return is approved (HRDMWKGJ)', 'Happy Returns <confirmation@notify.happyreturns.com>', 'return'],
-    ['Re: Your return has been submitted', 'Selvey Knight <selveyknight4@gmail.com>', 'return'],
-    ['Babyboo Fashion Return Confirmation - Order#2241944', 'BABYBOO <babyboofashion@loopreturns.com>', 'return'],
+    ['Mark & Graham Delivery Confirmation #360000000143', '"Mark & Graham" <MarkandGraham@o.markandgraham.com>', 'delivery'],
+    ['A package has been delivered!', 'Springfield Owls Official Team Shop <shop@s.fanaticsretailgroup.com>', 'delivery'],
+    ['Your Babyboo return is approved (FAKEABCD)', 'Happy Returns <confirmation@notify.happyreturns.com>', 'return'],
+    ['Re: Your return has been submitted', 'Alex Rivera <alex.rivera@example.com>', 'return'],
+    ['Babyboo Fashion Return Confirmation - Order#2200142', 'BABYBOO <babyboofashion@loopreturns.com>', 'return'],
     ['You have a refund from Fandango', '"service@paypal.com" <service@paypal.com>', 'return'],
   ])('keeps "%s"', (subject, fromAddress, expected) => {
     expect(classifyMessage({ subject, fromAddress, merchants }).classification).toBe(expected);
@@ -266,7 +266,7 @@ describe('heuristicExtractOrder + applyExtraction', () => {
       receivedAt: new Date('2026-03-30T04:37:57Z'),
     });
     expect(raw).not.toBeNull();
-    expect(raw?.externalOrderNumber).toBe('114-9014714-4960229');
+    expect(raw?.externalOrderNumber).toBe('114-5550142-0000001');
     expect(raw?.totalCents).toBe(4996);
     expect(raw?.taxCents).toBe(298);
     expect(raw?.lines).toHaveLength(2);
@@ -296,7 +296,7 @@ describe('heuristicExtractOrder + applyExtraction', () => {
     });
     expect(raw).not.toBeNull();
     expect(raw?.merchantName).toMatch(/Ms Betters/i);
-    expect(raw?.externalOrderNumber).toBe('5781');
+    expect(raw?.externalOrderNumber).toBe('9042');
     expect(raw?.totalCents).toBe(3999);
     expect(raw?.shippingCents).toBe(799);
     expect(raw?.lines).toHaveLength(1);

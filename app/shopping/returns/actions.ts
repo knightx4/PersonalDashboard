@@ -21,12 +21,12 @@ async function userTimezone(supabase: Awaited<ReturnType<typeof createClient>>, 
 }
 
 function revalidateReturnSurfaces(itemId: string, orderId?: string) {
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${itemId}`);
   revalidatePath('/shopping/orders');
   if (orderId) revalidatePath(`/shopping/orders/${orderId}`);
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 }
 
 /** Toggle whether an owned inventory unit is planned for return. */
@@ -294,8 +294,8 @@ export async function createMerchantReturnPolicy(
 
 function revalidatePaths() {
   revalidatePath('/shopping/settings');
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   revalidatePath('/shopping/inventory');
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/dashboard');
+  revalidatePath('/finances/spending');
 }

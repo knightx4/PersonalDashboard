@@ -38,7 +38,7 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 dates or the note.
  *   set_detail    one of the fields they named themselves on Details, set by
  *                 its label, created when none has that label (plan #2531.3).
- *                 Never touches the six fixed details (plan #2124.3) and never
+ *                 Never touches the fixed details (plan #2124.3) and never
  *                 removes a field.
  *   save_about_me something they said about themselves in a chat with
  *                 Claude, in their words, with why it was saved
@@ -353,11 +353,11 @@ async function saveAboutMe(env: YouWriteEnv, args: Args): Promise<YouMade> {
   };
 }
 
-const BOARD_PATHS = ['/you/board', '/home'];
+const BOARD_PATHS = ['/you/council', '/home'];
 
 /** Why a question put to the board has no Undo: Dash never deletes, and a meeting may already hold it. */
 const BOARD_NO_UNDO =
-  'A question put to the board is on its agenda, and Dash does not delete rows. Open it on the Board tab.';
+  'A question put to the council is on its agenda, and Dash does not delete rows. Open it on the Council tab.';
 
 async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const question = textArg(args, 'question') ?? '';
@@ -391,19 +391,19 @@ async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
       : ', queued for the Sunday meeting';
   return {
     kind: 'ask_board',
-    input: { verb: 'Asked the board', what: short, rest, href: '/you/board', where: 'Open the Board', paths: BOARD_PATHS },
+    input: { verb: 'Asked the council', what: short, rest, href: '/you/council', where: 'Open the Council', paths: BOARD_PATHS },
     subjectRef: toRef('you.board_questions', row.id),
     op: 'insert',
     before: null,
     after: { ...row } as unknown as Row,
-    summary: `Dash asked the board "${short}"${rest}.`,
+    summary: `Dash asked the council "${short}"${rest}.`,
     row: {
       table: 'you.board_questions',
       ref: row.id,
       title: short,
-      href: '/you/board',
+      href: '/you/council',
       detail: {
-        options: row.options.map((o) => `${o.letter}: ${o.text}`).join(' | ') || 'the board will write them',
+        options: row.options.map((o) => `${o.letter}: ${o.text}`).join(' | ') || 'the council will write them',
         lean: row.lean,
         meeting: convened ? 'called now' : 'next Sunday',
       },
@@ -502,7 +502,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
     name: 'set_detail',
     runs: noButton('The Details tab saves the whole list of their own fields at once; no button sets one by its name.'),
     description:
-      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their phone, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
+      'Set one of the fields the person named themselves on their Details tab, when they ask ("my shirt size is M"). Give the field\'s label and its new value: a field with that label (any capitals) has its value replaced, and none yet is added. An empty value clears it; Dash never removes a field. To read their fields first, call list_rows on you.details and look at custom_fields. This cannot change their name, email, phone, mailing address, LinkedIn, citizenship, race, gender or sexuality, which are theirs to say.',
     input_schema: {
       type: 'object',
       properties: {
@@ -516,8 +516,8 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'ask_board',
-    runs: sameAs(['app/you/board/actions.ts#askBoard', 'lib/you/board-ask.ts#putQuestionToBoard']),
-    description: `Put a question to the person's board of advisors (hiring manager, mentor, skeptic, CFO, dreamer, and any guests) on the Board tab, when they say "ask the board whether ...", "put this to the board" or the like. It is queued for the board's next Sunday meeting, and a meeting is called about it right now only when they say so ("ask the board now", "convene the board on this"): pass when 'now' then, never otherwise, since a meeting costs them a long run. Write question as one line from what they said, take options from the conversation (two to ${OPTIONS_MAX}, one line each; leave them out and the board writes them), put the numbers, limits and what success would look like in context, and pass their lean in lean when they gave one (an option's letter, or a line). Do not invent options, numbers or a lean they did not give. Then answer with the question and the link to it on the Board tab. Not for a decision they have already made, or a todo.`,
+    runs: sameAs(['app/you/council/actions.ts#askBoard', 'lib/you/board-ask.ts#putQuestionToBoard']),
+    description: `Put a question to the person's council of mentors (the hiring manager, Jerwyn the Elder, the skeptic, the CFO, the dreamer and any guests) on the Council tab, when they say "ask the council whether ...", "put this to the council" or the like. It is queued for the council's next Sunday meeting, and a meeting is called about it right now only when they say so ("ask the council now", "convene the council on this"): pass when 'now' then, never otherwise, since a meeting costs them a long run. Write question as one line from what they said, take options from the conversation (two to ${OPTIONS_MAX}, one line each; leave them out and the council writes them), put the numbers, limits and what success would look like in context, and pass their lean in lean when they gave one (an option's letter, or a line). Do not invent options, numbers or a lean they did not give. Then answer with the question and the link to it on the Council tab. Not for a decision they have already made, or a todo.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -529,7 +529,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
         },
         context: {
           type: 'string',
-          description: `What the board needs to know from the conversation: numbers, limits, deadline, what a good outcome is. At most ${CONTEXT_MAX} characters.`,
+          description: `What the council needs to know from the conversation: numbers, limits, deadline, what a good outcome is. At most ${CONTEXT_MAX} characters.`,
         },
         lean: {
           type: 'string',

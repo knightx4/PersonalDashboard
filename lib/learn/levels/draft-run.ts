@@ -2,66 +2,66 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedOne } from '@/lib/learn/embed/embed';
-import { draftTopic } from '@/lib/learn/levels/draft';
+import { DRAFT_SYSTEM, DRAFT_TOOL, draftPrompt, readDraftReport } from '@/lib/learn/levels/draft';
+import { draftingRecord, type DraftSources, type DraftedFromBrief } from '@/lib/learn/levels/draft-sources';
 import {
-  NO_SOURCES,
-  bothOrEither,
-  draftingRecord,
-  pickDraft,
-  type DraftSources,
-  type DraftedFromBrief,
-} from '@/lib/learn/levels/draft-sources';
+  DRAFT_REQUEST_COLUMNS,
+  DRAFTING_STALE_MS,
+  draftRoutineBrief,
+  readDraftRequest,
+  type DraftAfter,
+  type DraftRequest,
+} from '@/lib/learn/levels/draft-request';
 import { asEmerging } from '@/lib/learn/briefs/topics';
-import { loadFieldOptions, loadMapTopics, saveDraft } from '@/lib/learn/levels/store';
+import { approveDrafts, loadFieldOptions, loadMapTopics, saveDraft, settleWanted } from '@/lib/learn/levels/store';
+import { addToSubjectLens } from '@/lib/learn/levels/lens-store';
 import {
   draftedDocuments,
   withDocumentCanonicality,
   type CanonText,
   type StoredSourceRef,
 } from '@/lib/learn/levels/stored-sources';
-import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
-import type { SpendReport } from '@/lib/core/spend/pricing';
+import { settleBriefTopic } from '@/lib/learn/briefs/topics-store';
+import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
+import { collectSpend } from '@/lib/learn/spend';
+import { recordSpend } from '@/lib/core/spend/record';
+import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 
 /**
- * One press of drafting: read the map, make the call, embed the scope, keep
- * the draft, and put both costs on the ledger. Shared by the topics page,
- * where a goal is named, and a draft's page, where a topic its links need is
- * drafted.
+ * Drafting a topic, through the routine (learn 0193).
  *
- * The scope embedding is what finds a duplicate. When it cannot be made (no
- * key on this deployment, the provider down) the draft is still kept, and the
- * match falls back to the name alone; the trigger in learn 0133 leaves the
- * column empty for a later pass to fill.
+ * A press that drafts a topic no longer calls the API. runTopicDraft writes a
+ * request with everything the prompt is given besides the map, and what the
+ * press would have done with the draft (`after`), and fires the goals routine
+ * with the learn-drafts skill. The routine's session reads the prompt through
+ * scripts/learn-drafts.ts, writes the draft itself, and hands it to
+ * keepRoutineDraft, which checks it with the parser the API reply went
+ * through and keeps it exactly as the API path did: settled against the
+ * stored documents, emerging when from a brief, its scope embedded, saved as
+ * a draft, then approved, targeted and linked as `after` says.
  *
- * The call runs twice, side by side (plan #2138.11). How far the two drafts
- * agree is the stability check; the one more of whose rows cite a source is
- * kept, and the sources and the checks a draft alone can give go on the topic
- * as `drafting`. Both calls go on the ledger under draft-topic, so a draft
- * costs twice what one call did. When one call fails the other is kept and
- * the overlap says why it is missing.
+ * Why: the API path was a pair of Sonnet calls of about 50,000 input tokens
+ * each, about a dollar a topic, and a subject's preparation drafts forty.
+ * Topic drafting was $124 of Learn's $150 in the month to 28 October 2026.
  *
- * When some of the sources are stored documents (plan #2247.10), `documents`
- * says which source ids they are. Both drafts are then read back against
- * them: the topic row cites every document its levels and links cite, each
- * row's canonicality follows the count of independent documents it cites, and
- * the documents and the territory's canon go on the topic's `drafting`.
- *
- * When the sources are a research brief's pages (plan #2184.1), `brief` names
- * the brief and the goal it is drafted under. Every row the pages support is
- * then emerging, and the brief goes on `drafting`, where approving the topic
- * reads it to put the topic on the goal's lens.
+ * One draft, not the pair the API path compared (plan #2138.11): the record's
+ * overlap is left empty and says the routine wrote one.
  */
-export type DraftRunResult = { ok: true; id: string } | { ok: false; detail: string };
+export type DraftRunResult =
+  /** Queued for the routine; `fired` is false when the routine could not be started, and the request waits for the next one. */
+  | { ok: true; requestId: string; fired: boolean; detail: string }
+  | { ok: false; detail: string };
 
 /**
- * How a run with no signed-in person does the two things that otherwise read
- * the session: whose topics the call is told about, and where the cost goes.
- * The territory drafter (plan #2172.6) runs on the service role, which sees
- * every account, so it names the owner and brings its own ledger.
+ * A run with no signed-in person (the territory drafter, plan #2172.6) runs on
+ * the service role, which sees every account, so it names the owner, and a
+ * preparation names its run so its step can find its own requests.
  */
 export type DraftRunOptions = {
   owner?: string;
-  ledger?: (operation: 'draft-topic' | 'embed-topic-scope', reports: SpendReport[]) => Promise<void>;
+  preparationId?: string;
+  /** Queue without firing the routine; the caller fires it once for many (fireDraftRoutine). */
+  hold?: boolean;
 };
 
 export async function runTopicDraft(
@@ -74,72 +74,239 @@ export async function runTopicDraft(
     documents?: readonly StoredSourceRef[];
     canon?: readonly CanonText[];
     brief?: DraftedFromBrief;
-    anthropicApiKey: string;
+    after?: DraftAfter;
   },
   options: DraftRunOptions = {},
 ): Promise<DraftRunResult> {
-  // Each operation spelled out, so the paid-action check can read what this records.
-  const ledger =
-    options.ledger ??
-    ((operation, reports) =>
-      operation === 'draft-topic'
-        ? recordLearnSpend(userId, 'draft-topic', reports)
-        : recordLearnSpend(userId, 'embed-topic-scope', reports));
-  const [map, fields] = await Promise.all([loadMapTopics(client, options.owner), loadFieldOptions(client)]);
-  const given = input.sources ?? NO_SOURCES;
-
-  const drafting = collectSpend();
-  const call = () =>
-    draftTopic({
-      goal: input.goal,
+  const goal = input.goal.trim();
+  if (!goal) return { ok: false, detail: 'Name what you want to know.' };
+  const row = {
+    user_id: userId,
+    goal,
+    input: {
       scope: input.scope ?? null,
-      map,
-      fields,
-      sources: given,
-      anthropicApiKey: input.anthropicApiKey,
-      onSpend: drafting.sink,
-    });
-  const [first, second] = await Promise.all([call(), call()]);
-  await ledger('draft-topic', drafting.reports);
-
-  const result = bothOrEither(first, second);
-  if (!result.ok) {
-    // A too-broad goal is an answer to reword; a broken call is one to send again.
-    return {
-      ok: false,
-      detail:
-        result.reason === 'too-vague'
-          ? result.detail
-          : `Dash could not write the draft. ${result.detail} Press Draft the topic to send it again.`,
-    };
+      sources: input.sources ?? null,
+      documents: input.documents ?? [],
+      canon: input.canon ?? [],
+      brief: input.brief ?? null,
+    },
+    after_draft: input.after ?? {},
+    preparation_id: options.preparationId ?? null,
+  };
+  const { data, error } = await client.from('topic_draft_requests').insert(row).select('id').single();
+  let requestId = (data as { id: string } | null)?.id ?? null;
+  if (error?.code === '23505') {
+    // Asked again while one waits: the waiting one stands.
+    const { data: open } = await client
+      .from('topic_draft_requests')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['queued', 'drafting'])
+      .ilike('goal', goal.replace(/[%_\\]/g, (c) => `\\${c}`))
+      .limit(1)
+      .maybeSingle();
+    requestId = (open as { id: string } | null)?.id ?? null;
+  } else if (error) {
+    return { ok: false, detail: `Could not queue the draft: ${error.message}` };
   }
+  if (!requestId) return { ok: false, detail: 'Could not queue the draft.' };
+  if (options.hold) return { ok: true, requestId, fired: false, detail: 'Queued for Dash.' };
+  const fired = await fireDraftRoutine(client, userId);
+  return { ok: true, requestId, fired: fired.ok, detail: fired.detail };
+}
 
-  const refs = input.documents ?? [];
-  const settle = <T extends typeof result.draft>(d: T): T =>
-    input.brief ? asEmerging(withDocumentCanonicality(d, refs)) : withDocumentCanonicality(d, refs);
-  const draft = settle(result.draft);
-  const other = result.other ? settle(result.other) : null;
-  const kept = other ? pickDraft(draft, other, given) : draft;
-  const record = draftingRecord(kept, kept === draft ? other : draft, result.failed, given);
+/**
+ * Start the routine on the person's waiting drafts, unless a session is
+ * already working them (a request taken within the hour), which drains the
+ * queue to its end, new requests included. Never throws.
+ */
+export async function fireDraftRoutine(
+  client: LearnSupabaseClient,
+  userId: string,
+): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const since = new Date(Date.now() - DRAFTING_STALE_MS).toISOString();
+    const [{ count: waiting }, { count: working }] = await Promise.all([
+      client.from('topic_draft_requests').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'queued'),
+      client
+        .from('topic_draft_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'drafting')
+        .gte('taken_at', since),
+    ]);
+    if (!waiting) return { ok: true, detail: 'Nothing is waiting to be drafted.' };
+    if (working) return { ok: true, detail: 'Dash is already drafting; this one is next in its queue.' };
+    const routine = goalsRoutine();
+    if (!routine.id) return { ok: false, detail: 'Queued, but no goals routine is set (CLAUDE_GOALS_ROUTINE_ID), so it waits.' };
+    const fired = await fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text: draftRoutineBrief(userId, waiting) });
+    if (!fired.ok) return { ok: false, detail: `Queued, but the routine did not start: ${fired.error}` };
+    return { ok: true, detail: 'Dash is drafting it in a routine; it lands on Topics in a few minutes.' };
+  } catch (error) {
+    return { ok: false, detail: error instanceof Error ? error.message : 'The routine did not start.' };
+  }
+}
+
+/** The prompt the routine's session drafts from: the system, the user message, and the tool whose input it writes. */
+export async function draftRequestPrompt(
+  client: LearnSupabaseClient,
+  request: DraftRequest,
+): Promise<{ system: string; prompt: string; tool: typeof DRAFT_TOOL }> {
+  const [map, fields] = await Promise.all([loadMapTopics(client, request.userId), loadFieldOptions(client)]);
+  const prompt = draftPrompt({
+    goal: request.goal,
+    scope: request.input.scope,
+    map,
+    fields,
+    sources: request.input.sources,
+  });
+  return { system: DRAFT_SYSTEM, prompt, tool: DRAFT_TOOL };
+}
+
+/** Take the oldest waiting request (or one drafting past the stale mark) for this session. */
+export async function takeDraftRequest(client: LearnSupabaseClient, userId: string): Promise<DraftRequest | null> {
+  const stale = new Date(Date.now() - DRAFTING_STALE_MS).toISOString();
+  const { data, error } = await client
+    .from('topic_draft_requests')
+    .select('id, status')
+    .eq('user_id', userId)
+    .or(`status.eq.queued,and(status.eq.drafting,taken_at.lt.${stale})`)
+    .order('requested_at')
+    .limit(5);
+  if (error) throw new Error(`Reading the queue failed: ${error.message}`);
+  for (const candidate of (data ?? []) as { id: string; status: string }[]) {
+    // Taken only if still as read, so two sessions never draft one request.
+    let take = client
+      .from('topic_draft_requests')
+      .update({ status: 'drafting', taken_at: new Date().toISOString() })
+      .eq('id', candidate.id)
+      .eq('user_id', userId)
+      .eq('status', candidate.status);
+    if (candidate.status === 'drafting') take = take.lt('taken_at', stale);
+    const { data: taken } = await take.select(DRAFT_REQUEST_COLUMNS).maybeSingle();
+    if (taken) return readDraftRequest(taken as Record<string, unknown>);
+  }
+  return null;
+}
+
+export async function failDraftRequest(client: LearnSupabaseClient, userId: string, requestId: string, detail: string) {
+  const { error } = await client
+    .from('topic_draft_requests')
+    .update({ status: 'failed', error: detail.slice(0, 500), finished_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .eq('user_id', userId);
+  if (error) throw new Error(`Marking the request failed failed: ${error.message}`);
+}
+
+export type KeptDraft = { ok: true; topicId: string; name: string; approved: boolean } | { ok: false; detail: string };
+
+/**
+ * Keep the routine's draft of a request: check it, settle it, embed it, save
+ * it, do what `after` says, and close the request. A report that does not
+ * check fails the request with why, for the session to write again or leave.
+ */
+export async function keepRoutineDraft(
+  client: LearnSupabaseClient,
+  request: DraftRequest,
+  report: unknown,
+): Promise<KeptDraft> {
+  const userId = request.userId;
+  const { input } = request;
+  const [map, fields] = await Promise.all([loadMapTopics(client, userId), loadFieldOptions(client)]);
+  const result = readDraftReport(report, { map, fields, sources: input.sources });
+  if (!result.ok) return { ok: false, detail: result.detail };
+
+  const refs = input.documents;
+  const settled = withDocumentCanonicality(result.draft, refs);
+  const kept = input.brief ? asEmerging(settled) : settled;
+  const record = draftingRecord(kept, null, 'only one draft was written, by the routine', input.sources);
   if (refs.length > 0) {
     record.documents = draftedDocuments(kept, refs);
-    record.canon = [...(input.canon ?? [])];
+    record.canon = [...input.canon];
   }
   if (input.brief) record.brief = input.brief;
 
   const embedding = collectSpend();
   const embedded = await embedOne(kept.scope, { inputType: 'document', onSpend: embedding.sink });
-  await ledger('embed-topic-scope', embedding.reports);
+  // On the request's client: the script that calls this has no session to record through.
+  const core = client.schema(CORE_SCHEMA) as unknown as CoreSupabaseClient;
+  for (const r of embedding.reports) {
+    await recordSpend(core, userId, { module: 'learn', operation: 'embed-topic-scope', model: r.model, usage: r.usage }).catch(
+      (e: unknown) => console.error('[learn drafts] spend', e instanceof Error ? e.message : e),
+    );
+  }
   if (!embedded.ok && embedded.reason !== 'no-key') {
-    console.error('[learn topics] scope embedding', embedded.reason, embedded.detail);
+    console.error('[learn drafts] scope embedding', embedded.reason, embedded.detail);
   }
 
   const saved = await saveDraft(client, userId, {
     draft: kept,
-    sources: given,
+    sources: input.sources,
     drafting: record,
-    asked: input.goal,
+    asked: request.goal,
     embedding: embedded.ok ? { vector: embedded.vector, model: embedded.model } : null,
   });
-  return { ok: true, id: saved.id };
+  const approved = await settleDraftAfter(client, userId, saved.id, request.after);
+
+  const { error } = await client
+    .from('topic_draft_requests')
+    .update({ status: 'done', topic_id: saved.id, error: null, finished_at: new Date().toISOString() })
+    .eq('id', request.id)
+    .eq('user_id', userId);
+  if (error) throw new Error(`Closing the request failed: ${error.message}`);
+  return { ok: true, topicId: saved.id, name: kept.name, approved };
+}
+
+/** What the press would have done with the draft. Each part is logged and passed over on failure: the draft stays kept. */
+export async function settleDraftAfter(
+  client: LearnSupabaseClient,
+  userId: string,
+  topicId: string,
+  after: DraftAfter,
+): Promise<boolean> {
+  const step = async (label: string, run: () => Promise<unknown>) => {
+    try {
+      await run();
+    } catch (error) {
+      console.error(`[learn drafts] ${label}`, error instanceof Error ? error.message : error);
+    }
+  };
+  if (after.wanted) {
+    const wanted = after.wanted;
+    await step('wanted', () => settleWanted(client, userId, { ...wanted, draftId: topicId }));
+  }
+  if (after.subjectLens) {
+    const subject = after.subjectLens;
+    await step('subject lens', () => addToSubjectLens(client, userId, subject, topicId));
+  }
+  if (after.refinesArticleId || after.lensTarget) {
+    await step('territory', async () => {
+      const { data: saved } = await client
+        .from('topics')
+        .update({ refines_article_id: after.refinesArticleId ?? null })
+        .eq('id', topicId)
+        .eq('user_id', userId)
+        .select('ceiling')
+        .single();
+      if (!after.lensTarget) return;
+      const { error } = await client.from('lens_targets').upsert(
+        {
+          user_id: userId,
+          lens_id: after.lensTarget.lensId,
+          topic_id: topicId,
+          target_level: Math.min(after.lensTarget.target, (saved?.ceiling as number | undefined) ?? after.lensTarget.target),
+        },
+        { onConflict: 'lens_id,topic_id', ignoreDuplicates: true },
+      );
+      if (error) throw new Error(error.message);
+    });
+  }
+  if (!after.approve) return false;
+  let approved = false;
+  await step('approve', async () => {
+    const [done] = await approveDrafts(client, [topicId]);
+    approved = Boolean(done);
+    if (done) await settleBriefTopic(client, userId, topicId);
+  });
+  return approved;
 }

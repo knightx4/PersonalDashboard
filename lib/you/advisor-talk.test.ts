@@ -30,6 +30,8 @@ const buffett: RosterAdvisor = {
   updatedAt: '2026-11-01T00:00:00Z',
   avatar: { style: 'notionists', seed: 'buffett', options: {} } as unknown as RosterAdvisor['avatar'],
   assessment: 'The twenty-year owner’s test',
+  madeByYou: false,
+  hasPersona: false,
 };
 
 const brain: Brain = {

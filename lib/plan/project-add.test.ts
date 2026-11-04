@@ -17,8 +17,8 @@ const ME = '00000000-0000-4000-8000-0000000000aa';
 
 function repo(over: Partial<GithubRepository> & { name: string }): GithubRepository {
   return {
-    owner: 'knightx4',
-    fullName: `knightx4/${over.name}`,
+    owner: 'example-owner',
+    fullName: `example-owner/${over.name}`,
     description: null,
     homepage: null,
     defaultBranch: 'main',
@@ -44,9 +44,9 @@ function db(tables: FakeTables) {
 
 describe('parseRepositoryName', () => {
   it('reads owner/name, a link and a clone address', () => {
-    expect(parseRepositoryName('knightx4/recipes')).toEqual({ owner: 'knightx4', repo: 'recipes' });
-    expect(parseRepositoryName('https://github.com/knightx4/recipes/')).toEqual({ owner: 'knightx4', repo: 'recipes' });
-    expect(parseRepositoryName('git@github.com:knightx4/recipes.git')).toEqual({ owner: 'knightx4', repo: 'recipes' });
+    expect(parseRepositoryName('example-owner/recipes')).toEqual({ owner: 'example-owner', repo: 'recipes' });
+    expect(parseRepositoryName('https://github.com/example-owner/recipes/')).toEqual({ owner: 'example-owner', repo: 'recipes' });
+    expect(parseRepositoryName('git@github.com:example-owner/recipes.git')).toEqual({ owner: 'example-owner', repo: 'recipes' });
   });
 
   it('refuses a bare name and anything with more parts', () => {
@@ -75,9 +75,9 @@ describe('the listing', () => {
       token: 't',
       fetch: github({
         '/user/repos': [
-          { name: 'old', owner: { login: 'knightx4' }, pushed_at: '2025-01-01T00:00:00Z' },
-          { name: 'new', owner: { login: 'knightx4' }, pushed_at: '2026-10-01T00:00:00Z', private: true },
-          { name: 'gone', owner: { login: 'knightx4' }, archived: true },
+          { name: 'old', owner: { login: 'example-owner' }, pushed_at: '2025-01-01T00:00:00Z' },
+          { name: 'new', owner: { login: 'example-owner' }, pushed_at: '2026-10-01T00:00:00Z', private: true },
+          { name: 'gone', owner: { login: 'example-owner' }, archived: true },
         ],
       }),
     });
@@ -104,8 +104,8 @@ describe('repositoryByName', () => {
   const listed = [repo({ name: 'recipes' }), repo({ name: 'recipes-old' }), repo({ name: 'pointtracker' })];
 
   it('takes an exact name before a partial one', () => {
-    expect(repositoryByName('recipes', listed)).toEqual({ owner: 'knightx4', repo: 'recipes' });
-    expect(repositoryByName('point', listed)).toEqual({ owner: 'knightx4', repo: 'pointtracker' });
+    expect(repositoryByName('recipes', listed)).toEqual({ owner: 'example-owner', repo: 'recipes' });
+    expect(repositoryByName('point', listed)).toEqual({ owner: 'example-owner', repo: 'pointtracker' });
   });
 
   it('refuses a name that matches several or none', () => {
@@ -117,7 +117,7 @@ describe('repositoryByName', () => {
 describe('addDevProject', () => {
   const recipes = {
     name: 'recipes',
-    owner: { login: 'knightx4' },
+    owner: { login: 'example-owner' },
     description: 'Things to cook',
     homepage: 'https://recipes.example.com',
     default_branch: 'trunk',
@@ -128,9 +128,9 @@ describe('addDevProject', () => {
     const result = await addDevProject({
       db: db(tables),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'recipes' },
+      repository: { owner: 'example-owner', repo: 'recipes' },
       token: 't',
-      fetch: github({ '/repos/knightx4/recipes': recipes }),
+      fetch: github({ '/repos/example-owner/recipes': recipes }),
     });
     expect(result.ok).toBe(true);
     expect(tables['public.dev_projects']).toHaveLength(1);
@@ -149,9 +149,9 @@ describe('addDevProject', () => {
     const result = await addDevProject({
       db: db(tables),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'recipes' },
+      repository: { owner: 'example-owner', repo: 'recipes' },
       token: 't',
-      fetch: github({ '/repos/knightx4/recipes': recipes }),
+      fetch: github({ '/repos/example-owner/recipes': recipes }),
     });
     expect(result).toMatchObject({ ok: true, restored: false });
     if (result.ok) expect(result.setUp).not.toHaveProperty('error');
@@ -161,7 +161,7 @@ describe('addDevProject', () => {
       user_id: ME,
       module: 'recipes',
       parent_id: feature.id,
-      title: 'Make knightx4/recipes ready for Dash to build in',
+      title: 'Make example-owner/recipes ready for Dash to build in',
       status: 'not_started',
       kind: 'build',
     });
@@ -172,31 +172,31 @@ describe('addDevProject', () => {
   it('writes no set-up step for a project put back', async () => {
     const tables: FakeTables = {
       'public.dev_projects': [
-        { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
+        { id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
       ],
       'public.plan_items': [],
     };
-    const result = await addDevProject({ db: db(tables), userId: ME, repository: { owner: 'knightx4', repo: 'recipes' }, token: 't' });
+    const result = await addDevProject({ db: db(tables), userId: ME, repository: { owner: 'example-owner', repo: 'recipes' }, token: 't' });
     expect(result).toMatchObject({ ok: true, restored: true, setUp: null });
     expect(tables['public.plan_items']).toEqual([]);
   });
 
   it('refuses one already added, and this app', async () => {
     const tables: FakeTables = {
-      'public.dev_projects': [{ id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'Recipes' }],
+      'public.dev_projects': [{ id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'Recipes' }],
     };
     const again = await addDevProject({
       db: db(tables),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'recipes' },
+      repository: { owner: 'example-owner', repo: 'recipes' },
       token: 't',
-      fetch: github({ '/repos/knightx4/recipes': recipes }),
+      fetch: github({ '/repos/example-owner/recipes': recipes }),
     });
     expect(again).toMatchObject({ ok: false });
     const self = await addDevProject({
       db: db(tables),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'PersonalDashboard' },
+      repository: { owner: 'example-owner', repo: 'PersonalDashboard' },
       token: 't',
     });
     expect(self).toMatchObject({ ok: false });
@@ -205,13 +205,13 @@ describe('addDevProject', () => {
   it('puts an archived one back', async () => {
     const tables: FakeTables = {
       'public.dev_projects': [
-        { id: 'recipes', user_id: ME, label: 'recipes', owner: 'knightx4', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
+        { id: 'recipes', user_id: ME, label: 'recipes', owner: 'example-owner', repo: 'recipes', archived_at: '2026-10-01T00:00:00Z' },
       ],
     };
     const result = await addDevProject({
       db: db(tables),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'recipes' },
+      repository: { owner: 'example-owner', repo: 'recipes' },
       token: 't',
     });
     expect(result).toMatchObject({ ok: true, restored: true });
@@ -222,12 +222,12 @@ describe('addDevProject', () => {
     const result = await addDevProject({
       db: db({ 'public.dev_projects': [] }),
       userId: ME,
-      repository: { owner: 'knightx4', repo: 'secret' },
+      repository: { owner: 'example-owner', repo: 'secret' },
       token: 't',
       fetch: github({}),
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/GitHub would not show knightx4\/secret/);
+    if (!result.ok) expect(result.error).toMatch(/GitHub would not show example-owner\/secret/);
   });
 });
 

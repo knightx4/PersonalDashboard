@@ -41,6 +41,10 @@ export type RosterAdvisor = {
   avatar: AdvisorAvatar;
   /** The one assessment their brain says they own, by name (plan #2581.5); null before it is built. */
   assessment: string | null;
+  /** Someone the person made up in Chat (plan #2748.11), who talks from their card alone. */
+  madeByYou: boolean;
+  /** They have a persona card. */
+  hasPersona: boolean;
 };
 
 /** What a guest's row says about its brain right now. */
@@ -93,10 +97,13 @@ export function rosterOf(row: Record<string, unknown>): RosterAdvisor | null {
       brain?.assessment && typeof brain.assessment === 'object' && !Array.isArray(brain.assessment)
         ? str((brain.assessment as Record<string, unknown>).name) || null
         : null,
+    madeByYou: row.made_by_you === true,
+    hasPersona: str(row.persona) !== '',
   };
 }
 
-export const ROSTER_COLUMNS = 'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain, avatar';
+export const ROSTER_COLUMNS =
+  'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain, avatar, made_by_you, persona';
 
 /** Every advisor's key and stored avatar, for the sprite the Advisors pages draw from (plan #2581.3). */
 export async function listAvatars(

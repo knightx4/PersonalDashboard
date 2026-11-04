@@ -15,12 +15,12 @@ const NOW = new Date('2026-09-28T13:37:00Z');
 
 const kept: NeighbourPair = {
   recentId: 'r1',
-  recentPath: 'Yale/MGT 649 - World Financial History.md',
-  recentTitle: 'MGT 649 - World Financial History',
+  recentPath: 'Courses/ECON 210 - History of Trade.md',
+  recentTitle: 'ECON 210 - History of Trade',
   recentChars: 12_000,
   olderId: 'o1',
-  olderPath: 'Pending/Money Changes Everything.md',
-  olderTitle: 'Money Changes Everything',
+  olderPath: 'Pending/Notes on Shipping.md',
+  olderTitle: 'Notes on Shipping',
   olderChars: 9_000,
   similarity: 0.768,
   mutualRank: 1,
@@ -137,15 +137,15 @@ describe('shapeConnections', () => {
   it('names and links each note, leaving out one deleted since', () => {
     expect(
       shapeConnections([row], [
-        { id: 'o1', path: 'Pending/Money Changes Everything.md', title: 'Money Changes Everything' },
-        { id: 'r1', path: 'Yale/MGT 649.md', title: null },
+        { id: 'o1', path: 'Pending/Notes on Shipping.md', title: 'Notes on Shipping' },
+        { id: 'r1', path: 'Courses/ECON 210.md', title: null },
       ]),
     ).toEqual([
       {
         id: 'c1',
         sentence: 'Both follow money.',
-        older: { noteId: 'o1', title: 'Money Changes Everything', href: '/vault/n/Pending/Money%20Changes%20Everything.md' },
-        recent: [{ noteId: 'r1', title: 'Yale/MGT 649.md', href: '/vault/n/Yale/MGT%20649.md' }],
+        older: { noteId: 'o1', title: 'Notes on Shipping', href: '/vault/n/Pending/Notes%20on%20Shipping.md' },
+        recent: [{ noteId: 'r1', title: 'Courses/ECON 210.md', href: '/vault/n/Courses/ECON%20210.md' }],
       },
     ]);
   });

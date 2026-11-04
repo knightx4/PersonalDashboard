@@ -347,6 +347,11 @@ export type LifecycleSourceId = keyof typeof LIFECYCLE_SOURCES;
  * LIFECYCLE_SOURCES, so a new one is decided when it is added.
  */
 export const NOT_A_CLOSING_STATUS: Record<string, string> = {
+  session_progress_state_ck: 'what a session says it is doing now, reported as it works; nothing closes by it',
+  session_threads_state_ck: 'whether a session thread is waiting, working or idle; the thread is a conversation, and nothing closes by it',
+  links_status_ck: 'whether a Plaid link is working, failing or removed',
+  dash_questions_status_ck: 'whether a question Dash asked is still open, answered or skipped, kept on the Ask tab',
+  month_reviews_status_ck: 'whether the monthly money review was written or the run failed',
   email_account_status: 'connection state of a mailbox',
   sync_job_status: 'state of a background sync',
   sync_run_status: 'state of a background sync',
@@ -373,6 +378,9 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   plan_runs_status_ck: 'state of a Dash run',
   company_research_status_ck: 'state of a Dash research run',
   insight_runs_status_ck: 'state of a Dash run',
+  dash_question_runs_status_ck: 'state of a Dash run',
+  council_runs_status_ck: 'state of a Dash run',
+  advisor_chats_reply_status_ck: 'whether a mentor is writing a reply',
   board_meetings_status_ck: 'state of a Dash run',
   insights_status_ck: 'whether Dash still shows an insight it wrote',
   runs_status_ck: 'state of a Dash run',
@@ -380,6 +388,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
   briefs_status_check: 'state of a research run',
   subject_preparations_status_ck: 'state of a subject\'s preparation run',
+  topic_draft_requests_status_ck: 'whether the routine has drafted a topic someone asked for',
   subject_preparation_steps_status_ck: 'state of a step in a subject\'s preparation run',
   video_transcripts_state_ck: 'state of a transcript fetch',
   inspiration_videos_transcript_state_ck: 'state of a transcript fetch',

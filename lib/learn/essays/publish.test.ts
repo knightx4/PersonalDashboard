@@ -25,7 +25,7 @@ const draft = [
 
 const file = essayNoteText(fm, draft, {
   marks: [{ author: 'dash', from: 9, to: 20, name: 'Dash' }],
-  self: 'Selvey',
+  self: 'Alex',
 });
 
 describe('essaySnapshot (plan #1863.11, R4)', () => {

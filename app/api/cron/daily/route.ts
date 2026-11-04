@@ -5,6 +5,8 @@ import { runJobSweep } from '@/inngest/jobs/cron/sweep';
 import { runJdBackfill } from '@/inngest/jobs/cron/jd-backfill';
 import { kickCompanyBoards } from '@/inngest/jobs/company-boards';
 import { runRecurringReread } from '@/inngest/cron/recurring-reread';
+import { runMonthReviews } from '@/inngest/finances/month-review';
+import { runPlaidSyncForAll } from '@/inngest/finances/plaid-sync';
 import { runVaultSyncForAll } from '@/inngest/vault/sync';
 import { runClaimSweep } from '@/inngest/dev/claims';
 import { runDevDigest } from '@/inngest/dev/digest';
@@ -23,6 +25,8 @@ import { runFigureBackfillDaily } from '@/inngest/learn/figure-backfill';
 import { runXReadsForAll } from '@/inngest/x/read';
 import { runInsightSignals } from '@/inngest/you/insight-signals';
 import { runInsightsTick } from '@/inngest/you/insights-tick';
+import { runDashQuestionsTick } from '@/inngest/you/dash-questions-tick';
+import { runCouncilTick } from '@/inngest/you/council-tick';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -89,6 +93,15 @@ export async function GET(request: NextRequest) {
     // (plan #2535.2).
     { name: 'company-boards', run: () => kickCompanyBoards(origin) },
     { name: 'vault', run: () => runVaultSyncForAll() },
+    // Balances, transactions, card and loan details and holdings for every
+    // linked Plaid Item (plan #2593.4). A few seconds a link; nothing until
+    // Plaid's keys are set.
+    { name: 'finances-plaid', run: () => runPlaidSyncForAll() },
+    // After the sync, so the month's last transactions are in: the review of
+    // the month before, written once on the first day this runs in a month
+    // (plan #2593.8.2). One Sonnet call a person a month; a read of the
+    // stored row every other day, and nothing for anyone without accounts.
+    { name: 'finances-review', run: () => runMonthReviews() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
@@ -99,6 +112,14 @@ export async function GET(request: NextRequest) {
     // insights skill only when the last ready run is over 30 days old.
     { name: 'insight-signals', run: () => runInsightSignals() },
     { name: 'insights-monthly', run: () => runInsightsTick() },
+    // New questions for the Ask tab of You, at most weekly, only when
+    // fewer than three are open and one was answered or skipped since the
+    // last run (plan #2635.1).
+    { name: 'dash-questions-weekly', run: () => runDashQuestionsTick() },
+    // The Council's mentors write a few notes unasked (you 0037), after the
+    // goals stages so they read the morning's closed steps. Skipped while six
+    // notes are unread or three were written today.
+    { name: 'council-advice', run: () => runCouncilTick() },
     // After the goals stages: the counts are of the steps as they stand once
     // the morning's closing is done (plan #1836).
     { name: 'scope-days', run: () => runScopeDays() },

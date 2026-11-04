@@ -99,7 +99,7 @@ function fakeLearn() {
 }
 
 describe('recording a lesson’s needs', () => {
-  const user = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
+  const user = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
   const vectors: Record<string, number[]> = {
     'A data source: Reach by year.': [1, 0],
     'A data source: How far Londoners could commute, by year.': [0.97, 0.05],

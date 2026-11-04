@@ -17,7 +17,7 @@ import type { MapNoteClass } from '@/lib/vault/map/rules';
 
 /**
  * Whether the sweep asks Jev at all. On since the map trial re-run
- * (docs/trials/2026-09-29-jev-vault-map.md) found the rollout reads as many of
+ * (a trial write-up, not kept in the repository because it quoted the person's own data) found the rollout reads as many of
  * the trial's notes as Haiku. An account also has to have opted in
  * (lib/jev/enabled.ts). Setting this to false puts every account back on
  * Haiku alone.

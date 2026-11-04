@@ -161,7 +161,7 @@ where id = '<step id>' and user_id = '<user>' and kind = 'mine';
 
 `evidence` is one line, up to 500 characters, that the person reads on the
 Goals home after "Closed <the step>:". Name the thing you saw and its date,
-and where it is: "The Nelnet email of 20 September says autopay is on for
+and where it is: "The Northstar email of 20 September says autopay is on for
 both loans." `evidence_source` is `jobs`, `gmail`, `calendar` or `todo`.
 `shopping` is the database's own: a step of the person's that links a saved
 product closes by itself when the product is bought (plan #2330.5), so a
@@ -186,8 +186,7 @@ Neither is a rhythm, which repeats. Only the steps on the person's Inbox are
 listed: one with a date, one on Todo, one another step waits on, and the
 first plain step of each goal. The plain steps after it are the goal's
 backlog and are left to sit. A goal with a step already waiting on an
-unanswered question gets no move for its plain steps until the answer, so
-the Inbox holds one "Do you still want…?" per goal at most. A goal offered
+unanswered question gets no move for its plain steps until the answer. A goal offered
 for parking is not listed (the park row is the one question about it), nor
 is one whose question closed unanswered in the last three weeks.
 
@@ -199,62 +198,35 @@ it appears on the Goals home with an Undo and needs no approval.
 **Which move.** Read the step, its done-when, the steps around it and the
 goal, then take the first that fits:
 
-1. **Split it** when the step is bigger than one sitting, or its first action
-   is unclear: "Build a network that can refer you", "Update your resume".
-   Add two to four `mine` sub-steps under it, each one sitting of work with
-   its own done-when, the first of them something they could do today. The
-   step becomes the phase that holds them, and closes itself when the last
-   one does. Where part of it is research or a draft, make that part a
-   `claude` sub-step instead, and the morning run will work it.
-2. **Prepare it** when the step is one clear action that needs something
+1. **Prepare it** when the step is one clear action that needs something
    written or looked up first: a call, an email, a form, an application.
    Write what they need, as in "A step of yours to prepare", in the same
    run. A step the brief marks "already prepared once" sat after being
-   prepared, so preparing it again is the weakest move: split it or ask.
-   A step with a finished Dash step before it counts as prepared too, even
-   though the brief does not mark it: a `claude` step whose `prepares_id`
-   names it is done and carries a `result`. While that `claude` step is still
-   open, the prep is on its way: split the step or ask, rather than
-   preparing it a second time.
-3. **Set it for later** when the step still makes sense but nothing about it
+   prepared, so leave it, or set it for later. A step with a finished Dash
+   step before it counts as prepared too, even though the brief does not
+   mark it: a `claude` step whose `prepares_id` names it is done and carries
+   a `result`. While that `claude` step is still open, the prep is on its
+   way, so leave the step alone.
+2. **Set it for later** when the step still makes sense but nothing about it
    is pressing, or the goal's work is elsewhere this month. Set `starts_on`
    two to four weeks out and add one line to the step's `detail` saying why
    ("Set for 15 November: the resume work comes first"). The step leaves the
    Inbox for the Later list, the Goals home shows the change with an Undo,
    and it comes back on its day. This is the move for most backlog that has
    sat, and it asks nothing of the person.
-4. **Ask whether they still want it** only when you cannot tell from what
-   you can read, and the answer would change what you do. The brief says how
-   many questions you have left this run ("Questions left"); the Inbox holds
-   five open questions at most, and past that the database refuses the
-   insert (`goals.cap_open_questions`, `migrations-goals/0088`). When it
-   refuses, or none are left, take move 3 instead. A question goes five
-   days without an answer and closes by itself with the step left as it
-   was (`defaulted_at`), so ask only what is worth one of the five places.
-   Add a question beside it
-   (same parent, just before it) and make the step wait on the question:
+3. **Leave it** when neither fits. A step that sits is not a problem to
+   solve.
 
-   ```sql
-   set local goals.actor = 'claude';
-   set local goals.run_id = '<the run id>';
-   with q as (
-     insert into goals.items (user_id, level, parent_id, kind, title, detail, status, position)
-     values ('<user>', 'step', '<the step''s parent>', 'decision',
-             'Do you still want to call the servicer about the rate?',
-             E'A — Keep it. I split it into smaller steps.\nB — Keep it for later. Give me a date and I set it to start then.\nC — Drop it.\nRecommend A: the rate is still 6.8% and the call is one of three left on this goal.',
-             'open', <the step''s position minus 1>)
-     returning id
-   )
-   insert into goals.dependencies (user_id, item_id, depends_on_id)
-   select '<user>', '<step id>', id from q;
-   ```
+**Never split a step that has sat, and never ask whether they still want
+it.** Both were moves here until November 2026, and between them they grew
+the apartment goal to 127 open steps and 31 open "Do you still want…?"
+questions, almost all written by Dash. The person drops a step they do not
+want, and asks you to break one down when they want that.
 
-   The question never goes beneath the step: answering it would close the
-   step's last sub-step, and the step would then close itself as done.
-
-**After the answer.** The re-shape run's brief lists the step under "Steps
-that wait on those questions". Do what the answer says: split it, set
-`starts_on`, leave it as it is, or drop it. Dropping one of the person's
+**After an answer.** A question asked before November 2026, or one the
+person raised, can still ask whether they want a step. The re-shape run's
+brief lists the step under "Steps that wait on those questions". Do what the
+answer says: set `starts_on`, leave it as it is, or drop it. Dropping one of the person's
 steps is refused except on their answer, with `dropped_on` naming the
 answered question the step waits on, in one update:
 
@@ -272,8 +244,8 @@ and the step has nothing open beneath it. The Goals home reads it as
 "Dropped X on your answer to Y", with an Undo that reopens the step.
 
 The brief lists at most ten a morning, longest untouched first; the rest
-come the next day. Name each move in the run summary ("Split Update your
-resume into 3 steps; asked about Call the servicer").
+come the next day. Name each move in the run summary ("Prepared Call the
+servicer; set Update your resume for 15 November").
 
 ## Steps under way
 

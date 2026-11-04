@@ -54,6 +54,7 @@ export const KIND_ORDER: readonly Exclude<CandidateKind, 'todo'>[] = [
   'interview',
   'deadline',
   'bill',
+  'card',
   'reply',
   'goal-step',
   'dash-result',
@@ -108,6 +109,21 @@ export function reasonFor(candidate: Candidate, context: Context): string {
         return price ? `Renews ${when} for ${price}` : `Renews ${when}`;
       }
       return price ? `${price} due ${when}` : `Due ${when}`;
+    }
+    case 'card': {
+      const when =
+        candidate.dueIn === 0
+          ? 'today'
+          : candidate.dueIn === 1
+            ? 'tomorrow'
+            : whenDate(candidate.dueOn, { timeZone: 'UTC', month: 'long', year: 'never', weekday: 'long' });
+      const due = amount(candidate.amountCents, candidate.currency);
+      if (candidate.amountIs === 'minimum') return `${due} minimum payment due ${when}`;
+      const min =
+        candidate.minimumCents != null
+          ? `, minimum ${amount(candidate.minimumCents, candidate.currency)}`
+          : '';
+      return `${due} statement balance due ${when}${min}`;
     }
     case 'price-rise': {
       const per = candidate.period
@@ -168,6 +184,9 @@ function compareWithinKind(a: Candidate, b: Candidate): number {
   }
   if (a.kind === 'bill' && b.kind === 'bill') {
     return a.dueIn - b.dueIn || (b.amountCents ?? -1) - (a.amountCents ?? -1) || byKey;
+  }
+  if (a.kind === 'card' && b.kind === 'card') {
+    return a.dueIn - b.dueIn || b.amountCents - a.amountCents || byKey;
   }
   if (a.kind === 'reply' && b.kind === 'reply') {
     return b.daysWaiting - a.daysWaiting || a.receivedAt.localeCompare(b.receivedAt) || byKey;
@@ -257,6 +276,7 @@ const KIND_LABEL: Record<CandidateKind, string> = {
   interview: 'Interview',
   deadline: 'Deadline',
   bill: 'Bill',
+  card: 'Card payment',
   'price-rise': 'Price rise',
   reply: 'Reply waiting',
   'goal-step': 'Goal step others wait on',

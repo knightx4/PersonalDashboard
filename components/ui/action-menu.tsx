@@ -51,7 +51,7 @@ export type ActionMenuItem = {
    * keeping. Ignored when `formAction` or `onSelect` is set.
    */
   href?: string;
-  /** Marks the link as the page you are already on. */
+  /** Marks the link as the page you are already on, or the choice already made. */
   current?: boolean;
 };
 
@@ -61,7 +61,13 @@ function lifecycleLabel(lifecycle: Lifecycle, label: string): string {
   return label.startsWith(`${verb},`) ? label : verb;
 }
 
-type MenuPosition = { top: number; left: number; minWidth: number };
+/**
+ * Where the panel sits. Below its button it is placed by its top edge; above
+ * it, by its bottom edge, so the panel ends at the button whatever its height
+ * (plan #2778.11: placed by a guessed height, a short menu opened upwards with
+ * a row between it and its button).
+ */
+type MenuPosition = { top?: number; bottom?: number; left?: number; right?: number; minWidth: number };
 
 function useMenuPosition(
   open: boolean,
@@ -75,17 +81,21 @@ function useMenuPosition(
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const minWidth = Math.max(180, rect.width);
-    const left =
+    // An end-aligned panel is placed by its right edge, at the button's, so a
+    // panel wider than its minimum grows leftwards rather than past the
+    // button toward the screen's edge (plan #2778.11).
+    const across =
       align === 'end'
-        ? Math.min(rect.right - minWidth, window.innerWidth - minWidth - 8)
-        : Math.max(8, rect.left);
+        ? { right: Math.max(8, window.innerWidth - rect.right) }
+        : { left: Math.max(8, rect.left) };
     const below = rect.bottom + 6;
     const estimatedHeight = 220;
-    const top =
-      below + estimatedHeight > window.innerHeight - 8
-        ? Math.max(8, rect.top - estimatedHeight - 6)
-        : below;
-    setPos({ top, left: Math.max(8, left), minWidth });
+    const upwards = below + estimatedHeight > window.innerHeight - 8;
+    setPos(
+      upwards
+        ? { bottom: Math.max(8, window.innerHeight - rect.top + 6), ...across, minWidth }
+        : { top: below, ...across, minWidth },
+    );
   }, [align, triggerRef]);
 
   useLayoutEffect(() => {
@@ -279,7 +289,14 @@ export function ActionMenu({
             id={menuId}
             role="menu"
             aria-label={label}
-            style={{ top: pos.top, left: pos.left, minWidth: pos.minWidth }}
+            style={{
+              top: pos.top,
+              bottom: pos.bottom,
+              left: pos.left,
+              right: pos.right,
+              minWidth: pos.minWidth,
+              maxWidth: 'calc(100vw - 16px)',
+            }}
             className={cn(popoverSurface, 'fixed z-overlay overflow-hidden p-1', panelClassName)}
           >
             {header}
@@ -348,8 +365,9 @@ export function ActionMenu({
                   key={item.id}
                   type="button"
                   role="menuitem"
+                  aria-current={item.current ? 'true' : undefined}
                   disabled={item.disabled || pending}
-                  className={itemClass}
+                  className={cn(itemClass, item.current && 'font-medium text-accent')}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();

@@ -91,6 +91,12 @@ export type StepOutcome =
        * one piece of work (a long model call) will not fit in the time left.
        */
       pause?: boolean;
+      /**
+       * With pause: the step is waiting on work done elsewhere (the routine
+       * drafting its topics, learn 0193), so no call is started after this
+       * one. What finishes that work, or the daily cron, resumes the run.
+       */
+      wait?: boolean;
     }
   | { state: 'skipped'; reason: string; detail?: Record<string, unknown> }
   /** Stop the run at this step, as a throw does, keeping what the step learned in its detail. */
@@ -132,6 +138,8 @@ export type PreparationResult =
   | { outcome: 'finished'; ran: PreparationStepKey[] }
   /** The budget ran out; the next call carries on at `step`. */
   | { outcome: 'paused'; step: PreparationStepKey; ran: PreparationStepKey[] }
+  /** The step waits on the routine; whatever finishes it resumes the run at `step`. */
+  | { outcome: 'waiting'; step: PreparationStepKey; ran: PreparationStepKey[] }
   /** A step threw; Continue or the cron starts again at it. */
   | { outcome: 'failed'; step: PreparationStepKey; error: string; ran: PreparationStepKey[] }
   /** Another call holds the run, or the subject has none. */
@@ -267,7 +275,7 @@ export async function runPreparation(
     await ports.saveStep(run.id, step.key, patch);
     if (outcome.state === 'more' && outcome.pause) {
       await ports.saveRun(run.id, { leaseUntil: null });
-      return { outcome: 'paused', step: step.key, ran };
+      return { outcome: outcome.wait ? 'waiting' : 'paused', step: step.key, ran };
     }
   }
 

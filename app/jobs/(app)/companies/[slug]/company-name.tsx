@@ -10,7 +10,7 @@ import { renameCompany } from '../actions';
  * The company's name, overridable.
  *
  * Names arrive from an ATS board or from the signature block of an email, so
- * "Galaxy Digital Holdings LP" and "galaxy" are both things this page has been
+ * "Globex Digital Holdings LP" and "globex" are both things this page has been
  * called, and neither is what you would write yourself.
  *
  * Renaming moves the slug, and the slug is the URL, so this navigates to the

@@ -32,7 +32,7 @@ export const SHOPPING: InboxRow[] = [
     href: '/shopping/orders/o1',
     move: onYou,
     later,
-    verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/returns' }],
+    verbs: [{ label: 'Returns', tone: 'primary', href: '/shopping/inventory/returns' }],
     decline,
   },
   {
@@ -51,10 +51,10 @@ export const SHOPPING: InboxRow[] = [
     section: 'actions',
     title: 'Council tax',
     line: '£148.00 · due Sat 18 Oct',
-    href: '/shopping/recurring',
+    href: '/finances/recurring',
     move: onYou,
     later,
-    verbs: [{ label: 'Open Recurring', tone: 'primary', href: '/shopping/recurring' }],
+    verbs: [{ label: 'Open Recurring', tone: 'primary', href: '/finances/recurring' }],
     decline,
   },
 ];

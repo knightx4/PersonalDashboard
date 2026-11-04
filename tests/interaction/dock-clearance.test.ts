@@ -19,4 +19,11 @@ describeInBrowser('dock check', () => {
     const found = await check('clean');
     expect(found.dock).toEqual([]);
   });
+
+  it('passes a fixed pane above the dock whose scroller holds a button past its foot', async () => {
+    // The button's box reaches into the dock's band, but the scroller clips it
+    // at 690px, so nothing of it is drawn, or pressable, under the dock.
+    const found = await check('scrolling-pane');
+    expect(found.dock).toEqual([]);
+  });
 });

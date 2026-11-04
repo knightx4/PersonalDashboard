@@ -66,6 +66,12 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     rule: 'From laptop width a list of chats sits on the left and can be hidden to a thin strip holding New chat and the button to show it, the open chat sits at reading width with the box at its foot, and a glance column on the right can be hidden too. Hidden or shown is kept on that device. On a phone the list is the page and a chat opens over it, with the way back above its title.',
     component: 'components/patterns/conversation.tsx',
   },
+  {
+    name: 'messaging',
+    label: 'Messaging',
+    rule: 'From laptop width the list of people sits on the left and the open thread on the right, each a pane as tall as the window; on a phone one pane is drawn at a time, with the way back above the name of the person. Bubbles are yours on the right and theirs on the left, grouped by sender, oldest at the top, and the box stays fixed at the foot while the messages scroll.',
+    component: 'components/patterns/messaging.tsx',
+  },
 ];
 
 /**

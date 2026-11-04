@@ -77,7 +77,7 @@ async function performancesFor(client: Client, aimId: string): Promise<string[]>
 export async function draftBriefTopic(
   client: Client,
   userId: string,
-  input: { briefId: string; aimId: string; anthropicApiKey: string },
+  input: { briefId: string; aimId: string },
 ): Promise<DraftRunResult> {
   const [brief, aim, readings] = await Promise.all([
     client.from('briefs').select('id, question, status, sections').eq('id', input.briefId).maybeSingle(),
@@ -110,7 +110,8 @@ export async function draftBriefTopic(
     goal: row.question,
     sources,
     brief: { id: row.id, question: row.question, aimId: goal.id, aimName: goal.name },
-    anthropicApiKey: input.anthropicApiKey,
+    // Approving it puts it on the goal's lens and records the goal on the brief (settleBriefTopic).
+    after: { approve: true },
   });
 }
 
