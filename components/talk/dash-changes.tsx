@@ -5,17 +5,12 @@ import { useMemo, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CostHint } from '@/components/ui/cost-hint';
+import { DashAction } from '@/components/ui/dash-action';
 import { cn } from '@/lib/cn';
 import { FieldError } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { CloseButton } from '@/components/inbox/close-button';
-import {
-  CHANGE_STATUS_LABEL,
-  changeHref,
-  changeWhere,
-  changeWords,
-} from '@/lib/ask/change-view';
+import { CHANGE_STATUS_LABEL, changeHref, changeWhere, changeWords } from '@/lib/ask/change-view';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
@@ -73,7 +68,10 @@ export function DashChanges({
   inThread?: boolean;
 }) {
   // Kept by identity, so the card's own state is reset only by a newer list.
-  const paid = useMemo(() => changes.filter((change): change is PaidChange => change.kind === 'paid_action'), [changes]);
+  const paid = useMemo(
+    () => changes.filter((change): change is PaidChange => change.kind === 'paid_action'),
+    [changes],
+  );
   if (changes.length === 0) return null;
   const free = changes.filter((change) => change.kind !== 'paid_action');
   const verb = free.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
@@ -89,7 +87,12 @@ export function DashChanges({
         >
           {free.map((change) => (
             <li key={change.id} className="py-2.5">
-              <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
+              <DashChangeRow
+                change={change}
+                presses={presses}
+                onChanged={onChanged}
+                today={today}
+              />
             </li>
           ))}
         </ul>
@@ -140,7 +143,11 @@ export function DashChangeRow({
     setPressing(which);
     startPress(async () => {
       const outcome = await presses[which](change.id).catch(
-        (): ChangeOutcome => ({ ok: false, error: 'That did not go through. Check your connection and try again.', change: null }),
+        (): ChangeOutcome => ({
+          ok: false,
+          error: 'That did not go through. Check your connection and try again.',
+          change: null,
+        }),
       );
       setPressing(null);
       const next = outcome.change;
@@ -209,26 +216,48 @@ export function DashChangeRow({
 
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            pending={pressing === 'confirm'}
-            disabled={pressing !== null}
-            onClick={() => {
-              if (change.kind === 'delete_rows') {
-                setError(null);
-                setConfirming(true);
-              } else press('confirm');
-            }}
-          >
-            {pressing === 'confirm' && !confirming
-              ? change.kind === 'start_build'
-                ? 'Starting…'
-                : 'Writing…'
-              : 'Confirm'}
-          </Button>
           {/* A build runs on the Plan routine, which is not metered per press. */}
-          {change.kind === 'start_build' && <CostHint routine="plan" what="Cost of starting the build" />}
+          {change.kind === 'start_build' ? (
+            <DashAction
+              routine="plan"
+              what="Cost of starting the build"
+              type="button"
+              size="sm"
+              pending={pressing === 'confirm'}
+              disabled={pressing !== null}
+              onClick={() => {
+                if (change.kind === 'delete_rows') {
+                  setError(null);
+                  setConfirming(true);
+                } else press('confirm');
+              }}
+            >
+              {pressing === 'confirm' && !confirming
+                ? change.kind === 'start_build'
+                  ? 'Starting…'
+                  : 'Writing…'
+                : 'Confirm'}
+            </DashAction>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              pending={pressing === 'confirm'}
+              disabled={pressing !== null}
+              onClick={() => {
+                if (change.kind === 'delete_rows') {
+                  setError(null);
+                  setConfirming(true);
+                } else press('confirm');
+              }}
+            >
+              {pressing === 'confirm' && !confirming
+                ? change.kind === 'start_build'
+                  ? 'Starting…'
+                  : 'Writing…'
+                : 'Confirm'}
+            </Button>
+          )}
           <CloseButton
             lifecycle="declined"
             variant="secondary"

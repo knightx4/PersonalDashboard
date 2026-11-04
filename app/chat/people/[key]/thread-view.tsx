@@ -357,14 +357,14 @@ export function ThreadView({
       // Their name is the way into their settings, as a messaging app's is (plan #2854.1).
       name={
         <h1 className="truncate text-body font-semibold text-ink">
-          <Link href={editHref(person.key)} title={`Edit ${person.name}`} className="rounded-control hover:underline">
+          <Link href={editHref(person.key)} title={`Edit ${person.name}`} className="inline-flex min-h-11 items-center rounded-control hover:underline">
             {person.name}
           </Link>
         </h1>
       }
       detail={threadDetail(person)}
       avatar={
-        <Link href={editHref(person.key)} aria-label={`Edit ${person.name}`} title={`Edit ${person.name}`} className="press shrink-0 rounded-full">
+        <Link href={editHref(person.key)} aria-label={`Edit ${person.name}`} title={`Edit ${person.name}`} className="press grid min-h-11 min-w-11 shrink-0 place-items-center rounded-full">
           <PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />
         </Link>
       }
