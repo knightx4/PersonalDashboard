@@ -12,6 +12,8 @@ import type { RosterAdvisor } from '@/lib/you/board-advisors';
 import { avatarFor } from '@/lib/you/advisor-avatar';
 import type { Drawn } from '@/app/you/advisors/avatar-editor';
 import { ProfileView, type ProfileActions } from '@/app/you/advisors/advisors/[key]/profile-view';
+import { TalkTab, type TalkActions, type TalkData } from '@/app/you/advisors/advisors/[key]/talk-view';
+import { AdvisorTalkSkeleton } from '@/app/you/advisors/advisors/[key]/talk-skeleton';
 import type { Brain } from '@/lib/you/board-brain';
 import { advisorHref, type AdvisorDecision, type AdvisorTab } from '@/lib/you/board-profile';
 import { trackRecords, type TrackRecord } from '@/lib/you/board-scoring';
@@ -412,10 +414,12 @@ export function YouBoardAdvisorProfilePreview({
   tab = 'about',
   state = 'ready',
   editing,
+  talk = null,
 }: {
   tab?: AdvisorTab;
   state?: 'ready' | 'empty' | 'building' | 'failed';
   editing?: Drawn;
+  talk?: React.ReactNode;
 }) {
   const base = guests.find((g) => g.key === 'buffett')!;
   const advisor =
@@ -432,6 +436,7 @@ export function YouBoardAdvisorProfilePreview({
       now={NOW}
       actions={profileActions}
       editing={editing ?? null}
+      talk={talk}
       subject={{
         ref: null,
         path: [
@@ -441,6 +446,111 @@ export function YouBoardAdvisorProfilePreview({
           { label: advisor.name, href: advisorHref(advisor.key) },
         ],
       }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The Talk tab (plan #2581.6)
+// ---------------------------------------------------------------------------
+
+const TALK_CHAT_ID = '00000000-0000-4000-8000-0000000c4a71';
+
+const TALK_TURNS: TalkData['turns'] = [
+  {
+    id: 't1',
+    role: 'user',
+    body: 'I have the offer from Meridian Analytics at $92,000. Should I take it, or hold out for one of the fintech roles I am still waiting on?',
+    createdAt: '2026-11-02T09:12:00Z',
+  },
+  {
+    id: 't2',
+    role: 'assistant',
+    body:
+      'Before I say what I think of the job, look at what you owe. Your Navient loan stands at $18,420 at 6.8%, and you have $4,310 in checking. That loan costs you about $1,250 a year whether you work or not, so every month you hold out is paid for at that rate.\n\n' +
+      'Meridian is a business you can explain in a paragraph, and the offer is in writing. The fintech roles are three applications with no reply. I would not trade a sure thing you understand for a better one you have only imagined. What would you have to believe about the fintech roles to turn this down?',
+    createdAt: '2026-11-02T09:12:40Z',
+    citations: [
+      { table: 'money.debts', ref: 'navient', title: 'Navient student loan: $18,420 at 6.8%', href: '/money/debts' },
+      { table: 'money.accounts', ref: 'checking', title: 'Checking: $4,310', href: '/money/accounts' },
+      { table: 'jobs.roles', ref: 'meridian', title: 'Operations Analyst, Meridian Analytics: offer', href: '/jobs/roles/meridian' },
+    ],
+  },
+  {
+    id: 't3',
+    role: 'user',
+    body: 'One of them pays more, maybe $105k, but it is a seed-stage startup.',
+    createdAt: '2026-11-02T09:14:05Z',
+  },
+  {
+    id: 't4',
+    role: 'assistant',
+    body:
+      'Then the extra $13,000 comes with a real chance the company is gone in two years, and you would be looking again with the loan still there. I never wrote about seed-stage pay, so take this as what my rules imply rather than something I said: when the upside is a little more money and the downside is starting over, the margin of safety is in the job you already have. Take Meridian, put the difference toward the loan, and keep talking to the startup on your own time.',
+    createdAt: '2026-11-02T09:14:50Z',
+  },
+];
+
+const TALK_CHATS: TalkData['chats'] = [
+  { id: TALK_CHAT_ID, title: 'I have the offer from Meridian Analytics at $92,000. Should I take it, or hold out…', createdAt: '2026-11-02T09:12:00Z', lastMessageAt: '2026-11-02T09:14:50Z' },
+  { id: '00000000-0000-4000-8000-0000000c4a72', title: 'Is it worth paying the loan down before I have six months saved?', createdAt: '2026-10-21T19:02:00Z', lastMessageAt: '2026-10-21T19:20:00Z' },
+  { id: '00000000-0000-4000-8000-0000000c4a73', title: 'What should I read first?', createdAt: '2026-10-09T08:40:00Z', lastMessageAt: '2026-10-09T08:44:00Z' },
+];
+
+const TALK_MEMORY: TalkData['memory'] = [
+  { id: 'm1', kind: 'preference', text: 'You want the plain number first and the argument after it.', createdAt: '2026-10-09T08:44:30Z' },
+  { id: 'm2', kind: 'fact', text: 'You owe $18,420 on your Navient student loan at 6.8%.', createdAt: '2026-10-21T19:20:30Z' },
+  { id: 'm3', kind: 'commitment', text: 'You said you would answer Meridian Analytics by Friday 14 November 2026.', createdAt: '2026-11-02T09:13:00Z' },
+  { id: 'm4', kind: 'open_thread', text: 'Whether the seed-stage fintech role is worth the risk to your savings is still open.', createdAt: '2026-11-02T09:15:20Z' },
+];
+
+const TALK_OPENERS: TalkData['openers'] = [
+  {
+    shown: 'Should I take the Meridian Analytics offer or wait for the fintech roles?',
+    send: 'What would you want to know before I decide: Should I take the Meridian Analytics offer or wait for the fintech roles?',
+  },
+  {
+    shown: 'Do I move to Chicago in the spring?',
+    send: 'What would you want to know before I decide: Do I move to Chicago in the spring?',
+  },
+  { shown: 'My goal: Pay off student debt', send: 'How would you go about my goal "Pay off student debt"?' },
+];
+
+const talkActions: TalkActions = {
+  send: async () => ({ error: 'The gallery does not send.' }),
+  forget: async () => ({ error: null }),
+};
+
+/**
+ * The Talk tab on Warren Buffett's profile (plan #2581.6): a talk with his
+ * replies citing the person's rows, earlier talks and what he remembers; a
+ * first talk with three openers; a reply that failed, with Try again; and
+ * him writing a reply.
+ */
+export function YouBoardAdvisorTalkPreview({ state = 'chat' }: { state?: 'chat' | 'empty' | 'error' | 'running' | 'loading' }) {
+  const buffett = guests.find((g) => g.key === 'buffett')!;
+  const data: TalkData =
+    state === 'empty'
+      ? { chats: [], chat: null, turns: [], memory: [], openers: TALK_OPENERS }
+      : state === 'error'
+        ? { chats: TALK_CHATS, chat: TALK_CHATS[0], turns: TALK_TURNS.slice(0, 3), memory: TALK_MEMORY.slice(0, 3), openers: [] }
+        : { chats: TALK_CHATS, chat: TALK_CHATS[0], turns: state === 'running' ? TALK_TURNS.slice(0, 2) : TALK_TURNS, memory: TALK_MEMORY, openers: [] };
+  return (
+    <YouBoardAdvisorProfilePreview
+      tab="talk"
+      talk={
+        state === 'loading' ? (
+          <AdvisorTalkSkeleton />
+        ) : (
+          <TalkTab
+            advisor={buffett}
+            data={data}
+            actions={talkActions}
+            timeZone="America/New_York"
+            pendingQuestion={state === 'running' ? TALK_TURNS[2].body : undefined}
+          />
+        )
+      }
     />
   );
 }

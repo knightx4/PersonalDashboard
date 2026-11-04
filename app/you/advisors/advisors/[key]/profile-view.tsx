@@ -34,7 +34,8 @@ import { topicRecordText } from '../../track-records';
  * One advisor's profile (plan #2581.5), on the tabbed detail pattern: their
  * avatar large and their name, a guest marked as an AI impression, and the
  * assessment they own, then About (the assessment in full, how they talk,
- * the questions they ask, their rules and frameworks, from the brain), Track
+ * the questions they ask, their rules and frameworks, from the brain), Talk
+ * (a one-on-one chat with them, plan #2581.6, talk-view.tsx), Track
  * record (forecasts scored by topic, and every decision they weighed in on
  * with what they forecast and what happened) and Sources. Pressing the avatar
  * opens the editor for how they look (plan #2581.3).
@@ -59,6 +60,7 @@ export function ProfileView({
   now,
   subject,
   actions,
+  talk = null,
   editing = null,
 }: {
   advisor: RosterAdvisor;
@@ -71,6 +73,8 @@ export function ProfileView({
   now: number;
   subject: Subject;
   actions: ProfileActions;
+  /** The Talk tab's content, drawn on the server (talk-section.tsx); shown when `tab` is talk. */
+  talk?: React.ReactNode;
   /** Their look open to change, with its drawing, as the gallery draws it. */
   editing?: Drawn | null;
 }) {
@@ -207,7 +211,9 @@ export function ProfileView({
         {error && <FieldError>{error}</FieldError>}
         {state.kind === 'building' && <Building />}
         {state.kind === 'failed' && <Failed advisorId={advisor.id} why={state.why} retry={actions.retry} />}
-        {tab === 'record' ? (
+        {tab === 'talk' ? (
+          talk
+        ) : tab === 'record' ? (
           <RecordTab record={record} decisions={decisions} />
         ) : tab === 'sources' ? (
           <SourcesTab brain={brain} />

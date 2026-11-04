@@ -31,6 +31,7 @@ import {
   YouBoardAdvisorsLoadingPreview,
   YouBoardAdvisorsPreview,
   YouBoardPanelPreview,
+  YouBoardAdvisorTalkPreview,
 } from './you-board-advisor-surfaces';
 import { AdvisorProfileSkeleton } from '@/app/you/advisors/board-skeleton';
 import { SetTab } from './set-tab';
@@ -10028,6 +10029,68 @@ export const SURFACES: readonly Surface[] = [
         <YouBoardAdvisorProfilePreview
           editing={{ svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) }}
         />
+      </div>
+    ),
+  },
+  {
+    /* Talking to one advisor alone (plan #2581.6): the talk on one card, his
+     * replies citing the person’s rows, the earlier talks and what he remembers. */
+    id: 'you-board-advisor-talk',
+    label: 'You · Advisors, talking to one advisor alone',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="chat" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-empty',
+    label: 'You · Advisors, a first talk with three ways in',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-error',
+    label: 'You · Advisors, a reply that failed, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-running',
+    label: 'You · Advisors, an advisor writing a reply',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-loading',
+    label: 'You · Advisors, a talk loading',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="loading" />
       </div>
     ),
   },

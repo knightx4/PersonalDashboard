@@ -275,6 +275,14 @@ export const SPEND_OPERATIONS = {
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.
     'write-insights',
+    // An advisor's reply when the person talks to one alone, on the Talk tab
+    // of their profile (plan #2581.6). Sonnet on Ask Dash's loop, with its
+    // lookups, so a reply takes a few rounds as an Ask answer does.
+    'talk-to-advisor',
+    // What the advisor should remember from that exchange (plan #2581.6).
+    // One Haiku call after each reply, reading the two messages and what
+    // the advisor already remembers.
+    'remember-advisor-talk',
   ],
 } as const;
 

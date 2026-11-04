@@ -181,9 +181,10 @@ export function recordsByKey(records: readonly TrackRecord[]): Record<string, Tr
   return Object.fromEntries(records.map((r) => [r.advisor, r]));
 }
 
-/** The profile's tabs; About is the plain address. The chat step adds Talk (plan #2581.6). */
+/** The profile's tabs; About is the plain address. Talk is the one-on-one chat (plan #2581.6). */
 export const ADVISOR_TABS = [
   { id: 'about', label: 'About' },
+  { id: 'talk', label: 'Talk' },
   { id: 'record', label: 'Track record' },
   { id: 'sources', label: 'Sources' },
 ] as const satisfies readonly Tab[];
