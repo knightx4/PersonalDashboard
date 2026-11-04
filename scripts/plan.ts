@@ -52,7 +52,10 @@
  *   npx tsx scripts/plan.ts approve <n>                 # a person's move, never a session's
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
- *                                # refused unless GitHub says that commit is on
+ *                                [--repo <project>]
+ *                                # --repo: the project whose repository the
+ *                                # step was built in, when its feature's is
+ *                                # another; refused unless GitHub says that commit is on
  *                                # main, and refused if GitHub cannot be asked;
  *                                # refused while a screen it changed has no
  *                                # passing design check (plan #1534)
@@ -146,7 +149,7 @@ import { surfacesForFiles } from '../lib/preview/routes';
 import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
-import { closeRefusal, commitOnMain, isAppRepo } from '../lib/plan/github';
+import { closeRefusal, commitOnMain, isAppRepo, type Repo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { ProgressInputError, currentSessionId, progressRpcArgs, readProgress } from '../lib/plan/session-progress';
@@ -426,10 +429,13 @@ async function doneRefusal(
   userId: string,
   number: number,
   commit: string,
+  /** The repository `--repo` named, for a step built outside its root's. */
+  named?: Repo,
 ): Promise<string | null> {
   // Asked of the repository the step was built in: its root feature's
-  // project's, or this one (plan #2553.2).
-  const repo = repoForScope(await rootScope(sql, userId, number), projects);
+  // project's, or this one (plan #2553.2), unless `--repo` names a project
+  // because the step's work went to another repository than its feature's.
+  const repo = named ?? repoForScope(await rootScope(sql, userId, number), projects);
   const app = isAppRepo(repo);
   const landing = await commitOnMain({ sha: commit, repo });
   // This checkout's branches say nothing about another repository's.
@@ -455,6 +461,29 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/**
+ * The repository `done --repo <project>` names, or undefined without the flag.
+ *
+ * Plan #2800.8 was built in music-pipeline under #2800, a feature about the
+ * app as a whole, so its close asked PersonalDashboard about a commit that
+ * repository has never seen. The flag takes only a project the list knows
+ * (its id or its owner/name), so GitHub is still asked whether that
+ * repository's main carries the commit; it never skips the check.
+ */
+function namedRepo(value: string | undefined): Repo | undefined {
+  if (!value) return undefined;
+  const wanted = value.toLowerCase();
+  const project = projects.find(
+    (p) => p.id.toLowerCase() === wanted || `${p.repo.owner}/${p.repo.repo}`.toLowerCase() === wanted,
+  );
+  if (!project) {
+    fail(
+      `--repo ${value} is not a project's repository. Use one of: ${projects.map((p) => p.id).join(', ') || 'none'}.`,
+    );
+  }
+  return project.repo;
 }
 
 /** The id of the feature at the top of a step's chain (the step itself when it is one). */
@@ -2135,7 +2164,7 @@ async function main(): Promise<void> {
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
 
       if (command === 'done' && commit) {
-        const refusal = await doneRefusal(sql, userId, item.number, commit);
+        const refusal = await doneRefusal(sql, userId, item.number, commit, namedRepo(arg('--repo')));
         if (refusal) fail(refusal);
       }
 

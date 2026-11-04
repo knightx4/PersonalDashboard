@@ -35,6 +35,25 @@ checkout's HEAD, which is the dashboard's. Close a project's step with
 commit on the project's branch that holds the step. `done` asks GitHub
 whether that commit is on the project's branch and refuses one that is not.
 
+`done` finds the repository through the step's root feature. A step built in a
+project's repository under a feature about the app as a whole (plan #2800.8,
+built in music-pipeline under #2800) needs `--repo <project id>` as well, or
+`done` asks this repository about a commit it has never seen.
+
+### A 403 from a cloud session is not the token
+
+A cloud session's proxy replaces the token on every api.github.com request and
+refuses, with a 403, any repository not attached to the session. Its body says
+"not enabled for this session. Use add_repo". That refusal says nothing about
+GITHUB_READ_TOKEN, so never raise it, or tell the person, as the token lacking
+access. Call add_repo for the repository with read access and ask again. A
+routine run has no add_repo; there, write the setup step that **The prompt**
+below names ("Add <owner/repo> to the Plan step builder routine"), never a
+token raise. Only when add_repo itself is refused is there something for the
+person to do, and it is what add_repo's answer names. On 4 November 2026 a run
+raised this as the token's fault, and the person was sent to change a token
+that already read every repository they own.
+
 ## Setting up a new project
 
 Adding a repository on the Projects page, or through Ask Dash's
