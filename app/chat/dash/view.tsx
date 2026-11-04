@@ -8,6 +8,7 @@ import type { TalkTurn } from '@/lib/talk/talk';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
 import type { AskChat } from '@/lib/talk/ask-chats';
+import type { SessionThread } from '@/lib/core/session-threads-model';
 import type { Crumb } from '@/components/shell/breadcrumb';
 import { AskChats, openChatRef, type ChatEdits } from './chats';
 import { ChatUsed, type ChatUsedData } from './used';
@@ -71,15 +72,21 @@ export function DashChatsList({
   today,
   made,
   madeFailed = false,
+  sessions,
+  sessionsFailed = false,
 }: {
   chats: AskChat[];
   chatsFailed?: boolean;
   today: string;
   made: MadeChange[];
   madeFailed?: boolean;
+  sessions?: SessionThread[];
+  sessionsFailed?: boolean;
 }) {
   return (
     <AskChats
+      sessions={sessions}
+      sessionsFailed={sessionsFailed}
       chats={chats}
       failed={chatsFailed}
       today={today}

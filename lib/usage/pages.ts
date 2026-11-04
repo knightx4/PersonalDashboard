@@ -9,6 +9,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/chat',
   '/chat/dash',
   '/chat/dash/[ref]',
+  '/chat/dash/session/[id]',
   '/chat/dash/writing-style',
   '/chat/people/[key]',
   '/dev',
