@@ -35,7 +35,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
     sections: [
       { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-      { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
       { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -80,10 +79,8 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   },
   vault: {
     sections: [
-      { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-      { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
-      { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-      { href: '/vault/maya', label: 'Maya', icon: 'maya' },
+      // One room since Inbox and Triage folded into Now (plan #1496.9).
+      { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
     ],
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',
@@ -91,7 +88,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   news: {
     sections: [
       { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
-      { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
       {
         href: '/news/all',
         label: 'Newsletters',
@@ -99,7 +95,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         exact: true,
         alsoMatches: ['/news/i/'],
       },
-      { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
     ],
     settingsHref: '/news/settings',
     settingsLabel: 'News settings',
