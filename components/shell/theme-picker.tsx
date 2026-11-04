@@ -448,7 +448,7 @@ function Swatch({
           // ui-ok: raw-hex -- the generated accent, as above.
           style={{ backgroundColor: accent, color: fill }}
         >
-          {chosen && <Check className="size-3" strokeWidth={2.25} aria-hidden />}
+          {chosen && <Check className="size-3" strokeWidth={1.75} aria-hidden />}
         </span>
         <span className="sr-only">{label}</span>
       </button>
