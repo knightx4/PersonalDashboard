@@ -224,10 +224,14 @@ export function stackDots<T extends { p: number }>(dots: readonly T[], gap = 0.0
     });
 }
 
-/** "80,000 to 95,000 salary", or "0 to 4 people". */
-export function rangeText(range: ForecastRange): string {
-  const n = (v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 2 });
-  const span = range.low === range.high ? n(range.low) : `${n(range.low)} to ${n(range.high)}`;
+/** "80,000 to 95,000 salary", or short as "80K–95K salary"; "0 to 4 people". */
+export function rangeText(range: ForecastRange, short = false): string {
+  const n = (v: number) =>
+    short && Math.abs(v) >= 1000
+      ? new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v)
+      : v.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+  const span =
+    range.low === range.high ? n(range.low) : `${n(range.low)}${short ? '–' : ' to '}${n(range.high)}`;
   return range.unit ? `${span} ${range.unit}` : span;
 }
 

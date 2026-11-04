@@ -251,7 +251,9 @@ export function MeetingView({
           {debate.questions.length > 1 && (
             <Property label="Questions" value={String(debate.questions.length)} />
           )}
-          <Property label="Advisors" value={String(debate.advisors.length)} />
+          {debate.advisors.length > 0 && (
+            <Property label="Advisors" value={String(debate.advisors.length)} />
+          )}
         </>
       ) : ready && isDebate ? (
         <>

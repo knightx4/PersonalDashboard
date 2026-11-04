@@ -8,6 +8,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Popover } from '@/components/ui/popover';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { usePopover } from '@/lib/use-popover';
@@ -196,7 +197,6 @@ export function ForecastDecision({
 /** "Measured by …, by 14 Nov 2026 · Hard to undo". */
 function MeasureLine({ question }: { question: DebateQuestion }) {
   const parts = [
-    question.decideBy ? `decide by ${heldOnLabel(question.decideBy)}` : null,
     question.door === 'one_way' ? 'hard to undo' : question.door === 'two_way' ? 'easy to undo' : null,
   ].filter(Boolean);
   if (!question.successMeasure && !parts.length) return null;
@@ -309,7 +309,7 @@ function SpreadCard({
         {placed.length === 0 && (
           <p className="text-ui text-ink-muted">
             {running
-              ? 'No advisor has answered yet. They answer blind, each from their own evidence, and land here one by one.'
+              ? 'They answer blind, each from their own evidence, and land on the line one by one.'
               : 'The advisors gave no probability for this decision.'}
           </p>
         )}
@@ -449,74 +449,80 @@ function DotPopover({
 
 /** Each option with every advisor's chance, 90% range and points. */
 function OptionsCard({ question, forecasts }: { question: DebateQuestion; forecasts: readonly AdvisorForecast[] }) {
-  const grid = 'grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,8rem)_2.75rem] items-baseline gap-x-3';
   const topOf = (f: AdvisorForecast) => {
     const budget = f.budget;
     if (!budget) return null;
-    const ranked = Object.entries(budget).sort((a, b) => b[1] - a[1]);
+    const ranked = Object.entries(budget).sort((x, y) => y[1] - x[1]);
     return ranked[0] && (!ranked[1] || ranked[1][1] < ranked[0][1]) ? ranked[0][0] : null;
   };
   return (
     <Card padding="none" data-board-options>
-      <div
-        className={cn(grid, 'card-pad-x border-b border-border py-2 text-small text-ink-muted')}
-        aria-hidden
-      >
-        <span>Option, then each advisor</span>
-        <span className="text-right">Chance</span>
-        <span>90% range</span>
-        <span className="text-right">Points</span>
-      </div>
-      <ul className="divide-y divide-border">
+      <ol className="card-pad space-y-2 border-b border-border">
         {question.options.map((option) => {
           const mean = meanOf(question, forecasts, option.letter);
           return (
-            <li key={option.letter} className="card-pad-x space-y-2 py-3">
-              <div className={grid}>
-                <p className="flex min-w-0 items-start gap-2 text-body text-ink">
-                  <span className="tabular inline-flex size-5 shrink-0 translate-y-0.5 items-center justify-center rounded-control bg-sunken text-small font-semibold text-ink">
-                    {option.letter}
-                  </span>
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{option.text}</span>
-                </p>
-                <span className="tabular text-right text-body font-semibold text-ink">
-                  {mean !== null ? pct(mean) : '–'}
-                </span>
-                <span />
-                <span />
-              </div>
-              <ul className="space-y-1.5" aria-label={`Each advisor on ${option.letter}`}>
-                {forecasts.map((f) => {
-                  const p = f.probabilities[option.letter];
-                  const range = f.ranges?.[option.letter];
-                  const points = f.budget?.[option.letter];
-                  const backs = topOf(f) === option.letter;
-                  return (
-                    <li key={f.advisor.id} className={cn(grid, 'text-ui')}>
-                      <span className="flex min-w-0 items-center gap-1.5 text-ink-muted">
-                        <AdvisorAvatar advisorKey={f.advisor.key} name={f.advisor.name} decorative />
-                        <span className="truncate">{f.advisor.name}</span>
-                      </span>
-                      <span className={cn('tabular text-right', backs ? 'font-semibold text-ink' : 'text-ink-muted')}>
-                        {typeof p === 'number' ? pct(p) : '–'}
-                      </span>
-                      <span className="tabular text-small text-ink-muted [overflow-wrap:anywhere]">
-                        {range ? rangeText(range) : '–'}
-                      </span>
-                      <span className={cn('tabular text-right', backs ? 'font-semibold text-ink' : 'text-ink-muted')}>
-                        {typeof points === 'number' ? points : '–'}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
+            <li key={option.letter} className="flex items-start gap-2.5">
+              <span className="tabular inline-flex size-5 shrink-0 translate-y-0.5 items-center justify-center rounded-control bg-sunken text-small font-semibold text-ink">
+                {option.letter}
+              </span>
+              <span className="min-w-0 flex-1 text-body text-ink [overflow-wrap:anywhere]">{option.text}</span>
+              <span className="tabular shrink-0 text-body font-semibold text-ink">
+                {mean !== null ? pct(mean) : '–'}
+              </span>
             </li>
           );
         })}
-      </ul>
+      </ol>
+      <Table stack={false} fit>
+        <caption className="sr-only">
+          Each advisor’s chance for each option, the points they bet on it, and their 90% range
+        </caption>
+        <THead>
+          <tr className="border-b border-border">
+            <TH>Advisor</TH>
+            {question.options.map((option) => (
+              <TH key={option.letter} num>
+                {option.letter}
+              </TH>
+            ))}
+          </tr>
+        </THead>
+        <TBody>
+          {forecasts.map((f) => {
+            const top = topOf(f);
+            return (
+              <TR key={f.advisor.id}>
+                <TD primary className="align-top">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <AdvisorAvatar advisorKey={f.advisor.key} name={f.advisor.name} decorative />
+                    <span className="[overflow-wrap:anywhere]">{f.advisor.name}</span>
+                  </span>
+                </TD>
+                {question.options.map((option) => {
+                  const p = f.probabilities[option.letter];
+                  const range = f.ranges?.[option.letter];
+                  const points = f.budget?.[option.letter];
+                  return (
+                    <TD key={option.letter} num className="align-top">
+                      <span className={cn('block', top === option.letter ? 'font-semibold text-ink' : 'text-ink-muted')}>
+                        {typeof p === 'number' ? pct(p) : '–'}
+                      </span>
+                      {typeof points === 'number' && (
+                        <span className="block text-small text-ink-muted">{points} pts</span>
+                      )}
+                      {range && <span className="block text-small text-ink-muted">{rangeText(range, true)}</span>}
+                    </TD>
+                  );
+                })}
+              </TR>
+            );
+          })}
+        </TBody>
+      </Table>
       <p className="card-pad-x border-t border-border py-2 text-small text-ink-muted">
-        Chance is each advisor’s probability that the option meets your measure. Points are 100 bet across
-        the options; in bold, the option each put the most on.
+        Under each option, every advisor’s chance that it meets your measure, the points of 100 they bet
+        on it, and their 90% range. In bold, the option each bet most on. Beside each option above, the
+        weighted chance.
       </p>
     </Card>
   );
