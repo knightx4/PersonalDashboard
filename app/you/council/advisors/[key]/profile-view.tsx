@@ -491,12 +491,12 @@ function SourcesTab({ brain }: { brain: Brain | null }) {
                   href={source.link}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`${linkVariants()} text-ui [overflow-wrap:anywhere]`}
+                  className={`${linkVariants()} press-area text-ui [overflow-wrap:anywhere]`}
                 >
                   {source.label}
                 </a>
               ) : (
-                <Link href={source.link} className={`${linkVariants()} text-ui [overflow-wrap:anywhere]`}>
+                <Link href={source.link} className={`${linkVariants()} press-area text-ui [overflow-wrap:anywhere]`}>
                   {source.label}
                 </Link>
               )}
