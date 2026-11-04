@@ -48,10 +48,13 @@ import { codeDeps } from '@/lib/dash/think-code';
 import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
+import type { PeopleDash } from '@/lib/you/people-actions';
 import {
   attachProposals,
   discardProposals,
   insertMadeChange,
+  insertPeopleChange,
+  insertPeopleProposal,
   insertProposal,
   insertThreadProposal,
   loadChanges,
@@ -272,6 +275,39 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
     queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
     saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
+  };
+}
+
+/**
+ * What the people on People act with (plan #2854.2): Ask's lookups, writes,
+ * proposals and paid presses as the signed-in person, each kept in
+ * core.dash_actions naming the person on People who made it and the thread.
+ * Only inside a request, or `after` one, while its cookies are still read.
+ */
+export async function peopleDashInRequest(userId: string): Promise<PeopleDash & Pick<ThreadDash, 'today' | 'execute'>> {
+  const [settings, core] = await Promise.all([loadAccountSettings(userId), createCoreClient()]);
+  const ctx = askContext(userId, settings);
+  return {
+    today: todayInTimezone(settings.timezone),
+    execute: (name, args) => executeAskTool(name, args, ctx),
+    apply: (tool, args, seen) =>
+      tool.apply(
+        {
+          ...ctx,
+          seen,
+          goals: (history) => createGoalsClient(history),
+          createTask,
+          quickNotePorts: () => sessionInboxPorts(userId),
+          goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a People thread is answered from Chat.
+          origin: { kind: 'chat', ref: null },
+        },
+        args,
+      ),
+    saveChange: (made, cause) => insertPeopleChange(core, userId, cause, made),
+    propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
+    queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
+    saveProposal: (change, cause) => insertPeopleProposal(core, userId, cause, change),
   };
 }
 
