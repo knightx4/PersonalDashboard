@@ -19,6 +19,7 @@ import { isClosed, loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
   OVERNIGHT_AT_ONCE,
+  OVERNIGHT_PROJECTS_AT_ONCE,
   featureSessionsAtOnce,
   overnightVerdict,
   recordOvernightFire,
@@ -56,6 +57,7 @@ import { startLand } from '@/lib/plan/land-run';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { besideRunning } from '@/lib/plan/module-share';
+import { isProjectScope } from '@/lib/plan/projects';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
 
 /**
@@ -548,6 +550,11 @@ export type OvernightPorts = {
    * start (`featureSessionsAtOnce`).
    */
   atOnce?: number;
+  /**
+   * How many sessions to keep going on Dev projects, one per project, on top
+   * of `atOnce`. `OVERNIGHT_PROJECTS_AT_ONCE` when left out.
+   */
+  projectsAtOnce?: number;
   loadRun: () => Promise<OvernightRun | null>;
   loadSections: () => Promise<readonly PlanSection[]>;
   /** When each feature was last fired, by feature id. */
@@ -605,6 +612,28 @@ export type OvernightPorts = {
     built: readonly PlanNode[],
   ) => Promise<{ ok: boolean; error?: string }>;
 };
+
+/**
+ * One group of seats: the app's, or the Dev projects'. `running` counts the
+ * group's sessions going, and goes up as the tick starts more.
+ */
+type Lane = {
+  sections: readonly PlanSection[];
+  running: number;
+  atOnce: number;
+  /** Whether a module with a session may take a second one (`besideRunning`). */
+  beside: boolean;
+};
+
+/** The sections with only the features `keep` says yes to, and no empty section. */
+function onlyFeatures(
+  sections: readonly PlanSection[],
+  keep: (id: string) => boolean,
+): PlanSection[] {
+  return sections
+    .map((section) => ({ ...section, nodes: section.nodes.filter((node) => keep(node.id)) }))
+    .filter((section) => section.nodes.length > 0);
+}
 
 /** A feature session that is still going, as the tick counts it. */
 export type InFlightRun = { featureId: string | null; liveness: RunLiveness };
@@ -713,15 +742,56 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   const inFlight = (await ports.runsInFlight(run)).filter((one) => !isOver(one.liveness));
   const unrecorded = inFlight.some((one) => one.featureId === null);
   const atOnce = ports.atOnce ?? OVERNIGHT_AT_ONCE;
-  if (inFlight.length >= atOnce || unrecorded) {
+  const projectsAtOnce = ports.projectsAtOnce ?? OVERNIGHT_PROJECTS_AT_ONCE;
+  if (unrecorded || inFlight.length >= atOnce + projectsAtOnce) {
     return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length, atOnce };
   }
+
+  const sections = await ports.loadSections();
+
+  // Two groups of seats. The app's work fills `atOnce` of them as it always
+  // has; a Dev project's work (lib/plan/projects.ts) fills seats of its own,
+  // one per project, and only when a project has something ready. A running
+  // feature the tree no longer shows counts against the app's seats.
+  const projectFeatures = new Set<string>();
+  for (const section of sections) {
+    for (const node of section.nodes) {
+      if (isProjectScope(node.module)) projectFeatures.add(node.id);
+    }
+  }
+  const lanes: Lane[] = [
+    {
+      sections: onlyFeatures(sections, (id) => !projectFeatures.has(id)),
+      running: inFlight.filter((one) => !projectFeatures.has(one.featureId as string)).length,
+      atOnce,
+      beside: true,
+    },
+    {
+      sections: onlyFeatures(sections, (id) => projectFeatures.has(id)),
+      running: inFlight.filter((one) => projectFeatures.has(one.featureId as string)).length,
+      atOnce: projectsAtOnce,
+      beside: false,
+    },
+  ];
+  const [appLane] = lanes;
+  const appWaiting: OvernightTick = {
+    act: 'waiting',
+    liveness: waitingOn(inFlight),
+    running: appLane.running,
+    atOnce,
+  };
+  const open = lanes.filter(
+    (lane) =>
+      lane.running < lane.atOnce &&
+      (lane === appLane || lane.sections.some((section) => section.nodes.length > 0)),
+  );
+  if (open.length === 0) return appWaiting;
+  const openSections = open.flatMap((lane) => lane.sections);
   const runningIds = inFlight.map((one) => one.featureId as string);
 
-  const [allFires, earlierFires, sections] = await Promise.all([
+  const [allFires, earlierFires] = await Promise.all([
     ports.lastFiredAt(),
     ports.previousFiredAt?.() ?? Promise.resolve({}),
-    ports.loadSections(),
   ]);
 
   // Only the fires this run made. The guard below passes over a feature whose
@@ -779,8 +849,9 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // Stalled features are dealt with before the choice: one being diagnosed,
   // or held by its raise, is never chosen. One whose diagnosis has ended since
   // its last build is let out of the in-night guard for one more try, since
-  // the diagnosis either cleared the wall or wrote what it waits on.
-  const stalls = await raiseStalls(ports, sections);
+  // the diagnosis either cleared the wall or wrote what it waits on. Only the
+  // groups with a seat free are looked at, so a full group sends no diagnosis.
+  const stalls = await raiseStalls(ports, openSections);
   const released = new Set(stalls.released);
   const lastFired = firesWithout(lastFiredAt, released);
   const previousFired = firesWithout(previousFiredAt, released);
@@ -794,7 +865,7 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
     return out;
   };
 
-  // The tick fills every free slot, not one. It used to start one feature and
+  // The tick fills every free seat, not one. It used to start one feature and
   // return, so a night pressed with four slots empty took a quarter of an hour
   // to fill, and the card said "nothing to work on" beside eleven ready
   // features the whole time. Each feature started here joins `runningIds`, so
@@ -812,14 +883,14 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
     refused: refused.map((one) => one.number),
     running: inFlight.length + started.length,
   });
-  const full = (): boolean => inFlight.length + started.length >= atOnce || featuresLeft === 0;
+  const full = (lane: Lane): boolean => lane.running >= lane.atOnce || featuresLeft === 0;
 
   // Built steps land before anything new is built (plan #2815.2). A feature
   // with steps built on its branch and no session going is sent a session
   // whose only job is to merge them to main, which checks first that the app
-  // works without the rest of the feature. It takes a slot and a fire from
-  // the budget like a build, and joins `runningIds`, so the passes below
-  // neither build that feature nor start another in its module this tick.
+  // works without the rest of the feature. It takes a seat in its group and a
+  // fire from the budget like a build, and joins `runningIds`, so the passes
+  // below neither build that feature nor start another in its module this tick.
   //
   // Not a stall: a land run is not one of `STALL_JOBS`, and `featureFires`
   // reads only feature runs, so a land that closes nothing neither sends the
@@ -833,155 +904,179 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         `land runs could not be read on the overnight tick: ${err instanceof Error ? err.message : 'failed'}`,
       );
     }
-    const landing = featuresToLand(sections, {
-      runningIds,
-      heldIds: stalls.held,
-      lastLandAt,
-      now: ports.now,
-    });
-    for (const { feature, built } of landing) {
-      if (full()) break;
-      let sent: { ok: boolean; error?: string };
-      try {
-        sent = await ports.land(feature, built);
-      } catch (err) {
-        sent = { ok: false, error: err instanceof Error ? err.message : 'failed' };
+    for (const lane of open) {
+      const landing = featuresToLand(lane.sections, {
+        runningIds,
+        heldIds: stalls.held,
+        lastLandAt,
+        now: ports.now,
+      });
+      for (const { feature, built } of landing) {
+        if (full(lane)) break;
+        let sent: { ok: boolean; error?: string };
+        try {
+          sent = await ports.land(feature, built);
+        } catch (err) {
+          sent = { ok: false, error: err instanceof Error ? err.message : 'failed' };
+        }
+        if (!sent.ok) {
+          console.error(`#${feature.number} could not be sent to land: ${sent.error ?? 'failed'}`);
+          continue;
+        }
+        console.log(
+          `overnight: sent #${feature.number} to land ${built.length} built step(s): ${built
+            .map((step) => `#${step.outline}`)
+            .join(', ')}.`,
+        );
+        await ports.recordFire(featuresLeft);
+        featuresLeft = featuresLeft === null ? null : Math.max(0, featuresLeft - 1);
+        started.push({ feature: feature.number, step: built[0].number });
+        landed.push(feature.number);
+        runningIds.push(feature.id);
+        lane.running += 1;
       }
-      if (!sent.ok) {
-        console.error(`#${feature.number} could not be sent to land: ${sent.error ?? 'failed'}`);
-        continue;
-      }
-      console.log(
-        `overnight: sent #${feature.number} to land ${built.length} built step(s): ${built
-          .map((step) => `#${step.outline}`)
-          .join(', ')}.`,
-      );
-      await ports.recordFire(featuresLeft);
-      featuresLeft = featuresLeft === null ? null : Math.max(0, featuresLeft - 1);
-      started.push({ feature: feature.number, step: built[0].number });
-      landed.push(feature.number);
-      runningIds.push(feature.id);
     }
-    if (started.length > 0 && full()) return firedSoFar();
   }
 
-  fill: for (;;) {
-    // Two passes. The first offers only modules with no session going, the way
-    // the runner always has. The second runs only when that found nothing and a
-    // slot is still free: a module with a session may take a second one when the
-    // two features' work does not meet (lib/plan/module-share.ts). Every other
-    // module still gets the free slot first.
-    const passes: (readonly PlanSection[])[] = [outsideRunning(sections, runningIds)];
-    if (runningIds.length > 0) passes.push(besideRunning(sections, runningIds));
-    const asked = { ...run, featuresLeft };
+  /**
+   * Fill one group's free seats. Null when it started what it could and the
+   * tick goes on to the next group; otherwise the answer the tick gives.
+   */
+  const fillLane = async (lane: Lane): Promise<OvernightTick | null> => {
+    if (full(lane)) return null;
+    fill: for (;;) {
+      // Two passes in the app's group. The first offers only modules with no
+      // session going, the way the runner always has. The second runs only when
+      // that found nothing and a seat is still free: a module with a session may
+      // take a second one when the two features' work does not meet
+      // (lib/plan/module-share.ts). Every other module still gets the free seat
+      // first. A project's group has the first pass only: one session a project.
+      const passes: (readonly PlanSection[])[] = [outsideRunning(lane.sections, runningIds)];
+      if (lane.beside && runningIds.length > 0) passes.push(besideRunning(lane.sections, runningIds));
+      const asked = { ...run, featuresLeft };
 
-    for (const [pass, start] of passes.entries()) {
-      let remaining: readonly PlanSection[] = narrowed(start);
-      const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
+      for (const [pass, start] of passes.entries()) {
+        let remaining: readonly PlanSection[] = narrowed(start);
+        const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
 
-      for (let round = 0; round < rounds; round += 1) {
-        const choice = chooseOvernightFire(remaining, asked, ports.now, lastFired, previousFired);
-        // Something was started this tick and nothing more fits: the tick fired,
-        // and the next one asks again once a slot or a module frees.
-        if (choice.act !== 'fire' && started.length > 0) return firedSoFar();
-        if (choice.act === 'end') {
-          // The chooser can only say the tree ran out, and once anything has been
-          // refused that is no longer the whole truth: the reason has to name them,
-          // because the row's sentence is all the morning gets.
-          const said =
-            refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
-          // Which features the guard is holding, by name, so the note on the plan
-          // page says what the runner is waiting for rather than only that it is.
-          const held = choice.passedOver ?? [];
-          const reason = held.length > 0 ? `${said} ${passedOverNote(held, ports.now)}` : said;
-          // Nothing ready is a reading of one instant, so the night keeps its
-          // clock and asks again in four minutes. The budget and the stop time are
-          // settled and do end it; this is not.
-          //
-          // Refusals are the same reading. A feature refuses the send because a
-          // re-shape is rewriting it, because a claim beneath it is still live, or
-          // because it is only a proposal -- and the first two clear themselves
-          // while nobody is watching. On 19 September a run with no limit ended
-          // twenty-one minutes in: #669 and #656 both refused for a re-shape that
-          // had been sitting in `started` for nearly two hours, and five other
-          // features were waiting behind that.
-          //
-          // Retrying them costs a few queries a tick. The send refuses before it
-          // starts a routine, so no session is fired and no tokens are spent, and
-          // that is a much smaller price than a night that stops.
-          // The same goes for every feature having been tried without a close. It
-          // is a fact about this run so far, not about the plan: a claim frees, a
-          // step closes under a neighbouring feature, you approve something, and
-          // the tree reads differently four minutes later.
-          //
-          // Which leaves the budget and the stop time as the only two things that
-          // end a run, and that is the whole rule. A run told to go until you stop
-          // it has neither, so it goes until you stop it.
-          if (
-            choice.reason === OVERNIGHT_NOTHING_READY ||
-            choice.reason === OVERNIGHT_NO_PROGRESS
-          ) {
-            // With sessions going, what is ready may only be in their modules, and
-            // one of them finishing changes that. Said as waiting on them.
-            if (inFlight.length > 0 && refused.length === 0) {
-              // Nothing in the free modules; the next pass may still fit one beside them.
-              if (pass < passes.length - 1) break;
-              return {
-                act: 'waiting',
-                liveness: waitingOn(inFlight),
-                running: inFlight.length,
-                atOnce,
-              };
+        for (let round = 0; round < rounds; round += 1) {
+          const choice = chooseOvernightFire(remaining, asked, ports.now, lastFired, previousFired);
+          // Something was started this tick and nothing more fits: the tick fired,
+          // and the next one asks again once a seat or a module frees.
+          if (choice.act !== 'fire' && started.length > 0) return null;
+          if (choice.act === 'end') {
+            // The chooser can only say the tree ran out, and once anything has been
+            // refused that is no longer the whole truth: the reason has to name them,
+            // because the row's sentence is all the morning gets.
+            const said =
+              refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
+            // Which features the guard is holding, by name, so the note on the plan
+            // page says what the runner is waiting for rather than only that it is.
+            const held = choice.passedOver ?? [];
+            const reason = held.length > 0 ? `${said} ${passedOverNote(held, ports.now)}` : said;
+            // Nothing ready is a reading of one instant, so the night keeps its
+            // clock and asks again in four minutes. The budget and the stop time are
+            // settled and do end it; this is not.
+            //
+            // Refusals are the same reading. A feature refuses the send because a
+            // re-shape is rewriting it, because a claim beneath it is still live, or
+            // because it is only a proposal -- and the first two clear themselves
+            // while nobody is watching. On 19 September a run with no limit ended
+            // twenty-one minutes in: #669 and #656 both refused for a re-shape that
+            // had been sitting in `started` for nearly two hours, and five other
+            // features were waiting behind that.
+            //
+            // Retrying them costs a few queries a tick. The send refuses before it
+            // starts a routine, so no session is fired and no tokens are spent, and
+            // that is a much smaller price than a night that stops.
+            // The same goes for every feature having been tried without a close. It
+            // is a fact about this run so far, not about the plan: a claim frees, a
+            // step closes under a neighbouring feature, you approve something, and
+            // the tree reads differently four minutes later.
+            //
+            // Which leaves the budget and the stop time as the only two things that
+            // end a run, and that is the whole rule. A run told to go until you stop
+            // it has neither, so it goes until you stop it.
+            if (
+              choice.reason === OVERNIGHT_NOTHING_READY ||
+              choice.reason === OVERNIGHT_NO_PROGRESS
+            ) {
+              // With sessions going, what is ready may only be in their modules, and
+              // one of them finishing changes that. Said as waiting on them.
+              if (lane.running > 0 && refused.length === 0) {
+                // Nothing in the free modules; the next pass may still fit one beside them.
+                if (pass < passes.length - 1) break;
+                return {
+                  act: 'waiting',
+                  liveness: waitingOn(inFlight),
+                  running: lane.running,
+                  atOnce: lane.atOnce,
+                };
+              }
+              return { act: 'nothing-ready', reason };
             }
-            return { act: 'nothing-ready', reason };
+            await ports.stop(reason);
+            return { act: 'ended', reason };
           }
-          await ports.stop(reason);
-          return { act: 'ended', reason };
-        }
-        if (choice.act !== 'fire') return { act: choice.act };
+          if (choice.act !== 'fire') return { act: choice.act };
 
-        const sent = await ports.fire(choice.feature, choice.step);
-        if (sent.ok) {
-          // Only after something was actually started. A budget that went down on a
-          // send that never happened is a night that spends itself on nothing.
-          await ports.recordFire(featuresLeft);
-          featuresLeft = featuresLeft === null ? null : Math.max(0, featuresLeft - 1);
-          started.push({ feature: choice.feature.number, step: choice.step.number });
-          runningIds.push(choice.feature.id);
-          // A spent budget is left for the next tick to end, as it always was,
-          // so this tick's answer names what it started.
-          if (full()) return firedSoFar();
-          continue fill;
-        }
+          const sent = await ports.fire(choice.feature, choice.step);
+          if (sent.ok) {
+            // Only after something was actually started. A budget that went down on a
+            // send that never happened is a night that spends itself on nothing.
+            await ports.recordFire(featuresLeft);
+            featuresLeft = featuresLeft === null ? null : Math.max(0, featuresLeft - 1);
+            started.push({ feature: choice.feature.number, step: choice.step.number });
+            runningIds.push(choice.feature.id);
+            lane.running += 1;
+            // A spent budget is left for the next tick to end, as it always was,
+            // so this tick's answer names what it started.
+            if (full(lane)) return null;
+            continue fill;
+          }
 
-        const error = sent.error ?? 'The feature could not be sent.';
-        // A send that broke rather than refused stops the tick where it stands.
-        // The next feature would be handed to the same routine over the same
-        // connection and fail the same way, and a tick that worked down the whole
-        // tree on a dead API would burn every candidate the night had left.
-        if (!sent.refused) {
-          if (started.length === 0) return { act: 'failed', error };
-          console.error(`overnight: stopped filling slots after a send broke: ${error}`);
-          return firedSoFar();
-        }
+          const error = sent.error ?? 'The feature could not be sent.';
+          // A send that broke rather than refused stops the tick where it stands.
+          // The next feature would be handed to the same routine over the same
+          // connection and fail the same way, and a tick that worked down the whole
+          // tree on a dead API would burn every candidate the night had left.
+          if (!sent.refused) return { act: 'failed', error };
 
-        refused.push({ number: choice.feature.number, error });
-        refusedIds.push(choice.feature.id);
-        remaining = without(remaining, choice.feature.id);
+          refused.push({ number: choice.feature.number, error });
+          refusedIds.push(choice.feature.id);
+          remaining = without(remaining, choice.feature.id);
+        }
       }
+      // Every pass answers or fires, so this is the unreachable case below.
+      if (started.length > 0) return null;
+      break;
     }
-    // Every pass answers or fires, so this is the unreachable case below.
-    if (started.length > 0) return firedSoFar();
-    break;
-  }
 
-  // Unreachable: every turn of the loop either answers or removes one of the
-  // features it was bounded by. Here so the night ends on a sentence rather
-  // than on a type error if that ever stops being true.
-  /* v8 ignore next 3 */
-  const reason = overnightRefusedReason(refused, OVERNIGHT_NOTHING_READY);
-  await ports.stop(reason);
-  return { act: 'ended', reason };
+    // Unreachable: every turn of the loop either answers or removes one of the
+    // features it was bounded by. Here so the night ends on a sentence rather
+    // than on a type error if that ever stops being true.
+    /* v8 ignore next 3 */
+    const reason = overnightRefusedReason(refused, OVERNIGHT_NOTHING_READY);
+    await ports.stop(reason);
+    return { act: 'ended', reason };
+  };
+
+  // The app's group first, so its reading is the one the page shows when no
+  // group starts anything; a project with nothing ready says nothing.
+  let answer: OvernightTick | null = open.includes(appLane) ? null : appWaiting;
+  for (const lane of open) {
+    const said = await fillLane(lane);
+    if (said === null) continue;
+    if (said.act === 'failed') {
+      if (started.length === 0) return said;
+      console.error(`overnight: stopped filling slots after a send broke: ${said.error}`);
+      return firedSoFar();
+    }
+    if (said.act === 'ended' || said.act === 'idle' || said.act === 'paused') return said;
+    answer ??= said;
+  }
+  if (started.length > 0) return firedSoFar();
+  return answer ?? appWaiting;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

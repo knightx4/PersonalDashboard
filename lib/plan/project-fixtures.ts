@@ -15,7 +15,6 @@ export const WEBSITE_FIXTURE: DevProject = {
   checkCommand: null,
   setUpAt: '2026-10-26T00:00:00Z',
   archivedAt: null,
-  routineEnv: { id: 'CLAUDE_WEBSITE_ROUTINE_ID', token: 'CLAUDE_WEBSITE_ROUTINE_TOKEN' },
 };
 
 export const PROJECT_FIXTURES: readonly DevProject[] = [WEBSITE_FIXTURE];

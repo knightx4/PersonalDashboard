@@ -10,8 +10,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { isOwner, type OwnerCheck } from '@/lib/dev/owner';
 import { moveNoteToIdea, routesToPlan } from '@/lib/feedback/move';
 import { triageRow } from '@/lib/feedback/triage-run';
-import { scoreIdeaRow } from '@/lib/ideas/score-run';
-import { shapeIdeaRun } from '@/lib/ideas/shape';
+import { sendIdeaToPlan } from '@/lib/ideas/send-to-plan';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /**
@@ -70,13 +69,15 @@ export async function writeDevNote(
       if (!routesToPlan(triage) || !(await isOwner({ user, supabase }))) return;
       const moved = await moveNoteToIdea(supabase, { userId: user.id, noteId: id });
       if (!moved.ok) return;
-      const scoreSpend: SpendReport[] = [];
-      await scoreIdeaRow(supabase, { userId: user.id, id: moved.ideaId, triage, spend: scoreSpend });
-      await recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, scoreSpend);
-      // Then straight on to be shaped into a proposed feature (note 677a1cdd),
-      // as Shape on the ideas page would, rather than waiting there for a press.
-      const shaped = await shapeIdeaRun(supabase, user.id, moved.ideaId);
-      if (!shaped.ok) console.warn('[capture] shaping a moved note failed', shaped.error);
+      // Scored, then straight on to be shaped (note 677a1cdd): the same path a
+      // project app's notes take (lib/ideas/send-to-plan.ts).
+      await sendIdeaToPlan(supabase, {
+        userId: user.id,
+        ideaId: moved.ideaId,
+        triage,
+        score: true,
+        record: (spend) => recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, spend),
+      });
     } catch (problem) {
       console.warn('[capture] triaging a note failed', problem);
     }

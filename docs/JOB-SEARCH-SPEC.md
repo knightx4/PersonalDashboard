@@ -733,7 +733,7 @@ Every source passes one gate (`lib/jobs/suggest/admit.ts`, `fit-gate.ts`): a rol
 
 **Interviews.** Scheduled and past, at `/jobs/interviews`, reached from Today. Prep notes before, debrief after. A prompt to write the debrief that evening while it is fresh, since a debrief written three days later is worth very little.
 
-**Email ingestion and the review queue.** Everything above. The review queue is not optional polish. It is what keeps the pipeline trustworthy. It is a strip on Today, and the full queue at `/jobs/review` is one press from it.
+**Email ingestion and the review queue.** Everything above. The review queue is not optional polish. It is what keeps the pipeline trustworthy. Every item in it is listed in the Jobs Inbox (`/jobs/inbox`), each with its own buttons and narrowed by kind; `/jobs/review` lands there.
 
 **Question and answer capture.** Bookmarklet, paste box, and Greenhouse API where available. Question bank with canonical answers. Generation comes later (see [EVIDENCE-LAYER.md](EVIDENCE-LAYER.md)), but capture and manual answering are MVP, so the bank has content by the time generation exists.
 

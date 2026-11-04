@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { THEME_LIST_LIMIT, type ThemeListRow } from '@/lib/vault/map/read';
 import type { MergeLogPage } from '@/lib/vault/map/merge-log';
-import type { SweepView } from '@/lib/vault/map/sweep-read';
+import { SWEEP_PAUSED, type SweepView } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
 import { MergeLog } from './merge-log';
 import { SweepAction, SweepPanel } from './sweep-panel';
@@ -44,7 +44,11 @@ export function VaultMapView({
         <EmptyState
           icon={Waypoints}
           title="Nothing on the map yet"
-          description="The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Sweep every note to fill it, or open one note and use its Map section. What the sweep reads and what you accept on a note appear here."
+          description={
+            SWEEP_PAUSED
+              ? 'The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Open a note and use its Map section: what you accept there appears here.'
+              : 'The map lists the subjects your notes return to, most written about first, with the positions under each and the sentence each came from. Sweep every note to fill it, or open one note and use its Map section. What the sweep reads and what you accept on a note appear here.'
+          }
           action={{ label: 'Open your notes', href: '/vault' }}
         />
       </PageColumn>
