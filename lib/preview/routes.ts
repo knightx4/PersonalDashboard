@@ -649,6 +649,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   // A ref link's preview held open (plan #1931.4): in comments, Dash's
   // replies and plan details.
   'ref-preview': ['/dev/plan', '/dev/inbox', '/goals'],
+  // The page's heading, path and widths (plan #2815.3), a component surface:
+  // every page draws them, and each page has surfaces of its own.
+  'shell-page-header': ['/dev/ui'],
   // The per-day bar chart (plan #2036.1), made for the two usage pages: drawn
   // with data, the readout held on a day, and a period with nothing in it.
   'usage-day-bars': ['/dev/usage', '/account/spend'],
@@ -1003,6 +1006,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],
+  // A comment's body (plan #2815.3), which the thread draws on every row and
+  // which reached 57 surfaces through it and the two pages that quote one.
+  'dev-comment-thread': ['components/dev/comment-body.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
   // Dash's box: @ rows, / commands and the scope chip (plan #1899.5).
   'ask-box-rows': ['components/talk/ask-box.tsx'],
@@ -1031,7 +1037,20 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],
+  // The count of comments on a row (plan #2815.3), drawn by the plan tree's
+  // row on every page with a tree: 153 surfaces. The tree surface has a row
+  // with two comments.
+  'dev-plan-tree': ['components/dev/comment-count.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The frame every page draws (plan #2815.3). Each of these reached 700 to
+  // 850 surfaces, so a change to one is looked at once, where the header is
+  // drawn in each state and the page in both widths.
+  'shell-page-header': [
+    'components/shell/page-header.tsx',
+    'components/shell/breadcrumb.tsx',
+    'components/shell/back-link.tsx',
+    'components/shell/page-width.tsx',
+  ],
   'shell-account-menu': ['components/shell/account-menu.tsx'],
   // The status line while a run is going (plan #1964.2.3).
   'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],

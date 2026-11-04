@@ -5,8 +5,11 @@
  *   UI_PREVIEW=1 PORT=3400 npm run start &
  *   npx tsx scripts/shoot.ts                    # everything
  *   npx tsx scripts/shoot.ts jobs-role-timeline # one surface
+ *   npx tsx scripts/shoot.ts a b c              # several (plan #2815.3)
  *
- * Shots land in .preview-shots/, which is gitignored. Nothing here ships.
+ * Shots land in .preview-shots/, which is gitignored, or in the folder
+ * SHOOT_OUT names: `npm run ui-guard -- <n> --compare` shoots main's into
+ * .preview-shots/before/ that way. Nothing here ships.
  *
  * With --record it films instead of photographing (docs/UI-QUALITY-SPEC.md,
  * Part 8). Each surface whose gallery entry declares an `interaction` has it
@@ -78,7 +81,7 @@ function findChrome(): string {
 
 const CHROME = findChrome();
 const PORT = process.env.PREVIEW_PORT ?? '3400';
-const OUT = join(process.cwd(), '.preview-shots');
+const OUT = process.env.SHOOT_OUT?.trim() || join(process.cwd(), '.preview-shots');
 const PROBE = process.env.SHOOT_PROBE_PORT ? Number(process.env.SHOOT_PROBE_PORT) : 9500;
 
 /**
@@ -311,7 +314,7 @@ async function evaluate<T>(send: Send, expression: string): Promise<T | undefine
 }
 
 async function main() {
-  const only = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
+  const asked = new Set(process.argv.slice(2).filter((arg) => !arg.startsWith('--')));
 
   // The status, not the body. Checking the HTML for the string "404" was the
   // first version of this and it matched the framework's own markup, so a
@@ -331,10 +334,14 @@ async function main() {
   // two cannot drift.
   const index = await probe.text();
   const ids = [...index.matchAll(/\/preview\?s=([\w-]+)/g)].map((m) => m[1]!);
-  const surfaces = [...new Set(only ? ids.filter((entry) => entry === only) : ids)];
+  const surfaces = [...new Set(asked.size > 0 ? ids.filter((entry) => asked.has(entry)) : ids)];
   if (surfaces.length === 0) {
-    throw new Error(only ? `No surface named ${only}` : 'The index lists no surfaces.');
+    throw new Error(
+      asked.size > 0 ? `No surface named ${[...asked].join(', ')}` : 'The index lists no surfaces.',
+    );
   }
+  const unknown = [...asked].filter((id) => !surfaces.includes(id));
+  if (unknown.length > 0) console.log(`Not in this gallery, so not shot: ${unknown.join(', ')}`);
 
   if (RECORD) {
     await recordAll(surfaces, readInteractions(index));
