@@ -418,6 +418,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-session-failed': ['/chat/dash/session/[id]'],
   'chat-people': ['/chat'],
   'chat-people-empty': ['/chat'],
+  'chat-people-new': ['/chat'],
   'chat-people-failed': ['/chat'],
   'chat-people-loading': ['/chat'],
   'chat-people-search': ['/chat'],

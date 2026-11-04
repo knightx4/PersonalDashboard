@@ -163,6 +163,30 @@ export function previewOf(row: PersonRow, now: number): string {
   return row.canTalk ? 'Say hello' : 'Not ready to talk yet';
 }
 
+/**
+ * The Messages list (plan #2879.2): only the people and bots you have a chat
+ * with. Everyone else is reached through New message, which starts one.
+ */
+export function withChats(rows: readonly PersonRow[], open: string | null = null): PersonRow[] {
+  // The open thread keeps a row, lit, even before it has a chat, so the list
+  // always says whose thread is beside it.
+  return rows.filter((r) => r.chatId !== null || r.key === open);
+}
+
+/** Who New message offers, A to Z: everyone, those ready to talk first. */
+export function recipientsOf(rows: readonly PersonRow[]): PersonRow[] {
+  return [...rows].sort((a, b) => Number(b.canTalk) - Number(a.canTalk) || a.name.localeCompare(b.name));
+}
+
+/** Who New message shows for what is typed in its To box: a name holding those letters. */
+export function filterRecipients(rows: readonly PersonRow[], typed: string): PersonRow[] {
+  const q = typed.trim().toLowerCase();
+  return q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : [...rows];
+}
+
+/** Where New message opens: the picker of who to message, in the thread's place. */
+export const NEW_MESSAGE_HREF = '/chat?new=1';
+
 /** Where a person's thread is. */
 export function threadHref(key: string): string {
   return `/chat/people/${key}`;

@@ -6,17 +6,19 @@ import {
   loadThreadPage,
   searchTextOf,
   searchThreads,
+  withChats,
   type PersonRow,
   type SearchHit,
   type ThreadPage,
 } from '@/lib/you/chat-threads';
 import { newPersonCard } from '@/lib/you/people-cards-model';
-import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard } from './actions';
+import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard, startChatWith } from './actions';
+import { NewMessage } from './new-message';
 import { ThreadView } from './people/[key]/thread-view';
 import { PersonForm } from './people/person-form';
 import { PeopleView } from './people-view';
 
-export const metadata = { title: 'People' };
+export const metadata = { title: 'Messages' };
 export const dynamic = 'force-dynamic';
 
 /** The time the page is read; outside the component, since reading the clock during render is unstable. */
@@ -25,6 +27,9 @@ function readAt(): number {
 }
 
 type Found = {
+  /** Everyone on the roster, for New message and the add form's colours. */
+  everyone: PersonRow[];
+  /** Those with a chat, which the list shows. */
   rows: PersonRow[];
   hits: SearchHit[] | null;
   newest: { person: PersonRow; page: ThreadPage } | null;
@@ -32,41 +37,55 @@ type Found = {
 };
 
 /**
- * Chat's People tab (plan #2748.6), the page Chat opens on: everyone you
- * talk to, newest thread first, and on a laptop the newest thread open
- * beside them. `?q=` searches every thread's words, and `?add=1` opens the
- * form for adding someone in the thread's place (plan #2748.11).
+ * Chat's Messages tab (plan #2748.6, #2879.2), the page Chat opens on: the
+ * people and bots you have a chat with, newest first, and on a laptop the
+ * newest thread open beside them. `?q=` searches every thread's words,
+ * `?new=1` opens New message in the thread's place, and `?add=1` the form
+ * for adding someone (plan #2748.11).
  */
-export default async function ChatPeoplePage({ searchParams }: { searchParams: Promise<{ q?: string; add?: string }> }) {
-  const { q, add } = await searchParams;
-  const adding = add === '1';
-  const query = searchTextOf(q);
+export default async function ChatMessagesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; add?: string; new?: string }>;
+}) {
+  const params = await searchParams;
+  const adding = params.add === '1';
+  const composing = params.new === '1';
+  const query = searchTextOf(params.q);
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
   const [found, settings] = await Promise.all([
     loadPeople(client, user.id).then(
-      async (rows): Promise<Found> => {
+      async (everyone): Promise<Found> => {
+        const rows = withChats(everyone);
         const first = rows.find((r) => r.chatId && r.last);
         const [hits, page] = await Promise.all([
           query ? searchThreads(client, user.id, query, rows) : null,
           first?.chatId ? loadThreadPage(client, user.id, first.chatId) : null,
         ]);
-        return { rows, hits, newest: first && page ? { person: first, page } : null };
+        return { everyone, rows, hits, newest: first && page ? { person: first, page } : null };
       },
       (error: unknown): Found => {
         console.error('chat people were not read', error);
-        return { rows: [], hits: null, newest: null, failed: true };
+        return { everyone: [], rows: [], hits: null, newest: null, failed: true };
       },
     ),
     loadAccountSettings(user.id),
   ]);
   const newest = found.newest;
+  if (composing && !found.failed) {
+    return (
+      <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
+        <NewMessage everyone={found.everyone} start={startChatWith} />
+      </PeopleView>
+    );
+  }
   if (adding && !found.failed) {
     return (
       <PeopleView rows={found.rows} query={query} hits={found.hits} timezone={settings.timezone} now={now} adding>
         <PersonForm
-          card={newPersonCard(found.rows.map((r) => r.colour))}
+          card={newPersonCard(found.everyone.map((r) => r.colour))}
           timezone={settings.timezone}
           now={now}
           actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory }}

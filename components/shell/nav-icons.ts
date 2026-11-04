@@ -1,7 +1,7 @@
 import {
   Timer,
   MessagesSquare,
-  UsersRound,
+  MessageCircle,
   Activity,
   SendHorizontal,
   BarChart3,
@@ -216,8 +216,8 @@ export const NAV_ICONS = {
   board: Users,
   // Dash's Writing style page: how you write, read from your sent mail.
   writingStyle: Feather,
-  // Chat's two tabs (plan #2748.1): the mentors you text, and your chats with Dash.
-  chatPeople: UsersRound,
+  // Chat's tabs (plan #2748.1, #2879.2): Messages, your chats with people and bots, and Dash.
+  chatMessages: MessageCircle,
   chatDash: MessagesSquare,
 } as const;
 

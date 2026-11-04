@@ -283,8 +283,8 @@ export function ThreadView({
       name={person.name}
       detail={threadDetail(person)}
       avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
-      back={{ href: '/chat', label: 'People' }}
-      crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
+      back={{ href: '/chat', label: 'Messages' }}
+      crumbs={[{ label: 'Messages', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
       actions={
         <Link href={editHref(person.key)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
           Edit

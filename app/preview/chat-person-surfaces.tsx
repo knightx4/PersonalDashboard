@@ -7,7 +7,7 @@ import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import { newPersonCard, type PersonCard } from '@/lib/you/people-cards-model';
 import { PeopleView } from '@/app/chat/people-view';
 import { PersonForm } from '@/app/chat/people/person-form';
-import { CHAT_PEOPLE } from './chat-surfaces';
+import { CHAT_PEOPLE, MESSAGE_ROWS } from './chat-surfaces';
 
 /**
  * Adding and editing a person in Chat (plan #2748.11), in the gallery: the
@@ -124,7 +124,7 @@ export function ChatPersonAddSurface({ state = 'empty' }: { state?: 'empty' | 'd
   const card = state === 'empty' ? newPersonCard(CHAT_PEOPLE.map((p) => p.colour)) : NEW_FILLED;
   return (
     <Shell path="/chat">
-      <PeopleView rows={CHAT_PEOPLE} timezone={ZONE} now={NOW} live={false} adding>
+      <PeopleView rows={MESSAGE_ROWS} timezone={ZONE} now={NOW} live={false} adding>
         <PersonForm
           card={card}
           timezone={ZONE}
@@ -142,7 +142,7 @@ export function ChatPersonAddSurface({ state = 'empty' }: { state?: 'empty' | 'd
 export function ChatPersonEditSurface({ state = 'form' }: { state?: 'form' | 'card' | 'redrafting' | 'memory' }) {
   return (
     <Shell path={`/chat/people/${FRANKLIN_PERSON.key}`}>
-      <PeopleView rows={CHAT_PEOPLE} current={FRANKLIN_PERSON.key} timezone={ZONE} now={NOW} live={false}>
+      <PeopleView rows={MESSAGE_ROWS} current={FRANKLIN_PERSON.key} timezone={ZONE} now={NOW} live={false}>
         <PersonForm
           card={FRANKLIN_PERSON}
           timezone={ZONE}

@@ -3,9 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Search } from 'lucide-react';
+import { Search, SquarePen } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
-import { ADD_HREF } from '@/lib/you/people-cards-model';
 import { PersonMark } from '@/components/patterns/messaging';
 import { Input } from '@/components/ui/field';
 import { createClient } from '@/lib/auth/client';
@@ -13,6 +12,7 @@ import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
 import {
   isTyping,
+  NEW_MESSAGE_HREF,
   personInitials,
   previewOf,
   threadHref,
@@ -22,7 +22,8 @@ import {
 } from '@/lib/you/chat-threads-model';
 
 /**
- * The People list (plan #2748.6): everyone you talk to, newest thread first,
+ * The Messages list (plan #2748.6, renamed and narrowed by #2879.2): everyone
+ * you have a chat with, newest thread first,
  * each with their initials in their colour, the last thing said, its time,
  * and a dot while it is unread; "typing…" in place of the last line while
  * they write. The search box above it finds words across every thread.
@@ -109,10 +110,10 @@ export function PeopleList({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
-          <Link href={ADD_HREF} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-mr-2')}>
-            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-            Add
+          <h2 className="font-display text-title font-semibold tracking-tight text-ink">Messages</h2>
+          <Link href={NEW_MESSAGE_HREF} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-mr-2')}>
+            <SquarePen className="size-4" strokeWidth={1.75} aria-hidden />
+            New message
           </Link>
         </div>
         <form action="/chat" role="search" className="relative mt-3">

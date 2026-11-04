@@ -7,7 +7,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
-import { loadThreadPage, markThreadRead, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
 import {
   addPerson,
   ASK_MAX,
@@ -32,6 +32,7 @@ import {
  * adding and editing a person and what they remember (plan #2748.11).
  */
 
+const KEY = /^[a-z0-9_-]{1,80}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // latency: pending
@@ -43,6 +44,22 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+/** New message (plan #2879.2): start the chat with them, or find the one there is, and say where it is. */
+// latency: pending
+export async function startChatWith(key: string): Promise<{ href: string } | { error: string }> {
+  const user = await requireUser();
+  if (!KEY.test(key)) return { error: 'That chat cannot be started.' };
+  try {
+    const started = await startChat(await createYouClient(), user.id, key);
+    if (!started) return { error: 'They are not on your list any more.' };
+    revalidatePath('/chat');
+    return { href: threadHref(key) };
+  } catch (error) {
+    console.error('chat not started', error);
+    return { error: 'The chat could not be started. Try again.' };
   }
 }
 
