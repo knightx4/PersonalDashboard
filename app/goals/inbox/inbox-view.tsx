@@ -8,7 +8,9 @@ import type { TodayItem } from '@/lib/goals/today';
 import { formatDay } from '@/lib/goals/dates';
 import { stepHref } from '@/lib/goals/all-goals';
 import { RunQuestionCard } from '@/components/runs/run-question-card';
+import { SessionQuestionCard } from '@/components/runs/session-question-card';
 import { answerGoalRunAction } from '../runs/[runId]/actions';
+import { answerSessionQuestionAction } from './actions';
 import { DashRow } from '../goal-lanes';
 import { bringBackAction } from '../home-actions';
 import { TodayRow } from '../today-list';
@@ -65,6 +67,14 @@ export function GoalsInboxView({
       title: question.about,
       move: { state: 'on_you' as const },
       card: <RunQuestionCard question={question} action={answerGoalRunAction} />,
+    })),
+    // A session that stopped to ask is held the same way.
+    ...group.sessions.map((question) => ({
+      ref: `session:${question.id}`,
+      section: group.key,
+      title: question.about,
+      move: { state: 'on_you' as const },
+      card: <SessionQuestionCard question={question} action={answerSessionQuestionAction} />,
     })),
     // Then the rows that say one thing many times, folded into one each.
     ...group.bundles
