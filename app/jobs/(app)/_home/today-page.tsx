@@ -59,7 +59,8 @@ export function TodayPage(
         <PageHeader title="Now" />
         <TabbedSections tabs={NOW_TABS} label="Now" address={{ ...NOW_TAB_ADDRESS, opensOn }}>
           {props.tab === 'activity' ? (
-            <section id="activity" aria-label="Activity" className="max-w-3xl scroll-mt-4">
+            // As wide as the tab row above it, so the row and the feed share one column.
+            <section id="activity" aria-label="Activity" className="scroll-mt-4">
               <CheckInboxNow accounts={props.accounts} />
               <ActivityFeed activity={props.activity} timezone={timezone} />
             </section>
