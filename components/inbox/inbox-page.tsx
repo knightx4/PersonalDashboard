@@ -337,6 +337,7 @@ export function InboxPage({
   later = [],
   empty,
   sectionActions,
+  sectionTools,
   alsoWaiting = 0,
   laterOpen = false,
   groups,
@@ -359,6 +360,8 @@ export function InboxPage({
   empty: { title: string; description: string; align?: 'center' | 'start' };
   /** A press that acts on a whole section, opposite its heading (Dev's Approve all). */
   sectionActions?: Partial<Record<InboxSectionKey, ReactNode>>;
+  /** What a section's rows are narrowed by, between its heading and its rows (the Jobs Inbox's kinds of import). */
+  sectionTools?: Partial<Record<InboxSectionKey, ReactNode>>;
   /** Rows the workspace lists under the sections itself, which keep the empty state away. */
   alsoWaiting?: number;
   /** Whether Later starts open; shut on the app's pages. */
@@ -442,6 +445,7 @@ export function InboxPage({
               )
             }
           >
+            {groups ? null : sectionTools?.[section.key as InboxSectionKey]}
             <ul className={cn(cardVariants(), 'divide-y divide-border')}>
               {section.rows.map((row) =>
                 row.card ? <Fragment key={row.ref}>{row.card}</Fragment> : <ShapeRow key={row.ref} row={row} />,

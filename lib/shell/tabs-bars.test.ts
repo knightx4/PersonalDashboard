@@ -43,7 +43,6 @@ const BEFORE: Record<
         href: '/jobs/inbox',
         label: 'Inbox',
         icon: 'inbox',
-        alsoMatches: ['/jobs/review'],
         badge: 7,
       },
       // Returns to the view it was left on (note 978314f8).

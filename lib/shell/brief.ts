@@ -113,7 +113,7 @@ export async function loadJobsBrief(
   if (reviewCount > 0) {
     return {
       text: `${plural(reviewCount, 'import')} to check`,
-      href: '/jobs/review',
+      href: '/jobs/inbox',
       tone: 'caution',
     };
   }
