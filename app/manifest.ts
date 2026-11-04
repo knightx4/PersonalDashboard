@@ -34,9 +34,9 @@ export default function manifest(): MetadataRoute.Manifest {
       params: { title: 'title', text: 'text', url: 'url' },
     },
     background_color:
-      '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
+      '#f5f1e8' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
     theme_color:
-      '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
+      '#f5f1e8' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
     /*
      * Android wants 192 and 512 PNGs, and a maskable one for the launcher's
      * own shape (circle, squircle, rounded square). Without a maskable icon,

@@ -3,8 +3,9 @@
  *
  * The app used to offer four named themes; it now offers light or dark and a
  * hue, which is the same four themes and every other one. Picking a colour
- * moves the grounds, the text, the borders and the app's own accent to it and
- * leaves everything else -- the six workspace colours, green for saved, red
+ * moves the grounds, the text, the borders and the app's own accent to it --
+ * in Solid the grounds, text and borders only by a trace (`quieten` below),
+ * so the colour reads as an accent rather than a glaze -- and leaves everything else -- the six workspace colours, green for saved, red
  * for delete -- where it was. The one exception is a colour picked close to
  * one of those three: the accent steps a few degrees off it so a link never
  * comes out the same colour as the delete button, which is `accentHueFor`
@@ -130,9 +131,43 @@ function generateBase(mode: ThemeMode, hue: number | null): Palette {
   // Asking for the reference's own hue is the reference, said outright rather
   // than arrived at: Dusk has to come back hex for hex, and a bisection that
   // lands a ten-thousandth away from where it started could round otherwise.
-  if (turn === 0 && accentTurn === 0) return { ...reference };
+  if (turn === 0 && accentTurn === 0) return quieten({ ...reference }, mode);
 
-  return rotate(reference, turn, accentTurn, hueTokensFor(mode));
+  return quieten(rotate(reference, turn, accentTurn, hueTokensFor(mode)), mode);
+}
+
+/**
+ * The most colour Solid's grounds, borders and text may carry, by polarity.
+ *
+ * Solid is a flat page, and the colour chosen for it is an accent: the links,
+ * the primary button, the selected row. Turning Dusk or LIGHT_CAST whole put
+ * the colour into every surface at 0.02 to 0.06 chroma, and the person saw
+ * it as a coloured glaze over the whole app. Capped here, the page, the cards
+ * and the text keep only a trace of the hue -- about what Ink's own slate
+ * carries -- so they read as neutral with a temperature, and the accent
+ * carries the colour on its own.
+ */
+export const SOLID_NEUTRAL_CHROMA: Record<'light' | 'dark', number> = { light: 0.008, dark: 0.009 };
+
+/**
+ * Solid's neutrals with their chroma capped, each at the light it reflected,
+ * so every contrast ratio is the one the turned palette had. The accent
+ * tokens and the wash are left alone, and so are the glass rooms, which paint
+ * their colour on purpose.
+ */
+function quieten(palette: Palette, mode: ThemeMode): Palette {
+  if (mode !== 'light' && mode !== 'dark') return palette;
+  const cap = SOLID_NEUTRAL_CHROMA[mode];
+  const keep = new Set([...ACCENT_TOKENS, ...WASH_TOKENS]);
+  for (const token of hueTokensFor(mode)) {
+    if (keep.has(token)) continue;
+    const value = palette[token];
+    if (!value || !value.startsWith('#')) continue;
+    const colour = hexToOklch(value);
+    if (colour.c <= cap) continue;
+    palette[token] = withLuminance({ ...colour, c: cap }, relativeLuminance(value));
+  }
+  return palette;
 }
 
 /**
