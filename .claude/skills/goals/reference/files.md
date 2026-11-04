@@ -74,3 +74,16 @@ question, update the file rather than writing a second one: rewrite the parts
 that changed, keep what still holds, and set `change_note` to one sentence on
 what changed ("Added the October applications; the operations reply rate is now 50%").
 Every earlier version stays readable.
+
+## Documents a step waits for
+
+A goal's Work & files tab lists, under Waiting for, the documents its open
+steps still need (plan #2778.7): each live row in `goals.document_kinds` whose
+`item_id` is an open step, or whose `collection_id` is the form of an open
+information step. A kind stays there until a file link names it: a
+`goals.links` row of kind 'file' with `document_kind_id` set. When a step
+waits for a document (an approval letter, a receipt), add a kind for it with
+`item_id` set to the step, a `name` the person would use and a `recognise`
+line saying how to tell one. When the morning run finds that document in
+Gmail and keeps it as a file on the step, set the link's `document_kind_id`
+to the kind, which takes it off Waiting for.

@@ -268,38 +268,6 @@ export function RecentFiles({
 }
 
 /**
- * The Work & files tab (plan #2778.4): what Dash is on under the goal and
- * every file on it, the goal's own first. Plan #2778.7 gives it its views
- * (All, Dash wrote, Yours, Waiting for), uploads and Dash's full list of work.
- */
-export function GoalWorkFiles({ work, files }: { work: React.ReactNode; files: React.ReactNode }) {
-  return (
-    <div className="space-y-6">
-      <section aria-labelledby="work-heading" className="space-y-2">
-        <SectionHeading id="work-heading" title="Dash’s work" className="px-1" />
-        <Card padding="dense">
-          {work ?? (
-            <p className="text-small text-ink-muted">
-              Nothing running on this goal, and nothing finished in the last day.
-            </p>
-          )}
-        </Card>
-      </section>
-      {files ?? (
-        <section aria-labelledby="files-heading" className="space-y-2">
-          <SectionHeading id="files-heading" title="Files" className="px-1" />
-          <Card padding="dense">
-            <p className="text-small text-ink-muted">
-              No files on this goal yet. What Dash writes for it, and what you add, lands here.
-            </p>
-          </Card>
-        </section>
-      )}
-    </div>
-  );
-}
-
-/**
  * A goal with no tiles laid out yet (plan #2778.4): one line saying so, with
  * Ask Dash to lay them out. Laying out is plan #2778.9's; until then the
  * press asks Dash on the goal, as Ask Dash does.
