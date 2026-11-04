@@ -10,6 +10,7 @@ import { loadDailyView } from '@/lib/goals/steps-store';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { goalsWaitingText } from '@/lib/shell/home-model';
 import { todayInTimezone } from '@/lib/money';
+import { ACTIVITY_HREF } from '@/lib/jobs/home/now-tabs';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -154,7 +155,7 @@ export async function loadJobsBrief(
   );
 
   return events > 0
-    ? { text: `${plural(events, 'update')} in the last day`, href: '/jobs/activity' }
+    ? { text: `${plural(events, 'update')} in the last day`, href: ACTIVITY_HREF }
     : null;
 }
 

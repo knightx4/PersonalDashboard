@@ -3246,7 +3246,6 @@ const shellSections: NavSection[] = [
   { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
-  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -12203,9 +12202,9 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-activity',
-    label: 'Jobs · Activity',
+    label: 'Now · the Activity tab',
     module: 'jobs',
-    width: 'page',
+    width: 'wide',
     render: () => <JobsActivitySurface />,
   },
   {
