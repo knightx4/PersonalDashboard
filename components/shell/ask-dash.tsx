@@ -712,10 +712,11 @@ export function AskThread({
       boxStart={
         <>
           {box.thread.boxStart}
-          <ThinkSwitch on={think} onChange={setThink} />
+          {/* On Chat's Dash tab they sit under the box as quiet words (plan #2863). */}
+          <ThinkSwitch on={think} onChange={setThink} quiet={bubbles} />
           {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
           {!think && handle?.model && handle.chooseModel ? (
-            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} />
+            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} quiet={bubbles} />
           ) : null}
         </>
       }
