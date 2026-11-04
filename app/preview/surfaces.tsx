@@ -8831,6 +8831,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SessionThreadSurface part="attach" />,
   },
   {
+    /* Hidden part (plan #2789.9): Comment pressed on the session's mockup, its note box open under the card. */
+    id: 'chat-session-comment',
+    label: 'Dash · A session thread, a note on a mockup',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="comment" />,
+  },
+  {
+    /* Hidden part (plan #2789.9): the mockup picked, its card marked Picked, with your pick and a note on it as turns. */
+    id: 'chat-session-picked',
+    label: 'Dash · A session thread, a mockup picked',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="picked" />,
+  },
+  {
     /* A new thread (plan #2789.7), as Talk about this project opens it: the project picked, and the prompt to say what to work on. */
     id: 'chat-session-empty',
     label: 'Dash · A new session thread',
