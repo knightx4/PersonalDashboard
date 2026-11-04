@@ -2,6 +2,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { SEATS, type BoardReceipt } from '@/lib/you/board';
 import type { MadeItem } from '@/lib/you/board-make';
 import { optionsOf, type BoardOption, type QuestionStatus, QUESTION_STATUSES } from '@/lib/you/board-questions';
+import { tripwireOf, type Tripwire } from '@/lib/you/board-tripwires';
 
 /**
  * One meeting's debate as its page reads it (plan #2561.5): the questions the
@@ -32,6 +33,9 @@ export type TurnKind = 'opening' | 'reply' | 'vote';
 export type Round = 1 | 2 | 3;
 export type Scores = Record<string, number>;
 
+/** A 90% range for the success measure under one option (migrations-you/0029). */
+export type ForecastRange = { low: number; high: number; unit: string | null };
+
 export type DebateTurn = {
   id: string;
   questionId: string | null;
@@ -43,12 +47,40 @@ export type DebateTurn = {
   scores: Scores | null;
   receipts: BoardReceipt[];
   position: number;
+  /** Since plan #2581.8: the probability per option that it meets the success measure; null when the turn gave none. */
+  probabilities: Record<string, number> | null;
+  ranges: Record<string, ForecastRange> | null;
+  /** 100 points over the options. */
+  budget: Record<string, number> | null;
+  changeMind: string | null;
+  /** The one question this advisor answered. */
+  assessment: string | null;
+  /** A round 1 turn written without seeing the others'. */
+  blind: boolean;
+};
+
+/** One advisor's final numbers in a verdict (plan #2581.8). */
+export type VerdictForecast = {
+  advisor: string;
+  probabilities: Record<string, number>;
+  budget: Record<string, number> | null;
+  weight: number | null;
 };
 
 export type BoardVerdict = {
+  /** full for a one-way door, quick for a two-way one; null on a verdict from before plan #2581.8. */
+  method: 'full' | 'quick' | null;
   recommended: string | null;
+  /** The believability-weighted mean probability per option. */
+  probability: Record<string, number> | null;
+  /** Per option, the gap between the highest and lowest blind probability. */
+  spread: Record<string, number> | null;
+  forecasts: VerdictForecast[];
+  /** On a unanimous decision, who argued for which option nobody backed. */
+  steelman: { advisor: string; option: string } | null;
   conditions: string[];
-  dissent: { advisor: string; text: string }[];
+  /** `option` is the one they backed instead, since plan #2581.8. */
+  dissent: { advisor: string; text: string; option?: string | null }[];
   wouldChange: string[];
   /** What the board took as given where a fact was missing (plan #2561.11). */
   assumptions: string[];
@@ -79,11 +111,22 @@ export function decisionFromRow(row: Record<string, unknown>): QuestionDecision 
   return null;
 }
 
+/** One advisor's failure story, told as if a year on the decision went badly. */
+export type PremortemStory = { advisor: string; text: string; signal: string | null };
+
 export type DebateQuestion = {
   id: string;
   question: string;
   options: BoardOption[];
   status: QuestionStatus;
+  /** one_way or two_way since plan #2581.8; null on a decision worked before. */
+  door: 'one_way' | 'two_way' | null;
+  successMeasure: string | null;
+  decideBy: string | null;
+  /** The option letter the person leans toward. */
+  lean: string | null;
+  premortem: PremortemStory[];
+  tripwire: Tripwire | null;
   verdict: BoardVerdict | null;
   /** What the person did with the verdict (plan #2561.6); null while they have not. */
   decision: QuestionDecision | null;
@@ -120,6 +163,40 @@ function receiptsOf(value: unknown): BoardReceipt[] {
   });
 }
 
+/** { "A": 0.6, … } with every value a number in [lo, hi]; null when none is left. */
+function numberMap(value: unknown, lo: number, hi: number): Record<string, number> | null {
+  const row = record(value);
+  if (!row) return null;
+  const out: Record<string, number> = {};
+  for (const [letter, v] of Object.entries(row)) {
+    const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+    if (/^[A-Z]$/.test(letter) && Number.isFinite(n) && n >= lo && n <= hi) out[letter] = n;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function rangesOf(value: unknown): Record<string, ForecastRange> | null {
+  const row = record(value);
+  if (!row) return null;
+  const out: Record<string, ForecastRange> = {};
+  for (const [letter, v] of Object.entries(row)) {
+    const r = record(v);
+    if (!/^[A-Z]$/.test(letter) || !r) continue;
+    if (typeof r.low !== 'number' || typeof r.high !== 'number' || r.low > r.high) continue;
+    out[letter] = { low: r.low, high: r.high, unit: text(r.unit) || null };
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function premortemOf(value: unknown): PremortemStory[] {
+  return list(value).flatMap((entry) => {
+    const row = record(entry);
+    const advisor = text(row?.advisor);
+    const said = text(row?.text);
+    return advisor && said ? [{ advisor, text: said, signal: text(row?.signal) || null }] : [];
+  });
+}
+
 /** { "A": 7, "B": 4 }, keeping only single letters scored 1 to 10; null when none are left. */
 export function scoresOf(value: unknown): Scores | null {
   const row = record(value);
@@ -136,14 +213,37 @@ export function verdictOf(value: unknown): BoardVerdict | null {
   const row = record(value);
   if (!row) return null;
   const texts = (v: unknown) => list(v).map(text).filter(Boolean);
+  const steel = record(row.steelman);
   return {
+    method: row.method === 'full' || row.method === 'quick' ? row.method : null,
     recommended: /^[A-Z]$/.test(text(row.recommended)) ? text(row.recommended) : null,
+    probability: numberMap(row.probability, 0, 1),
+    spread: numberMap(row.spread, 0, 1),
+    forecasts: list(row.forecasts).flatMap((entry) => {
+      const f = record(entry);
+      const advisor = text(f?.advisor);
+      const probabilities = numberMap(f?.probabilities, 0, 1);
+      if (!advisor || !probabilities) return [];
+      return [
+        {
+          advisor,
+          probabilities,
+          budget: numberMap(f?.budget, 0, 100),
+          weight: typeof f?.weight === 'number' ? f.weight : null,
+        },
+      ];
+    }),
+    steelman:
+      steel && text(steel.advisor) && /^[A-Z]$/.test(text(steel.option))
+        ? { advisor: text(steel.advisor), option: text(steel.option) }
+        : null,
     conditions: texts(row.conditions),
     dissent: list(row.dissent).flatMap((entry) => {
       const d = record(entry);
       const advisor = text(d?.advisor);
       const said = text(d?.text);
-      return advisor && said ? [{ advisor, text: said }] : [];
+      const option = text(d?.option);
+      return advisor && said ? [{ advisor, text: said, option: /^[A-Z]$/.test(option) ? option : null }] : [];
     }),
     wouldChange: texts(row.would_change),
     assumptions: texts(row.assumptions),
@@ -175,6 +275,12 @@ export function turnOf(row: Record<string, unknown>): DebateTurn | null {
     scores: scoresOf(row.scores),
     receipts: receiptsOf(row.receipts),
     position: typeof row.position === 'number' ? row.position : 0,
+    probabilities: numberMap(row.probabilities, 0, 1),
+    ranges: rangesOf(row.ranges),
+    budget: numberMap(row.budget, 0, 100),
+    changeMind: text(row.change_mind) || null,
+    assessment: text(row.assessment) || null,
+    blind: row.blind === true,
   };
 }
 
@@ -218,6 +324,12 @@ export function debateFrom(
         question,
         options: optionsOf(row.options),
         status,
+        door: row.door === 'one_way' || row.door === 'two_way' ? row.door : null,
+        successMeasure: text(row.success_measure) || null,
+        decideBy: /^\d{4}-\d{2}-\d{2}/.test(text(row.decide_by)) ? text(row.decide_by).slice(0, 10) : null,
+        lean: /^[A-Z]$/.test(text(row.lean)) ? text(row.lean) : null,
+        premortem: premortemOf(row.premortem),
+        tripwire: tripwireOf(row.tripwire),
         verdict: verdictOf(row.verdict),
         decision: decisionFromRow(row),
         made: [],
@@ -235,7 +347,12 @@ export function debateFrom(
       rank(a.id) - rank(b.id) || (created.get(a.id) ?? '').localeCompare(created.get(b.id) ?? ''),
   );
   const spoke = new Set(turns.flatMap((t) => (t.addressedTo ? [t.advisorId, t.addressedTo] : [t.advisorId])));
-  const verdictKeys = new Set(questions.flatMap((q) => q.verdict?.scores.map((s) => s.advisor) ?? []));
+  const verdictKeys = new Set(
+    questions.flatMap((q) => [
+      ...(q.verdict?.scores.map((s) => s.advisor) ?? []),
+      ...(q.verdict?.forecasts.map((f) => f.advisor) ?? []),
+    ]),
+  );
   const advisors = advisorRows
     .map(advisorOf)
     .filter((a): a is DebateAdvisor => a !== null && (spoke.has(a.id) || verdictKeys.has(a.key)));
@@ -361,12 +478,16 @@ export async function loadMeetingDebate(
   const [questions, turns, advisors] = await Promise.all([
     client
       .from('board_questions')
-      .select('id, question, options, status, verdict, decided_option, decision_note, decided_at, created_at')
+      .select(
+        'id, question, options, status, verdict, decided_option, decision_note, decided_at, created_at, door, success_measure, decide_by, lean, premortem, tripwire',
+      )
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),
     client
       .from('board_turns')
-      .select('id, question_id, round, advisor_id, addressed_to, kind, text, scores, receipts, position')
+      .select(
+        'id, question_id, round, advisor_id, addressed_to, kind, text, scores, receipts, position, probabilities, ranges, budget, change_mind, assessment, blind',
+      )
       .eq('user_id', userId)
       .eq('meeting_id', meetingId)
       .order('position'),

@@ -23,6 +23,7 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouBoardDecisionPreview } from './you-board-decision-surfaces';
 import { AdvisorAvatars } from '@/app/you/advisors/advisor-avatar';
 import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
 import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
@@ -9800,6 +9801,66 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardDebatePreview />
+      </div>
+    ),
+  },
+  {
+    /* A decision worked with probabilities (plan #2581.9): the headline, the
+     * strip of advisors along 0 to 100% for the leading option with a line
+     * from each, the numbers behind it, the exchange, the premortem and
+     * tripwire, and the verdict waiting on a decision. Also drawn with one
+     * dot open, while answers arrive, before any has, and with a steelman. */
+    id: 'you-board-decision',
+    label: 'You · Advisors, a decision led by its headline and spread',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-popover',
+    label: 'You · Advisors, one advisor’s range and reasoning open from their dot',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview openDot="skeptic" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-running',
+    label: 'You · Advisors, a decision while the answers arrive',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-empty',
+    label: 'You · Advisors, a decision no advisor has answered yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-steelman',
+    label: 'You · Advisors, a unanimous decision with its other side argued',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="steelman" />
       </div>
     ),
   },
