@@ -472,7 +472,7 @@ async function doneRefusal(
  * (its id or its owner/name), so GitHub is still asked whether that
  * repository's main carries the commit; it never skips the check.
  */
-function namedRepo(value: string | undefined): Repo | undefined {
+function namedRepo(value: string | null | undefined): Repo | undefined {
   if (!value) return undefined;
   const wanted = value.toLowerCase();
   const project = projects.find(
