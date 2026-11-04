@@ -138,6 +138,7 @@ import {
   storedScopeOf,
   type DevProject,
 } from '../lib/plan/projects';
+import { endsWithBuiltLine } from '../lib/plan/built';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
@@ -401,9 +402,6 @@ function currentBranch(): string | null {
     return null;
   }
 }
-
-/** The dated line `built` writes, which `land` looks for as the step's last. */
-const BUILT_LINE = /^Built \d{4}-\d{2}-\d{2}\b/;
 
 /**
  * Why a step may not close as done against this commit, or null when it may.
@@ -1971,8 +1969,7 @@ async function main(): Promise<void> {
           and status = 'in_progress' and commit_sha is not null
         order by position, created_at`;
       const built = rows.filter((row) => {
-        const paragraphs = String(row.comment ?? '').split(/\n\n/);
-        return BUILT_LINE.test(paragraphs[paragraphs.length - 1]?.trim() ?? '');
+        return endsWithBuiltLine(row.comment as string | null);
       });
       if (built.length === 0) fail(`Nothing under ${ref(item.number)} is marked built.`);
 
