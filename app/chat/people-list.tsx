@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { ADD_HREF } from '@/lib/you/people-cards-model';
 import { PersonMark } from '@/components/patterns/messaging';
 import { Input } from '@/components/ui/field';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
@@ -103,8 +104,12 @@ export function PeopleList({
 }) {
   useLiveThreads(live);
   const now = useTypingClock(rows, start, live);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   useRowArrival(listRef, rows);
+  // A row with a message or typing is a thread; the rest wait under their own label.
+  const started = (row: PersonRow) => Boolean(row.last) || isTyping(row.typingUntil, now);
+  const talking = rows.filter(started);
+  const waiting = rows.filter((row) => !started(row));
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 px-4 pt-4 pb-2">
@@ -130,11 +135,28 @@ export function PeopleList({
       {hits ? (
         <SearchResults hits={hits} query={query ?? ''} timezone={timezone} now={now} />
       ) : (
-        <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {rows.map((row) => (
-            <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
-          ))}
-        </ul>
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          {talking.length > 0 && (
+            <ul>
+              {talking.map((row) => (
+                <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
+              ))}
+            </ul>
+          )}
+          {waiting.length > 0 && (
+            <>
+              {/* Mentors never written to wait below the threads, so no line of theirs reads as a message. */}
+              <SectionLabel as="h3" className={cn('px-2 pb-1', talking.length > 0 ? 'pt-4' : 'pt-1')}>
+                Not written to yet
+              </SectionLabel>
+              <ul>
+                {waiting.map((row) => (
+                  <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       )}
     </div>
   );
@@ -173,8 +195,7 @@ function PersonItem({
             data-person-preview
             className={cn(
               'line-clamp-2 text-small',
-              typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted',
-            )}
+              typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted',            )}
           >
             {previewOf(row, now)}
           </span>

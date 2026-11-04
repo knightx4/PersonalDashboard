@@ -27,6 +27,7 @@ import {
   personInitials,
   receiptOf,
   threadBlocks,
+  threadDetail,
   threadMessageOf,
   type PersonRow,
   type ThreadMessage,
@@ -280,7 +281,7 @@ export function ThreadView({
   return (
     <MessagingThread
       name={person.name}
-      detail={person.about}
+      detail={threadDetail(person)}
       avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
       back={{ href: '/chat', label: 'People' }}
       crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
