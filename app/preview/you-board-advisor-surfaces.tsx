@@ -9,6 +9,8 @@ import { PREVIEW_PANELS } from './you-board-surfaces';
 import { BoardListSkeleton } from '@/app/you/advisors/board-skeleton';
 import { PanelView } from '@/app/you/advisors/advisors/panels/[id]/panel-view';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
+import { avatarFor } from '@/lib/you/advisor-avatar';
+import type { Drawn } from '@/app/you/advisors/avatar-editor';
 
 /**
  * The Advisors view of the Advisors tab in the gallery (plan #2561.7): the roster
@@ -25,6 +27,8 @@ const actions: AdvisorActions = {
   setActive: async () => ({ error: null }),
   createPanel: async () => ({ error: null, panelId: PREVIEW_PANELS[0].id }),
   startMeeting: async () => ({ error: null }),
+  drawAvatar: async () => ({ error: 'The gallery does not draw new looks.' }),
+  saveAvatar: async () => ({ error: null }),
 };
 
 function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'name' | 'question'>): RosterAdvisor {
@@ -38,6 +42,7 @@ function advisor(over: Partial<RosterAdvisor> & Pick<RosterAdvisor, 'key' | 'nam
     active: true,
     addedBy: 'person',
     updatedAt: '2026-10-30T09:00:00Z',
+    avatar: avatarFor(over.key, null),
     ...over,
   };
 }
@@ -168,9 +173,11 @@ const failed = advisor({
 export function YouBoardAdvisorsPreview({
   state = 'ready',
   start,
+  editing,
 }: {
   state?: 'ready' | 'building' | 'failed';
   start?: AddStart;
+  editing?: { key: string; drawn: Drawn };
 }) {
   const extra = state === 'building' ? [building] : state === 'failed' ? [failed] : [];
   return (
@@ -180,6 +187,7 @@ export function YouBoardAdvisorsPreview({
       now={NOW}
       actions={actions}
       start={start}
+      editing={editing}
       subject={{
         ref: null,
         path: [

@@ -10,7 +10,9 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
 import { answerAsk, answerError } from '@/lib/you/board-asks';
-import { listRoster } from '@/lib/you/board-advisors';
+import { listRoster, saveAvatar } from '@/lib/you/board-advisors';
+import { parseAvatar, type AvatarLook } from '@/lib/you/advisor-avatar';
+import { avatarLook, avatarSvg } from '@/lib/you/advisor-avatar-draw';
 import {
   cleanPanelMembers,
   cleanPanelName,
@@ -534,5 +536,35 @@ export async function deleteBoardPanel(id: string): Promise<PanelResult> {
     return { error: null };
   } catch (error) {
     return panelFailed(error, 'The panel was not deleted. Try again.');
+  }
+}
+
+/**
+ * Draw a look the person is trying on an advisor's profile, without keeping
+ * it (plan #2581.3): the drawing, and the traits it shows so the pickers
+ * start where the drawing is. DiceBear runs here, never in the browser.
+ */
+// latency: pending
+export async function drawAdvisorAvatar(
+  avatar: unknown,
+): Promise<{ error: string | null; svg?: string; look?: AvatarLook }> {
+  await requireUser();
+  const parsed = parseAvatar(avatar);
+  if (!parsed) return { error: 'That look could not be drawn. Try another.' };
+  return { error: null, svg: avatarSvg(parsed, 'preview'), look: avatarLook(parsed) };
+}
+
+/** Keep an advisor's new look, or with null go back to their first one (plan #2581.3). */
+// latency: pending
+export async function saveAdvisorAvatar(advisorId: string, avatar: unknown): Promise<{ error: string | null }> {
+  if (!meetingId.safeParse(advisorId).success) return { error: 'That is not one of your advisors.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await saveAvatar({ client, userId: user.id, advisorId, avatar });
+    revalidatePath('/you/advisors', 'layout');
+    return result;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
   }
 }

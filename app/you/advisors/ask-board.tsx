@@ -21,7 +21,7 @@ import {
   type QuestionInput,
 } from '@/lib/you/board-questions';
 import { panelPicked, panelSeats, type BoardPanel } from '@/lib/you/board-panels';
-import { AdvisorMark } from './advisor-mark';
+import { AdvisorAvatar } from './advisor-avatar';
 
 /**
  * Ask the advisors (plan #2561.4): the header's one action on the Advisors tab, and
@@ -350,7 +350,7 @@ export function AskBoardForm({
             <div className="flex items-center justify-between gap-3">
               <p className="min-w-0 text-ui text-ink">
                 <span className="text-small font-medium text-ink-muted">Advisors </span>
-                {picked.length > 0 ? `${picked.length} chosen` : 'the advisors chooses'}
+                {picked.length > 0 ? `${picked.length} chosen` : 'the chair chooses'}
                 {leftOut.length > 0 && <span className="text-ink-muted">{` · without ${leftOut.join(', ')}`}</span>}
               </p>
               <Button
@@ -371,6 +371,7 @@ export function AskBoardForm({
                   <div className="flex flex-wrap gap-2">
                     {seats.map((a) => (
                       <ToggleChip key={a.key} on={!seatsOff.includes(a.key)} onClick={() => toggleSeat(a.key)}>
+                        <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
                         {a.name}
                       </ToggleChip>
                     ))}
@@ -388,7 +389,7 @@ export function AskBoardForm({
                           on={value.advisors.includes(a.key)}
                           onClick={() => toggle(a.key)}
                         >
-                          <AdvisorMark name={a.name} />
+                          <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
                           {a.name}
                         </ToggleChip>
                       ))}

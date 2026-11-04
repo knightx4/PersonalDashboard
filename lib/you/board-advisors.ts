@@ -1,4 +1,5 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { avatarFor, parseAvatar, type AdvisorAvatar } from '@/lib/you/advisor-avatar';
 import { sortAdvisors } from '@/lib/you/board-questions';
 
 /**
@@ -10,7 +11,7 @@ import { sortAdvisors } from '@/lib/you/board-questions';
  *
  * A build that cannot finish leaves brain_status `failed` and the reason in
  * `brain.error`, the only place a row without a brain can hold text. The skill
- * writes it the same way (advisor-brain.md, step 7).
+ * writes it the same way (advisor-brain.md, step 8).
  */
 
 export const NAME_MAX = 120;
@@ -36,6 +37,8 @@ export type RosterAdvisor = {
   active: boolean;
   addedBy: 'person' | 'dash';
   updatedAt: string;
+  /** How they are drawn: what is stored, or the default for their key (plan #2581.3). */
+  avatar: AdvisorAvatar;
 };
 
 /** What a guest's row says about its brain right now. */
@@ -83,10 +86,23 @@ export function rosterOf(row: Record<string, unknown>): RosterAdvisor | null {
     active: row.active !== false,
     addedBy: row.added_by === 'dash' ? 'dash' : 'person',
     updatedAt: str(row.updated_at),
+    avatar: avatarFor(key, row.avatar),
   };
 }
 
-export const ROSTER_COLUMNS = 'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain';
+export const ROSTER_COLUMNS = 'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain, avatar';
+
+/** Every advisor's key and stored avatar, for the sprite the Advisors pages draw from (plan #2581.3). */
+export async function listAvatars(
+  client: YouSupabaseClient,
+  userId: string,
+): Promise<{ key: string; avatar: unknown }[]> {
+  const { data, error } = await client.from('board_advisors').select('key, avatar').eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((row) =>
+    typeof row.key === 'string' ? [{ key: row.key, avatar: (row as { avatar?: unknown }).avatar }] : [],
+  );
+}
 
 /** Every advisor on or off the board, the seats first. The brain is read for its source count and failure only. */
 export async function listRoster(client: YouSupabaseClient, userId: string): Promise<RosterAdvisor[]> {
@@ -133,4 +149,26 @@ export function cleanAdvisor(input: {
 /** The question a new guest owns until the brain is built and Dash writes theirs. */
 export function placeholderQuestion(name: string): string {
   return `What would ${name} make of this?`;
+}
+
+/**
+ * Keep the look the person chose on an advisor's profile, or with null go
+ * back to the default for their key (plan #2581.3). Seats and guests alike.
+ */
+export async function saveAvatar(input: {
+  client: YouSupabaseClient;
+  userId: string;
+  advisorId: string;
+  avatar: unknown;
+}): Promise<{ error: string | null }> {
+  const avatar = input.avatar === null ? null : parseAvatar(input.avatar);
+  if (input.avatar !== null && !avatar) return { error: 'That look could not be drawn. Try another.' };
+  const { data, error } = await input.client
+    .from('board_advisors')
+    .update({ avatar })
+    .eq('user_id', input.userId)
+    .eq('id', input.advisorId)
+    .select('id');
+  if (error) return { error: error.message };
+  return data && data.length > 0 ? { error: null } : { error: 'That is not one of your advisors.' };
 }

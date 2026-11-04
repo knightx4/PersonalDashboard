@@ -10,7 +10,6 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
-import { SEATS, type Seat } from '@/lib/you/board';
 import {
   advisorThinking,
   BRIEF_OPENING,
@@ -25,8 +24,7 @@ import {
   type Scores,
 } from '@/lib/you/board-debate';
 import type { BoardOption } from '@/lib/you/board-questions';
-import { AdvisorMark } from '../advisor-mark';
-import { SEAT_ICONS } from '../seat-label';
+import { AdvisorAvatar } from '../advisor-avatar';
 import { VerdictAndDecision, type DecideAction } from './decision';
 import type { MakeProps } from './make';
 import { Evidence, Prose, ReceiptLink } from './prose';
@@ -38,24 +36,9 @@ import { Evidence, Prose, ReceiptLink } from './prose';
  * between two advisors. Pressing an advisor anywhere opens their thinking for
  * the meeting in a drawer: every turn they wrote and how their scores moved.
  *
- * Seats keep their icons (seat-label.tsx); a guest shows initials only, since
- * a guest is a persona built from public work and not the person.
+ * Every advisor, seat or guest, is marked by their illustrated avatar
+ * (plan #2581.3).
  */
-
-const isSeat = (key: string): key is Seat => (SEATS as readonly string[]).includes(key);
-
-/** An advisor's mark: the seat's icon, or a guest's initials. */
-function AdvisorBadge({ advisor }: { advisor: DebateAdvisor }) {
-  if (advisor.kind === 'seat' && isSeat(advisor.key)) {
-    const Icon = SEAT_ICONS[advisor.key];
-    return (
-      <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center">
-        <Icon className="size-4" strokeWidth={1.75} />
-      </span>
-    );
-  }
-  return <AdvisorMark name={advisor.name} />;
-}
 
 /** An advisor's mark and name, pressed to open their thinking. */
 export function AdvisorButton({
@@ -77,7 +60,7 @@ export function AdvisorButton({
         className,
       )}
     >
-      <AdvisorBadge advisor={advisor} />
+      <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} decorative />
       <span className="[overflow-wrap:anywhere]">{advisor.name}</span>
     </button>
   );
@@ -435,7 +418,7 @@ export function AdvisorDrawer({
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <h2 id={titleId} className="flex min-w-0 items-center gap-2 text-ui font-semibold text-ink">
-            <AdvisorBadge advisor={advisor} />
+            <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
             <span className="[overflow-wrap:anywhere]">{advisor.name}</span>
           </h2>
           <Tooltip label="Close" align="end">

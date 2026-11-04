@@ -450,6 +450,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'you-board-advisors-building': ['/you/advisors/advisors'],
   'you-board-advisors-failed': ['/you/advisors/advisors'],
   'you-board-advisors-loading': ['/you/advisors/advisors'],
+  'you-board-advisors-avatar': ['/you/advisors/advisors'],
   'you-board-panel': ['/you/advisors/advisors/panels/[id]'],
   'you-board-panel-delete': ['/you/advisors/advisors/panels/[id]'],
   'you-board-panel-empty': ['/you/advisors/advisors/panels/[id]'],

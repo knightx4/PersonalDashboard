@@ -24,17 +24,22 @@ import {
 } from '@/lib/you/board-advisors';
 import { MEETING_RUNNING_MESSAGE } from '@/lib/you/board';
 import { panelNames, type BoardPanel } from '@/lib/you/board-panels';
-import { AdvisorMark } from '../advisor-mark';
+import { Chip } from '@/components/ui/chip';
+import { AdvisorAvatar } from '../advisor-avatar';
+import { AvatarEditor, type DrawAvatar, type Drawn, type SaveAvatar } from '../avatar-editor';
 import { useRefreshWhileRunning } from '../refresh-while-running';
 
 /**
  * The Advisors view of the Board tab (plan #2561.7), on the list pattern: the
  * header with its one action, Add advisor, then one surface in two groups.
  * The five seats come first and always sit. Under them every guest: a persona
- * Dash builds from a person's public work, shown by initials, with the
- * question they own, the state of their brain and a switch for whether the
- * chair may bring them in. A guest whose brain is being built shows it; one
- * that failed says why and offers a retry.
+ * Dash builds from a person's public work, marked as an AI impression, with
+ * the question they own, the state of their brain and a switch for whether
+ * the chair may bring them in. A guest whose brain is being built shows it;
+ * one that failed says why and offers a retry.
+ *
+ * Every advisor leads their row with their avatar (plan #2581.3); pressing it
+ * opens the editor under the row, to shuffle the look or pick its traits.
  */
 
 export type AdvisorActions = {
@@ -45,6 +50,9 @@ export type AdvisorActions = {
   createPanel: () => Promise<{ error: string | null; panelId?: string }>;
   /** Start a board meeting for a panel (plan #2576.3). */
   startMeeting: (panelId: string) => Promise<{ error: string | null }>;
+  /** Draw a look being tried on, and keep one (plan #2581.3). */
+  drawAvatar: DrawAvatar;
+  saveAvatar: SaveAvatar;
 };
 
 /** How the press starts: closed, with the card open and filled, or refusing a name (the gallery draws each). */
@@ -62,6 +70,7 @@ export function AdvisorsView({
   actions,
   subject,
   start = 'closed',
+  editing,
 }: {
   advisors: readonly RosterAdvisor[];
   /** Their panels, each opening on its own page. */
@@ -73,6 +82,8 @@ export function AdvisorsView({
   actions: AdvisorActions;
   subject?: Subject;
   start?: AddStart;
+  /** An advisor whose look is open to change, with its drawing, as the gallery draws it. */
+  editing?: { key: string; drawn: Drawn };
 }) {
   const [open, setOpen] = useState(start !== 'closed');
   const [name, setName] = useState(start === 'closed' ? '' : SAMPLE_NAME);
@@ -205,12 +216,24 @@ export function AdvisorsView({
           </Group>
           <Group title="Seats" count={seats.length}>
             {seats.map((advisor) => (
-              <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
+              <AdvisorRow
+                key={advisor.id}
+                advisor={advisor}
+                state={stateOf(advisor)}
+                actions={actions}
+                editing={editing?.key === advisor.key ? editing.drawn : null}
+              />
             ))}
           </Group>
           <Group title="Guests" count={guests.length}>
             {guests.map((advisor) => (
-              <AdvisorRow key={advisor.id} advisor={advisor} state={stateOf(advisor)} actions={actions} />
+              <AdvisorRow
+                key={advisor.id}
+                advisor={advisor}
+                state={stateOf(advisor)}
+                actions={actions}
+                editing={editing?.key === advisor.key ? editing.drawn : null}
+              />
             ))}
           </Group>
         </ul>
@@ -252,12 +275,16 @@ function AdvisorRow({
   advisor,
   state,
   actions,
+  editing = null,
 }: {
   advisor: RosterAdvisor;
   state: BrainState;
   actions: AdvisorActions;
+  editing?: Drawn | null;
 }) {
   const [active, setActive] = useState(advisor.active);
+  const [look, setLook] = useState<Drawn | null>(editing);
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [, startTransition] = useTransition();
@@ -284,13 +311,50 @@ function AdvisorRow({
     });
   };
 
+  const openEditor = () => {
+    if (look) {
+      setLook(null);
+      return;
+    }
+    setOpening(true);
+    setError(null);
+    startTransition(async () => {
+      const result = await actions.drawAvatar(advisor.avatar);
+      setOpening(false);
+      if (result.error || !result.svg || !result.look) {
+        setError(result.error ?? 'Their look could not be drawn. Try again.');
+        return;
+      }
+      setLook({ svg: result.svg, look: result.look });
+    });
+  };
+  const changeLabel = `Change how ${advisor.name} looks`;
+
   return (
     <li className="card-pad-x row-pad">
       <div className="flex min-h-11 items-start gap-3">
+        <Tooltip label={changeLabel} align="start">
+          <button
+            type="button"
+            aria-label={changeLabel}
+            aria-expanded={look !== null}
+            aria-busy={opening || undefined}
+            onClick={openEditor}
+            className="press-area shrink-0 rounded-pill transition-opacity duration-quick hover:opacity-80"
+          >
+            <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative />
+          </button>
+        </Tooltip>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-ui text-ink">
-            {guest && <AdvisorMark name={advisor.name} />}
             <span className="min-w-0 [overflow-wrap:anywhere]">{advisor.name}</span>
+            {guest && (
+              <Tooltip label="A persona Dash built from their public work, not the person">
+                <Chip size="sm" tabIndex={0}>
+                  AI impression
+                </Chip>
+              </Tooltip>
+            )}
             <BrainStatus state={state} />
           </span>
           <span className="mt-0.5 block text-small text-ink-muted [overflow-wrap:anywhere]">
@@ -335,6 +399,15 @@ function AdvisorRow({
             {retrying ? 'Retrying…' : 'Try again'}
           </DashAction>
         </div>
+      )}
+      {look && (
+        <AvatarEditor
+          advisor={advisor}
+          start={look}
+          draw={actions.drawAvatar}
+          save={actions.saveAvatar}
+          onDone={() => setLook(null)}
+        />
       )}
       {error && <FieldError>{error}</FieldError>}
     </li>

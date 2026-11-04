@@ -23,6 +23,9 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { AdvisorAvatars } from '@/app/you/advisors/advisor-avatar';
+import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
+import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
 import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
@@ -9936,6 +9939,24 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* An advisor's look open to change (plan #2581.3): the avatar large,
+     * Shuffle, and a stepper for hair, glasses and beard. */
+    id: 'you-board-advisors-avatar',
+    label: 'You · Advisors, changing how an advisor looks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorsPreview
+          editing={{
+            key: 'buffett',
+            drawn: { svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) },
+          }}
+        />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-advisors-loading',
     label: 'You · Board, advisors loading',
     module: 'you',
@@ -12616,3 +12637,19 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FigureQuestionPreview form="move-agglomeration" />,
   },
 ];
+
+/**
+ * The Advisors surfaces draw their avatars from one sprite, made here on the
+ * server as the pages make theirs (plan #2581.3): every advisor the board
+ * started with, and the guest the fixtures add. Wrapped in place, so the
+ * entries above stay where the gallery's tests read them.
+ */
+for (const surface of SURFACES) {
+  if (!surface.id.startsWith('you-board')) continue;
+  const render = surface.render;
+  surface.render = () => (
+    <AdvisorAvatars {...spriteFor([...Object.keys(SEEDED_AVATARS), 'aurelius'].map((key) => ({ key })))}>
+      {render()}
+    </AdvisorAvatars>
+  );
+}

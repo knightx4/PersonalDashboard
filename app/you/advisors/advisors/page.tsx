@@ -3,7 +3,17 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
 import { hasOpenMeeting } from '@/lib/you/board';
 import { listPanels } from '@/lib/you/board-panels';
-import { addBoardAdvisor, createBoardPanel, retryAdvisorBrain, setAdvisorActive, startMeeting } from '../actions';
+import {
+  addBoardAdvisor,
+  createBoardPanel,
+  drawAdvisorAvatar,
+  retryAdvisorBrain,
+  saveAdvisorAvatar,
+  setAdvisorActive,
+  startMeeting,
+} from '../actions';
+import { spriteFor } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from '../advisor-avatar';
 import { AdvisorsView } from './advisors-view';
 
 export const metadata = { title: 'Advisors roster' };
@@ -27,26 +37,30 @@ export default async function Page() {
     hasOpenMeeting(client, user.id),
   ]);
   return (
-    <AdvisorsView
-      advisors={advisors}
-      panels={panels}
-      meetingRunning={running}
-      now={readAt()}
-      subject={{
-        ref: null,
-        path: [
-          { label: 'You', href: '/you' },
-          { label: 'Advisors', href: '/you/advisors' },
-          { label: 'Roster', href: '/you/advisors/advisors' },
-        ],
-      }}
-      actions={{
-        add: addBoardAdvisor,
-        retry: retryAdvisorBrain,
-        setActive: setAdvisorActive,
-        createPanel: createBoardPanel,
-        startMeeting,
-      }}
-    />
+    <AdvisorAvatars {...spriteFor(advisors)}>
+      <AdvisorsView
+        advisors={advisors}
+        panels={panels}
+        meetingRunning={running}
+        now={readAt()}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Advisors', href: '/you/advisors' },
+            { label: 'Roster', href: '/you/advisors/advisors' },
+          ],
+        }}
+        actions={{
+          add: addBoardAdvisor,
+          retry: retryAdvisorBrain,
+          setActive: setAdvisorActive,
+          createPanel: createBoardPanel,
+          startMeeting,
+          drawAvatar: drawAdvisorAvatar,
+          saveAvatar: saveAdvisorAvatar,
+        }}
+      />
+    </AdvisorAvatars>
   );
 }

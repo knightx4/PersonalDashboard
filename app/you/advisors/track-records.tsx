@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { TOPIC_LABELS } from '@/lib/you/board-reviews';
 import type { TrackRecord } from '@/lib/you/board-scoring';
+import { AdvisorAvatar } from './advisor-avatar';
 
 /**
  * Who has been right about what (plan #2581.10), as rows of the Advisors tab's
@@ -20,12 +21,15 @@ export function TrackRecordRows({ records }: { records: readonly TrackRecord[] }
     <>
       <li className="card-pad-x row-pad text-small text-ink-muted">
         How close each advisor’s forecasts came once you said how a decision went. 0 is perfect and 0.25 is a coin
-        toss. After five scored on a topic, the advisors weighs them by it.
+        toss. After five scored on a topic, the chair weighs them by it.
       </li>
       {records.map((record) => (
         <li key={record.advisor} className="card-pad-x row-pad flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="text-ui text-ink [overflow-wrap:anywhere]">{record.name}</p>
+            <p className="flex min-w-0 items-center gap-1.5 text-ui text-ink">
+              <AdvisorAvatar advisorKey={record.advisor} name={record.name} decorative />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{record.name}</span>
+            </p>
             <p className="text-small text-ink-muted">
               {record.topics.map((t, i) => (
                 <Fragment key={t.topic}>

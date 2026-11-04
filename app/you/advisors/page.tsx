@@ -17,6 +17,8 @@ import {
 import { answerBoardReview, answerBoardTripwire } from './review-actions';
 import { listDueTripwires } from '@/lib/you/board-tripwires';
 import { loadTrackRecords } from '@/lib/you/board-scoring';
+import { loadAvatarSprite } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from './advisor-avatar';
 import { BoardListView } from './board-list-view';
 
 export const metadata = { title: 'Advisors' };
@@ -38,7 +40,7 @@ function readAt(): number {
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [meetings, questions, asks, reviews, names, decisions, advisors, panels, settings, tripwires, records] =
+  const [meetings, questions, asks, reviews, names, decisions, advisors, panels, settings, tripwires, records, avatars] =
     await Promise.all([
       listBoardMeetings(client, user.id),
       listBoardQuestions(client, user.id),
@@ -51,32 +53,35 @@ export default async function Page() {
       loadAccountSettings(user.id),
       listDueTripwires(client, user.id),
       loadTrackRecords(client, user.id),
+      loadAvatarSprite(client, user.id),
     ]);
   return (
-    <BoardListView
-      meetings={meetings}
-      questions={questions}
-      asks={asks}
-      reviews={reviews}
-      tripwires={tripwires}
-      records={records}
-      names={names}
-      advisors={advisors}
-      panels={panels}
-      decisions={decisions}
-      nextMeeting={nextMeetingDay(settings.timezone)}
-      timezone={settings.timezone}
-      now={readAt()}
-      actions={{
-        ask: askBoard,
-        start: startMeeting,
-        accept: acceptSuggestion,
-        dismiss: dismissSuggestion,
-        convene: conveneQuestion,
-        answerAsk: answerBoardAsk,
-        answerReview: answerBoardReview,
-        answerTripwire: answerBoardTripwire,
-      }}
-    />
+    <AdvisorAvatars {...avatars}>
+      <BoardListView
+        meetings={meetings}
+        questions={questions}
+        asks={asks}
+        reviews={reviews}
+        tripwires={tripwires}
+        records={records}
+        names={names}
+        advisors={advisors}
+        panels={panels}
+        decisions={decisions}
+        nextMeeting={nextMeetingDay(settings.timezone)}
+        timezone={settings.timezone}
+        now={readAt()}
+        actions={{
+          ask: askBoard,
+          start: startMeeting,
+          accept: acceptSuggestion,
+          dismiss: dismissSuggestion,
+          convene: conveneQuestion,
+          answerAsk: answerBoardAsk,
+          answerReview: answerBoardReview,
+          answerTripwire: answerBoardTripwire,
+        }}
+      />
+    </AdvisorAvatars>
   );
 }

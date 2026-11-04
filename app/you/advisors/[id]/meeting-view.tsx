@@ -46,6 +46,7 @@ import {
   type BoardMarkResult,
 } from '../actions';
 import { useRefreshWhileRunning } from '../refresh-while-running';
+import { AdvisorAvatar } from '../advisor-avatar';
 import { SeatLabel } from '../seat-label';
 import { AdvisorDrawer, QuestionDebate } from './debate';
 import type { MakeProps } from './make';
@@ -970,7 +971,10 @@ function PickScorecard({
           {picks.map((score) => (
             <tr key={score.advisor} className="align-top">
               <th scope="row" className="card-pad-x py-2 text-left font-normal text-ink">
-                <span className="block">{advisorName(score.advisor, names)}</span>
+                <span className="flex items-center gap-1.5">
+                  <AdvisorAvatar advisorKey={score.advisor} name={advisorName(score.advisor, names)} decorative />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{advisorName(score.advisor, names)}</span>
+                </span>
                 <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
                   {topicsLine(score)}
                 </span>
