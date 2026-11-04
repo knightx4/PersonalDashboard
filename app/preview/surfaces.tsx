@@ -496,7 +496,8 @@ import {
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
-import { ChatPeopleSurface } from './chat-surfaces';
+import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -8859,13 +8860,12 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* Chat's People tab (plan #2748.1), where Chat opens: each mentor as a
-     * thread, newest note first, unread ones bold with a dot, one writing
-     * back, one with nothing yet and a guest not ready to talk. A row opens
-     * the mentor's page on the Council until #2748.6. */
+     * thread, newest first, unread ones bold with a dot, one never written
+     * to, a long name and a guest not ready to talk (plan #2748.6). */
     id: 'chat-people',
     label: 'Chat · People',
     module: 'chat',
-    width: 'page',
+    width: 'screen',
     render: () => <ChatPeopleSurface />,
   },
   {
@@ -8873,8 +8873,180 @@ export const SURFACES: readonly Surface[] = [
     id: 'chat-people-empty',
     label: 'Chat · People, no mentors yet',
     module: 'chat',
-    width: 'page',
+    width: 'screen',
     render: () => <ChatPeopleSurface state="empty" />,
+  },
+  {
+    /* The threads could not be read (plan #2748.6): one line saying so under the heading. */
+    id: 'chat-people-failed',
+    label: 'Chat · People, the threads not read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="failed" />,
+  },
+  {
+    /* The People tab while it is read: the list's pane with round marks and two lines, and on a laptop the thread's pane with bubbles. */
+    id: 'chat-people-loading',
+    label: 'Chat · People loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="loading" />,
+  },
+  {
+    /* A search across every thread (plan #2748.6): the messages with the words, each under whose thread it is in. */
+    id: 'chat-people-search',
+    label: 'Chat · People, a search',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="search" />,
+  },
+  {
+    /* A search nothing matches: the line saying so and the way back to the list. */
+    id: 'chat-people-search-none',
+    label: 'Chat · People, a search that finds nothing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="nothing-found" />,
+  },
+  {
+    /* A thread open beside the list (plan #2748.6): day labels, bubbles grouped by sender, a text first with its to do, and Read under your last message. On a phone the thread alone, with the way back above the name. */
+    id: 'chat-people-thread',
+    label: 'Chat · A thread open',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface />,
+  },
+  {
+    /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
+    id: 'chat-people-thread-typing',
+    label: 'Chat · A thread, them typing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="typing" />,
+  },
+  {
+    /* The moment "A mentor typing" played (plan #2748.10): the dots rise in, give way to their text, and rise in again while another is coming. */
+    id: 'chat-people-thread-typing-moment',
+    label: 'Chat · A thread, them typing then replying',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-typing"]',
+      shows:
+        'Their three dots rise in at the foot of the thread, then give way to their first bubble rising from the same place, and the dots rise in again below it while another text is coming.',
+    },
+    render: () => <ChatTypingMomentSurface />,
+  },
+  {
+    /* The moment "A text that arrives first" played (plan #2748.10): their row rises to the top of the list with the new preview and an unread dot. */
+    id: 'chat-people-arrives',
+    label: 'Chat · People, a text arriving first',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-arrival"]',
+      shows:
+        'The Mentor’s row rises from the third place to the top as the rows it passes move down one place each, its preview line changes to the new text and its unread dot lands.',
+    },
+    render: () => <ChatArrivalMomentSurface />,
+  },
+  {
+    /* Scrolled to the top of a long thread: earlier messages loading above the oldest shown. */
+    id: 'chat-people-thread-older',
+    label: 'Chat · A thread, loading earlier messages',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="older" />,
+  },
+  {
+    /* A message that was not sent: dimmed in place, why under it, and Retry. */
+    id: 'chat-people-thread-failed',
+    label: 'Chat · A thread, a send that failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="failed" />,
+  },
+  {
+    /* A mentor you have never written to: their mark and name, and a line saying to write below. */
+    id: 'chat-people-thread-new',
+    label: 'Chat · A thread never written in',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="new" />,
+  },
+  {
+    /* A guest whose brain is not built yet: the line saying when they can talk, and the box off. */
+    id: 'chat-people-thread-not-ready',
+    label: 'Chat · A thread with a guest not ready',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="not-ready" />,
+  },
+  {
+    /* A thread while it is read: on a phone the thread's pane alone, on a laptop beside the list. */
+    id: 'chat-people-thread-loading',
+    label: 'Chat · A thread loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="loading" />,
+  },
+  {
+    /* The form for someone new in place of the thread (plan #2748.11): name, colour, who they are, how they talk, what they care about and never say, and Draft the card. */
+    id: 'chat-person-add',
+    label: 'Chat · Adding someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface />,
+  },
+  {
+    /* The form filled in, scrolled to the card, while Dash writes it. */
+    id: 'chat-person-add-drafting',
+    label: 'Chat · Adding someone, Dash drafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="drafting" />,
+  },
+  {
+    /* The form filled in, scrolled to the card, with why the draft failed and Try again. */
+    id: 'chat-person-add-failed',
+    label: 'Chat · Adding someone, the draft failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="failed" />,
+  },
+  {
+    /* The same form for a mentor already there, opened from Edit on their thread, on what was filled in last time. */
+    id: 'chat-person-edit',
+    label: 'Chat · Editing someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface />,
+  },
+  {
+    /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
+    id: 'chat-person-edit-versions',
+    label: 'Chat · Editing someone, their card and earlier cards',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="card" />,
+  },
+  {
+    /* The card while Dash redrafts it from a sentence. */
+    id: 'chat-person-edit-drafting',
+    label: 'Chat · Editing someone, Dash redrafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="redrafting" />,
+  },
+  {
+    /* Scrolled to what they remember: one line being corrected, and the confirm before another is removed. */
+    id: 'chat-person-edit-memory',
+    label: 'Chat · Editing someone, what they remember',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="memory" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),

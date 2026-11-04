@@ -21,6 +21,7 @@ export type MomentWorkspace =
   | 'goals'
   | 'learn'
   | 'shopping'
+  | 'chat'
   | 'dash';
 
 /** The order /dev/ui lists them in, with the name it shows. */
@@ -32,6 +33,7 @@ export const MOMENT_WORKSPACES: readonly (readonly [MomentWorkspace, string])[] 
   ['goals', 'Goals'],
   ['learn', 'Learn'],
   ['shopping', 'Shopping'],
+  ['chat', 'Chat'],
   ['dash', 'Dash'],
 ];
 
@@ -207,6 +209,30 @@ export const MOMENTS: readonly Moment[] = [
       built: 'yes',
       where:
         'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the count at the foot of /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+    },
+  },
+  {
+    workspace: 'chat',
+    name: 'A mentor typing',
+    trigger: 'A mentor starting to write back, in a thread that is open.',
+    sees: 'Three dots rise in at the foot of the thread. When the text comes, the bubble rises in from the same place, and the dots rise in again below it if another is coming.',
+    reducedMotion: 'The dots and each bubble appear and go without rising, and the dots stand still.',
+    state: {
+      built: 'yes',
+      where:
+        'TypingBubble and MessageBubble in components/patterns/messaging.tsx, drawn by ThreadView in app/chat/people/[key]/thread-view.tsx for the texts that arrive after the thread opened, with the keyframes in app/globals.css. Played in the gallery at /preview?s=chat-people-thread-typing-moment.',
+    },
+  },
+  {
+    workspace: 'chat',
+    name: 'A text that arrives first',
+    trigger: 'A mentor texting first, or replying, while the People list is open.',
+    sees: 'Their row rises to the top of the list as the rows it passes move down one place, the preview line changes to the new words, and the unread dot lands with a little give.',
+    reducedMotion: 'The row is at the top, with the new preview and its dot, at once.',
+    state: {
+      built: 'yes',
+      where:
+        'useRowArrival in app/chat/use-row-arrival.ts, on the list in app/chat/people-list.tsx, redrawn when Realtime hears a change. Played in the gallery at /preview?s=chat-people-arrives.',
     },
   },
   {

@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_episodes', 'advisor_memory','advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_messages', 'advisor_persona_versions', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -1164,5 +1164,31 @@ describe('mentor texts: caps and quiet hours', () => {
                 values (${user}, ${chats[1]}, 'advisor', 'reply', 'Answering you.')`;
     await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
                 values (${user}, ${chats[1]}, 'advisor', 'ack', 'Hm.')`;
+  });
+});
+
+describe('earlier persona cards', () => {
+  // migrations-you/0040_people_cards.sql (plan #2748.11).
+  it('keeps a card the person replaced to its owner only', async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'cards', 'Cards', 'seat', 'Ten years on?', ${admin.json({ style: 'notionists', seed: 'cards' })})
+      returning id`;
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                 values (${userA}, ${advisor.id}, 'Blunt and short.')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select persona from advisor_persona_versions`)).toEqual([
+      { persona: 'Blunt and short.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_persona_versions`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                   values (${userA}, ${advisor.id}, 'Forged.')`,
+      ),
+    ).rejects.toThrow();
   });
 });

@@ -117,6 +117,21 @@ export const youActions: ModuleActions = {
       'Turning a decision into todos or goal steps is the person taking up what they decided; Dash does not write them for them (plan #2561.9).',
     ),
   },
+  // Chat's People tab: threads (plan #2748.6), and adding and editing a person (plan #2748.11).
+  'app/chat/actions.ts': {
+    olderMessages: none('page', 'Reads the page of a thread before the oldest one shown; it serves the page.'),
+    readThread: none('own', "Having a thread open is the person's own reading of what a mentor wrote."),
+    savePersonCard: none(
+      'theirs',
+      "Who the person talks to, and how each one sounds and what they care about, is the person's own call on their mentors; Dash does not reshape them unasked.",
+    ),
+    draftPersonCard: none(
+      'spends',
+      'Has Dash draft or redraft a persona card on the People form, one Sonnet call paid for on each press, which the person decides to make by pressing Draft (plan #2748.11).',
+    ),
+    correctPersonMemory: none('theirs', 'Correcting what a mentor remembers is the person correcting what Dash noted about them.'),
+    removePersonMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them; the line is kept, retired.'),
+  },
   // The Council's notes, talks and memory (you 0037).
   'app/you/council/council-actions.ts': {
     readCouncilNotes: none('own', "Marking a mentor's note read is the person's own reading; it is what lets the council write again."),

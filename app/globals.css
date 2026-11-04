@@ -2153,6 +2153,56 @@ body[data-keyhints] .keyhint {
   }
 }
 
+/* A person typing in a thread (plan #2748.6): three dots that rise and dim
+ * in turn, each started a little after the one before. */
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.typing-dot {
+  animation: typing-dot calc(var(--motion-moment) * 2) var(--ease-sway) infinite;
+}
+
+/* Their typing arrives, then their text does (plan #2748.10, the moment
+ * "A mentor typing"). The dots rise in where the next bubble will stand; a
+ * bubble that comes in over Realtime rises from the same place, and the dots
+ * rise in again below it while more are coming. Only what arrives while the
+ * thread is open carries these, never the messages read on load. */
+@keyframes typing-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.9);
+  }
+}
+
+@utility typing-in {
+  transform-origin: bottom left;
+  animation: typing-in var(--motion-move) var(--ease-out-soft) both;
+}
+
+/* It starts part way lit, so the dots it replaces never leave the foot of the
+ * thread empty for a frame. */
+@keyframes message-in {
+  from {
+    opacity: 0.4;
+    transform: translateY(0.5rem) scale(0.96);
+  }
+}
+
+@utility message-in {
+  transform-origin: bottom left;
+  animation: message-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 a:has([data-link-pending]),
 tr:has([data-link-pending]) {
   cursor: progress;
@@ -2969,6 +3019,12 @@ button[aria-busy='true'] {
   }
 
   .run-line-in {
+    animation: none;
+  }
+
+  .typing-dot,
+  .typing-in,
+  .message-in {
     animation: none;
   }
 
