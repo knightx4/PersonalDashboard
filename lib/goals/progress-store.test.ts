@@ -5,6 +5,7 @@ import {
   loadProgressEntries,
   setProgressEstimate,
   undoProgressEntry,
+  updateProgressEntry,
 } from '@/lib/goals/progress-store';
 
 type Call = { table: string; op: string; args: unknown[] };
@@ -175,6 +176,114 @@ describe('undoProgressEntry', () => {
   it('says so when there was nothing left to undo', async () => {
     const { client } = fakeClient({ progress_entries: { data: [], error: null } });
     expect(await undoProgressEntry(client, 'e1')).toBe(false);
+  });
+});
+
+describe('updateProgressEntry (plan #2907.1)', () => {
+  const row = {
+    id: 'e1',
+    item_id: 'step-1',
+    capture_id: null,
+    happened_on: '2026-11-02',
+    text: 'applied',
+    quantity: '2',
+    unit: 'h',
+    estimate: null,
+    created_at: '2026-11-02T10:00:00Z',
+  };
+
+  /** Reads (maybeSingle) and the write (awaited) of progress_entries answer separately. */
+  function entryClient(opts: { entry?: unknown; item?: unknown; written?: unknown[] }) {
+    const calls: Call[] = [];
+    const client = {
+      from(table: string) {
+        const query: Record<string, unknown> = {};
+        for (const op of ['select', 'update', 'eq', 'is']) {
+          query[op] = (...args: unknown[]) => {
+            calls.push({ table, op, args });
+            return query;
+          };
+        }
+        query.maybeSingle = async () => ({
+          data: table === 'items' ? (opts.item === undefined ? { id: 'step-1' } : opts.item) : opts.entry === undefined ? row : opts.entry,
+          error: null,
+        });
+        query.then = (resolve: (value: unknown) => unknown) =>
+          resolve({ data: opts.written ?? [{ ...row }], error: null });
+        return query;
+      },
+    } as unknown as GoalsSupabaseClient;
+    return { client, calls };
+  }
+
+  const today = '2026-11-04';
+
+  it('writes the changed hours, day and note and returns the entry', async () => {
+    const { client, calls } = entryClient({
+      written: [{ ...row, quantity: '3.5', happened_on: '2026-11-03', text: 'applied, fixed' }],
+    });
+    const result = await updateProgressEntry(
+      client,
+      'e1',
+      { quantity: 3.5, happenedOn: '2026-11-03', text: ' applied, fixed ' },
+      today,
+    );
+    expect(result).toMatchObject({
+      status: 'changed',
+      entry: { quantity: 3.5, happenedOn: '2026-11-03', text: 'applied, fixed', unit: 'h' },
+    });
+    const update = calls.find((c) => c.op === 'update');
+    expect(update?.args[0]).toEqual({
+      text: 'applied, fixed',
+      quantity: 3.5,
+      unit: 'h',
+      happened_on: '2026-11-03',
+    });
+    expect(calls).toContainEqual({ table: 'progress_entries', op: 'is', args: ['undone_at', null] });
+  });
+
+  it.each([
+    [{ quantity: 0 }, 'An amount has to be more than nothing.'],
+    [{ quantity: -1 }, 'An amount has to be more than nothing.'],
+    [{ quantity: null }, 'A unit needs an amount to go with it.'],
+    [{ text: '   ' }, 'Say what happened.'],
+    [{ happenedOn: 'yesterday' }, 'The day has to be a date.'],
+    [{ happenedOn: '2026-02-31' }, 'The day has to be a date.'],
+    [{ happenedOn: '2026-11-05' }, 'The day cannot be in the future.'],
+  ])("refuses %j with the rule's message and writes nothing", async (change, message) => {
+    const { client, calls } = entryClient({});
+    expect(await updateProgressEntry(client, 'e1', change, today)).toEqual({
+      status: 'refused',
+      error: message,
+    });
+    expect(calls.some((c) => c.op === 'update')).toBe(false);
+  });
+
+  it('lets a note be fixed on an entry already filed for a later day', async () => {
+    const { client } = entryClient({ entry: { ...row, happened_on: '2026-11-09' } });
+    expect((await updateProgressEntry(client, 'e1', { text: 'better' }, today)).status).toBe(
+      'changed',
+    );
+  });
+
+  it('says gone for an undone or missing entry, or one on an archived step', async () => {
+    const missing = entryClient({ entry: null });
+    expect(await updateProgressEntry(missing.client, 'e1', { text: 'x' }, today)).toEqual({
+      status: 'gone',
+    });
+    expect(missing.calls).toContainEqual({ table: 'progress_entries', op: 'is', args: ['undone_at', null] });
+
+    const archived = entryClient({ item: null });
+    expect(await updateProgressEntry(archived.client, 'e1', { text: 'x' }, today)).toEqual({
+      status: 'gone',
+    });
+    expect(archived.calls).toContainEqual({ table: 'items', op: 'is', args: ['archived_at', null] });
+    expect(archived.calls.some((c) => c.op === 'update')).toBe(false);
+
+    const raced = entryClient({ written: [] });
+    expect(await updateProgressEntry(raced.client, 'e1', { text: 'x' }, today)).toEqual({
+      status: 'gone',
+    });
   });
 });
 
