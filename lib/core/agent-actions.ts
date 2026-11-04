@@ -56,6 +56,11 @@ export const coreActions: ModuleActions = {
     searchDashChats: none('page'),
     rateDashAnswer: none('theirs', "The person's verdict on a Dash answer."),
   },
+  'app/chat/dash/session-actions.ts': {
+    startSessionThreadAction: none('own', 'The person opening a conversation with a Claude Code session.'),
+    sendSessionMessageAction: none('own', "The person's own words to a Claude Code session."),
+    answerSessionMessageAction: none('theirs', "The person's answer to a session's question."),
+  },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
     stopWatch: tool('stop_watch'),

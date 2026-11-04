@@ -27,6 +27,13 @@ import {
 } from '@/lib/talk/ask-chats';
 import type { MadeChange } from '@/lib/talk/changes';
 import { useClockNow } from '@/lib/use-clock-now';
+import {
+  newSessionThreadHref,
+  openSessionRef,
+  sessionThreadPath,
+  stateWord,
+  type SessionThread,
+} from '@/lib/core/session-threads-model';
 
 /**
  * The list of Dash's chats beside the open one on Chat's Dash tab (plans
@@ -248,8 +255,14 @@ export function AskChats({
   initialArchivedOpen = false,
   initialRenaming = null,
   initialMenu = null,
+  sessions = [],
+  sessionsFailed = false,
 }: {
   chats: readonly AskChat[];
+  /** Conversations with Claude Code sessions (plan #2789.7), listed above the chats. */
+  sessions?: readonly SessionThread[];
+  /** The session threads could not be read: said under their heading. */
+  sessionsFailed?: boolean;
   /** Today in the person's timezone, YYYY-MM-DD, for the groups. */
   today: string;
   made: readonly MadeChange[];
@@ -272,6 +285,7 @@ export function AskChats({
 }) {
   const pathname = usePathname();
   const active = activeOverride !== undefined ? activeOverride : openChatRef(pathname ?? '');
+  const activeSession = activeOverride !== undefined ? activeOverride : openSessionRef(pathname ?? '');
   const toast = useToast();
   const now = useClockNow();
   const [, startTransition] = useTransition();
@@ -408,6 +422,18 @@ export function AskChats({
     <div className="space-y-3 rounded-card bg-surface p-2 min-[720px]:rounded-none min-[720px]:bg-transparent min-[720px]:p-0">
       {chats.length > 0 && <ChatSearch value={query} onChange={setQuery} />}
 
+      {!searching && (
+        <SessionThreads
+          sessions={sessions}
+          failed={sessionsFailed}
+          active={activeSession}
+          whenOf={(at) => {
+            const since = commentWhen(at, now);
+            return since === at.slice(0, 10) ? shortDay(at.slice(0, 10)) : since;
+          }}
+        />
+      )}
+
       {chats.length === 0 ? (
         <div className="px-2">
           {failed ? (
@@ -470,5 +496,77 @@ export function AskChats({
         </Disclosure>
       )}
     </div>
+  );
+}
+
+/**
+ * The threads with Claude Code sessions (plan #2789.7), above the chats with
+ * Dash: each under its name, with the project it is on and where it stands,
+ * and the way to start one at the head.
+ */
+function SessionThreads({
+  sessions,
+  failed,
+  active,
+  whenOf,
+}: {
+  sessions: readonly SessionThread[];
+  failed: boolean;
+  active: string | null;
+  whenOf: (at: string) => string;
+}) {
+  return (
+    <section aria-label="Sessions">
+      <div className="flex items-center justify-between gap-2 px-2">
+        <h3 className="text-small font-medium text-ink-muted">Sessions</h3>
+        <Link
+          href={newSessionThreadHref()}
+          className="inline-flex min-h-11 items-center text-small font-medium text-accent hover:underline sm:min-h-0"
+        >
+          Talk to a session
+        </Link>
+      </div>
+      {failed ? (
+        <p className="px-2 text-small text-danger">Your session threads could not be read. Reload to try again.</p>
+      ) : sessions.length === 0 ? (
+        <p className="px-2 text-small text-ink-muted">Start one to have a session work on a project&rsquo;s code.</p>
+      ) : (
+        <ul className="mt-1 space-y-0.5">
+          {sessions.map((thread) => {
+            const on = thread.id === active;
+            const word = stateWord(thread.state);
+            return (
+              <li key={thread.id}>
+                <Link
+                  href={sessionThreadPath(thread.id)}
+                  aria-current={on ? 'page' : undefined}
+                  className={cn(
+                    'block min-h-11 rounded-control px-2 py-2 transition-colors duration-quick',
+                    on ? 'bg-accent-tint' : 'hover:bg-sunken',
+                  )}
+                >
+                  <span className="flex items-baseline gap-2">
+                    <span className={cn('min-w-0 flex-1 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
+                      {thread.title}
+                    </span>
+                    <time dateTime={thread.lastAt} title={exactTime(thread.lastAt)} className="tabular shrink-0 text-small text-ink-muted">
+                      {whenOf(thread.lastAt)}
+                    </time>
+                  </span>
+                  <span className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-small text-ink-muted">
+                    <span className="min-w-0 truncate">{thread.projectLabel}</span>
+                    {word && (
+                      <span className={cn('shrink-0', thread.state === 'waiting' && 'font-medium text-accent')}>
+                        · {word}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
