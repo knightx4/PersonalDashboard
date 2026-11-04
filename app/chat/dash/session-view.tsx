@@ -506,7 +506,7 @@ function FileChip({ name, href }: { name: string; href: string | null }) {
   );
   const chip = cn(chipVariants({ tone: 'neutral' }), 'max-w-full font-normal text-ink');
   return href ? (
-    <a href={href} target="_blank" rel="noreferrer" className={cn(chip, 'hover:text-accent')}>
+    <a href={href} target="_blank" rel="noreferrer" className={cn(chip, 'min-h-11 hover:text-accent sm:min-h-0')}>
       {inner}
     </a>
   ) : (
