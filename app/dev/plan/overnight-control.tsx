@@ -299,7 +299,7 @@ export function OvernightControl({
   readySteps,
   goals = null,
   fresh = false,
-  label = 'Overnight',
+  label = 'Runner',
   bare = false,
   mark = null,
   showBlocked = true,
@@ -343,11 +343,10 @@ export function OvernightControl({
   /**
    * What to call the runner here.
    *
-   * "Overnight" on the plan, where it is the night you set going before bed.
-   * On Dash it is one row of a Status panel standing beside the notes routine,
-   * and there the useful name is the queue it works rather than the hour it
-   * usually works it -- a runner you started at ten in the morning is still
-   * this one.
+   * "Runner" on Home (plan #578.12): it was "Overnight" while it lived on the
+   * plan, but it runs around the clock now. On Dev settings it is one row
+   * standing beside the notes routine, and there the useful name is the queue
+   * it works.
    */
   label?: string;
   /**
@@ -506,7 +505,7 @@ export function OvernightControl({
 
   return (
     <section
-      aria-label="The overnight runner"
+      aria-label="The runner"
       className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
       {/* With a mark, the mark sits beside the label on the heading line

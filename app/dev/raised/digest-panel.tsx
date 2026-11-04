@@ -148,11 +148,11 @@ function Night({ night }: { night: DigestNight }) {
   const blocked = nightRows(night.blocked);
 
   return (
-    <section aria-label="The overnight runner" className="space-y-1.5">
+    <section aria-label="The runner" className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
           <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
-          Overnight
+          Runner
         </span>
         <OvernightState standing={night.standing} />
         <span className="tabular text-small text-ink-muted">{nightBudgetLine(night)}</span>

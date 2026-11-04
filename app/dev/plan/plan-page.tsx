@@ -9,7 +9,6 @@ import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
   endQuietRuns,
-  loadFeatureFires,
   loadLastRuns,
   loadRunRaises,
   loadStartedRuns,
@@ -20,9 +19,6 @@ import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { withMockups } from '@/lib/plan/mockup';
-import { loadOvernightRun } from '@/lib/plan/overnight';
-import { runnerCard } from '@/lib/plan/runner-card';
-import { loadRunnerGoals } from '@/lib/goals/runner-status-load';
 import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
@@ -40,7 +36,6 @@ import {
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
-import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { ScopeLabelsProvider } from './scope-labels';
 import { catalogOf } from './plan-catalog';
@@ -160,7 +155,7 @@ export async function renderPlanPage({
   // end of a run, so this is where it gets noticed.
   await endQuietRuns({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, overnight, fires, started, updateTimes] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, started, updateTimes] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
@@ -171,18 +166,8 @@ export async function renderPlanPage({
     // through `app/api/plan/checks`: asked here, it held every open of the page
     // on a walk of main's history.
     loadCommitChecks(supabase, user.id),
-    // The runner's standing intention, one row, which is about the plan as a
-    // whole rather than about any part of the tree.
-    loadOvernightRun(supabase, user.id),
-    // The presses the night made, for the control's totals. The same rows the
-    // morning digest reads, through the same loader, so the two cannot come to
-    // different answers about how many features a night got through. #633.
-    // Alongside the rest rather than behind a look at the runner's row: it is
-    // one indexed read of a table this page is already reading, and holding it
-    // back would cost every load a round trip to save this one.
-    loadFeatureFires(supabase, user.id),
-    // Every run still going, after the sweep above, so the card can name each
-    // session running in parallel rather than only the last fire (note 39576272).
+    // Every run still going, after the sweep above, for what is running now at
+    // the top of the page. The runner's card is on Home (plan #578.12).
     loadStartedRuns(supabase, user.id),
     // When each feature last had an update, for the overdue mark on its row.
     loadLatestUpdateTimes(supabase, user.id),
@@ -216,27 +201,6 @@ export async function renderPlanPage({
     : everything;
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
-
-  // The runner's card, read by the same function Dash reads it with, so the
-  // two pages say the same thing about what is running. Off the whole tree
-  // rather than the view: what is ready does not change with the filter.
-  const card = runnerCard({
-    run: overnight,
-    fires,
-    items: data.items,
-    sections: everything,
-    started,
-    lastRuns: Object.values(lastRuns),
-  });
-  // The goals half, for the Goals Dash on the card (plan #1704). Skipped on a
-  // project's page, which draws no card.
-  const goals = project
-    ? null
-    : await loadRunnerGoals({
-        userId: user.id,
-        nightStartedAt: overnight?.running ? overnight.startedAt : null,
-        now: Date.now(),
-      });
 
   // Only on Everything, which is the one view a finished feature reaches at
   // all: it goes into the fold at the foot of the page rather than sitting in
@@ -351,20 +315,6 @@ export async function renderPlanPage({
       )}
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
-      )}
-      {!project && (
-        <OvernightControl
-          run={overnight}
-          canSend={Boolean(planRoutine().token)}
-          night={card.night}
-          on={card.on}
-          sessions={card.sessions}
-          goals={goals}
-          progress={card.progress}
-          push={card.push}
-          ready={card.ready}
-          next={card.next}
-        />
       )}
       <PlanViewComponent
         basePath={basePath}
