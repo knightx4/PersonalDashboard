@@ -33,6 +33,8 @@ import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
 import { snoozeRefOf, withoutSnoozed } from '@/lib/goals/inbox-snooze';
 import { withoutPassiveGoals } from '@/lib/goals/inbox';
 import type { RunQuestion } from '@/lib/core/run-questions';
+import type { SessionQuestion } from '@/lib/core/session-questions';
+import { loadSessionQuestions } from '@/lib/core/session-questions-store';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -58,6 +60,8 @@ export type Home = {
   laterOn: LaterLaneItem[];
   /** Runs waiting on your answer to a question they asked partway (plan #1824). */
   waitingRuns: RunQuestion[];
+  /** Sessions waiting on your answer, from their progress reports (plan #2800.4). */
+  sessionQuestions: SessionQuestion[];
   /** What is coming up within a week under a passive goal, not dismissed (plan #2503.5). */
   mentions: PassiveMention[];
   /** The weekly run's suggestions to react to, soonest first: offers, kept off the Inbox. */
@@ -81,7 +85,7 @@ export async function loadHome(
 ): Promise<Home> {
   const tree = await loadLiveTree(client, { today });
   const since = new Date(now - RUNS_READ_DAYS * 86_400_000).toISOString();
-  const [input, runs, waitingRuns, mentionStates] = await Promise.all([
+  const [input, runs, waitingRuns, sessionQuestions, mentionStates] = await Promise.all([
     // Its reviews double as the goal lines' statuses; a failed read of them
     // leaves the statuses off the lines rather than the page.
     loadTodayInput(client, supabase, { userId, today, tree, now }),
@@ -89,6 +93,8 @@ export async function loadHome(
     loadRunsStartedSince(client, since).catch((): RunListing[] => []),
     // A failed read leaves the questions off the Inbox, not the page.
     loadGoalRunQuestions(client).catch((): RunQuestion[] => []),
+    // A failed read leaves them off the Inbox, not the page.
+    loadSessionQuestions(supabase, userId, now).catch((): SessionQuestion[] => []),
     // A failed read leaves the mentions off, since a dismissed one must not come back.
     loadMentionStates(client).catch((): Map<string, MentionState> | null => null),
   ]);
@@ -126,6 +132,7 @@ export async function loadHome(
     dash,
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today, showsOutside: showsOutside(tree.byGoal, today) }),
     waitingRuns,
+    sessionQuestions,
     suggested: suggestedItems({ goals: tree.goals, byGoal: tree.byGoal, suggestions: input.suggestions }),
     mentions: mentionStates
       ? passiveMentions({

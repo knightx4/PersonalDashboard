@@ -1,4 +1,5 @@
 import type { RunQuestion } from '@/lib/core/run-questions';
+import type { SessionQuestion } from '@/lib/core/session-questions';
 import type { DashLaneItem } from './lanes';
 import type { TodayItem, TodayKind } from './today';
 import { toGoalActivity } from './tree';
@@ -48,6 +49,8 @@ export type GoalInboxGroup = {
   dash: DashLaneItem[];
   /** Runs stopped partway on a question for you (plan #1824); only Questions holds any. */
   runs: RunQuestion[];
+  /** Sessions waiting on an answer from you (plan #2800.4); only Questions holds any. */
+  sessions: SessionQuestion[];
 };
 
 const GROUP_OF: Record<TodayKind, GoalInboxKey> = {
@@ -150,6 +153,7 @@ export function goalInboxGroups(
   onYou: readonly TodayItem[],
   dash: readonly DashLaneItem[],
   runs: readonly RunQuestion[] = [],
+  sessions: readonly SessionQuestion[] = [],
 ): GoalInboxGroup[] {
   return (['actions', 'questions', 'review'] as const).map((key) => {
     const { bundles, single } = bundleRows(onYou.filter((item) => GROUP_OF[item.kind] === key));
@@ -161,6 +165,7 @@ export function goalInboxGroups(
       bundles,
       dash: key === 'questions' ? dash.filter((item) => item.needs) : [],
       runs: key === 'questions' ? [...runs] : [],
+      sessions: key === 'questions' ? [...sessions] : [],
     };
   });
 }
@@ -173,7 +178,8 @@ export function goalInboxCount(
   onYou: readonly TodayItem[],
   dash: readonly DashLaneItem[],
   runs: readonly RunQuestion[] = [],
+  sessions: readonly SessionQuestion[] = [],
 ): number {
   const { bundles, single } = bundleRows(onYou);
-  return single.length + bundles.length + dash.filter((item) => item.needs).length + runs.length;
+  return single.length + bundles.length + dash.filter((item) => item.needs).length + runs.length + sessions.length;
 }
