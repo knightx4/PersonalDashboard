@@ -697,6 +697,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-now-stale': ['/dev/plan', '/dev/projects/[id]'],
   'dev-now-empty': ['/dev/plan', '/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
+  // Mockup pictures under a question's options (plan #2810.2).
+  'dev-question-mockups': ['/dev/raised', '/dev/plan', '/dev/plan/[number]'],
+  'dev-question-mockups-loading': ['/dev/raised', '/dev/plan', '/dev/plan/[number]'],
+  'dev-question-mockups-failed': ['/dev/raised', '/dev/plan', '/dev/plan/[number]'],
+  'dev-question-mockups-viewer': ['/dev/raised', '/dev/plan', '/dev/plan/[number]'],
   'dev-inbox': ['/dev/inbox'],
   'dev-settings': ['/dev/settings'],
   'goals-settings': ['/goals/settings'],
@@ -975,6 +980,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The four words that close a row (plan #1957.3), which every workspace's
   // closing buttons draw.
   'core-close-buttons': ['components/inbox/close-button.tsx'],
+  // The pictures under a question's options (plan #2810.2).
+  'dev-question-mockups': ['components/dev/mockups.tsx'],
   // The agenda's borrowed rows (plan #1957.9), with the one Later menu.
   'todo-agenda-rows': ['components/todo/agenda-item-row.tsx'],
   // Tags on a todo row (plan #2340.2), at rest, picking and pointed at.
