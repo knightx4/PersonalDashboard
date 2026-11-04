@@ -13,7 +13,9 @@
  *                                [--priority 1|2|3] [--size s|m|l]
  *                                [--detail "…"] [--done-when "…"]
  *                                [--proposed] [--idea <id prefix>]
- *                                [--kind decision|setup] [--from <n>]
+ *                                [--kind decision|setup] [--from <n>] [--because "…"]
+ *                                # --from: the answered decision, or the built step
+ *                                # whose finding (--because) made this step
  *                                # under an approved feature a step is ready
  *                                # to build, stamped with the session that
  *                                # added it; --proposed holds it for the person
@@ -63,6 +65,11 @@
  *                                # setup job (needs) or a ready step; never on
  *                                # the person directly
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
+ *   npx tsx scripts/plan.ts revise <n> --from <built step> --because "what it found"
+ *                                [--title "…"] [--detail "…"] [--done-when "…"]
+ *                                # rewrite a step nobody has started, under the same
+ *                                # feature, from what building an earlier step found;
+ *                                # the old wording stays in its comment
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
  *                                # ending a run with the step neither closed nor
@@ -142,7 +149,14 @@ import {
   setupHome,
   setupStartRefusal,
 } from '../lib/plan/needs';
-import { addsAsProposal, currentSession, reshapeStamp, sessionStamp } from '../lib/plan/origin';
+import {
+  addsAsProposal,
+  buildStamp,
+  currentSession,
+  reshapeStamp,
+  sessionStamp,
+} from '../lib/plan/origin';
+import { reviseRefusal, revisedComment } from '../lib/plan/revise';
 import {
   CHECK_BACK_COLUMNS,
   checkBackFrom,
@@ -386,6 +400,21 @@ async function doneRefusal(
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/** The id of the feature at the top of a step's chain (the step itself when it is one). */
+async function rootId(sql: Sql, userId: string, number: number): Promise<string | null> {
+  const rows = await sql<{ id: string }[]>`
+    with recursive up as (
+      select id, parent_id, 0 as depth from plan_items
+      where user_id = ${userId} and number = ${number}
+      union all
+      select p.id, p.parent_id, up.depth + 1 from plan_items p
+      join up on p.id = up.parent_id
+      where p.user_id = ${userId} and up.depth < 50
+    )
+    select id from up order by depth desc limit 1`;
+  return rows[0]?.id ?? null;
 }
 
 /** The scope a step's root feature is filed under: a workspace, a project, or null. */
@@ -1282,13 +1311,30 @@ async function main(): Promise<void> {
       // is read off the decision's own answer rather than retyped by whoever
       // is adding the step, so a session cannot paraphrase an answer into
       // something that was never said.
+      //
+      // A built step under the same feature can be the source too: what
+      // building it found is often what makes the next piece of work clear.
+      // There is no answer to quote then, so the finding is given with
+      // --because and shown on the row as the session's words.
       const fromNumber = arg('--from');
       let comment: string | null = null;
       if (fromNumber) {
         const from = await byNumber(sql, userId, fromNumber);
-        if (from.kind !== 'decision') fail(`${ref(from.number)} is not a decision.`);
-        if (!from.resolution) fail(`${ref(from.number)} has not been answered yet.`);
-        comment = reshapeStamp(typed(from.number), from.resolution);
+        if (from.kind === 'decision') {
+          if (!from.resolution) fail(`${ref(from.number)} has not been answered yet.`);
+          comment = reshapeStamp(typed(from.number), from.resolution);
+        } else if (from.kind === 'build') {
+          const built = from.status === 'done' || (from.status === 'in_progress' && from.commitSha);
+          if (!built) fail(`${ref(from.number)} has not been built yet.`);
+          const because = arg('--because')?.trim();
+          if (!because) fail(`Say what ${ref(from.number)} found with --because "…".`);
+          if (!parent || (await rootId(sql, userId, from.number)) !== (await rootId(sql, userId, parent.number))) {
+            fail(`${ref(from.number)} is not under the same feature as the new step.`);
+          }
+          comment = buildStamp(typed(from.number), because);
+        } else {
+          fail(`${ref(from.number)} is a ${from.kind}: --from takes a decision or a built step.`);
+        }
       }
 
       // A step a session writes ready under an approved feature says so, on
@@ -1819,6 +1865,64 @@ async function main(): Promise<void> {
 
     // Closing or parking a step always records why. A status with no reason
     // is how a plan becomes something nobody trusts.
+    // Rewrite a step nobody has started, because of what building an earlier
+    // step under the same feature found (lib/plan/revise.ts has the limits).
+    // The row keeps what it said before in its comment, under a stamp naming
+    // the step whose build caused it, so the person sees why and can put it
+    // back.
+    if (command === 'revise') {
+      const fromNumber = arg('--from');
+      if (!fromNumber) {
+        fail('revise <step> --from <built step> --because "what it found" [--title …] [--detail …] [--done-when …]');
+      }
+      const from = await byNumber(sql, userId, fromNumber);
+      const change = { title: arg('--title'), detail: arg('--detail'), doneWhen: arg('--done-when') };
+      const finding = arg('--because');
+      const target = {
+        kind: item.kind,
+        status: item.status,
+        parent_id: item.parentId,
+        title: item.title,
+        acceptance: item.acceptance,
+        detail: item.detail,
+        comment: item.comment,
+      };
+      const sameFeature =
+        (await rootId(sql, userId, item.number)) === (await rootId(sql, userId, from.number));
+      const refusal = reviseRefusal({
+        target,
+        targetRef: ref(item.number),
+        source: { kind: from.kind, status: from.status, commit_sha: from.commitSha },
+        sourceRef: ref(from.number),
+        sameFeature,
+        change,
+        finding,
+      });
+      if (refusal) fail(refusal);
+      const comment = revisedComment({
+        comment: item.comment,
+        target,
+        change,
+        sourceOutline: typed(from.number),
+        finding: finding ?? '',
+        date: new Date().toISOString().slice(0, 10),
+      });
+      await sql`
+        update plan_items
+        set title = coalesce(${change.title}, title),
+            detail = coalesce(${change.detail}, detail),
+            acceptance = coalesce(${change.doneWhen}, acceptance),
+            comment = ${comment}
+        where id = ${item.id} and user_id = ${userId}`;
+      console.log(`${ref(item.number)} revised from ${ref(from.number)}'s build.`);
+      await checkRowWriting(sql, userId, item, {
+        title: change.title ?? undefined,
+        detail: change.detail ?? undefined,
+        doneWhen: change.doneWhen ?? undefined,
+      });
+      return;
+    }
+
     if (command === 'done' || command === 'block' || command === 'drop') {
       // A block says two things and they have different lifetimes. What the
       // step needs is one sentence that is true until somebody supplies it, so
