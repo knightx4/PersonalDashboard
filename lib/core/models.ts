@@ -261,6 +261,10 @@ export const MODELS = {
   vaultConnections: HAIKU,
   /** lib/vault/notes/voice.ts: whose words each note is (plan #2413.3) */
   vaultNoteVoice: HAIKU,
+  /** lib/you/advisor-talk-run.ts: an advisor's reply when the person talks to one alone (plan #2581.6) */
+  youAdvisorTalk: SONNET,
+  /** lib/you/advisor-talk-run.ts: what an advisor remembers after each exchange (plan #2581.6) */
+  youAdvisorMemory: HAIKU,
   /** lib/you/note-extracts.ts: their own words from private notes (plan #2413.8) */
   youNoteExtracts: HAIKU,
   /** lib/you/transcript-model.ts */

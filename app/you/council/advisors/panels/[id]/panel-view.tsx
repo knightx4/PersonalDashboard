@@ -11,7 +11,7 @@ import { FieldError, FieldHint, Input, Switch } from '@/components/ui/field';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { PANEL_NAME_MAX, PANEL_SIZE_MAX, type BoardPanel } from '@/lib/you/board-panels';
 import type { RosterAdvisor } from '@/lib/you/board-advisors';
-import { AdvisorMark } from '../../../advisor-mark';
+import { AdvisorAvatar } from '../../../advisor-avatar';
 
 /**
  * One panel of advisors (plan #2561.12), on the detail pattern
@@ -236,7 +236,7 @@ function Member({
       <label className="flex min-h-11 items-center gap-3">
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2 text-ui text-ink">
-            {a.kind === 'guest' && <AdvisorMark name={a.name} />}
+            <AdvisorAvatar advisorKey={a.key} name={a.name} size="md" decorative />
             <span className="min-w-0 [overflow-wrap:anywhere]">{a.name}</span>
           </span>
           {a.kind === 'guest' && (

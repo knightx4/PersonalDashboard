@@ -8,17 +8,22 @@ import { isSure, triageLine, type Triage } from '@/lib/feedback/triage';
  * this repository. Instead it is filed as an idea under the project, and
  * triage decides where it goes from there: a note triage is sure is one fix
  * becomes a step under the project's standing feedback feature, ready for the
- * projects routine to build in the right repository; anything else stays an
- * idea, for shaping into a feature of its own.
+ * projects routine to build in the right repository; anything else goes
+ * straight on to be shaped into a feature on the plan (lib/ideas/send-to-plan.ts),
+ * as a note from Dash's own header does. Nothing waits on the ideas page.
  *
  * This file is the pure part: the decision and the words written. The
  * writing is lib/project-notes/file.ts.
  */
 
-/** Where a project note ended up. */
+/**
+ * Where a project note ended up: a step, or sent to be shaped into a feature
+ * (`'idea'` on the wire, which the apps already read; the idea is the record
+ * the shaping run links its feature to).
+ */
 export type ProjectNoteOutcome = { as: 'step'; number: number } | { as: 'idea' };
 
-/** A step only when triage is sure it is one fix; unsure, or no triage at all, stays an idea. */
+/** A step only when triage is sure it is one fix; unsure, or no triage at all, is shaped into a feature. */
 export function routesToStep(triage: Triage | null): boolean {
   const route = triage?.route ?? null;
   return route !== null && route.value === 'fix' && isSure(route);
@@ -32,7 +37,7 @@ export function feedbackFeatureTitle(projectLabel: string): string {
 export function feedbackFeatureDetail(projectLabel: string): string {
   return (
     `Notes written in ${projectLabel}'s own app with its note button land here as steps ` +
-    'when triage reads them as one fix. Larger ones go to the ideas page under this project instead. ' +
+    'when triage reads them as one fix. Larger ones are shaped into features of their own on the plan. ' +
     'This feature stays open; close a step, not the feature.'
   );
 }
@@ -57,5 +62,5 @@ export function noteIdeaBody(body: string, page: string | null): string {
 export function outcomeLine(outcome: ProjectNoteOutcome): string {
   return outcome.as === 'step'
     ? `Added to the plan as step #${outcome.number}.`
-    : 'Saved as an idea for Dash to plan.';
+    : 'Sent to Dash to shape into the plan.';
 }

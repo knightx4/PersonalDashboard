@@ -37,8 +37,20 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
+import { YouBoardDecisionPreview } from './you-board-decision-surfaces';
+import { AdvisorAvatars } from '@/app/you/council/advisor-avatar';
+import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
+import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
+import {
+  YouBoardAdvisorProfilePreview,
+  YouBoardAdvisorsLoadingPreview,
+  YouBoardAdvisorsPreview,
+  YouBoardPanelPreview,
+  YouBoardAdvisorTalkPreview,
+} from './you-board-advisor-surfaces';
+import { AdvisorProfileSkeleton } from '@/app/you/council/board-skeleton';
+import { SetTab } from './set-tab';
 import { YouCouncilLoadingPreview, YouCouncilMentorPreview, YouCouncilPreview } from './you-council-surfaces';
-import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -10671,6 +10683,66 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A decision worked with probabilities (plan #2581.9): the headline, the
+     * strip of advisors along 0 to 100% for the leading option with a line
+     * from each, the numbers behind it, the exchange, the premortem and
+     * tripwire, and the verdict waiting on a decision. Also drawn with one
+     * dot open, while answers arrive, before any has, and with a steelman. */
+    id: 'you-board-decision',
+    label: 'You · Advisors, a decision led by its headline and spread',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-popover',
+    label: 'You · Advisors, one advisor’s range and reasoning open from their dot',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview openDot="skeptic" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-running',
+    label: 'You · Advisors, a decision while the answers arrive',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-empty',
+    label: 'You · Advisors, a decision no advisor has answered yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-steelman',
+    label: 'You · Advisors, a unanimous decision with its other side argued',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="steelman" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-meeting-debate-running',
     label: 'You · Council, a debate still being held, one question not reached',
     module: 'you',
@@ -10813,6 +10885,161 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* One advisor's profile (plan #2581.5): the avatar large, the name,
+     * the assessment they own, then About, Track record and Sources. */
+    id: 'you-board-advisor',
+    label: 'You · Advisors, one advisor’s profile, About',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record',
+    label: 'You · Advisors, an advisor’s track record',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record-empty',
+    label: 'You · Advisors, an advisor with no track record yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-sources',
+    label: 'You · Advisors, the sources an advisor was built from',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="sources" />
+        <YouBoardAdvisorProfilePreview tab="sources" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-building',
+    label: 'You · Advisors, a guest’s profile while the brain is built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-failed',
+    label: 'You · Advisors, a guest whose brain failed to build, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    /* An advisor's look open to change (plan #2581.3), on their profile since
+     * plan #2581.5: the avatar large, Shuffle, and a stepper for each trait. */
+    id: 'you-board-advisor-avatar',
+    label: 'You · Advisors, changing how an advisor looks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview
+          editing={{ svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) }}
+        />
+      </div>
+    ),
+  },
+  {
+    /* Talking to one advisor alone (plan #2581.6): the talk on one card, his
+     * replies citing the person’s rows, the earlier talks and what he remembers. */
+    id: 'you-board-advisor-talk',
+    label: 'You · Advisors, talking to one advisor alone',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="chat" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-empty',
+    label: 'You · Advisors, a first talk with three ways in',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-error',
+    label: 'You · Advisors, a reply that failed, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-running',
+    label: 'You · Advisors, an advisor writing a reply',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-loading',
+    label: 'You · Advisors, a talk loading',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="loading" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-loading',
+    label: 'You · Advisors, a profile loading',
+    module: 'you',
+    width: 'page',
+    render: () => <AdvisorProfileSkeleton />,
+  },
+  {
     id: 'you-board-advisors-loading',
     label: 'You · Council, advisors loading',
     module: 'you',
@@ -10849,17 +11076,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardPanelPreview state="delete" />
-      </div>
-    ),
-  },
-  {
-    id: 'you-board-meeting-advisor',
-    label: 'You · Council, one advisor’s thinking open',
-    module: 'you',
-    width: 'page',
-    render: () => (
-      <div className={SHELL_FOOT}>
-        <YouBoardDebatePreview advisor="buffett" />
       </div>
     ),
   },
@@ -13930,3 +14146,19 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FigureQuestionPreview form="move-agglomeration" />,
   },
 ];
+
+/**
+ * The Advisors surfaces draw their avatars from one sprite, made here on the
+ * server as the pages make theirs (plan #2581.3): every advisor the board
+ * started with, and the guest the fixtures add. Wrapped in place, so the
+ * entries above stay where the gallery's tests read them.
+ */
+for (const surface of SURFACES) {
+  if (!surface.id.startsWith('you-board')) continue;
+  const render = surface.render;
+  surface.render = () => (
+    <AdvisorAvatars {...spriteFor([...Object.keys(SEEDED_AVATARS), 'aurelius'].map((key) => ({ key })))}>
+      {render()}
+    </AdvisorAvatars>
+  );
+}
