@@ -229,7 +229,7 @@ function Talks({
                 ) : (
                   <Link
                     href={talkHref(advisor.key, chat.id)}
-                    className="min-w-0 text-ui text-ink hover:text-accent [overflow-wrap:anywhere]"
+                    className="press-area min-w-0 text-ui text-ink hover:text-accent [overflow-wrap:anywhere]"
                   >
                     {chat.title ?? 'Untitled talk'}
                   </Link>
