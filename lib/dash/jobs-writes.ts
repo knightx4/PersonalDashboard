@@ -587,7 +587,7 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
   const said = listed(changed);
   return {
     kind: 'change_application',
-    input: { verb: 'Changed', what: name, rest: `: ${said}`, href, where: 'Open the role', paths: [...rolePaths(roleId), '/jobs/analytics'] },
+    input: { verb: 'Changed', what: name, rest: `: ${said}`, href, where: 'Open the role', paths: [...rolePaths(roleId)] },
     subjectRef: toRef(APPLICATIONS, id),
     op: 'update',
     before,
@@ -1437,7 +1437,7 @@ async function mergeRoles(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       rest: `: folded in ${folded}`,
       href,
       where: 'Open the role',
-      paths: [...rolePaths(keepId), '/jobs/analytics'],
+      paths: [...rolePaths(keepId)],
     },
     subjectRef: toRef(ROLES, keepId),
     op: 'update',

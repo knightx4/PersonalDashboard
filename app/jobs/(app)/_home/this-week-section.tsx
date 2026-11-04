@@ -1,10 +1,8 @@
 import { INTERVIEW_HORIZON_DAYS, type TodayBoard } from '@/lib/jobs/today/load';
 import { Card } from '@/components/ui/card';
+import { INTERVIEWS_HREF } from '@/lib/jobs/pipeline-view';
 import { HomeSection } from './home-section';
 import { TodayLists } from './this-week-lists';
-
-/** Every interview, past and upcoming, which left the tab bar in plan #1591. */
-export const INTERVIEWS_HREF = '/jobs/interviews';
 
 /**
  * What is happening this week: the interviews coming up. First on Now.
@@ -26,7 +24,7 @@ export function ThisWeekSection({ board, timezone }: { board: TodayBoard; timezo
     <HomeSection
       id="this-week"
       title="This week"
-      more={{ href: INTERVIEWS_HREF, label: 'All interviews' }}
+      more={{ href: INTERVIEWS_HREF, label: 'Roles in process' }}
     >
       {board.interviews.length === 0 ? (
         <Card padding="dense">

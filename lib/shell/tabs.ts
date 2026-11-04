@@ -59,14 +59,11 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'] },
     // Back to the view you left it on (note 978314f8).
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline', keepsView: true },
-    // Who to tell about each application, and the note to them.
-    { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
     { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
     { href: '/jobs/material', label: 'Material', icon: 'answers' },
-    { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   ],
   todo: [
     { href: '/todo', label: 'Now', icon: 'agenda', exact: true },
