@@ -44,6 +44,8 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { codeDeps } from '@/lib/dash/think-code';
+import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
 import {
@@ -116,6 +118,8 @@ export async function askDashInRequest(input: {
   mentions?: readonly AskMention[];
   /** The workspace the lookups are kept to, already checked; null for every one. */
   scope?: ModuleId | null;
+  /** "Think it through" was on (plan #2789.10). */
+  think?: boolean;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -176,6 +180,8 @@ export async function askDashInRequest(input: {
       mentions: mentionCitations(input.mentions ?? []),
       scope,
       model: await choosing,
+      // The code is read as the owner, as Dev is (plan #2789.10).
+      think: input.think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
     },
     {
       start: (question) => startAsk(core, user.id, question),

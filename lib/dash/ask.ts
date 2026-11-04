@@ -26,6 +26,20 @@ import { lookupInScope } from '@/lib/ask/tools';
 import { moduleById, type ModuleId } from '@/lib/modules';
 import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 import type { PaidQueued } from './paid';
+import {
+  THINK_EFFORT,
+  THINK_MAX_TOKENS,
+  THINK_MODEL,
+  THINK_RULES,
+  THINK_TIME_BUDGET_MS,
+  THINK_TOOLS,
+  THINK_WEB_SEARCH,
+  isThinkTool,
+  runThinkTool,
+  thoughtCall,
+  thoughtCost,
+  type ThinkDeps,
+} from './think';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -268,6 +282,25 @@ export function scopedVoice(scope: ModuleId | null | undefined, model: string = 
   return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
 }
 
+/**
+ * Ask's voice with "Think it through" on (plan #2789.10; lib/dash/think.ts):
+ * Opus at high effort, Ask's rules with the thinking rules after them, web
+ * search, and the code lookups and the mockup on top of Ask's tools. The
+ * model the person chose for ordinary questions does not apply.
+ */
+export function thinkVoice(scope: ModuleId | null | undefined): DashVoice {
+  const ask = scopedVoice(scope, THINK_MODEL);
+  return {
+    ...ask,
+    system: `${SYSTEM}\n\n${THINK_RULES}`,
+    tools: [...ask.tools, ...THINK_TOOLS],
+    serverTools: [THINK_WEB_SEARCH],
+    effort: THINK_EFFORT,
+    maxTokens: THINK_MAX_TOKENS,
+    timeBudgetMs: THINK_TIME_BUDGET_MS,
+  };
+}
+
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
 export type AskLookupEvent = DashLookupEvent;
@@ -314,11 +347,17 @@ export async function answerQuestion(input: {
   scope?: ModuleId | null;
   /** The model the person chose to be answered with (plan #2458.2); absent, Sonnet. */
   model?: DashChoiceId;
+  /**
+   * "Think it through" (plan #2789.10): answered with thinkVoice, and the
+   * think lookups run with these. Absent: an ordinary answer.
+   */
+  think?: ThinkDeps | null;
 }): Promise<AskAnswer> {
-  const { page, scope, model, ...rest } = input;
+  const { page, scope, model, think, execute, ...rest } = input;
   return runDash({
     ...rest,
-    voice: scopedVoice(scope, model),
+    execute: think ? (name, args) => (isThinkTool(name) ? runThinkTool(name, args, think) : execute(name, args)) : execute,
+    voice: think ? thinkVoice(scope) : scopedVoice(scope, model),
     context: {
       surface: 'ask',
       subject: null,
@@ -475,6 +514,12 @@ export async function askDash(
      * Sonnet. The spend is recorded under the model that answered.
      */
     model?: DashChoiceId;
+    /**
+     * "Think it through" was on (plan #2789.10): answered on Opus at high
+     * effort with web search, the code and the mockup, and the answer keeps
+     * what it cost. Absent: an ordinary answer.
+     */
+    think?: ThinkDeps | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -639,6 +684,7 @@ export async function askDash(
     signal: input.signal,
     scope: input.scope,
     model: input.model,
+    think: input.think,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);
@@ -653,8 +699,12 @@ export async function askDash(
 
   let answered: TalkTurn[];
   try {
+    // A thought-through answer keeps its mark and its cost, read by the line under it.
+    const toolCalls = input.think
+      ? [...answer.toolCalls, thoughtCall({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spent) })]
+      : answer.toolCalls;
     answered = await stores.append(subject, [
-      { role: 'assistant', body: answer.body, toolCalls: answer.toolCalls, citations: answer.citations },
+      { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
     ]);
   } catch {
     await discard();

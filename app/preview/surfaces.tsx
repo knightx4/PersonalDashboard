@@ -473,6 +473,7 @@ import {
   DashPageSurface,
   AskAnswerActionsSurface,
   AskBoxSurface,
+  AskThinkSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -8617,6 +8618,33 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskBoxSurface open="scope" />,
+  },
+  {
+    /* "Think it through" on (plan #2789.10): the switch pressed in the box's
+     * foot, standing in for the model chip, with a question typed. */
+    id: 'ask-think-on',
+    label: 'Dash · Think it through, switched on',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="on" />,
+  },
+  {
+    /* A thought-through answer with the mockup it drew, in its sandboxed
+     * frame, and the line saying it was thought through on Opus and its cost. */
+    id: 'ask-think-mockup',
+    label: 'Dash · A thought-through answer with a mockup',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="mockup" />,
+  },
+  {
+    /* A thought-through answer with no mockup: the cost line alone, the
+     * switch off again in the box. */
+    id: 'ask-think-cost',
+    label: 'Dash · What a thought-through answer cost',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="cost" />,
   },
   {
     /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet

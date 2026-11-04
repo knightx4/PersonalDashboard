@@ -73,6 +73,8 @@ export type AskInput = {
   mentions: AskMention[];
   /** The workspace Dash's lookups are kept to (plan #1899.5); null for every one. */
   scope: ModuleId | null;
+  /** "Think it through" was on (plan #2789.10): true only when the body said exactly true. */
+  think: boolean;
 };
 
 /** The question, the conversation it continues and the page, or the sentence saying why not. */
@@ -85,6 +87,7 @@ export function parseAskInput(
   list?: unknown,
   rows?: unknown,
   scope?: unknown,
+  think?: unknown,
 ): { ok: true; input: AskInput } | { ok: false; error: string } {
   if (typeof question !== 'string') return { ok: false, error: 'Write a question first.' };
   let ref: string | null = null;
@@ -104,6 +107,7 @@ export function parseAskInput(
       list: parseAskListFilter(list),
       mentions: parseAskMentions(rows),
       scope: parseAskScope(scope),
+      think: think === true,
     },
   };
 }
