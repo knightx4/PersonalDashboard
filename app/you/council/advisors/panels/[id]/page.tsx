@@ -4,6 +4,8 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
 import { loadPanel } from '@/lib/you/board-panels';
 import { deleteBoardPanel, renameBoardPanel, setBoardPanelAdvisors } from '../../../actions';
+import { spriteFor } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from '../../../advisor-avatar';
 import { PanelView } from './panel-view';
 
 export const metadata = { title: 'Council panel' };
@@ -24,19 +26,21 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const [panel, roster] = await Promise.all([loadPanel(client, user.id, id), listRoster(client, user.id)]);
   if (!panel) notFound();
   return (
-    <PanelView
-      panel={panel}
-      roster={roster}
-      actions={{ rename: renameBoardPanel, setAdvisors: setBoardPanelAdvisors, remove: deleteBoardPanel }}
-      subject={{
-        ref: null,
-        path: [
-          { label: 'You', href: '/you' },
-          { label: 'Council', href: '/you/council' },
-          { label: 'Mentors', href: '/you/council/advisors' },
-          { label: panel.name, href: `/you/council/advisors/panels/${id}` },
-        ],
-      }}
-    />
+    <AdvisorAvatars {...spriteFor(roster)}>
+      <PanelView
+        panel={panel}
+        roster={roster}
+        actions={{ rename: renameBoardPanel, setAdvisors: setBoardPanelAdvisors, remove: deleteBoardPanel }}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Council', href: '/you/council' },
+            { label: 'Mentors', href: '/you/council/advisors' },
+            { label: panel.name, href: `/you/council/advisors/panels/${id}` },
+          ],
+        }}
+      />
+    </AdvisorAvatars>
   );
 }

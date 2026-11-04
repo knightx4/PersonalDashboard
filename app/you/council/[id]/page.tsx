@@ -10,6 +10,8 @@ import { createTodoClient } from '@/lib/todo/auth/server';
 import { loadGoalChoices, withMade } from '@/lib/you/board-make-store';
 import { advisorNames, listMeetingReviews, loadPickScorecard } from '@/lib/you/board-reviews';
 import { makeDecisionHappen } from '../make-actions';
+import { loadAvatarSprite } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from '../advisor-avatar';
 import { MeetingView } from './meeting-view';
 
 export const metadata = { title: 'Council meeting' };
@@ -37,13 +39,14 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (!UUID.test(id)) notFound();
   const user = await requireUser();
   const you = await createYouClient();
-  const [found, scorecard, settings, reviews, picks, names] = await Promise.all([
+  const [found, scorecard, settings, reviews, picks, names, avatars] = await Promise.all([
     loadBoardMeeting(you, user.id, id),
     boardScorecard(you, user.id),
     loadAccountSettings(user.id),
     listMeetingReviews(you, user.id, id),
     loadPickScorecard(you, user.id),
     advisorNames(you, user.id),
+    loadAvatarSprite(you, user.id),
   ]);
   if (!found) notFound();
   const loaded = await loadMeetingDebate(you, user.id, id, found.minutes.agenda);
@@ -52,27 +55,29 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const debate = todo && goals ? await withMade(you, { todo, goals }, user.id, loaded) : loaded;
   const goalChoices = goals ? await loadGoalChoices(goals, user.id) : [];
   return (
-    <MeetingView
-      meeting={found.meeting}
-      minutes={found.minutes}
-      marks={found.marks}
-      debate={debate}
-      make={{ action: makeDecisionHappen, goals: goalChoices, today: todayInTimezone(settings.timezone) }}
-      scorecard={scorecard}
-      reviews={reviews}
-      picks={picks}
-      names={names}
-      timezone={settings.timezone}
-      now={readAt()}
-      subject={{
-        ref: null,
-        path: [
-          { label: 'You', href: '/you' },
-          { label: 'Council', href: '/you/council' },
-          { label: 'Decisions', href: '/you/council/decisions' },
-          { label: meetingTitle(found.meeting), href: `/you/council/${id}` },
-        ],
-      }}
-    />
+    <AdvisorAvatars {...avatars}>
+      <MeetingView
+        meeting={found.meeting}
+        minutes={found.minutes}
+        marks={found.marks}
+        debate={debate}
+        make={{ action: makeDecisionHappen, goals: goalChoices, today: todayInTimezone(settings.timezone) }}
+        scorecard={scorecard}
+        reviews={reviews}
+        picks={picks}
+        names={names}
+        timezone={settings.timezone}
+        now={readAt()}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Council', href: '/you/council' },
+            { label: 'Decisions', href: '/you/council/decisions' },
+            { label: meetingTitle(found.meeting), href: `/you/council/${id}` },
+          ],
+        }}
+      />
+    </AdvisorAvatars>
   );
 }

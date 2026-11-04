@@ -10,7 +10,9 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { addAdvisor, retryBuild, setActive } from '@/lib/you/board-advisor-build';
 import { conveneBoardQuestion as convene, putQuestionToBoard } from '@/lib/you/board-ask';
 import { answerAsk, answerError } from '@/lib/you/board-asks';
-import { listRoster } from '@/lib/you/board-advisors';
+import { listRoster, saveAvatar } from '@/lib/you/board-advisors';
+import { parseAvatar, type AvatarLook } from '@/lib/you/advisor-avatar';
+import { avatarLook, avatarSvg } from '@/lib/you/advisor-avatar-draw';
 import {
   cleanPanelMembers,
   cleanPanelName,
@@ -200,7 +202,7 @@ export async function makeResolutionTodo(id: string, item: string): Promise<Boar
 }
 
 /**
- * Ask the board a question: save it queued, and with `now` convene a meeting
+ * Ask the council a question: save it queued, and with `now` convene a meeting
  * about it at once. A meeting that cannot start leaves the question queued
  * for Sunday and says why, with `queued` and its id so the card can close
  * and the question's row can say why.
@@ -363,7 +365,7 @@ export async function addBoardAdvisor(input: {
       routine: boardRoutine(),
     });
     revalidatePath('/you/council');
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     return { error: result.error, saved: Boolean(result.advisorId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The advisor was not added. Try again.' };
@@ -378,7 +380,7 @@ export async function retryAdvisorBrain(advisorId: string): Promise<{ error: str
     const user = await requireUser();
     const client = await createYouClient();
     const result = await retryBuild({ client, userId: user.id, advisorId, routine: boardRoutine() });
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     return { error: result.started ? null : result.error };
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'The build did not start. Try again.' };
@@ -397,7 +399,7 @@ export async function setAdvisorActive(
     const client = await createYouClient();
     const result = await setActive({ client, userId: user.id, advisorId, active });
     revalidatePath('/you/council');
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     return result;
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
@@ -472,7 +474,7 @@ export async function createBoardPanel(): Promise<PanelResult> {
     const user = await requireUser();
     const client = await createYouClient();
     const panel = await createPanel(client, user.id);
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     return { error: null, panelId: panel.id };
   } catch (error) {
     return panelFailed(error, 'The panel was not made. Try again.');
@@ -490,7 +492,7 @@ export async function renameBoardPanel(id: string, name: string): Promise<PanelR
     const client = await createYouClient();
     const saved = await updatePanel(client, user.id, id, { name: clean.name });
     if (!saved) return { error: 'That panel is not yours or no longer exists.' };
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     revalidatePath(`/you/council/advisors/panels/${id}`);
     return { error: null };
   } catch (error) {
@@ -513,7 +515,7 @@ export async function setBoardPanelAdvisors(id: string, advisors: string[]): Pro
     if (!clean.ok) return { error: clean.error };
     const saved = await updatePanel(client, user.id, id, { advisors: clean.advisors });
     if (!saved) return { error: 'That panel is not yours or no longer exists.' };
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     revalidatePath(`/you/council/advisors/panels/${id}`);
     return { error: null };
   } catch (error) {
@@ -530,9 +532,39 @@ export async function deleteBoardPanel(id: string): Promise<PanelResult> {
     const client = await createYouClient();
     await removePanel(client, user.id, id);
     revalidatePath('/you/council');
-    revalidatePath('/you/council/advisors');
+    revalidatePath('/you/council/advisors', 'layout');
     return { error: null };
   } catch (error) {
     return panelFailed(error, 'The panel was not deleted. Try again.');
+  }
+}
+
+/**
+ * Draw a look the person is trying on an advisor's profile, without keeping
+ * it (plan #2581.3): the drawing, and the traits it shows so the pickers
+ * start where the drawing is. DiceBear runs here, never in the browser.
+ */
+// latency: pending
+export async function drawAdvisorAvatar(
+  avatar: unknown,
+): Promise<{ error: string | null; svg?: string; look?: AvatarLook }> {
+  await requireUser();
+  const parsed = parseAvatar(avatar);
+  if (!parsed) return { error: 'That look could not be drawn. Try another.' };
+  return { error: null, svg: avatarSvg(parsed, 'preview'), look: avatarLook(parsed) };
+}
+
+/** Keep an advisor's new look, or with null go back to their first one (plan #2581.3). */
+// latency: pending
+export async function saveAdvisorAvatar(advisorId: string, avatar: unknown): Promise<{ error: string | null }> {
+  if (!meetingId.safeParse(advisorId).success) return { error: 'That is not one of your advisors.' };
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const result = await saveAvatar({ client, userId: user.id, advisorId, avatar });
+    revalidatePath('/you/council', 'layout');
+    return result;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'That was not saved. Try again.' };
   }
 }

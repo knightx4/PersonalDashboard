@@ -3,7 +3,11 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
 import { hasOpenMeeting } from '@/lib/you/board';
 import { listPanels } from '@/lib/you/board-panels';
-import { addBoardAdvisor, createBoardPanel, retryAdvisorBrain, setAdvisorActive, startMeeting } from '../actions';
+import { recordsByKey } from '@/lib/you/board-profile';
+import { loadTrackRecords } from '@/lib/you/board-scoring';
+import { addBoardAdvisor, createBoardPanel, startMeeting } from '../actions';
+import { spriteFor } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from '../advisor-avatar';
 import { AdvisorsView } from './advisors-view';
 
 export const metadata = { title: 'Mentors' };
@@ -15,38 +19,41 @@ function readAt(): number {
 }
 
 /**
- * The Advisors view of the Board tab (plan #2561.7): the five seats and every
- * guest, each guest's brain and the switch for the chair.
+ * The roster of the Council tab (plan #2561.7): the panels, then the five
+ * seats and every guest as cards that open each advisor's profile
+ * (plan #2581.5).
  */
 export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
-  const [advisors, panels, running] = await Promise.all([
+  const [advisors, panels, running, records] = await Promise.all([
     listRoster(client, user.id),
     listPanels(client, user.id),
     hasOpenMeeting(client, user.id),
+    loadTrackRecords(client, user.id),
   ]);
   return (
-    <AdvisorsView
-      advisors={advisors}
-      panels={panels}
-      meetingRunning={running}
-      now={readAt()}
-      subject={{
-        ref: null,
-        path: [
-          { label: 'You', href: '/you' },
-          { label: 'Council', href: '/you/council' },
-          { label: 'Mentors', href: '/you/council/advisors' },
-        ],
-      }}
-      actions={{
-        add: addBoardAdvisor,
-        retry: retryAdvisorBrain,
-        setActive: setAdvisorActive,
-        createPanel: createBoardPanel,
-        startMeeting,
-      }}
-    />
+    <AdvisorAvatars {...spriteFor(advisors)}>
+      <AdvisorsView
+        advisors={advisors}
+        panels={panels}
+        meetingRunning={running}
+        records={recordsByKey(records)}
+        now={readAt()}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Council', href: '/you/council' },
+            { label: 'Mentors', href: '/you/council/advisors' },
+          ],
+        }}
+        actions={{
+          add: addBoardAdvisor,
+          createPanel: createBoardPanel,
+          startMeeting,
+        }}
+      />
+    </AdvisorAvatars>
   );
 }
