@@ -382,12 +382,12 @@ function AdvisorRow({
         )}
       </div>
       {guest && state.kind === 'building' && (
-        <p className="mt-1 text-small text-ink-muted">
+        <p className="mt-1 pl-12 text-small text-ink-muted">
           Dash is reading their public work. This takes a while, and the guest sits once it is done.
         </p>
       )}
       {guest && state.kind === 'failed' && (
-        <div className="mt-1.5 space-y-2">
+        <div className="mt-1.5 space-y-2 pl-12">
           <p className="text-small text-danger [overflow-wrap:anywhere]">{state.why}</p>
           <DashAction
             type="button"
@@ -412,7 +412,11 @@ function AdvisorRow({
           onDone={() => setLook(null)}
         />
       )}
-      {error && <FieldError>{error}</FieldError>}
+      {error && (
+        <div className="pl-12">
+          <FieldError>{error}</FieldError>
+        </div>
+      )}
     </li>
   );
 }
