@@ -168,7 +168,7 @@ function ChatShell({ path, children }: { path: string; children: React.ReactNode
  * Skeptic's is one just started from New message, nothing said yet, and
  * Richard Feynman, with no chat, is reached only through New message.
  */
-const MESSAGE_ROWS = withChats(CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'chat-m4' } : r)));
+export const MESSAGE_ROWS = withChats(CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'chat-m4' } : r)));
 
 /** Everyone New message offers: the people above, and one more with no chat yet. */
 const EVERYONE: PersonRow[] = [
@@ -249,7 +249,7 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
     );
   }
   const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
-  const rows = CHAT_PEOPLE.map((r) =>
+  const rows = MESSAGE_ROWS.map((r) =>
     state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
   );
   const messages =
@@ -298,7 +298,7 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
  * text, and rise in again while another is coming.
  */
 export function ChatTypingMomentSurface() {
-  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  const rows = MESSAGE_ROWS.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
   return (
     <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
       <ChatTypingDemo
@@ -323,12 +323,12 @@ export function ChatArrivalMomentSurface() {
       unread: true,
       last: { role: 'advisor' as const, text: 'You said you would call Dana by Friday. Have you picked a time?', at: '2026-11-03T08:59:00Z' },
     },
-    ...CHAT_PEOPLE.filter((r) => r.id !== mentor.id),
+    ...MESSAGE_ROWS.filter((r) => r.id !== mentor.id),
   ];
   return (
     <ChatShell path="/chat">
       <ChatArrivalDemo
-        before={CHAT_PEOPLE}
+        before={MESSAGE_ROWS}
         after={after}
         timezone={ZONE}
         now={NOW}
