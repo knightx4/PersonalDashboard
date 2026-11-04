@@ -23,10 +23,10 @@ export const segmentedTrack = 'inline-flex gap-0.5 rounded-control bg-sunken p-0
 /** One segment inside `segmentedTrack`: 13px muted, or ink on a raised pill when picked. */
 export function trackSegmentClass(on: boolean): string {
   return cn(
-    'press inline-flex h-7 items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 text-ui font-medium',
+    'press inline-flex h-7 items-center gap-1.5 rounded-control px-3 text-ui font-medium',
     'transition-colors duration-quick',
     'focus-visible:outline-2 focus-visible:-outline-offset-2',
-    on ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+    on ? 'bg-surface text-ink ring-1 ring-border' : 'text-ink-muted hover:text-ink',
   );
 }
 
