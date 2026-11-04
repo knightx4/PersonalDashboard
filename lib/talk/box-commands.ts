@@ -1,4 +1,4 @@
-import type { ModuleId } from '@/lib/modules';
+import { moduleById, type ModuleId } from '@/lib/modules';
 
 /**
  * The commands `/` offers in Dash's box (plan #1899.5): the things Dash can
@@ -73,4 +73,27 @@ export function boxTrigger(draft: string, caret: number): BoxTrigger | null {
 export function replaceTrigger(draft: string, trigger: BoxTrigger, text: string): { draft: string; caret: number } {
   const next = draft.slice(0, trigger.start) + text + draft.slice(trigger.end);
   return { draft: next, caret: trigger.start + text.length };
+}
+
+/**
+ * The workspaces a question can be kept to: the account's, without Chat,
+ * whose Dash tab is where the question is being asked (plan #2748.1).
+ */
+export function scopeWorkspaces(workspaces: readonly ModuleId[] | undefined): ModuleId[] {
+  return (workspaces ?? []).filter((id) => id !== 'chat');
+}
+
+/**
+ * The workspaces `@` and what follows it name (plan #2748.1): every one for a
+ * bare `@`, then those whose name, or a word in it, starts with what is typed.
+ * "@jo" and "@search" both offer Job search; "@cat" offers none, so the menu
+ * is left to the rows that match.
+ */
+export function workspacesNamed(typed: string, workspaces: readonly ModuleId[]): ModuleId[] {
+  const needle = typed.trim().toLowerCase();
+  if (!needle) return [...workspaces];
+  return workspaces.filter((id) => {
+    const label = (moduleById(id)?.label ?? id).toLowerCase();
+    return label.split(' ').some((word) => word.startsWith(needle)) || label.startsWith(needle);
+  });
 }

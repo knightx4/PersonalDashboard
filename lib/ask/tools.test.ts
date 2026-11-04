@@ -782,10 +782,15 @@ describe('goal_status', () => {
   const tables: Tables = {
     'goals.items': [
       // Dated, so its on_track verdict stands: a goal with no date keeps only a met or pace verdict (plan #1738).
-      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: '2026-12-31', archived_at: null, position: 1 },
+      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: '2026-12-31', archived_at: null, position: 1, area_id: 'a1' },
       { id: 'g2', user_id: ME, level: 'goal', status: 'proposed', title: 'Run a half', due_on: null, archived_at: null, position: 2 },
       { id: 's1', user_id: ME, level: 'step', status: 'open', title: 'A step', due_on: null, archived_at: null, position: 3 },
       { id: 'g3', user_id: THEM, level: 'goal', status: 'open', title: 'Theirs', due_on: null, archived_at: null, position: 1 },
+    ],
+    'goals.areas': [
+      { id: 'a1', user_id: ME, name: 'Career', position: 1, archived_at: null },
+      { id: 'a2', user_id: ME, name: 'Home', position: 2, archived_at: null },
+      { id: 'a3', user_id: THEM, name: 'Theirs', position: 1, archived_at: null },
     ],
     'goals.reviews': [
       { id: 'v1', user_id: ME, item_id: 'g1', verdict: 'on_track', reason: 'Two applications out.', next_move: 'Chase Acme', next_on: null, step_id: null, waits_on_id: null, run_id: null, created_at: '2026-09-26T06:00:00Z' },
@@ -805,6 +810,7 @@ describe('goal_status', () => {
         href: '/goals/g1',
         detail: {
           status: 'open',
+          area: 'Career',
           due_on: '2026-12-31',
           verdict: 'On track',
           reviewed_on: '2026-09-26',
@@ -814,6 +820,8 @@ describe('goal_status', () => {
         },
       },
     ]);
+    expect(result.ok && result.totals).toMatchObject({ by_area: { Career: 1 } });
+    expect(result.ok && result.note).toContain('Their areas, in order: Career, Home.');
   });
 
   it('takes in proposed goals when asked', async () => {

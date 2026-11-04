@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The app's own pages that core rows open under. They belong to no
  * workspace, so a path to one starts at Home (refPath in lib/core/refs.ts).
  */
-const ASK: Section = { href: '/ask', label: 'Questions to Dash' };
+const ASK: Section = { href: '/chat/dash', label: 'Dash' };
 const TIMELINE: Section = { href: '/timeline', label: 'Timeline' };
 const HOME: Section = { href: '/home', label: 'Home' };
 
@@ -28,7 +28,7 @@ export const coreSources: ModuleSources = {
       page: {
         title: 'title',
         reads: ['subject_kind', 'subject_ref'],
-        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
+        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/chat/dash/${row.subject_ref}` : null),
         section: ASK,
       },
       note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
@@ -118,6 +118,16 @@ export const coreSources: ModuleSources = {
       note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id the goals.items id of a goal, or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
     },
     {
+      table: 'core.session_messages',
+      module: 'Home',
+      holds: 'What they wrote to a Claude Code session working on one of their projects or this app, and what the session wrote back, message by message.',
+      weight: 'intent',
+      search: ['body', 'answer'],
+      title: 'body',
+      facts: ['author', 'kind', 'answer', 'answered_at', 'delivered_at', 'thread_id'],
+      note: "author 'person' is theirs and 'session' is the session's: read their messages as what they asked for, and the session's only for context. kind 'question' carries options and, once they pressed one, answer; 'mockup' carries artifact_url; 'status' is a line on what the session was doing. thread_id joins core.session_threads, whose title says what the thread is about and whose project_id names the dev_projects project (null for this app).",
+    },
+    {
       table: 'core.watches',
       module: 'Home',
       holds: 'Things they asked Dash to watch outside the app, such as a resale ticket price, with the price that should alert them and when the watch ends.',
@@ -155,6 +165,8 @@ export const coreSources: ModuleSources = {
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.run_activities', reason: 'What each Dash run did, line by line, for its run page; the rows a run wrote are sources in their own modules.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
+    { table: 'core.session_threads', reason: 'A conversation with a Claude Code session: its title, the repository it works on, the session id and its state; what was said is in core.session_messages, a source.' },
+    { table: 'core.session_progress', reason: 'What each session working for them is doing now and what it waits on, for the project pages and Dev; bookkeeping written by the sessions, and what they build is recorded on the plan.' },
     { table: 'core.scope_days', reason: 'Steps under each open goal or feature at the end of each day, counted by the daily run from rows that are sources in their own modules.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'core.writing_style', reason: 'Dash\'s analysis of how they write, read from their sent mail and shown on its own page; derived, and not read by anything else yet.' },

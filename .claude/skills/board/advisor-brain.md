@@ -46,7 +46,7 @@ from you.board_advisors
 where id = '<advisor id>' and user_id = '<user_id>';
 ```
 
-Stop if the row is not there. Keep the whole row as it is now; step 6
+Stop if the row is not there. Keep the whole row as it is now; step 7
 passes it as the row before. Read the rest of the roster too, since the
 brain names advisors it disagrees with:
 
@@ -66,7 +66,7 @@ update you.board_advisors set brain_status = 'building'
 where id = '<advisor id>' and user_id = '<user_id>';
 ```
 
-This is Dash's own bookkeeping and is not recorded; step 6 records the
+This is Dash's own bookkeeping and is not recorded; step 7 records the
 change the person sees.
 
 ## 2. Read the sources
@@ -103,7 +103,7 @@ challenge) stays only when a search result shows that page under that
 title. A dead link is replaced or dropped, never kept.
 
 Aim for twelve or more sources so ten survive the check. A brain needs **at
-least ten linked sources**; with fewer, go to step 7.
+least ten linked sources**; with fewer, go to step 8.
 
 ## 3. Write the brain
 
@@ -250,19 +250,45 @@ re-read each quote against the passage its subagent copied, and read the
 rules aloud as another advisor would. If a rule, a question or a never could
 sit in a different advisor's brain unchanged, rewrite it.
 
-## 5. Write it
+## 5. Choose their look
+
+Every advisor has an illustrated avatar (plan #2581.3), DiceBear's
+Notionists drawing, stored in `avatar` as `{ style: 'notionists', seed,
+options }`. Until something is stored the app draws one from the key, so a
+look is a choice, not a requirement. Choose one for a guest from how they
+are usually described, by the sources you read: glasses, long or short or
+white hair, a beard. Never trace a photograph; the drawing is an
+impression, and the app labels guests as one.
+
+`lib/you/advisor-avatar.ts` holds the parts and their variants
+(`TRAIT_VARIANTS`) and the looks chosen for the first guests
+(`SEEDED_AVATARS`), which show how a description maps to options. Each part
+is a one-item list; glasses and beard are drawn only with their probability
+at 100:
+
+```json
+{ "style": "notionists", "seed": "<key>",
+  "options": { "hair": ["variant42"], "glasses": ["variant03"], "glassesProbability": 100, "beardProbability": 0 } }
+```
+
+Check it with `parseAvatar` from that file: it returns null for a shape it
+cannot draw, and drops any part or variant Notionists does not have.
+
+## 6. Write it
 
 Put the object in a scratchpad file and send it with `--file`, so the shell
-does not touch the quoting:
+does not touch the quoting. The look goes in with the brain, only where
+none is stored, since a stored one may be the person's own choice:
 
 ```sql
 update you.board_advisors
-set brain = $b${ ... }$b$::jsonb, brain_status = 'ready'
+set brain = $b${ ... }$b$::jsonb, brain_status = 'ready',
+    avatar = coalesce(avatar, $a${ ... }$a$::jsonb)
 where id = '<advisor id>' and user_id = '<user_id>'
 returning id, brain_status, jsonb_array_length(brain->'sources') as sources;
 ```
 
-## 6. Record it
+## 7. Record it
 
 `scripts/sql.ts` sends one statement per call, so pass the row read in step
 1 as the row before:
@@ -277,7 +303,7 @@ select core.record_dash_action('<user_id>', 'you.board_advisors:<advisor id>',
 Read it back: the row is `ready`, its brain has every key above, and
 `jsonb_array_length(brain->'sources')` is ten or more.
 
-## 7. When it cannot finish
+## 8. When it cannot finish
 
 When fewer than ten sources survive, or the work cannot be read at all,
 leave the brain as it was. A rebuild of a brain that was `ready` in step 1

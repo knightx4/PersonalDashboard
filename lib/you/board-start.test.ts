@@ -55,10 +55,10 @@ describe('cleanDecision', () => {
 });
 
 describe('boardBrief', () => {
-  it('has the four lines the board skill reads', () => {
+  it('has the four lines the council skill reads', () => {
     expect(boardBrief({ meetingId: 'm1', userId: 'u1', decision: 'Take the offer?' }).split('\n')).toEqual([
       'Follow .claude/skills/board/SKILL.md',
-      'Board meeting m1',
+      'Council meeting m1',
       'user_id u1',
       'called: Take the offer?',
     ]);
@@ -89,7 +89,7 @@ describe('callBoardMeeting', () => {
     expect(r).toEqual({ started: true, meetingId: 'meet-new' });
     const insert = calls.find((c) => c.op === 'insert');
     expect(insert?.values).toMatchObject({ user_id: 'u1', kind: 'called', decision: 'Take the offer?', status: 'queued' });
-    expect(sentText(fetch)).toContain('Board meeting meet-new');
+    expect(sentText(fetch)).toContain('Council meeting meet-new');
     expect(sentText(fetch)).toContain('called: Take the offer?');
     expect(calls.some((c) => c.op === 'update' && c.values?.run_url === 'https://claude.ai/code/s1')).toBe(true);
   });
@@ -158,7 +158,7 @@ describe('startBoardMeeting', () => {
     });
     expect(sentText(fetch).split('\n')).toEqual([
       'Follow .claude/skills/board/SKILL.md',
-      'Board meeting meet-new',
+      'Council meeting meet-new',
       'user_id u1',
       'weekly',
       'panel p-career',

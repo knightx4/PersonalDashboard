@@ -24,6 +24,8 @@ import { ColumnHeader, ROW_GRID } from '@/components/plan-tree/grid';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProjectMainLine } from '@/app/dev/plan/project-main-line';
+import { NowSection } from '@/app/dev/plan/now-section';
+import type { NowList } from '@/lib/plan/now';
 import type { MainCheck } from '@/lib/plan/main-check';
 
 /**
@@ -97,6 +99,22 @@ const items: PlanItem[] = [
     acceptance: 'The dev plan renders through the shared components.',
     status: 'in_progress',
     size: 'l',
+    // Two comments, so the row draws its comment count: this surface is where
+    // a change to components/dev/comment-count.tsx is looked at (plan #2815.3).
+    thread: [
+      {
+        id: 'shared-t1',
+        author: 'me',
+        body: 'Keep the goal page’s rows the same height as the plan’s.',
+        createdAt: '2026-10-07T10:00:00Z',
+      },
+      {
+        id: 'shared-t2',
+        author: 'claude',
+        body: 'They share the row now, so they cannot drift.',
+        createdAt: '2026-10-07T10:05:00Z',
+      },
+    ],
   }),
   item({
     id: 'gallery',
@@ -383,6 +401,31 @@ const projectMainPassed: MainCheck = {
   migrationsError: null,
 };
 
+/** What is running now on the project (plan #2800.3): one session on its feed step. */
+const projectNow: NowList = {
+  sessions: [
+    {
+      key: 'report:cse_site',
+      source: 'report',
+      state: 'working',
+      action: 'Pushed: Build the feed from the essay list, newest first',
+      needs: null,
+      at: '2026-10-26T08:58:00Z',
+      step: {
+        id: 'site-writing-rss',
+        ref: '#917.2',
+        title: 'Add an RSS feed for the writing page',
+        href: '/dev/plan/918',
+        module: 'website',
+      },
+      project: 'website',
+      question: null,
+      runId: 'run-site',
+    },
+  ],
+  finished: null,
+};
+
 /** The reading a token that cannot see the project's repository leaves. */
 const projectMainRefused: MainCheck = {
   ...projectMainPassed,
@@ -402,6 +445,7 @@ export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = 
         title={site.label}
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
       />
+      <NowSection list={projectNow} now={PROJECT_MAIN_NOW} live={false} />
       <ProjectMainLine
         check={refused ? projectMainRefused : projectMainPassed}
         repo={`${site.repo.owner}/${site.repo.repo}`}

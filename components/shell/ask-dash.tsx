@@ -61,9 +61,10 @@ import {
   rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
-} from '@/app/ask/actions';
+} from '@/app/chat/dash/actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
+import { ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
 import type { DashChoiceId } from '@/lib/core/models';
 
@@ -91,10 +92,16 @@ import type { DashChoiceId } from '@/lib/core/models';
  * What else goes with a question (plan #1899.5): the signal that stops it,
  * the rows added with @, and the workspace its lookups are kept to.
  */
-export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+export type AskMore = {
+  signal?: AbortSignal;
+  rows?: AskMention[];
+  scope?: ModuleId | null;
+  /** "Think it through" is on (plan #2789.10). */
+  think?: boolean;
+};
 
 /**
- * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
@@ -149,7 +156,7 @@ async function askLive(
   onText?: (piece: string) => void,
   more: AskMore = {},
 ): Promise<AskDashResult> {
-  const { signal, rows, scope } = more;
+  const { signal, rows, scope, think } = more;
   // The question as the route kept it, heard before Dash answers: what a
   // stopped answer is found again by (plan #1899.5).
   let asked: AskedWire | null = null;
@@ -158,7 +165,7 @@ async function askLive(
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
+      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope, ...(think ? { think: true } : {}) }),
       signal,
     });
   } catch {
@@ -515,6 +522,7 @@ export function AskThread({
   onSend,
   onAnswered,
   boxStart,
+  bubbles = false,
   ...thread
 }: {
   id: string;
@@ -548,6 +556,11 @@ export function AskThread({
   pendingQuestion?: string;
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
+  /**
+   * Drawn as Chat's Dash tab draws it (plan #2748.12): questions in bubbles,
+   * and what Dash looked up folded under his name, above the answer.
+   */
+  bubbles?: boolean;
 }) {
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
@@ -563,6 +576,8 @@ export function AskThread({
     fixtureHits: handle?.searchHits,
     start: boxStart,
   });
+  // "Think it through" (plan #2789.10): on until pressed again.
+  const [think, setThink] = useState(boxStart?.think ?? false);
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
@@ -589,7 +604,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
-    () => ({ ...box.take(), signal: running.current?.signal }),
+    () => ({ ...box.take(), signal: running.current?.signal, think }),
   );
   const onChanged = useCallback(
     (next: DashChange) => {
@@ -654,33 +669,43 @@ export function AskThread({
         )
       }
       boxStart={
-        handle?.model && handle.chooseModel ? (
-          <>
-            {box.thread.boxStart}
-            <ModelChip
-              model={handle.model}
-              onModel={handle.chooseModel}
-              initialOpen={handle.modelOpen}
-            />
-          </>
-        ) : (
-          box.thread.boxStart
-        )
+        <>
+          {box.thread.boxStart}
+          <ThinkSwitch on={think} onChange={setThink} />
+          {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
+          {!think && handle?.model && handle.chooseModel ? (
+            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} />
+          ) : null}
+        </>
       }
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}
       activity="searching"
       incoming={incoming}
+      bubbles={bubbles}
+      lead={bubbles ? (turn) => (turn.role === 'assistant' ? <LookupFold calls={turn.toolCalls} quiet /> : null) : undefined}
       below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
-            <LookupFold calls={turn.toolCalls} />
+            {!bubbles && <LookupFold calls={turn.toolCalls} />}
+            {/* What a thought-through answer cost (plan #2789.10). */}
+            <ThoughtLine calls={turn.toolCalls} />
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
-                A todo or a note comes back as a change, drawn above with Undo. */}
+                A todo or a note comes back as a change, drawn above with Undo.
+                In a chat on the page they rest under every answer but the
+                latest until it is pointed at, from laptop width; a touch
+                screen, with nothing to point with, keeps them (plan #2748.12). */}
+            <div
+              className={
+                bubbles && !thread.latest
+                  ? 'min-[720px]:opacity-0 min-[720px]:transition-opacity min-[720px]:group-hover:opacity-100 min-[720px]:group-focus-within:opacity-100 pointer-coarse:opacity-100'
+                  : undefined
+              }
+            >
             <AnswerActions
               body={turn.body}
               question={thread.question}
@@ -695,6 +720,7 @@ export function AskThread({
               rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
               rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
             />
+            </div>
           </>
         );
       }}
@@ -909,7 +935,7 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip label="Open on Dash's page" align="end">
                 <Link
-                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  href={chatRef ? `/chat/dash/${chatRef}` : '/chat/dash'}
                   aria-label="Open on Dash's page"
                   className={iconButtonVariants()}
                 >
@@ -1077,7 +1103,7 @@ function Earlier({
         id="ask-dash-earlier"
         title="Earlier questions"
         action={
-          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
             All of them
           </Link>
         }

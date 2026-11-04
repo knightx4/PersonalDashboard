@@ -569,3 +569,10 @@ phone before the link goes to anyone.
   few indexed reads and nothing else, forever. This is the non-goal most likely
   to get quietly violated by a well-meaning "the price is missing, let's just
   fetch it" — it is a lint rule and a test for that reason.
+
+## Rules
+
+**R1.** A shared page picks up a change made on the owner's side while the tab
+is open, by revalidating on focus and on a slow poll. A page that needs a
+manual reload does not meet this rule.
+Checked by: audit.

@@ -11,7 +11,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Still returnable</CardTitle>
-        <Link href="/shopping/returns" className={`text-ui ${linkVariants()}`}>
+        <Link href="/shopping/inventory/returns" className={`text-ui ${linkVariants()}`}>
           Returns tracker
         </Link>
       </CardHeader>
@@ -55,7 +55,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
         {rows.length > shown.length && (
           <p className="mt-2 text-small text-ink-muted">
             +{rows.length - shown.length} more ·{' '}
-            <Link href="/shopping/returns?view=all" className={linkVariants()}>
+            <Link href="/shopping/inventory/returns?view=all" className={linkVariants()}>
               see all
             </Link>
           </p>

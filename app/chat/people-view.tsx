@@ -1,0 +1,101 @@
+import { Messaging, MessagingPlaceholder } from '@/components/patterns/messaging';
+import { buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
+import { PageColumn } from '@/components/shell/page-width';
+import type { PersonRow, SearchHit } from '@/lib/you/chat-threads-model';
+import { ADD_HREF } from '@/lib/you/people-cards-model';
+import { PeopleList } from './people-list';
+
+/**
+ * Chat's People tab (plan #2748.6), the messaging pattern: everyone you talk
+ * to on the left and the open thread on the right. On a phone the list is
+ * the page and a thread is a page of its own (app/chat/people/[key]); `/chat`
+ * on a laptop opens the newest thread beside the list, as a texting app
+ * does, and passes it as `newest` so a phone leaves it hidden.
+ *
+ * With no one to talk to, one card says so and links to the Council; with the
+ * threads not read, the list's pane says so where its rows would be, and
+ * the thread's pane says in one quiet line that threads open there once they
+ * can be read, so a laptop is not left with a blank pane.
+ */
+export function PeopleView({
+  rows,
+  failed = false,
+  query = null,
+  hits = null,
+  current = null,
+  timezone,
+  now,
+  live = true,
+  newest = false,
+  adding = false,
+  children,
+}: {
+  rows: readonly PersonRow[];
+  failed?: boolean;
+  query?: string | null;
+  hits?: readonly SearchHit[] | null;
+  /** The key of the open thread. */
+  current?: string | null;
+  timezone: string;
+  now: number;
+  live?: boolean;
+  /** The thread is the newest, opened beside the list on a laptop only. */
+  newest?: boolean;
+  /** The form for adding someone is open in the thread's place, even with nobody here yet. */
+  adding?: boolean;
+  /** The open thread, when one is. */
+  children?: React.ReactNode;
+}) {
+  if (!failed && rows.length === 0 && !adding) {
+    // Nobody to talk to: one card with the way to the Council, and no empty thread pane beside it.
+    return (
+      <PageColumn>
+        <section className="sheet rounded-card bg-surface px-4 py-4">
+          <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+          <p className="mt-4 text-body font-semibold text-ink">No one to talk to yet</p>
+          <p className="mt-1 text-ui text-ink-muted">Add someone of your own, or put mentors on your council, and each one gets a thread here.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={ADD_HREF} className={buttonVariants({ variant: 'primary' })}>
+              Add someone
+            </Link>
+            <Link href="/you/council" className={buttonVariants({ variant: 'secondary' })}>
+              Open the Council
+            </Link>
+          </div>
+        </section>
+      </PageColumn>
+    );
+  }
+  if (failed) {
+    return (
+      <Messaging
+        label="People"
+        open={false}
+        list={
+          <div className="flex flex-col px-4 pt-4 pb-4">
+            <h2 className="font-display text-title font-semibold tracking-tight text-ink">People</h2>
+            <p className="mt-3 text-ui text-danger">Your threads could not be read. Reload to try again.</p>
+          </div>
+        }
+      >
+        <MessagingPlaceholder>
+          <p className="text-ui text-ink-muted">Your threads open here once they can be read.</p>
+        </MessagingPlaceholder>
+      </Messaging>
+    );
+  }
+  return (
+    <Messaging
+      label="People"
+      open={Boolean(children) && !newest}
+      list={<PeopleList rows={rows} current={current} currentWide={newest} query={query} hits={hits} timezone={timezone} now={now} live={live} />}
+    >
+      {children ?? (
+        <MessagingPlaceholder>
+          <p className="text-body font-medium text-ink">Choose someone to open your thread with them.</p>
+        </MessagingPlaceholder>
+      )}
+    </Messaging>
+  );
+}

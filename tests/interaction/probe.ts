@@ -22,7 +22,10 @@
  *   draws the shell; otherwise one is laid where the shell puts it, at
  *   --dock-h and --z-chrome, and "covers" means the dock is what a press at
  *   that point would land on. So a dialog over the dock passes and a bar
- *   pinned to bottom: 0 under it fails. Things in the page's flow are left
+ *   pinned to bottom: 0 under it fails. Only the part of an element its
+ *   scrolling ancestors let show is measured: a field further down a fixed
+ *   pane that scrolls inside itself is clipped at the pane's foot, so a box
+ *   reaching past it is not under the dock. Things in the page's flow are left
  *   alone: the shell's room under the page (pb-[calc(var(--dock-h)+…)])
  *   clears them, and the gallery does not draw that room.
  * - contrast: every visible run of text against the ground it is painted
@@ -177,12 +180,31 @@ export const PROBE = String.raw`(function (options) {
     return false;
   }
   var heldEls = pressed.filter(function (el) { return !dockEl.contains(el) && held(el); });
+  // The part of an element its scrolling or clipping ancestors let show. A
+  // field further down a pane that scrolls inside itself has a box reaching
+  // past the pane's foot, but nothing of it is drawn there, so nothing of it
+  // can be pressed under the dock.
+  function shown(el) {
+    var r = el.getBoundingClientRect();
+    var box = { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+    for (var a = el.parentElement; a && a !== doc && a !== document.body; a = a.parentElement) {
+      var cs = getComputedStyle(a);
+      var clipsY = cs.overflowY !== 'visible', clipsX = cs.overflowX !== 'visible';
+      if (clipsY || clipsX) {
+        var c = a.getBoundingClientRect();
+        if (clipsY) { box.top = Math.max(box.top, c.top); box.bottom = Math.min(box.bottom, c.bottom); }
+        if (clipsX) { box.left = Math.max(box.left, c.left); box.right = Math.min(box.right, c.right); }
+      }
+      if (cs.position === 'fixed') break;
+    }
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right, full: r };
+  }
   var under = {};
   function look(where) {
     heldEls.forEach(function (el) {
-      var r = el.getBoundingClientRect();
-      var top = Math.max(r.top, dockTop), bottom = Math.min(r.bottom, vh);
-      var left = Math.max(r.left, 0), right = Math.min(r.right, vw);
+      var s = shown(el), r = s.full;
+      var top = Math.max(s.top, dockTop), bottom = Math.min(s.bottom, vh);
+      var left = Math.max(s.left, 0), right = Math.min(s.right, vw);
       if (bottom - top < 1 || right - left < 1) return;
       // Covered where the dock is the topmost thing at a point the element spans.
       var y = (top + bottom) / 2;

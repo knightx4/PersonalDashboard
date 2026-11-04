@@ -168,6 +168,7 @@ function StepBar({
  * template built from the module id would compile to nothing.
  */
 const CAPSULE_HUES: Record<ModuleId, string> = {
+  chat: 'bg-w-chat-tint text-w-chat',
   shopping: 'bg-w-shopping-tint text-w-shopping',
   jobs: 'bg-w-jobs-tint text-w-jobs',
   todo: 'bg-w-todo-tint text-w-todo',

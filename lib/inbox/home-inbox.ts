@@ -34,6 +34,8 @@ export const loadHomeAgenda = cache((userId: string) => loadAgenda(userId, new D
 
 /** Where a workspace's group heading goes: its own Inbox, or its first page. */
 function inboxHref(id: ModuleId, home: string): string {
+  // Vault's Inbox is drawn on its Now page (plan #1496.9).
+  if (id === 'vault') return '/vault#inbox';
   return (AGENDA_INBOXES as readonly string[]).includes(id) || id === 'goals' || id === 'dev'
     ? `/${id}/inbox`
     : home;

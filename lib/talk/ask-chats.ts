@@ -3,7 +3,7 @@ import { zoneDay } from '@/lib/core/when';
 import type { TalkCitation, TalkToolCall } from './talk';
 
 /**
- * The list of Dash's chats on /ask (plan #1899.2): which workspaces each chat
+ * The list of Dash's chats on Chat's Dash tab (plans #1899.2, #2748.1): which workspaces each chat
  * read or changed, and which day group it falls in. Nothing here is stored;
  * both are worked out from what the turns already keep. No database and no
  * React, so the page, the gallery and the tests share it.
@@ -158,28 +158,4 @@ export function matchSnippet(body: string, query: string, around = 48): string |
     if (space > at + query.length) end = space;
   }
   return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
-}
-
-/**
- * How many of a row of chips fit whole in `room` pixels, the rest going
- * behind a More chip `moreWidth` wide. All of them when they fit without
- * one; otherwise as many as fit beside More, which may be none.
- */
-export function chipsThatFit(widths: readonly number[], room: number, moreWidth: number, gap: number): number {
-  const total = widths.reduce((sum, width, i) => sum + width + (i > 0 ? gap : 0), 0);
-  if (total <= room) return widths.length;
-  let used = moreWidth;
-  let count = 0;
-  for (const width of widths) {
-    if (used + gap + width > room) break;
-    used += gap + width;
-    count += 1;
-  }
-  return count;
-}
-
-/** The workspaces any chat in the list touched, for the chips that narrow it. */
-export function chatChips(chats: readonly AskChat[]): ModuleId[] {
-  const used = new Set(chats.flatMap((chat) => chat.workspaces));
-  return MODULES.filter((module) => used.has(module.id)).map((module) => module.id);
 }

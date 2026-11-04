@@ -1,5 +1,6 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
 import { GuessedAlready } from './lesson-predict-seed';
+import { NowSurface } from './now-surfaces';
 import { BurnUpSurface } from './burn-up-surfaces';
 import { CellAnswerPreview, PlacementPreview, PracticeRunPreview } from './cell-answer-surface';
 import { LearnGoSurface } from './learn-go-surfaces';
@@ -10,6 +11,16 @@ import {
   GoalMetricsSurface,
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
+import {
+  GoalDashboardTilesAddSurface,
+  GoalDashboardTilesApartmentOpenSurface,
+  GoalDashboardTilesApartmentSurface,
+  GoalDashboardTilesBrokenSurface,
+  GoalDashboardTilesEmptySurface,
+  GoalDashboardTilesMenuSurface,
+  GoalDashboardTilesProgramsSurface,
+  GoalDashboardTilesSurface,
+} from './goal-dashboard-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
 import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
@@ -18,7 +29,7 @@ import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import { YouInsightsLoadingPreview, YouInsightsPreview } from './you-insights-surfaces';
-import { YouAnswerLoadingPreview, YouAnswerPreview } from './you-answer-surfaces';
+import { YouAskLoadingPreview, YouAskPreview } from './you-ask-surfaces';
 import {
   YouBoardListLoadingPreview,
   YouBoardListPreview,
@@ -26,7 +37,20 @@ import {
   YouBoardMeetingPreview,
 } from './you-board-surfaces';
 import { YouBoardDebatePreview } from './you-board-debate-surfaces';
-import { YouBoardAdvisorsLoadingPreview, YouBoardAdvisorsPreview, YouBoardPanelPreview } from './you-board-advisor-surfaces';
+import { YouBoardDecisionPreview } from './you-board-decision-surfaces';
+import { AdvisorAvatars } from '@/app/you/council/advisor-avatar';
+import { SEEDED_AVATARS } from '@/lib/you/advisor-avatar';
+import { avatarLook, avatarSvg, spriteFor } from '@/lib/you/advisor-avatar-draw';
+import {
+  YouBoardAdvisorProfilePreview,
+  YouBoardAdvisorsLoadingPreview,
+  YouBoardAdvisorsPreview,
+  YouBoardPanelPreview,
+  YouBoardAdvisorTalkPreview,
+} from './you-board-advisor-surfaces';
+import { AdvisorProfileSkeleton } from '@/app/you/council/board-skeleton';
+import { SetTab } from './set-tab';
+import { YouCouncilLoadingPreview, YouCouncilMentorPreview, YouCouncilPreview } from './you-council-surfaces';
 import { PlacesView } from '@/app/you/places/places-view';
 import { DetailsView } from '@/app/you/details/details-view';
 import { EMPTY_DETAILS, type Details } from '@/lib/you/details';
@@ -89,6 +113,7 @@ import {
 import { DashMarkRunners } from './dash-mark-surface';
 import { UiKit } from './ui-kit-surface';
 import { RefPreviewSurface } from './ref-preview-surface';
+import { PageHeaderSurface } from './page-header-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
@@ -96,7 +121,7 @@ import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModu
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
-import { UiStandard } from '@/app/dev/ui/standard';
+import { UiStandard, WorkspaceMoments } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
@@ -126,7 +151,6 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
 import { linkedInPlanFixture, linkedInRunsFixture } from './linkedin-import-fixtures';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
@@ -134,7 +158,6 @@ import { LearnSettingsView } from '@/app/learn/settings/settings-view';
 import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import type { ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactsPage } from '@/components/jobs/contacts/contacts-page';
-import { FollowUpsView } from '@/app/jobs/(app)/follow-ups/view';
 import type { FollowUp, OutreachPerson } from '@/lib/jobs/followup/load';
 import type { ContactListRow } from '@/lib/jobs/contacts-view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
@@ -150,7 +173,6 @@ import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { CompaniesPage } from '@/components/jobs/companies/companies-page';
 import type { CompanyRow } from '@/lib/jobs/companies-view';
-import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { buildFunnel } from '@/lib/jobs/home/funnel';
@@ -161,6 +183,12 @@ import type { Interaction } from '@/lib/preview/interaction';
 import type { Deck } from '@/lib/preview/deck';
 import { AgendaRowsSurface, LaterMenuRows } from './later-menu-surface';
 import { CloseButtonRows } from './close-buttons-surface';
+import {
+  QuestionMockupFailedSurface,
+  QuestionMockupLoadingSurface,
+  QuestionMockupViewerSurface,
+  QuestionMockupsSurface,
+} from './question-mockup-surfaces';
 import {
   GoalArchiveConfirmSurface,
   GoalPutAwayMenuSurface,
@@ -242,6 +270,7 @@ import {
 import {
   LearnConceptSurface,
   LearnConceptEvidenceSurface,
+  LearnConceptAllConsumedSurface,
   LearnListsSurface,
   LearnOpeningSurface,
   LearnPieceSurface,
@@ -376,6 +405,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { withBadges } from '@/lib/shell/tabs';
 import { AccountMenu } from '@/components/shell/account-menu';
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
@@ -395,7 +425,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import type { DashChange } from '@/lib/talk/changes';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
@@ -414,7 +444,7 @@ import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
-import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
+import { NewsReviewFold, type NewsReviewFoldProps } from '@/app/news/now-fold-views';
 import { NeedsConfirming } from '@/app/news/all/needs-confirming';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
@@ -453,7 +483,7 @@ import {
 } from './goal-surfaces';
 import { GoalStepEditingSurface, GoalStepMenuSurface } from './step-frame-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
-import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
+import { GoalDashArrivalDemo, GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
 import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
 import { DashWorkingReadingDemo } from './dash-working-rows';
@@ -471,10 +501,14 @@ import {
   DashPageSurface,
   AskAnswerActionsSurface,
   AskBoxSurface,
+  AskThinkSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
 } from './ask-surfaces';
+import { SessionThreadSurface } from './chat-session-surfaces';
+import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
@@ -542,12 +576,16 @@ import {
   ProjectsSearchEmptySurface,
   ProjectsSurface,
 } from './projects-surfaces';
+import { GoalPageErrorSurface } from './goal-page-error-surface';
+import { GoalPlanSurface } from './goal-plan-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
-  GoalStepsTabSurface,
   GoalActivitySurface,
+  GoalDashboardPageSurface,
+  GoalFilesTabSurface,
+  GoalPageLoadingSurface,
   FileSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
@@ -578,7 +616,7 @@ import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
   JobsInboxSurface,
   LearnInboxSurface,
-  NewsInboxSurface,
+  NewsInboxFoldSurface,
   ShoppingInboxSurface,
   TodoInboxSurface,
   VaultInboxSurface,
@@ -598,10 +636,8 @@ import {
   TermsSurface,
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
-import { JobsInsightsSurface } from './jobs-insights-surface';
 import {
   JobsActivitySurface,
-  JobsAnalyticsSurface,
   JobsAnswersSurface,
   JobsCasePageSurface,
   JobsOnboardingSurface,
@@ -641,7 +677,6 @@ import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
-  NewsStorySurface,
   TodoAllSurface,
   TodoAllTaggedSurface,
   TodoSettingsSurface,
@@ -1419,9 +1454,9 @@ const allRoles: SearchableRole[] = pipelineRows.map((row) => ({
 }));
 
 /**
- * The Jobs Inbox's review items (plan #2502.2): the queue above with one more
- * message, its subject as long as recruiters write them, and nine waiting in
- * all, so the first five show and "Open all 9 in Review" follows them.
+ * The Jobs Inbox's review items (plan #2502.2): the queue above with three
+ * more, one message's subject as long as recruiters write them, seven in all
+ * and every one listed with the kinds to narrow them by (plan #1496.7.3).
  */
 const inboxReview = {
   rows: [
@@ -1455,8 +1490,44 @@ const inboxReview = {
       ],
       sortAt: '2026-09-07T10:12:00.000Z',
     },
+    {
+      kind: 'application' as const,
+      id: 'r6',
+      applicationId: 'p6',
+      roleId: 'role-p6',
+      companyName: 'Halloran-Achterberg',
+      companyDomains: ['halloran-achterberg.example'],
+      roleTitle: 'Staff Software Engineer, Real-Time Risk & Settlement Infrastructure',
+      status: 'submitted',
+      submittedAt: '2026-09-02T08:20:00.000Z',
+      reason: 'Created from a confirmation email. Nobody has confirmed the details.',
+      gmailHref: 'https://mail.google.com/mail/#all/18f2a9c4d1e0b7b9',
+      sortAt: '2026-09-02T08:20:00.000Z',
+    },
+    {
+      kind: 'message' as const,
+      id: 'r7',
+      subject: 'Your application to Tallow',
+      fromAddress: 'no-reply@ashbyhq.example',
+      threadId: 'thread-tallow',
+      replyToAddress: null,
+      roleHint: null,
+      receivedAt: '2026-09-01T17:45:00.000Z',
+      classification: 'rejection',
+      reason: 'Tallow has two pursuits on file and the email names neither.',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/13',
+      candidates: [
+        {
+          applicationId: 'p3',
+          label: 'Tallow · Backend Engineer, Payments',
+          reason: 'Same company',
+          confidence: 0.41,
+        },
+      ],
+      sortAt: '2026-09-01T17:45:00.000Z',
+    },
   ] satisfies ReviewRow[],
-  counts: { all: 9, messages: 5, applications: 2, events: 2 },
+  counts: { all: 7, messages: 4, applications: 2, events: 1 },
   companyNames: [...new Set(pipelineRows.map((row) => row.companyName))].sort(),
   allRoles,
 };
@@ -1831,10 +1902,6 @@ const referrerFixtures: ReferrerOption[] = [
   { id: 'contact-3', name: 'Sam Okafor', company: null },
 ];
 
-const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({
-  name,
-}));
-
 /**
  * A week with something in every section: two rounds coming up, one of them a
  * superday with no prep written, mail that asked a question a fortnight ago,
@@ -2012,62 +2079,6 @@ const todayPageSince: SinceView = {
   error: null,
 };
 
-/** Two upcoming rounds and three past ones, one of them still owing a debrief. */
-const interviewRounds: RoundView[] = [
-  {
-    key: 'ir1',
-    leadId: 'ti1',
-    roleId: 'role-p1',
-    companyName: 'Larkspur Vane',
-    roleTitle: 'Quantitative Developer, Systematic Strategies',
-    scheduledAt: '2026-09-11T13:30:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-09-11T14:30:00.000Z'),
-    round: 'Round 2 · Technical',
-    kind: 'Technical',
-    notes: null,
-  },
-  {
-    key: 'ir2',
-    leadId: 'ti2',
-    roleId: 'role-p2',
-    companyName: 'The Halloran-Achterberg group',
-    roleTitle: 'Software Developer',
-    scheduledAt: '2026-09-16T08:00:00.000Z',
-    timeKnown: false,
-    endsAt: Date.parse('2026-09-17T00:00:00.000Z'),
-    round: 'Round 3 · Final',
-    kind: '4 interviews',
-    notes: null,
-  },
-  {
-    key: 'ir3',
-    leadId: 'ti4',
-    roleId: 'role-p1',
-    companyName: 'Larkspur Vane',
-    roleTitle: 'Quantitative Developer, Systematic Strategies',
-    scheduledAt: '2026-08-27T09:00:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-08-27T09:45:00.000Z'),
-    round: 'Round 1',
-    kind: 'Phone screen',
-    notes: 'Went well. She asked mostly about the reconciliation rewrite.',
-  },
-  {
-    key: 'ir4',
-    leadId: 'ti5',
-    roleId: 'role-p10',
-    companyName: 'Pennyroyal',
-    roleTitle: 'Engineering Manager, Core Banking',
-    scheduledAt: '2026-08-25T15:00:00.000Z',
-    timeKnown: true,
-    endsAt: Date.parse('2026-08-25T15:30:00.000Z'),
-    round: null,
-    kind: 'Recruiter screen',
-    notes: null,
-  },
-];
-
 /**
  * A month with an ordinary amount in it: a week carrying three things, one
  * square over the dot limit, a couple of finished tasks and a long run of
@@ -2104,7 +2115,7 @@ const calendarEntries: Record<string, CalendarEntry[]> = {
       eventId: null,
       feedEventId: null,
       title: 'Return window closes — Sony WH-1000XM5',
-      href: '/shopping/returns',
+      href: '/shopping/inventory/returns',
       done: false,
     },
   ],
@@ -3169,7 +3180,7 @@ const reviewLines: [string, number][] = [
   ['NASA set a new date in March for the next crewed Moon flyby.', 1],
 ];
 
-const reviewFull: ReviewViewProps = {
+const reviewFull: NewsReviewFoldProps = {
   review: {
     dayLabel: 'Tuesday 6 October',
     writtenAt: '8:04\u00a0PM',
@@ -3179,21 +3190,21 @@ const reviewFull: ReviewViewProps = {
       ...reviewLines.map(([line, sources], i) => ({
         issueId: `issue-${i + 1}`,
         storyIndex: i % 3,
-        href: `/news/i/issue-${i + 1}/s/${i % 3}?from=review`,
+        href: `/news/i/issue-${i + 1}`,
         line,
         sources,
       })),
       {
         issueId: 'issue-local',
         storyIndex: 2,
-        href: '/news/i/issue-local/s/2?from=review',
+        href: '/news/i/issue-local',
         line: 'The council approved protected cycle lanes on Mill Road, with work starting in January.',
         sources: 1,
         local: true,
       },
     ],
   },
-  earlier: { href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' },
+  earlier: { href: '/news?day=2026-10-05', label: 'Mon 5 Oct' },
   later: null,
   todayAt: null,
 };
@@ -3275,10 +3286,9 @@ const savedStories: SavedViewProps = {
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
-  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -3383,14 +3393,21 @@ const youSections: NavSection[] = [
   { href: '/you/places', label: 'Places', icon: 'places' },
   { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
   { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-  { href: '/you/answer', label: 'Answer', icon: 'answer', exact: true },
-  { href: '/you/board', label: 'Board', icon: 'board' },
+  { href: '/you/ask', label: 'Ask', icon: 'answer', exact: true },
+  { href: '/you/council', label: 'Council', icon: 'board' },
 ];
 
-const triageCrumbs = [
-  { label: 'Vault', href: '/vault' },
-  { label: 'Quick note triage', href: '/vault/triage' },
-];
+/**
+ * The Vault's Now page heading, as the page draws it: the triage deck and
+ * the Inbox sit on that page since plan #1496.9.
+ */
+const vaultNowHeader = (
+  <PageHeader
+    title="Vault"
+    description="alex-rivera/notes · main"
+    actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+  />
+);
 
 /**
  * The deck's lesson written with a prediction (plan #2522.6), asked or
@@ -5362,6 +5379,70 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricsErrorSurface />,
   },
   {
+    /* A goal's dashboard tiles (plan #2778.2): a total, two countdowns, a
+     * line of the balances, a metric's bars and a table, on a loans goal.
+     * Its hidden parts follow: the quick add open, a tile's menu open, every
+     * type empty and every type broken. */
+    id: 'goal-dashboard-tiles',
+    label: 'Goals · Dashboard tiles',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-add',
+    label: 'Goals · Dashboard tiles, quick add open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesAddSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-menu',
+    label: 'Goals · Dashboard tiles, a tile menu open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesMenuSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-empty',
+    label: 'Goals · Dashboard tiles, nothing in them yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesEmptySurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-broken',
+    label: 'Goals · Dashboard tiles, a list or field missing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesBrokenSurface />,
+  },
+  {
+    /* The parts tile (plan #2778.3): an apartment goal's rooms, a card each
+     * with its ring and next step. Its hidden part, a card pressed open to
+     * list its open steps, follows. */
+    id: 'goal-dashboard-tiles-apartment',
+    label: 'Goals · Dashboard tiles, rooms of an apartment',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-apartment-open',
+    label: 'Goals · Dashboard tiles, a room pressed open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentOpenSurface />,
+  },
+  {
+    /* The slots and grid tiles (plan #2778.3) on a graduate programs goal. */
+    id: 'goal-dashboard-tiles-programs',
+    label: 'Goals · Dashboard tiles, slots and a checklist grid',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesProgramsSurface />,
+  },
+  {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
      * Dash's latest update (plan #1666), the detail, a question, what it
      * waits on and the thread, and the properties column. */
@@ -5508,9 +5589,9 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalStepMenuSurface />,
   },
   {
-    /* A step's page whose thread has a comment: the count on Activity (plan #2373.1). */
+    /* A step's page whose thread has a comment: Comments on its Overview (note 42b3d858). */
     id: 'goals-step-comments',
-    label: 'Goal · a step’s comments on its Activity tab',
+    label: 'Goal · a step’s comments on its Overview tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalStepCommentsSurface />,
@@ -5729,10 +5810,17 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'vault-inbox',
-    label: 'Vault · Inbox',
+    label: 'Vault · Now, what is on you',
     module: 'vault',
-    width: 'page',
-    render: () => <VaultInboxSurface />,
+    width: 'narrow',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        {vaultNowHeader}
+        <VaultInboxSurface />
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable onVault />
+      </div>
+    ),
   },
   {
     id: 'learn-inbox',
@@ -5740,13 +5828,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnInboxSurface />,
-  },
-  {
-    id: 'news-inbox',
-    label: 'News · Inbox, empty',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
@@ -5846,15 +5927,116 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAreaSurface />,
   },
   {
-    /* A goal's page on its Overview tab (plan #1671), in the tabbed detail
-     * pattern: the path, title and done-when, the properties column, then
-     * Dash's status card, the number and its readings, Waiting on you, one
-     * Learn goal linked and a file. */
+    /* A goal's page on its Dashboard tab (plan #2778.4) before Dash has laid
+     * out its tiles: the done-when, the Now / Next / Later strip, Dash's
+     * status card, the line offering Dash lay it out, the number, Waiting on
+     * you, and Dash's card with the newest files beside them. */
     id: 'goals-page-top',
-    label: 'Goal · the Overview tab',
+    label: 'Goal · the Dashboard tab with no tiles yet',
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* A goal's Dashboard with its tiles (plan #2778.4): the strip, the
+     * status, the figures, the line of the balance, the table and the
+     * tracker, with Dash's card (a run going) and Recent files beside them. */
+    id: 'goal-dashboard-page',
+    label: 'Goal · the Dashboard tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface />,
+  },
+  {
+    /* The same Dashboard with Ask Dash open in Dash's card. */
+    id: 'goal-dashboard-page-ask',
+    label: 'Goal · asking Dash from the Dashboard',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface asking />,
+  },
+  {
+    /* The Dashboard opened from the notification for a question handed to
+     * the goal from Ask Dash (plan #2778.8): what Dash worked out first, with
+     * a suggested step and tile waiting on Add and No. */
+    id: 'goal-dashboard-page-answer',
+    label: 'Goal · what Dash worked out for a question',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface answered />,
+  },
+  {
+    /* A goal's page while it loads, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-loading',
+    label: 'Goal · loading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageLoadingSurface />,
+  },
+  {
+    /* A goal's page when it could not be read, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-error',
+    label: 'Goal · could not be loaded',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageErrorSurface />,
+  },
+  {
+    /* A goal's Work & files tab (plan #2778.7): the files on All, the drop
+     * zone, and Dash's work beside them. */
+    id: 'goals-page-files',
+    label: 'Goal · the Work & files tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface />,
+  },
+  {
+    /* Work & files on Waiting for: the documents the goal's steps still need. */
+    id: 'goals-page-files-waiting',
+    label: 'Goal · Work & files, Waiting for',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="waiting" />,
+  },
+  {
+    /* Work & files on Yours, once a PDF you added has gone on its step. */
+    id: 'goals-page-files-yours',
+    label: 'Goal · Work & files, Yours',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="yours" added />,
+  },
+  {
+    /* The drop zone with a file held over it. */
+    id: 'goals-page-files-drag',
+    label: 'Goal · Work & files, a file dragged over',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface dragging />,
+  },
+  {
+    /* A file uploading, before Dash has put it on its step. */
+    id: 'goals-page-files-uploading',
+    label: 'Goal · Work & files, uploading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface uploading />,
+  },
+  {
+    /* A file's menu open: Pin, Rename, Remove. */
+    id: 'goals-page-files-menu',
+    label: 'Goal · Work & files, a file’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface menu />,
+  },
+  {
+    /* A goal with no files, nothing waiting and no work from Dash. */
+    id: 'goals-page-files-empty',
+    label: 'Goal · Work & files, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface empty />,
   },
   {
     /* A passive goal's page (plan #2503.2): the switch in the header on
@@ -5884,18 +6066,76 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The same frame on its Steps tab: the step tree and its stages. */
+    /* A goal's Plan tab (plan #2778.5): the loans goal's letter Now, autopay
+     * Up next with Dash's how-to folded, and Later with what each waits on. */
     id: 'goals-page-steps',
-    label: 'Goal · the Steps tab',
+    label: 'Goal · the Plan tab',
     module: 'goals',
     width: 'page',
-    render: () => <GoalStepsTabSurface />,
+    render: () => <GoalPlanSurface />,
+  },
+  {
+    /* The apartment goal's Plan tab: one step Now, two Up next, and a long
+     * Later in rooms cut at eight with Show all. */
+    id: 'goals-page-plan-apartment',
+    label: 'Goal · the Plan tab, in rooms',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" />,
+  },
+  {
+    /* The same, with every later step listed. */
+    id: 'goals-page-plan-apartment-later',
+    label: 'Goal · the Plan tab, every later step',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" laterAll />,
+  },
+  {
+    /* The loans goal By stage: every stage on one card, open to its steps. */
+    id: 'goals-page-plan-stage',
+    label: 'Goal · the Plan tab by stage',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface view="stage" />,
+  },
+  {
+    /* The apartment goal By room. */
+    id: 'goals-page-plan-apartment-rooms',
+    label: 'Goal · the Plan tab by room',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" view="stage" />,
+  },
+  {
+    /* Dash's how-to opened in place on the step it is for. */
+    id: 'goals-page-plan-draft',
+    label: 'Goal · Dash’s draft open on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface draftOpen />,
+  },
+  {
+    /* The finished steps' fold open, newest first. */
+    id: 'goals-page-plan-done',
+    label: 'Goal · the finished steps on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface doneOpen />,
+  },
+  {
+    /* A goal with no steps yet: Help me plan this. */
+    id: 'goals-page-plan-empty',
+    label: 'Goal · the Plan tab with no plan',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="empty" />,
   },
   {
     /* A goal closing with the Steps tab open (plan #1672): the hexagon in the
      * title completes with its ring, then the steps fold into one line. */
     id: 'goals-page-close',
-    label: 'Goal · closing it on the Steps tab',
+    label: 'Goal · closing it on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
@@ -5907,24 +6147,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPageCloseDemo />,
   },
   {
-    /* A step Dash finished, on the Steps tab (plan #1672). */
+    /* A step Dash finished, on the Plan tab (plan #1672). */
     id: 'goals-page-arrival',
-    label: 'Goal · a step Dash finished, on the Steps tab',
+    label: 'Goal · a step Dash finished, on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="goal-page-arrival"]',
       shows:
-        'Draft what to say on the call settles into place in the step list and Dash’s mark beside it swells and takes the accent once, settled within the second.',
+        'Draft what to say on the call settles into place in the finished steps and Dash’s mark beside it swells and takes the accent once, settled within the second.',
     },
     render: () => <GoalPageArrivalDemo />,
   },
   {
-    /* The same frame on its Activity tab: the steps closed, the runs and
+    /* The same moment in Dash's card on the Dashboard (plan #2778.10). */
+    id: 'goals-page-dash-arrival',
+    label: 'Goal · a step Dash finished, in Dash’s card',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="goal-dash-arrival"]',
+      shows:
+        'The Last finished line in Dash’s card settles into place and Dash’s mark in it swells and takes the accent once, settled within the second.',
+    },
+    render: () => <GoalDashArrivalDemo />,
+  },
+  {
+    /* The same frame on its History tab: the steps closed, the runs and
      * the goal's comments. */
     id: 'goals-page-activity',
-    label: 'Goal · the Activity tab',
+    label: 'Goal · the History tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalActivitySurface />,
@@ -6131,6 +6385,20 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Chat's two moments as the catalogue on /dev/ui lists them (plan
+     * #2748.10), alone, since the whole page photographs taller than a
+     * browser shot reaches and the catalogue is near its foot. */
+    id: 'dev-ui-moments',
+    label: 'UI · the Chat moments in the catalogue',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <Card padding="standard">
+        <WorkspaceMoments workspace="chat" label="Chat" />
+      </Card>
+    ),
+  },
+  {
     /* The sent-back count on /dev/ui alone (plan #2215.5), with the empty and
      * unread states beneath, since the whole page is too tall to read a chart. */
     id: 'dev-ui-sent-back',
@@ -6280,27 +6548,6 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'jobs-review',
-    label: 'Review queue',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <ReviewQueue
-        rows={reviewRows}
-        counts={{
-          all: reviewRows.length,
-          messages: reviewRows.filter((row) => row.kind === 'message').length,
-          applications: reviewRows.filter((row) => row.kind === 'application').length,
-          events: reviewRows.filter((row) => row.kind === 'event').length,
-        }}
-        view="all"
-        timezone="Europe/London"
-        companyNames={knownCompanies.map((company) => company.name)}
-        allRoles={allRoles}
-      />
-    ),
-  },
-  {
     id: 'jobs-settings',
     label: 'Jobs · Settings, the Search tab',
     module: 'jobs',
@@ -6335,35 +6582,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <MaterialView {...material} part="voice" />,
-  },
-  {
-    /* Follow-ups: who to tell about each application, and the note to them. */
-    id: 'jobs-follow-ups',
-    width: 'page',
-    label: 'Follow-ups',
-    module: 'jobs',
-    render: () => (
-      <FollowUpsView
-        followUps={followUpRows}
-        contactsByCompany={{
-          'co-1': [
-            { id: 'c-1', name: 'Rae Patel', title: 'Talent Partner, Finance' },
-            { id: 'c-9', name: 'Sam Ortiz', title: 'Head of Strategic Finance' },
-            { id: 'c-10', name: 'Jo Kim', title: 'Finance Analyst' },
-          ],
-          'co-3': [{ id: 'c-8', name: 'Lee Park', title: 'Recruiter' }],
-        }}
-        timezone="Europe/London"
-      />
-    ),
-  },
-  {
-    /* The page before anything has been saved or applied for. */
-    id: 'jobs-follow-ups-empty',
-    width: 'page',
-    label: 'Follow-ups · Empty',
-    module: 'jobs',
-    render: () => <FollowUpsView followUps={[]} timezone="Europe/London" />,
   },
   {
     /* The page as it opens, in Pipeline's order: leads to reach out to,
@@ -6601,14 +6819,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <JobsTodaySurface board={{ ...todayBoard, interviews: [] }} />,
   },
   {
-    /* Analytics: how far each channel's applications got (plan #1595). */
-    id: 'jobs-insights',
-    label: 'Analytics · By channel',
-    module: 'jobs',
-    width: 'wide',
-    render: () => <JobsInsightsSurface />,
-  },
-  {
     /* The month grid, which is the todo module's densest surface and the one
      * with a phone layout of its own. */
     id: 'todo-calendar-month',
@@ -6677,7 +6887,7 @@ export const SURFACES: readonly Surface[] = [
      * with its suggested notes, a search, and a note of its own; Leave for
      * later is the forward press. The list of all waiting folds below. */
     id: 'vault-triage',
-    label: 'Vault · Quick note triage',
+    label: 'Vault · Now, quick notes and the triage deck',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6689,8 +6899,9 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable onVault />
       </div>
     ),
   },
@@ -6698,13 +6909,14 @@ export const SURFACES: readonly Surface[] = [
     /* Make it a note of its own, pressed (note 24fd1e02): the name field,
      * filled with the name the first line gives it, ready to change. */
     id: 'vault-triage-naming',
-    label: 'Vault · Quick note triage · Naming a new note',
+    label: 'Vault · Now, triage naming a new note',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable naming />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable naming onVault />
       </div>
     ),
   },
@@ -6712,7 +6924,7 @@ export const SURFACES: readonly Surface[] = [
     /* Triage on its second note (plan #1931.5): the first is left for later,
      * so Previous sits beside the forward press. */
     id: 'vault-triage-previous',
-    label: 'Vault · Quick note triage, Previous',
+    label: 'Vault · Now, triage on its second note',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6723,21 +6935,23 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable second />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable second onVault />
       </div>
     ),
   },
   {
     /* Triage with nothing waiting: the deck's last word. */
     id: 'vault-triage-empty',
-    label: 'Vault · Quick note triage, empty',
+    label: 'Vault · Now, every quick note filed',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview empty writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={0} writable />
+        <TriagePreview empty writable onVault />
       </>
     ),
   },
@@ -6745,13 +6959,14 @@ export const SURFACES: readonly Surface[] = [
     /* Triage under a vault token that can only read: the reason in place of
      * the buttons, and the suggestions as links. */
     id: 'vault-triage-read-only',
-    label: 'Vault · Quick note triage, read-only token',
+    label: 'Vault · Now, triage with a read-only token',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable={false} />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable={false} />
+        <TriagePreview writable={false} onVault />
       </div>
     ),
   },
@@ -6764,7 +6979,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'narrow',
     render: () => (
-      <>
+      <div className={SHELL_FOOT}>
         <PageHeader
           title="Vault"
           description="alex-rivera/notes · main"
@@ -6772,7 +6987,8 @@ export const SURFACES: readonly Surface[] = [
         />
         <NewVaultNote />
         <QuickNoteRow waiting={3} writable />
-      </>
+        <TriagePreview writable onVault />
+      </div>
     ),
   },
   {
@@ -8150,18 +8366,6 @@ export const SURFACES: readonly Surface[] = [
       <ConceptList concepts={subjectConcepts} nextId="k1" subjectId="s1" timezone="Europe/London" />
     ),
   },
-  {
-    id: 'jobs-interviews',
-    label: 'Interviews · Upcoming and past',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <>
-        <RoundsTable title="Upcoming" rows={interviewRounds.slice(0, 2)} timezone="Europe/London" />
-        <RoundsTable title="Past" rows={interviewRounds.slice(2)} timezone="Europe/London" />
-      </>
-    ),
-  },
 
   {
     /* The shared display control and the shared group header, before any page
@@ -8536,7 +8740,7 @@ export const SURFACES: readonly Surface[] = [
      * the list, with the way back above its title. */
     id: 'ask-page',
     label: 'Dash · A chat open beside the list',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface />,
   },
@@ -8546,7 +8750,7 @@ export const SURFACES: readonly Surface[] = [
      * after them and the mark coming to rest. */
     id: 'ask-page-at-work',
     label: 'Dash · Dash at work in a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     interaction: {
       kind: 'press',
@@ -8555,16 +8759,282 @@ export const SURFACES: readonly Surface[] = [
       shows:
         'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
-    render: () => <DashPageSurface listOpen={false} usedOpen={false} draft={AT_WORK_QUESTION} />,
+    render: () => <DashPageSurface usedOpen={false} draft={AT_WORK_QUESTION} />,
   },
   {
     /* The same page at /ask, a new chat beside the list; on a phone the
      * list is the whole page. */
     id: 'ask-page-new',
     label: 'Dash · The list and a new chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" />,
+  },
+  {
+    /* Chat's Dash tab with no chats yet (plan #2748.1): the list says so,
+     * and the new chat beside it is where the first one starts. */
+    id: 'ask-page-empty',
+    label: 'Dash · No chats yet',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="empty" />,
+  },
+  {
+    /* The chats could not be read (plan #2748.1): the line saying so above
+     * an empty list, and a new chat still open beside it. */
+    id: 'ask-page-failed',
+    label: 'Dash · The chats not read',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="failed" />,
+  },
+  {
+    /* The Dash tab while the chats are read (plan #2748.1): the list's pane
+     * with New chat and skeleton rows under its usual groups, and the new
+     * chat beside it with its box, as the layout streams them. */
+    id: 'ask-page-loading',
+    label: 'Dash · The list loading',
+    module: 'chat',
+    width: 'page',
+    render: () => <DashPageSurface list="loading" />,
+  },
+  {
+    /* A conversation with a Claude Code session (plan #2789.7): the project first, opening it, then where the thread stands with Open in Claude, the turns with a file, a mockup card and an answered question, and the box closed until pressed. The list shows session threads above the chats. */
+    id: 'chat-session',
+    label: 'Dash · A session thread open beside the list',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="open" />,
+  },
+  {
+    /* The working line (plan #2789.7): your message sent, and under it what the session last reported while the reply is to come. */
+    id: 'chat-session-working',
+    label: 'Dash · A session thread, a reply on its way',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="working" />,
+  },
+  {
+    /* A question from the session (plan #2789.7) with its options as buttons; one press answers it. */
+    id: 'chat-session-question',
+    label: 'Dash · A session thread, a question to answer',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="question" />,
+  },
+  {
+    /* The attach sheet (plan #2789.7): the box open with the paperclip pressed, a file chosen, and what kinds of file it takes. */
+    id: 'chat-session-attach',
+    label: 'Dash · A session thread, the attach sheet',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="attach" />,
+  },
+  {
+    /* A new thread (plan #2789.7), as Talk about this project opens it: the project picked, and the prompt to say what to work on. */
+    id: 'chat-session-empty',
+    label: 'Dash · A new session thread',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="empty" />,
+  },
+  {
+    /* A message that could not be sent (plan #2789.7): kept in the thread, marked, with Try again. */
+    id: 'chat-session-failed',
+    label: 'Dash · A session thread, a send that failed',
+    module: 'chat',
+    width: 'page',
+    render: () => <SessionThreadSurface part="failed" />,
+  },
+  {
+    /* Chat's People tab (plan #2748.1), where Chat opens: each mentor as a
+     * thread, newest first, unread ones bold with a dot, one never written
+     * to, a long name and a guest not ready to talk (plan #2748.6). */
+    id: 'chat-people',
+    label: 'Chat · People',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface />,
+  },
+  {
+    /* People with no mentors on the council yet. */
+    id: 'chat-people-empty',
+    label: 'Chat · People, no mentors yet',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="empty" />,
+  },
+  {
+    /* The threads could not be read (plan #2748.6): one line saying so under the heading. */
+    id: 'chat-people-failed',
+    label: 'Chat · People, the threads not read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="failed" />,
+  },
+  {
+    /* The People tab while it is read: the list's pane with round marks and two lines, and on a laptop the thread's pane with bubbles. */
+    id: 'chat-people-loading',
+    label: 'Chat · People loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="loading" />,
+  },
+  {
+    /* A search across every thread (plan #2748.6): the messages with the words, each under whose thread it is in. */
+    id: 'chat-people-search',
+    label: 'Chat · People, a search',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="search" />,
+  },
+  {
+    /* A search nothing matches: the line saying so and the way back to the list. */
+    id: 'chat-people-search-none',
+    label: 'Chat · People, a search that finds nothing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPeopleSurface state="nothing-found" />,
+  },
+  {
+    /* A thread open beside the list (plan #2748.6): day labels, bubbles grouped by sender, a text first with its to do, and Read under your last message. On a phone the thread alone, with the way back above the name. */
+    id: 'chat-people-thread',
+    label: 'Chat · A thread open',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface />,
+  },
+  {
+    /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
+    id: 'chat-people-thread-typing',
+    label: 'Chat · A thread, them typing',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="typing" />,
+  },
+  {
+    /* The moment "A mentor typing" played (plan #2748.10): the dots rise in, give way to their text, and rise in again while another is coming. */
+    id: 'chat-people-thread-typing-moment',
+    label: 'Chat · A thread, them typing then replying',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-typing"]',
+      shows:
+        'Their three dots rise in at the foot of the thread, then give way to their first bubble rising from the same place, and the dots rise in again below it while another text is coming.',
+    },
+    render: () => <ChatTypingMomentSurface />,
+  },
+  {
+    /* The moment "A text that arrives first" played (plan #2748.10): their row rises to the top of the list with the new preview and an unread dot. */
+    id: 'chat-people-arrives',
+    label: 'Chat · People, a text arriving first',
+    module: 'chat',
+    width: 'screen',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="chat-arrival"]',
+      shows:
+        'The Mentor’s row rises from the third place to the top as the rows it passes move down one place each, its preview line changes to the new text and its unread dot lands.',
+    },
+    render: () => <ChatArrivalMomentSurface />,
+  },
+  {
+    /* Scrolled to the top of a long thread: earlier messages loading above the oldest shown. */
+    id: 'chat-people-thread-older',
+    label: 'Chat · A thread, loading earlier messages',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="older" />,
+  },
+  {
+    /* A message that was not sent: dimmed in place, why under it, and Retry. */
+    id: 'chat-people-thread-failed',
+    label: 'Chat · A thread, a send that failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="failed" />,
+  },
+  {
+    /* A mentor you have never written to: their mark and name, and a line saying to write below. */
+    id: 'chat-people-thread-new',
+    label: 'Chat · A thread never written in',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="new" />,
+  },
+  {
+    /* A guest whose brain is not built yet: the line saying when they can talk, and the box off. */
+    id: 'chat-people-thread-not-ready',
+    label: 'Chat · A thread with a guest not ready',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="not-ready" />,
+  },
+  {
+    /* A thread while it is read: on a phone the thread's pane alone, on a laptop beside the list. */
+    id: 'chat-people-thread-loading',
+    label: 'Chat · A thread loading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="loading" />,
+  },
+  {
+    /* The form for someone new in place of the thread (plan #2748.11): name, colour, who they are, how they talk, what they care about and never say, and Draft the card. */
+    id: 'chat-person-add',
+    label: 'Chat · Adding someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface />,
+  },
+  {
+    /* The form filled in, scrolled to the card, while Dash writes it. */
+    id: 'chat-person-add-drafting',
+    label: 'Chat · Adding someone, Dash drafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="drafting" />,
+  },
+  {
+    /* The form filled in, scrolled to the card, with why the draft failed and Try again. */
+    id: 'chat-person-add-failed',
+    label: 'Chat · Adding someone, the draft failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonAddSurface state="failed" />,
+  },
+  {
+    /* The same form for a mentor already there, opened from Edit on their thread, on what was filled in last time. */
+    id: 'chat-person-edit',
+    label: 'Chat · Editing someone',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface />,
+  },
+  {
+    /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
+    id: 'chat-person-edit-versions',
+    label: 'Chat · Editing someone, their card and earlier cards',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="card" />,
+  },
+  {
+    /* The card while Dash redrafts it from a sentence. */
+    id: 'chat-person-edit-drafting',
+    label: 'Chat · Editing someone, Dash redrafting the card',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="redrafting" />,
+  },
+  {
+    /* Scrolled to what they remember: one line being corrected, and the confirm before another is removed. */
+    id: 'chat-person-edit-memory',
+    label: 'Chat · Editing someone, what they remember',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="memory" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),
@@ -8572,7 +9042,7 @@ export const SURFACES: readonly Surface[] = [
      * used is folded too, to its button in the chat's header (#1899.4). */
     id: 'ask-page-hidden',
     label: 'Dash · The list hidden',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} usedOpen={false} />,
   },
@@ -8583,7 +9053,7 @@ export const SURFACES: readonly Surface[] = [
      * phone has no room, so the chat shows the Used button. */
     id: 'ask-page-used',
     label: 'Dash · What Dash used, beside the chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} />,
   },
@@ -8617,6 +9087,42 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskBoxSurface open="scope" />,
   },
   {
+    /* "Think it through" on (plan #2789.10): the switch pressed in the box's
+     * foot, standing in for the model chip, with a question typed. */
+    id: 'ask-think-on',
+    label: 'Dash · Think it through, switched on',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="on" />,
+  },
+  {
+    /* A thought-through answer with the mockup it drew, in its sandboxed
+     * frame, and the line saying it was thought through on Opus and its cost. */
+    id: 'ask-think-mockup',
+    label: 'Dash · A thought-through answer with a mockup',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="mockup" />,
+  },
+  {
+    /* A thought-through answer with no mockup: the cost line alone, the
+     * switch off again in the box. */
+    id: 'ask-think-cost',
+    label: 'Dash · What a thought-through answer cost',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSurface part="cost" />,
+  },
+  {
+    /* @ and the start of a workspace's name in the box (plan #2748.1):
+     * Learn first in the menu, to keep the question to, then the rows. */
+    id: 'ask-box-workspaces',
+    label: 'Dash · @ keeps a question to a workspace',
+    module: 'chat',
+    width: 'page',
+    render: () => <AskBoxSurface open="workspaces" />,
+  },
+  {
     /* The model chip's list open in the popup (plan #2458.3): Haiku, Sonnet
      * and Opus, each with a line on speed and cost, Sonnet ticked. */
     id: 'ask-dash-new-models',
@@ -8646,7 +9152,7 @@ export const SURFACES: readonly Surface[] = [
     /* The same list open on the Dash page, in an open chat's docked box. */
     id: 'ask-page-models',
     label: 'Dash · Choosing the model in a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface listOpen={false} usedOpen={false} modelStart="open" />,
   },
@@ -8656,7 +9162,7 @@ export const SURFACES: readonly Surface[] = [
      * around it. On a phone the list is the page. */
     id: 'ask-page-search',
     label: 'Dash · Searching the chats',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="search" />,
   },
@@ -8664,7 +9170,7 @@ export const SURFACES: readonly Surface[] = [
     /* A chat's menu open in the list: pin, rename, archive (plan #1899.6). */
     id: 'ask-page-menu',
     label: "Dash · A chat's menu",
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="menu" />,
   },
@@ -8672,7 +9178,7 @@ export const SURFACES: readonly Surface[] = [
     /* A chat being renamed in place in the list (plan #1899.6). */
     id: 'ask-page-rename',
     label: 'Dash · Renaming a chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="new" list="rename" />,
   },
@@ -8681,7 +9187,7 @@ export const SURFACES: readonly Surface[] = [
      * #1899.6), with the line above it that puts it back. */
     id: 'ask-page-archived',
     label: 'Dash · An archived chat',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface chat="archived" usedOpen={false} />,
   },
@@ -8735,7 +9241,7 @@ export const SURFACES: readonly Surface[] = [
      * phone and on a laptop with the list shown. */
     id: 'ask-page-used-sheet',
     label: 'Dash · What Dash used, as a sheet',
-    module: 'jobs',
+    module: 'chat',
     width: 'page',
     render: () => <DashPageSurface sheetOpen />,
   },
@@ -9621,6 +10127,31 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    // One area chosen in the chips row (plan #2629.5): the deck holds only
+    // the Career cards, and Earlier only the Career marks.
+    id: 'you-insights-area',
+    label: 'You · Insights, one area chosen',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview open={{ area: '00000000-0000-4000-8000-0000000000c1', earlier: true }} />
+      </div>
+    ),
+  },
+  {
+    // The chosen area has no card waiting: its one card is marked.
+    id: 'you-insights-area-empty',
+    label: 'You · Insights, the chosen area has nothing waiting',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouInsightsPreview homeDone open={{ area: '00000000-0000-4000-8000-0000000000c3' }} />
+      </div>
+    ),
+  },
+  {
     id: 'you-insights-earlier',
     label: 'You · Insights, Earlier open with your marks',
     module: 'you',
@@ -9668,106 +10199,144 @@ export const SURFACES: readonly Surface[] = [
     render: () => <YouInsightsLoadingPreview />,
   },
   {
-    /* Answer (plan #2617.2): Dash's questions about you, three waiting with
-     * a box and Skip each, four answers below with Edit, two skipped folded. */
-    id: 'you-answer',
-    label: 'You · Answer, three waiting and four answered',
+    /* Ask (plans #2617.2 and #2635.3): Dash's questions about you, three
+     * waiting under the area each is about (none under Other), four answers
+     * below with Edit, two skipped folded. */
+    id: 'you-ask',
+    label: 'You · Ask, three waiting by area and four answered',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview />
+        <YouAskPreview />
       </div>
     ),
   },
   {
-    id: 'you-answer-empty',
-    label: 'You · Answer, before Dash has asked anything',
+    /* The tab in its shell, with the count of open questions on it. */
+    id: 'you-ask-tab',
+    label: 'You · Ask, in the workspace with the open count on its tab',
     module: 'you',
     width: 'page',
-    render: () => <YouAnswerPreview empty />,
+    render: () => (
+      <AppShell
+        account="preview"
+        module="you"
+        pathname="/you/ask"
+        sections={withBadges(youSections, { '/you/ask': 3 })}
+        displayName="Chris"
+        email="chris@example.com"
+        isOwner
+        counts={{ jobs: '12', shopping: '3', todo: '8' }}
+        theme={{ kind: 'written', id: 'paper' }}
+        brief={null}
+      >
+        <YouAskPreview />
+      </AppShell>
+    ),
   },
   {
-    id: 'you-answer-answered',
-    label: 'You · Answer, nothing waiting',
+    /* An open question hovered on a laptop: its Skip shows. A phone always shows it. */
+    id: 'you-ask-hover',
+    label: 'You · Ask, an open question hovered with Skip showing',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview noneOpen />
+        <YouAskPreview part="hover" />
       </div>
     ),
   },
   {
-    id: 'you-answer-edit',
-    label: 'You · Answer, an answer being changed',
+    id: 'you-ask-empty',
+    label: 'You · Ask, before Dash has asked anything',
+    module: 'you',
+    width: 'page',
+    render: () => <YouAskPreview empty />,
+  },
+  {
+    /* Nothing waiting: the line says when Dash next asks, beside Ask now. */
+    id: 'you-ask-answered',
+    label: 'You · Ask, nothing waiting',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview part="edit" />
+        <YouAskPreview noneOpen />
       </div>
     ),
   },
   {
-    id: 'you-answer-skipped',
-    label: 'You · Answer, skipped open with one being answered',
+    id: 'you-ask-edit',
+    label: 'You · Ask, an answer being changed',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview noneOpen part="skipped" />
+        <YouAskPreview part="edit" />
       </div>
     ),
   },
   {
-    id: 'you-answer-error',
-    label: 'You · Answer, an answer that did not save',
+    /* The skipped fold open: one being answered, the other hovered with Ask again showing. */
+    id: 'you-ask-skipped',
+    label: 'You · Ask, skipped open with one being answered',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview part="error" />
+        <YouAskPreview noneOpen part="skipped" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-ask-error',
+    label: 'You · Ask, an answer that did not save',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouAskPreview part="error" />
       </div>
     ),
   },
   {
     /* The Ask button's run going (plan #2617.3): Dash at work on the button
      * and a line under the header with when it started. */
-    id: 'you-answer-running',
-    label: 'You · Answer, Dash writing new questions',
+    id: 'you-ask-running',
+    label: 'You · Ask, Dash writing new questions',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview ask="running" />
+        <YouAskPreview ask="running" />
       </div>
     ),
   },
   {
-    id: 'you-answer-ask-failed',
-    label: 'You · Answer, the last run for new questions failed',
+    id: 'you-ask-ask-failed',
+    label: 'You · Ask, the last run for new questions failed',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
-        <YouAnswerPreview ask="failed" />
+        <YouAskPreview ask="failed" />
       </div>
     ),
   },
   {
-    id: 'you-answer-loading',
-    label: 'You · Answer, loading',
+    id: 'you-ask-loading',
+    label: 'You · Ask, loading',
     module: 'you',
     width: 'page',
-    render: () => <YouAnswerLoadingPreview />,
+    render: () => <YouAskLoadingPreview />,
   },
   {
     /* Board (plans #2540.3 and #2561.4): one surface in three groups, the
      * board's suggested questions with Ask now, Save for Sunday and Dismiss,
      * the questions asked with their state, then the meetings newest first. */
     id: 'you-board',
-    label: 'You · Board, suggestions, questions and meetings',
+    label: 'You · Council, suggestions, questions and meetings',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9781,7 +10350,7 @@ export const SURFACES: readonly Surface[] = [
      * board asks you, one asked a second time, one answered and waiting for
      * the next meeting; and the same with a failed save. */
     id: 'you-board-asks',
-    label: 'You · Board, the board asks you questions',
+    label: 'You · Council, the board asks you questions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9792,7 +10361,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-asks-error',
-    label: 'You · Board, an answer to the board that did not save',
+    label: 'You · Council, an answer to the board that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9806,7 +10375,7 @@ export const SURFACES: readonly Surface[] = [
      * how each turned out with receipts, and the three presses to answer;
      * and the same with a save that failed. */
     id: 'you-board-reviews',
-    label: 'You · Board, the board checks back on two decisions',
+    label: 'You · Council, the board checks back on two decisions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9817,7 +10386,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-reviews-error',
-    label: 'You · Board, an answer to a check-back that did not save',
+    label: 'You · Council, an answer to a check-back that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9832,7 +10401,7 @@ export const SURFACES: readonly Surface[] = [
      * it, a written one, a tripwire whose day came, and under the list each
      * advisor's track record by topic. */
     id: 'you-board-due',
-    label: 'You · Board, check-backs and a tripwire due, with track records',
+    label: 'You · Council, check-backs and a tripwire due, with track records',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9845,7 +10414,7 @@ export const SURFACES: readonly Surface[] = [
     /* A meeting that checked back on two decisions, one answered and graded,
      * with the scorecard of whose picks held up by topic (plan #2561.8). */
     id: 'you-board-meeting-reviewed',
-    label: 'You · Board, a meeting that checked back on decisions, with picks graded',
+    label: 'You · Council, a meeting that checked back on decisions, with picks graded',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9857,7 +10426,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* A verdict that names its assumptions (plan #2561.11). */
     id: 'you-board-meeting-assumed',
-    label: 'You · Board, a verdict resting on stated assumptions',
+    label: 'You · Council, a verdict resting on stated assumptions',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9868,7 +10437,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-empty',
-    label: 'You · Board, nothing asked, suggested or held yet',
+    label: 'You · Council, nothing asked, suggested or held yet',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9879,7 +10448,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-running',
-    label: 'You · Board, a question convened now, its meeting being held',
+    label: 'You · Council, a question convened now, its meeting being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9889,8 +10458,88 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The Council (you 0037): a decision waiting, a line to three unread
+     * texts in Chat (plan #2748.7), then the five seats and eleven guests as
+     * tiles with their newest note. */
+    id: 'you-council',
+    label: 'You · Council, unread texts and every mentor',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-empty',
+    label: 'You · Council, before any mentor has written',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    /* Six unread texts: the round holds back, and the line says so. */
+    id: 'you-council-held',
+    label: 'You · Council, held back at six unread',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilPreview state="held" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-loading',
+    label: 'You · Council, loading',
+    module: 'you',
+    width: 'page',
+    render: () => <YouCouncilLoadingPreview />,
+  },
+  {
+    /* Jerwyn the Elder: his newest note, a talk with a commitment made in
+     * it, what he holds the person to, what he knows, and how he thinks. */
+    id: 'you-council-mentor',
+    label: 'You · Council, one mentor mid-talk',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-council-mentor-waiting',
+    label: 'You · Council, a mentor writing back',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview state="waiting" />
+      </div>
+    ),
+  },
+  {
+    /* Opened from a note's Talk about this: the note above the box. */
+    id: 'you-council-mentor-about',
+    label: 'You · Council, talking about a note',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouCouncilMentorPreview state="about" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-loading',
-    label: 'You · Board, loading',
+    label: 'You · Council, loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardListLoadingPreview />,
@@ -9900,7 +10549,7 @@ export const SURFACES: readonly Surface[] = [
      * disagreements with a vote each, the dream, the question, the
      * resolutions, the predictions, the scorecard, and the memos folded. */
     id: 'you-board-meeting',
-    label: 'You · Board, one meeting with some marks made',
+    label: 'You · Council, one meeting with some marks made',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9911,7 +10560,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-memos',
-    label: 'You · Board, a meeting with the memos open',
+    label: 'You · Council, a meeting with the memos open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9925,7 +10574,7 @@ export const SURFACES: readonly Surface[] = [
      * filled as far as a real question goes, and the card with a question
      * that was saved but whose meeting could not start. */
     id: 'you-board-ask',
-    label: 'You · Board, Ask the board open',
+    label: 'You · Council, Ask the board open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9936,7 +10585,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-ask-error',
-    label: 'You · Board, a question whose meeting could not start',
+    label: 'You · Council, a question whose meeting could not start',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9947,7 +10596,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start',
-    label: 'You · Board, Start a meeting open',
+    label: 'You · Council, Start a meeting open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9958,7 +10607,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start-error',
-    label: 'You · Board, a meeting that could not be started',
+    label: 'You · Council, a meeting that could not be started',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9969,7 +10618,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-start-running',
-    label: 'You · Board, Start a meeting while one is running',
+    label: 'You · Council, Start a meeting while one is running',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9980,7 +10629,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-called',
-    label: 'You · Board, a called meeting with each seat’s vote',
+    label: 'You · Council, a called meeting with each seat’s vote',
     module: 'you',
     width: 'page',
     render: () => (
@@ -9991,7 +10640,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-running',
-    label: 'You · Board, a meeting still being held',
+    label: 'You · Council, a meeting still being held',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10002,7 +10651,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-failed',
-    label: 'You · Board, a meeting that failed',
+    label: 'You · Council, a meeting that failed',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10013,7 +10662,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-loading',
-    label: 'You · Board, a meeting loading',
+    label: 'You · Council, a meeting loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardMeetingLoadingPreview />,
@@ -10024,7 +10673,7 @@ export const SURFACES: readonly Surface[] = [
      * exchanges between two advisors. Drawn finished, still being held with
      * a question no advisor has reached, and with one advisor's thinking open. */
     id: 'you-board-meeting-debate',
-    label: 'You · Board, a meeting held as a debate',
+    label: 'You · Council, a meeting held as a debate',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10034,8 +10683,68 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A decision worked with probabilities (plan #2581.9): the headline, the
+     * strip of advisors along 0 to 100% for the leading option with a line
+     * from each, the numbers behind it, the exchange, the premortem and
+     * tripwire, and the verdict waiting on a decision. Also drawn with one
+     * dot open, while answers arrive, before any has, and with a steelman. */
+    id: 'you-board-decision',
+    label: 'You · Advisors, a decision led by its headline and spread',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-popover',
+    label: 'You · Advisors, one advisor’s range and reasoning open from their dot',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview openDot="skeptic" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-running',
+    label: 'You · Advisors, a decision while the answers arrive',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-empty',
+    label: 'You · Advisors, a decision no advisor has answered yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-decision-steelman',
+    label: 'You · Advisors, a unanimous decision with its other side argued',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardDecisionPreview state="steelman" />
+      </div>
+    ),
+  },
+  {
     id: 'you-board-meeting-debate-running',
-    label: 'You · Board, a debate still being held, one question not reached',
+    label: 'You · Council, a debate still being held, one question not reached',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10049,7 +10758,7 @@ export const SURFACES: readonly Surface[] = [
      * questions decided, the first against the board; the form to change a
      * decision; and the form with a save that failed. */
     id: 'you-board-meeting-decided',
-    label: 'You · Board, both questions decided from their verdicts',
+    label: 'You · Council, both questions decided from their verdicts',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10060,7 +10769,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-decision-change',
-    label: 'You · Board, changing a decision',
+    label: 'You · Council, changing a decision',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10071,7 +10780,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-meeting-decision-error',
-    label: 'You · Board, a decision that did not save',
+    label: 'You · Council, a decision that did not save',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10086,7 +10795,7 @@ export const SURFACES: readonly Surface[] = [
      * the words; the steps choice with a goal picked; the same after a write
      * that failed; and the card after the action was written, listing it. */
     id: 'you-board-make',
-    label: 'You · Board, writing a decision as todos',
+    label: 'You · Council, writing a decision as todos',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10097,7 +10806,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-make-steps',
-    label: 'You · Board, writing a decision as steps under a goal',
+    label: 'You · Council, writing a decision as steps under a goal',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10109,7 +10818,7 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The steps choice after a write under a goal that had closed. */
     id: 'you-board-make-steps-error',
-    label: 'You · Board, a decision whose goal had closed',
+    label: 'You · Council, a decision whose goal had closed',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10120,7 +10829,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-make-made',
-    label: 'You · Board, what a decision made',
+    label: 'You · Council, what a decision made',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10133,7 +10842,7 @@ export const SURFACES: readonly Surface[] = [
     /* Advisors (plan #2561.7): the five seats and every guest with the
      * question each owns, a brain state and the switch for the chair. */
     id: 'you-board-advisors',
-    label: 'You · Board, the advisors and their switches',
+    label: 'You · Council, the advisors and their switches',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10144,7 +10853,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-add',
-    label: 'You · Board, Add advisor open',
+    label: 'You · Council, Add advisor open',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10155,7 +10864,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-building',
-    label: 'You · Board, a guest’s brain being built',
+    label: 'You · Council, a guest’s brain being built',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10166,7 +10875,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-advisors-failed',
-    label: 'You · Board, a brain that failed to build, with retry',
+    label: 'You · Council, a brain that failed to build, with retry',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10176,15 +10885,170 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* One advisor's profile (plan #2581.5): the avatar large, the name,
+     * the assessment they own, then About, Track record and Sources. */
+    id: 'you-board-advisor',
+    label: 'You · Advisors, one advisor’s profile, About',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record',
+    label: 'You · Advisors, an advisor’s track record',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-record-empty',
+    label: 'You · Advisors, an advisor with no track record yet',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="record" />
+        <YouBoardAdvisorProfilePreview tab="record" state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-sources',
+    label: 'You · Advisors, the sources an advisor was built from',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="sources" />
+        <YouBoardAdvisorProfilePreview tab="sources" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-building',
+    label: 'You · Advisors, a guest’s profile while the brain is built',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="building" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-failed',
+    label: 'You · Advisors, a guest whose brain failed to build, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview state="failed" />
+      </div>
+    ),
+  },
+  {
+    /* An advisor's look open to change (plan #2581.3), on their profile since
+     * plan #2581.5: the avatar large, Shuffle, and a stepper for each trait. */
+    id: 'you-board-advisor-avatar',
+    label: 'You · Advisors, changing how an advisor looks',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <YouBoardAdvisorProfilePreview
+          editing={{ svg: avatarSvg(SEEDED_AVATARS.buffett, 'preview'), look: avatarLook(SEEDED_AVATARS.buffett) }}
+        />
+      </div>
+    ),
+  },
+  {
+    /* Talking to one advisor alone (plan #2581.6): the talk on one card, his
+     * replies citing the person’s rows, the earlier talks and what he remembers. */
+    id: 'you-board-advisor-talk',
+    label: 'You · Advisors, talking to one advisor alone',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="chat" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-empty',
+    label: 'You · Advisors, a first talk with three ways in',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="empty" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-error',
+    label: 'You · Advisors, a reply that failed, with Try again',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="error" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-running',
+    label: 'You · Advisors, an advisor writing a reply',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="running" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-talk-loading',
+    label: 'You · Advisors, a talk loading',
+    module: 'you',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <SetTab tab="talk" />
+        <YouBoardAdvisorTalkPreview state="loading" />
+      </div>
+    ),
+  },
+  {
+    id: 'you-board-advisor-loading',
+    label: 'You · Advisors, a profile loading',
+    module: 'you',
+    width: 'page',
+    render: () => <AdvisorProfileSkeleton />,
+  },
+  {
     id: 'you-board-advisors-loading',
-    label: 'You · Board, advisors loading',
+    label: 'You · Council, advisors loading',
     module: 'you',
     width: 'page',
     render: () => <YouBoardAdvisorsLoadingPreview />,
   },
   {
     id: 'you-board-panel',
-    label: 'You · Board, one panel of advisors',
+    label: 'You · Council, one panel of advisors',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10195,7 +11059,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-panel-empty',
-    label: 'You · Board, a panel just made with no advisors',
+    label: 'You · Council, a panel just made with no advisors',
     module: 'you',
     width: 'page',
     render: () => (
@@ -10206,23 +11070,12 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'you-board-panel-delete',
-    label: 'You · Board, deleting a panel',
+    label: 'You · Council, deleting a panel',
     module: 'you',
     width: 'page',
     render: () => (
       <div className={SHELL_FOOT}>
         <YouBoardPanelPreview state="delete" />
-      </div>
-    ),
-  },
-  {
-    id: 'you-board-meeting-advisor',
-    label: 'You · Board, one advisor’s thinking open',
-    module: 'you',
-    width: 'page',
-    render: () => (
-      <div className={SHELL_FOOT}>
-        <YouBoardDebatePreview advisor="buffett" />
       </div>
     ),
   },
@@ -10536,10 +11389,7 @@ export const SURFACES: readonly Surface[] = [
           module="news"
           sections={[
             { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-            { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
-            { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
           ]}
           settingsHref="/news/settings"
           settingsLabel="News settings"
@@ -10574,6 +11424,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <QuickReadView {...quickPageView} />
+      </div>
+    ),
+  },
+  {
+    /* Inbox and the Daily review as folds under the Quick read (plan #1496.10). */
+    id: 'news-now-folds',
+    label: 'News · Now with the Inbox and Daily review folds',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <>
+              <div className="mt-6">
+                <NewsInboxFoldSurface />
+              </div>
+              <div className="mt-6">
+                <NewsReviewFold {...reviewFull} />
+              </div>
+            </>
+          }
+        />
+      </div>
+    ),
+  },
+  {
+    /* Tonight's review could not be written and is tried again; an earlier day sits behind the arrow. */
+    id: 'news-now-folds-failed',
+    label: 'News · Now when the Daily review could not be written',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <div className="mt-6">
+              <NewsReviewFold
+                review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00 PM', overview: null, lines: [], retrying: true }}
+                earlier={{ href: '/news?day=2026-10-05', label: 'Mon 5 Oct' }}
+                later={null}
+                todayAt={null}
+              />
+            </div>
+          }
+        />
       </div>
     ),
   },
@@ -10653,36 +11551,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SavedView {...savedStories} />,
   },
   {
-    id: 'news-review',
-    label: 'News · Daily review',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView {...reviewFull} />,
-  },
-  {
-    id: 'news-review-empty',
-    label: 'News · Daily review before the first one',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView review={null} earlier={null} later={null} todayAt={'8:00\u00a0PM'} />,
-  },
-  {
-    /* Tonight's run failed and is tried again on the hour until midnight;
-     * earlier days are still there behind the back arrow. */
-    id: 'news-review-failed',
-    label: 'News · Daily review that could not be written',
-    module: 'news',
-    width: 'page',
-    render: () => (
-      <ReviewView
-        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
-        earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
-        later={null}
-        todayAt={null}
-      />
-    ),
-  },
-  {
     id: 'news-saved-empty',
     label: 'News · Saved with nothing saved',
     module: 'news',
@@ -10733,6 +11601,41 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <LaterMenuRows />,
+  },
+  {
+    /* A question about a screen with its mockups under the options (plan
+     * #2810.2): pictures on two options, none on the third, one picture of a
+     * whole question, and a plain question unchanged. */
+    id: 'dev-question-mockups',
+    label: 'Questions · mockups under the options',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupsSurface />,
+  },
+  {
+    /* The same, with the pictures still loading. */
+    id: 'dev-question-mockups-loading',
+    label: 'Questions · mockups loading',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupLoadingSurface />,
+  },
+  {
+    /* The same, with pictures that will not load: the options still read. */
+    id: 'dev-question-mockups-failed',
+    label: 'Questions · mockups that will not load',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupFailedSurface />,
+  },
+  {
+    /* A picture opened full screen: phone and laptop side by side, with Open
+     * the mockup. */
+    id: 'dev-question-mockups-viewer',
+    label: 'Questions · a mockup opened full screen',
+    module: 'dev',
+    width: 'page',
+    render: () => <QuestionMockupViewerSurface />,
   },
   {
     /* The four words that close a row (plan #1957.3): Done, Drop, Later and
@@ -10834,6 +11737,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'narrow',
     render: () => <RefPreviewSurface />,
+  },
+
+  /* The frame every page draws (plan #2815.3): the heading in each state it
+   * has, the path with its back link, and both page widths. */
+  {
+    id: 'shell-page-header',
+    label: 'The shell · A page’s heading, path and width',
+    module: 'dev',
+    width: 'page',
+    render: () => <PageHeaderSurface />,
   },
 
   /* The per-day bar chart for the usage pages (plan #2036.1): a month of
@@ -11394,6 +12307,40 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ProjectPlanSurface refused />,
   },
   {
+    /* What is running now, at the top of a project's page and Dev's plan
+     * (plan #2800.3): a session that reports and one read from its pushes. */
+    id: 'dev-now',
+    label: 'Dev · Now, sessions working',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="working" />,
+  },
+  {
+    /* Hidden part: a session waiting on you, with its question's choices to
+     * answer there, and one whose need has no choices. */
+    id: 'dev-now-waiting',
+    label: 'Dev · Now, waiting on you',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="waiting" />,
+  },
+  {
+    /* Hidden part: the stale mark, no report for twenty minutes. */
+    id: 'dev-now-stale',
+    label: 'Dev · Now, a session gone quiet',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="stale" />,
+  },
+  {
+    /* Hidden part: nothing running, with the last finished session. */
+    id: 'dev-now-empty',
+    label: 'Dev · Now, nothing running',
+    module: 'dev',
+    width: 'page',
+    render: () => <NowSurface variant="empty" />,
+  },
+  {
     id: 'dev-raised',
     label: 'Dev · Home',
     module: 'dev',
@@ -11435,10 +12382,11 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnSettingsView settings={{ goalsOnly: true, offerSubjects: true, teachBackEvery: 10 }} />,
   },
   {
-    /* The runner card on /dev/plan with its four Dashes (plan #1704): a
-     * night with two sessions, a goal run and a slot asleep, then off. */
+    /* The runner card on Home with its four Dashes (plan #1704, moved off
+     * /dev/plan by #578.12): a night with two sessions, a goal run and a
+     * slot asleep, then off. */
     id: 'dev-runner-crew',
-    label: 'Dev · Plan, the runner’s four Dashes',
+    label: 'Dev · Home, the runner’s four Dashes',
     module: 'dev',
     width: 'page',
     render: () => <DevRunnerCrewSurface />,
@@ -11560,17 +12508,10 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-activity',
-    label: 'Jobs · Activity',
+    label: 'Now · the Activity tab',
     module: 'jobs',
-    width: 'page',
+    width: 'wide',
     render: () => <JobsActivitySurface />,
-  },
-  {
-    id: 'jobs-analytics',
-    label: 'Jobs · Analytics',
-    module: 'jobs',
-    width: 'page',
-    render: () => <JobsAnalyticsSurface />,
   },
   {
     id: 'jobs-answers',
@@ -11872,6 +12813,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnConceptEvidenceSurface />,
+  },
+  {
+    /* Everything found for the idea has been read or given up on (plan
+     * #2741.1), so no list is offered and the line under the button says so. */
+    id: 'learn-concept-all-consumed',
+    label: 'Idea · Everything found for it already read',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptAllConsumedSurface />,
   },
   {
     id: 'learn-lists',
@@ -12618,13 +13568,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <NewsAllSurface />,
   },
   {
-    id: 'news-story',
-    label: 'News · One story on its own page',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsStorySurface />,
-  },
-  {
     id: 'news-settings',
     label: 'News · Settings',
     module: 'news',
@@ -13203,3 +14146,19 @@ export const SURFACES: readonly Surface[] = [
     render: () => <FigureQuestionPreview form="move-agglomeration" />,
   },
 ];
+
+/**
+ * The Advisors surfaces draw their avatars from one sprite, made here on the
+ * server as the pages make theirs (plan #2581.3): every advisor the board
+ * started with, and the guest the fixtures add. Wrapped in place, so the
+ * entries above stay where the gallery's tests read them.
+ */
+for (const surface of SURFACES) {
+  if (!surface.id.startsWith('you-board')) continue;
+  const render = surface.render;
+  surface.render = () => (
+    <AdvisorAvatars {...spriteFor([...Object.keys(SEEDED_AVATARS), 'aurelius'].map((key) => ({ key })))}>
+      {render()}
+    </AdvisorAvatars>
+  );
+}

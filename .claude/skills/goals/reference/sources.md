@@ -186,7 +186,7 @@ The decisions they put to their board: the question, its options, the way they w
 
 - Search: `question`, `context`, `lean`, `decision_note`
 - Name a row by `question`; link it by `id`
-- Opens at `/you/board`
+- Opens at `/you/council`
 - options is [ { letter, text } ]; decided_option is the letter they chose. status is suggested, queued, discussing, decided, dismissed or deferred. source is person (they asked), suggested (Dash suggested it; only theirs once accepted, so leave status suggested and dismissed rows out) or board. verdict is the board's recommendation, written by Dash, so cite their decision rather than the verdict (you 0022). reviews is the board checking back 30 and 90 days after the decision: account is Dash's, outcome (well, mixed or badly) is theirs; topic is work, money, learning, projects, place or time (you 0026). door is one_way or two_way; success_measure, decide_by and lean_probability (0 to 1) are theirs; premortem and tripwire are written with the board (you 0029).
 
 ### `core.conversation_turns` (Learn)
@@ -196,6 +196,14 @@ What they asked or explained, and what Dash replied, turn by turn.
 - Search: `body`
 - Name a row by `body`; link it by `id`
 - role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.
+
+### `core.session_messages` (Home)
+
+What they wrote to a Claude Code session working on one of their projects or this app, and what the session wrote back, message by message.
+
+- Search: `body`, `answer`
+- Name a row by `body`; link it by `id`
+- author 'person' is theirs and 'session' is the session's: read their messages as what they asked for, and the session's only for context. kind 'question' carries options and, once they pressed one, answer; 'mockup' carries artifact_url; 'status' is a line on what the session was doing. thread_id joins core.session_threads, whose title says what the thread is about and whose project_id names the dev_projects project (null for this app).
 
 ### `core.watches` (Home)
 
@@ -247,7 +255,7 @@ Interviews, with their prep and what was asked.
 
 - Search: `notes`, `prep_notes`, `questions_asked`
 - Name a row by `notes`; link it by `id`
-- Opens at `/jobs/interviews`
+- Opens at `/jobs/pipeline?stage=in_process`
 - Name one by its application’s role (application_id → applications.role_id → roles.title).
 
 ### `job_search.companies` (Job search)
@@ -619,11 +627,11 @@ The schools, certifications, honors, skills and courses on their LinkedIn profil
 
 ### `you.dash_questions` (You)
 
-Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.
+Their answers to the questions Dash asked them about themselves on the Ask tab, in their own words.
 
 - Search: `question`, `answer`
 - Name a row by `question`; link it by `id`
-- Opens at `/you/answer`
+- Opens at `/you/ask`
 - question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: only an answered row says anything about them, so leave open and skipped rows out. answered_at is when they first answered; updated_at moves when they change the answer (you 0033).
 
 ### `you.advisor_chats` (You)
@@ -632,7 +640,7 @@ The one-on-one talks they started with one of their advisors, by title.
 
 - Search: `title`
 - Name a row by `title`; link it by `id`
-- Opens at `/you/board`
+- Opens at `/you/council`
 - advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).
 
 ### `you.advisor_messages` (You)
@@ -641,8 +649,17 @@ What they said to an advisor in a one-on-one talk, and what the advisor answered
 
 - Search: `text`
 - Name a row by `text`; link it by `id`
-- Opens at `/you/board`
-- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029).
+- Opens at `/you/council`
+- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038).
+
+### `you.advisor_episodes` (You)
+
+Each conversation they had with a mentor, from its first message to three quiet hours after its last, with a summary of what was said.
+
+- Search: `summary`
+- Name a row by `summary`; link it by `id`
+- Opens at `/you/council`
+- summary is written by Dash once the episode is over and is null before that; the words themselves are in you.advisor_messages between first_message_id and last_message_id (you 0038).
 
 ### `finances.accounts` (Finances)
 

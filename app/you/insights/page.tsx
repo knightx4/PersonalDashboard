@@ -4,6 +4,7 @@ import { goalsRoutine } from '@/lib/feedback/routine';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import { createYouClient } from '@/lib/you/auth/server';
 import { chatStats } from '@/lib/you/claude-chats';
+import { listOpenAreas } from '@/lib/you/insight-areas';
 import { latestInsightRun, listInsights, loadNow } from '@/lib/you/insights';
 import { insightRunState } from '@/lib/you/insights-run';
 import { InsightsView } from './insights-view';
@@ -16,16 +17,18 @@ export const dynamic = 'force-dynamic';
  * right, not quite and wrong, the ones marked under Earlier, and Look again.
  * Every status is read, so a card marked and then retired or superseded by a
  * run still shows under Earlier with the mark; only shown ones are dealt.
+ * Their open Goals areas name the ones no insight is about yet (plan #2629.5).
  */
 export default async function Page() {
   const user = await requireUser();
   const you = await createYouClient();
-  const [all, run, settings, now, chats] = await Promise.all([
+  const [all, run, settings, now, chats, areas] = await Promise.all([
     listInsights(you, user.id, { statuses: ['shown', 'retired', 'superseded'] }),
     latestInsightRun(you, user.id),
     loadAccountSettings(user.id),
     loadNow(you, user.id),
     chatStats(you, user.id),
+    listOpenAreas(you, user.id),
   ]);
   const insights = all.filter((insight) => insight.status === 'shown' || insight.verdict);
   const routine = goalsRoutine();
@@ -38,6 +41,7 @@ export default async function Page() {
       now={now}
       chats={chats}
       timezone={settings.timezone}
+      areas={areas}
     />
   );
 }

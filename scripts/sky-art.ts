@@ -114,12 +114,12 @@ function ridge(seed: number, base: number, rough: number, fill: string): string 
 }
 
 /** A line of pines: each a narrow stack of tiers, so the edge is ragged like a real treeline. */
-function pines(seed: number, base: number, fill: string): string {
+function pines(seed: number, base: number, fill: string, scale = 1): string {
   const random = seeded(seed);
   const trees: string[] = [`<rect x="0" y="${base}" width="${W}" height="${H - base}" fill="${fill}"/>`];
   let x = -10;
   while (x < W + 20) {
-    const height = 40 + random() ** 1.6 * 120;
+    const height = (40 + random() ** 1.6 * 120) * scale;
     const width = height * (0.22 + random() * 0.1);
     // Overlapping tiers, each a triangle wider than the one above it, on a
     // thin trunk: the silhouette of a spruce rather than a stack of diamonds.
@@ -133,7 +133,7 @@ function pines(seed: number, base: number, fill: string): string {
       d += ` M${f(x)} ${f(apex)} L${f(x - w)} ${f(Math.min(foot, base + 2))} L${f(x + w)} ${f(Math.min(foot, base + 2))}Z`;
     }
     trees.push(`<path d="${d}" fill="${fill}"/>`);
-    x += 6 + random() * 22;
+    x += (6 + random() * 22) * scale;
   }
   return trees.join('');
 }
@@ -315,6 +315,226 @@ function northern(): string {
   return svg(defs, body);
 }
 
+/* ─────────────────────────── Shared pieces ─────────────────────────── */
+
+function skyGradient(stops: [string, string][]): string {
+  return `<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">${stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>`;
+}
+
+/** A low sun or a moon: a disc with a soft halo round it. */
+type Light = { x: number; y: number; r: number; core: string; halo: string };
+
+function lightDefs(light: Light, id: string): string {
+  return `<radialGradient id="${id}"><stop offset="0" stop-color="${light.core}"/><stop offset=".16" stop-color="${light.core}"/><stop offset=".2" stop-color="${light.halo}" stop-opacity=".6"/><stop offset="1" stop-color="${light.halo}" stop-opacity="0"/></radialGradient>`;
+}
+
+function lightBody(light: Light, id: string): string {
+  return `<circle cx="${light.x}" cy="${light.y}" r="${light.r}" fill="url(#${id})"/>`;
+}
+
+/** A band of mist: thickest just above its foot, fading out at both edges so it leaves no line. */
+function mist(id: string, colour: string, y: number, height: number, opacity: number): { defs: string; body: string } {
+  return {
+    defs: `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${colour}" stop-opacity="0"/><stop offset=".75" stop-color="${colour}" stop-opacity="${opacity}"/><stop offset="1" stop-color="${colour}" stop-opacity="0"/></linearGradient>`,
+    body: `<rect y="${y}" width="${W}" height="${height}" fill="url(#${id})"/>`,
+  };
+}
+
+/* ─────────────────────────── Alpine ─────────────────────────── */
+
+type RangeScene = {
+  sky: [string, string][];
+  light?: Light;
+  stars?: number;
+  /** Far to near; each range a little darker and lower than the last. */
+  ranges: string[];
+  /** The air between ranges, which is what makes the far ones pale. */
+  haze: string;
+};
+
+/** Range after range of mountains, paler as they recede. */
+function alpine(scene: RangeScene, seed: number): string {
+  let defs = skyGradient(scene.sky) + GLOW_DEF;
+  let body = `<rect width="${W}" height="${H}" fill="url(#sky)"/>`;
+  if (scene.stars) body += stars({ count: scene.stars, seed: seed + 9, maxY: 620 });
+  if (scene.light) {
+    defs += lightDefs(scene.light, 'sun');
+    body += lightBody(scene.light, 'sun');
+  }
+  const layout = [
+    { base: 560, rough: 300 },
+    { base: 650, rough: 240 },
+    { base: 750, rough: 180 },
+    { base: 860, rough: 130 },
+    { base: 950, rough: 80 },
+  ];
+  scene.ranges.forEach((fill, i) => {
+    const { base, rough } = layout[i]!;
+    body += ridge(seed + i * 13, base, rough, fill);
+    if (i < scene.ranges.length - 1) {
+      const band = mist(`h${i}`, scene.haze, base - 120, 160, 0.35);
+      defs += band.defs;
+      body += band.body;
+    }
+  });
+  return svg(defs, body);
+}
+
+/* ─────────────────────────── Mountain lake ─────────────────────────── */
+
+type LakeScene = {
+  sky: [string, string][];
+  light?: Light;
+  stars?: number;
+  ranges: [string, string, string];
+  water: [string, string];
+  /** The glints on the water under the sun or moon. */
+  glint: string;
+};
+
+/** Mountains standing in a still lake, their reflection broken by a few ripples. */
+function lake(scene: LakeScene, seed: number): string {
+  const shore = 680;
+  let defs =
+    skyGradient(scene.sky) +
+    GLOW_DEF +
+    `<linearGradient id="water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${scene.water[0]}"/><stop offset="1" stop-color="${scene.water[1]}"/></linearGradient>` +
+    `<clipPath id="lake"><rect y="${shore}" width="${W}" height="${H - shore}"/></clipPath>` +
+    `<filter id="ripple" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.002 0.06" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="18" xChannelSelector="R" yChannelSelector="G"/></filter>`;
+  let land = '';
+  if (scene.light) {
+    defs += lightDefs(scene.light, 'sun');
+    land += lightBody(scene.light, 'sun');
+  }
+  land += ridge(seed, 470, 280, scene.ranges[0]);
+  land += ridge(seed + 7, 590, 200, scene.ranges[1]);
+  land += ridge(seed + 19, shore, 60, scene.ranges[2]);
+  let body = `<rect width="${W}" height="${H}" fill="url(#sky)"/>`;
+  if (scene.stars) body += stars({ count: scene.stars, seed: seed + 3, maxY: 560 });
+  body += land;
+  body += `<rect y="${shore}" width="${W}" height="${H - shore}" fill="url(#water)"/>`;
+  // The reflection: the whole scene above the shore, mirrored about it.
+  body += `<g clip-path="url(#lake)"><g filter="url(#ripple)" opacity=".5" transform="translate(0 ${shore * 2}) scale(1 -1)"><rect width="${W}" height="${H}" fill="url(#sky)"/>${land}</g></g>`;
+  // Glints: short strokes of light down the water beneath the light.
+  if (scene.light) {
+    const random = seeded(seed + 31);
+    let glints = '';
+    for (let i = 0; i < 70; i += 1) {
+      const t = random();
+      const y = shore + 8 + t * (H - shore - 8);
+      const spread = 40 + t * 160;
+      const x = scene.light.x + (random() - 0.5) * spread;
+      const w = 10 + random() * (30 + t * 60);
+      glints += `<rect x="${f(x - w / 2)}" y="${f(y)}" width="${f(w)}" height="${f(1.2 + t * 2)}" rx="1" fill="${scene.glint}" opacity="${(0.25 + random() * 0.45).toFixed(2)}"/>`;
+    }
+    body += glints;
+  }
+  body += `<rect y="${shore}" width="${W}" height="2" fill="${scene.glint}" opacity=".25"/>`;
+  return svg(defs, body);
+}
+
+/* ─────────────────────────── Coast ─────────────────────────── */
+
+type CoastScene = {
+  sky: [string, string][];
+  light: Light;
+  stars?: number;
+  sea: [string, string];
+  glint: string;
+  /** The headland on the left and the rocks in front of it. */
+  land: [string, string];
+};
+
+/** Open sea to a straight horizon, a headland on one side, light laid across the water. */
+function coast(scene: CoastScene, seed: number): string {
+  const horizon = 620;
+  const random = seeded(seed);
+  const defs =
+    skyGradient(scene.sky) +
+    GLOW_DEF +
+    lightDefs(scene.light, 'sun') +
+    `<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${scene.sea[0]}"/><stop offset="1" stop-color="${scene.sea[1]}"/></linearGradient>` +
+    `<clipPath id="above"><rect width="${W}" height="${horizon}"/></clipPath>`;
+  let body = `<rect width="${W}" height="${H}" fill="url(#sky)"/>`;
+  if (scene.stars) body += stars({ count: scene.stars, seed: seed + 5, maxY: 560 });
+  body += `<g clip-path="url(#above)">${lightBody(scene.light, 'sun')}</g>`;
+  body += `<rect y="${horizon}" width="${W}" height="${H - horizon}" fill="url(#sea)"/>`;
+  // Swell: long, faint lines that crowd together towards the horizon.
+  for (let i = 0; i < 26; i += 1) {
+    const t = (i + 1) / 27;
+    const y = horizon + (H - horizon) * t ** 1.8;
+    body += `<rect x="0" y="${f(y)}" width="${W}" height="${f(0.6 + t * 2.4)}" fill="${scene.glint}" opacity="${(0.04 + t * 0.06).toFixed(3)}"/>`;
+  }
+  // The path of light across the water.
+  for (let i = 0; i < 120; i += 1) {
+    const t = random();
+    const y = horizon + 4 + t ** 1.5 * (H - horizon - 4);
+    const spread = 30 + t * 380;
+    const x = scene.light.x + (random() - 0.5) * spread;
+    const w = 8 + random() * (20 + t * 90);
+    body += `<rect x="${f(x - w / 2)}" y="${f(y)}" width="${f(w)}" height="${f(1 + t * 2.5)}" rx="1" fill="${scene.glint}" opacity="${(0.2 + random() * 0.5).toFixed(2)}"/>`;
+  }
+  // The headland: a rounded hill that drops as a cliff into the sea on the
+  // left, its top roughened by midpoint displacement like the ridges.
+  let head: [number, number][] = [];
+  for (let i = 0; i <= 8; i += 1) {
+    const x = -20 + (i / 8) * 560;
+    const t = i / 8;
+    head.push([x, 470 + 40 * Math.sin(t * Math.PI * 0.6 + 2.6) ** 2 + 230 * t ** 3]);
+  }
+  let spread = 22;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const next: [number, number][] = [];
+    for (let i = 0; i < head.length - 1; i += 1) {
+      const [ax, ay] = head[i]!;
+      const [bx, by] = head[i + 1]!;
+      next.push([ax, ay], [(ax + bx) / 2, (ay + by) / 2 + (random() - 0.5) * spread]);
+    }
+    next.push(head[head.length - 1]!);
+    head = next;
+    spread *= 0.6;
+  }
+  const d = `M${head.map(([x, y]) => `${f(x)} ${f(y)}`).join(' L')} Q560 760 575 ${H} L-20 ${H}Z`;
+  body += `<path d="${d}" fill="${scene.land[0]}"/>`;
+  body += ridge(seed + 11, 960, 50, scene.land[1]);
+  return svg(defs, body);
+}
+
+/* ─────────────────────────── Misty pines ─────────────────────────── */
+
+type ForestScene = {
+  sky: [string, string][];
+  light?: Light;
+  stars?: number;
+  /** Far to near. */
+  layers: string[];
+  mist: string;
+};
+
+/** Rank behind rank of pines, each further one sunk deeper in the mist. */
+function forest(scene: ForestScene, seed: number): string {
+  let defs = skyGradient(scene.sky) + GLOW_DEF;
+  let body = `<rect width="${W}" height="${H}" fill="url(#sky)"/>`;
+  if (scene.stars) body += stars({ count: scene.stars, seed: seed + 9, maxY: 560 });
+  if (scene.light) {
+    defs += lightDefs(scene.light, 'sun');
+    body += lightBody(scene.light, 'sun');
+  }
+  body += ridge(seed + 2, 600, 160, scene.layers[0]!);
+  const ranks = [
+    { base: 660, scale: 0.55 },
+    { base: 760, scale: 0.75 },
+    { base: 880, scale: 1.05 },
+  ];
+  ranks.forEach(({ base, scale }, i) => {
+    const band = mist(`m${i}`, scene.mist, base - 220 * scale, 240 * scale, 0.75);
+    defs += band.defs;
+    body += band.body;
+    body += pines(seed + 40 + i * 7, base, scene.layers[i + 1]!, scale);
+  });
+  return svg(defs, body);
+}
+
 /* ─────────────────────────── Write ─────────────────────────── */
 
 const FILES: Record<string, string> = {
@@ -374,6 +594,86 @@ const FILES: Record<string, string> = {
   ),
   'starfield.svg': starfield(),
   'northern.svg': northern(),
+  'alpine-dawn.svg': alpine(
+    {
+      sky: [['0', '#9fb4e8'], ['.35', '#d9c2e6'], ['.55', '#ffd7c2'], ['.62', '#ffe6cf']],
+      light: { x: 1160, y: 470, r: 240, core: '#fff7e6', halo: '#ffd1a8' },
+      ranges: ['#c7c3e4', '#a9a8d6', '#8a8cc4', '#6a6ea8', '#4a4f86'],
+      haze: '#f6e2e0',
+    },
+    505,
+  ),
+  'alpine-night.svg': alpine(
+    {
+      sky: [['0', '#050817'], ['.45', '#0d1630'], ['.62', '#1d2c52']],
+      light: { x: 420, y: 230, r: 150, core: '#e8eefc', halo: '#6d84c4' },
+      stars: 520,
+      ranges: ['#28385e', '#1f2c4c', '#18223c', '#11182c', '#0a0f1d'],
+      haze: '#3a4f80',
+    },
+    606,
+  ),
+  'lake-dawn.svg': lake(
+    {
+      sky: [['0', '#a8c0ee'], ['.4', '#f3c6d3'], ['.6', '#ffdcbc'], ['.68', '#ffe9d2']],
+      light: { x: 800, y: 560, r: 230, core: '#fff8e8', halo: '#ffcfa6' },
+      ranges: ['#b9b3dc', '#8e8cc0', '#5f6a8e'],
+      water: ['#d7c6dd', '#7f86b0'],
+      glint: '#fff4e0',
+    },
+    707,
+  ),
+  'lake-night.svg': lake(
+    {
+      sky: [['0', '#040714'], ['.5', '#0b1530'], ['.68', '#1a2a4e']],
+      light: { x: 1120, y: 260, r: 140, core: '#eef2ff', halo: '#7088c8' },
+      stars: 480,
+      ranges: ['#1e2c4c', '#141e36', '#0b1222'],
+      water: ['#121d38', '#04070f'],
+      glint: '#c6d4f6',
+    },
+    808,
+  ),
+  'coast-dawn.svg': coast(
+    {
+      sky: [['0', '#93b4e6'], ['.38', '#e8bfd6'], ['.56', '#ffcfa8'], ['.62', '#ffe2be']],
+      light: { x: 1040, y: 640, r: 260, core: '#fff6dc', halo: '#ffbf8a' },
+      sea: ['#c9a9b8', '#4f6f9a'],
+      glint: '#fff1d6',
+      land: ['#5a5878', '#3d3d5a'],
+    },
+    909,
+  ),
+  'coast-night.svg': coast(
+    {
+      sky: [['0', '#03060f'], ['.5', '#0a1428'], ['.62', '#152442']],
+      light: { x: 1080, y: 300, r: 150, core: '#f0f3ff', halo: '#6f86c0' },
+      stars: 560,
+      sea: ['#0f1c36', '#03060d'],
+      glint: '#c3d1f2',
+      land: ['#070b16', '#03050b'],
+    },
+    1010,
+  ),
+  'forest-dawn.svg': forest(
+    {
+      sky: [['0', '#b7cbe0'], ['.45', '#dfe3e2'], ['.62', '#f1ead9']],
+      light: { x: 1180, y: 420, r: 260, core: '#fffaf0', halo: '#f6e3c6' },
+      layers: ['#b7c4c6', '#93a8a8', '#6b8584', '#3f5958'],
+      mist: '#eef0ea',
+    },
+    1111,
+  ),
+  'forest-night.svg': forest(
+    {
+      sky: [['0', '#040810'], ['.5', '#0b1622'], ['.65', '#16283a']],
+      light: { x: 400, y: 250, r: 130, core: '#e8f0f6', halo: '#5f8098' },
+      stars: 380,
+      layers: ['#1a2c3a', '#13222e', '#0c1720', '#060c12'],
+      mist: '#2a4456',
+    },
+    1212,
+  ),
 };
 
 mkdirSync(OUT, { recursive: true });

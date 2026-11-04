@@ -1,8 +1,9 @@
+import { areaNamesById } from '@/lib/you/areas';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 
 /**
  * Dash's questions about the person and what they answered (plan #2617.1),
- * kept in you.dash_questions for the Answer tab of You (you 0033).
+ * kept in you.dash_questions for the Ask tab of You (you 0033).
  *
  * Dash writes a few questions at a time with why it asked. Each starts open;
  * the person answers it or skips it, and can change an answer afterwards. A
@@ -23,6 +24,9 @@ export type DashQuestion = {
   answer: string | null;
   answeredAt: string | null;
   skippedAt: string | null;
+  /** The Goals area it is about and that area's name; null when it has none (you 0036). */
+  areaId: string | null;
+  areaName: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -35,20 +39,21 @@ export type DashQuestionRow = {
   answer: string | null;
   answered_at: string | null;
   skipped_at: string | null;
+  area_id?: string | null;
   created_at: string;
   updated_at: string;
 };
 
 export const DASH_QUESTION_COLUMNS =
-  'id, question, why, status, answer, answered_at, skipped_at, created_at, updated_at';
+  'id, question, why, status, answer, answered_at, skipped_at, area_id, created_at, updated_at';
 
 /** The limits the table's checks hold to. */
 export const QUESTION_MAX = 300;
 export const WHY_MAX = 600;
 export const ANSWER_MAX = 4000;
 
-/** Where the questions are answered: the Answer tab of You (plan #2617.2). */
-export const ANSWER_HREF = '/you/answer';
+/** Where the questions are answered: the Ask tab of You (plans #2617.2, #2635.3). */
+export const ANSWER_HREF = '/you/ask';
 
 export type DashQuestionResult = { ok: true } | { ok: false; error: string };
 
@@ -61,6 +66,8 @@ export function dashQuestionFromRow(row: DashQuestionRow): DashQuestion {
     answer: row.answer,
     answeredAt: row.answered_at,
     skippedAt: row.skipped_at,
+    areaId: row.area_id ?? null,
+    areaName: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -92,6 +99,47 @@ export function splitDashQuestions(questions: readonly DashQuestion[]): {
   return { open, past };
 }
 
+export type AreaGroup = {
+  /** The area's id, or null for the questions about no area. */
+  areaId: string | null;
+  /** The area's name, or "Other". */
+  name: string;
+  questions: DashQuestion[];
+};
+
+/**
+ * Open questions under the area each is about (plan #2635.3), keeping the
+ * order they came in: an area appears where its first question was, and the
+ * questions with no area (or whose area has gone) come last under Other.
+ */
+export function groupByArea(questions: readonly DashQuestion[]): AreaGroup[] {
+  const groups = new Map<string, AreaGroup>();
+  const other: AreaGroup = { areaId: null, name: 'Other', questions: [] };
+  for (const q of questions) {
+    if (!q.areaId || !q.areaName) {
+      other.questions.push(q);
+      continue;
+    }
+    const group = groups.get(q.areaId) ?? { areaId: q.areaId, name: q.areaName, questions: [] };
+    group.questions.push(q);
+    groups.set(q.areaId, group);
+  }
+  const list = [...groups.values()];
+  if (other.questions.length > 0) list.push(other);
+  return list;
+}
+
+/** How many questions wait for them, for the count on the Ask tab (plan #2635.3). */
+export async function countOpenDashQuestions(client: YouSupabaseClient, userId: string): Promise<number> {
+  const { count, error } = await client
+    .from('dash_questions')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'open');
+  if (error) throw new Error(`Counting Dash's questions failed: ${error.message}`);
+  return count ?? 0;
+}
+
 /** All their questions, split into open and past. */
 export async function loadDashQuestions(
   client: YouSupabaseClient,
@@ -99,7 +147,11 @@ export async function loadDashQuestions(
 ): Promise<{ open: DashQuestion[]; past: DashQuestion[] }> {
   const { data, error } = await client.from('dash_questions').select(DASH_QUESTION_COLUMNS).eq('user_id', userId);
   if (error) throw new Error(`Reading Dash's questions failed: ${error.message}`);
-  return splitDashQuestions(((data ?? []) as DashQuestionRow[]).map(dashQuestionFromRow));
+  const questions = ((data ?? []) as DashQuestionRow[]).map(dashQuestionFromRow);
+  const names = await areaNamesById(client, userId, questions.map((q) => q.areaId));
+  return splitDashQuestions(
+    questions.map((q) => ({ ...q, areaName: q.areaId ? (names.get(q.areaId) ?? null) : null })),
+  );
 }
 
 /**
@@ -176,6 +228,24 @@ export async function skipDashQuestion(
     .select('id');
   if (error) return { ok: false, error: `Skipping the question failed: ${error.message}` };
   if ((data ?? []).length === 0) return { ok: false, error: 'That question is no longer open.' };
+  return { ok: true };
+}
+
+/** Puts a skipped question back with the open ones (plan #2635.3). */
+export async function unskipDashQuestion(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+): Promise<DashQuestionResult> {
+  const { data, error } = await client
+    .from('dash_questions')
+    .update({ status: 'open', skipped_at: null })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .eq('status', 'skipped')
+    .select('id');
+  if (error) return { ok: false, error: `Putting the question back failed: ${error.message}` };
+  if ((data ?? []).length === 0) return { ok: false, error: 'That question is no longer skipped.' };
   return { ok: true };
 }
 

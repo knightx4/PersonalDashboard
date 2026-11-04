@@ -32,12 +32,14 @@ import {
   OVERNIGHT_NO_PROGRESS,
   personAnsweredSince,
   outsideRunning,
+  stepAddedSince,
   runOvernightTick,
   sweepQuietRuns,
   tickNote,
   type OvernightPorts,
 } from '@/inngest/dev/overnight';
 import { buildPlanTree, findNode, type PlanSection } from '@/lib/plan/tree';
+import { STALL_JOBS } from '@/lib/plan/stall';
 
 const MIDNIGHT = Date.parse('2026-09-17T23:00:00.000Z');
 const SEVEN_AM = '2026-09-18T07:00:00.000Z';
@@ -1172,6 +1174,18 @@ describe('tickNote', () => {
         running: 2,
       }),
     ).toBe('Started #791. 2 sessions are running.');
+    expect(
+      tickNote({
+        act: 'fired',
+        feature: 791,
+        step: 792,
+        features: [791, 800],
+        landed: [791],
+        featuresLeft: null,
+        refused: [],
+        running: 2,
+      }),
+    ).toBe('Started #791 and #800. #791 is landing its built steps. 2 sessions are running.');
     expect(tickNote({ act: 'idle' })).toBeNull();
     expect(tickNote({ act: 'paused' })).toBeNull();
   });
@@ -1493,10 +1507,15 @@ describe('featureRunsInFlight', () => {
   /** plan_runs as a chain that answers the one read with these rows. */
   function runsTable(
     rows: Array<{ plan_item_id: string | null; status: string; created_at: string }>,
+    jobs: string[][] = [],
   ) {
     const chain = {
       select: () => chain,
       eq: () => chain,
+      in: (_column: string, values: string[]) => {
+        jobs.push(values);
+        return chain;
+      },
       gte: () => chain,
       order: () => chain,
       limit: async () => ({ data: rows, error: null }),
@@ -1523,6 +1542,17 @@ describe('featureRunsInFlight', () => {
       now: MIDNIGHT,
     });
     expect(runs).toEqual([]);
+  });
+
+  it('reads land runs beside feature runs, since each takes one of the slots', async () => {
+    const jobs: string[][] = [];
+    await featureRunsInFlight({
+      supabase: runsTable([], jobs),
+      userId: 'u',
+      run: night(),
+      now: MIDNIGHT,
+    });
+    expect(jobs).toEqual([['feature', 'land']]);
   });
 
   it('leaves out runs already written back as over', async () => {
@@ -1673,5 +1703,175 @@ describe('sweepQuietRuns', () => {
     expect(updates).toEqual([
       { values: { status: 'failed', error: 'Nothing was heard from this run for 4h.' }, id: 'r1' },
     ]);
+  });
+});
+
+describe('a feature whose steps are all done', () => {
+  // #2644 and #2667 on 1 and 2 November: every step closed, the feature left
+  // open, and the runner sent it again to a session with nothing to build.
+  const finished = () => [
+    item({ id: 'finished' }),
+    item({ id: 'finished-a', parentId: 'finished', status: 'done', commitSha: 'aaa', completedAt: HOUR_AGO }),
+    item({ id: 'finished-b', parentId: 'finished', status: 'done', commitSha: 'bbb', completedAt: SEVEN_HOURS_AGO }),
+  ];
+
+  it('is closed with its newest step\'s commit and never sent', async () => {
+    const closed: Array<{ id: string; commitSha: string | null }> = [];
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(finished()),
+      closeFinished: async (features) => {
+        closed.push(...features.map((f) => ({ id: f.id, commitSha: f.commitSha })));
+      },
+    });
+
+    await overnightTick(p);
+
+    expect(closed).toEqual([{ id: 'finished', commitSha: 'aaa' }]);
+    expect(calls.fired).toEqual([]);
+  });
+
+  it('is passed over for the ready feature beside it', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree([...finished(), ...oneReadyFeature()]),
+    });
+
+    await overnightTick(p);
+
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+
+  it('still lets the tick fire when closing it fails', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree([...finished(), ...oneReadyFeature()]),
+      closeFinished: async () => {
+        throw new Error('down');
+      },
+    });
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await overnightTick(p);
+
+    quiet.mockRestore();
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+});
+
+describe('a step added under a held feature', () => {
+  // #2644.6 to #2644.8 on 2 November: written under #2644 after its last
+  // session closed nothing, and held from the runner with it.
+  const held = (added: string) =>
+    tree([
+      item({ id: 'first', priority: 1 }),
+      item({ id: 'first-old', parentId: 'first', status: 'done', completedAt: YESTERDAY }),
+      item({ id: 'first-new', parentId: 'first', priority: 1, createdAt: added }),
+      item({ id: 'second', priority: 3 }),
+      item({ id: 'second-step', parentId: 'second', priority: 3 }),
+    ]);
+
+  it('releases the feature when the step is newer than its last fire', () => {
+    const sections = held('2026-09-17T22:30:00.000Z');
+    expect(stepAddedSince(findNode(sections, 'first')!, HOUR_AGO)).toBe(true);
+    const choice = chooseOvernightFire(sections, night(), MIDNIGHT, { first: HOUR_AGO }, { first: YESTERDAY });
+    expect(choice.act === 'fire' && choice.feature.id).toBe('first');
+  });
+
+  it('keeps holding it when every open step was there before the fire', () => {
+    const sections = held('2026-09-17T21:00:00.000Z');
+    expect(stepAddedSince(findNode(sections, 'first')!, HOUR_AGO)).toBe(false);
+    const choice = chooseOvernightFire(sections, night(), MIDNIGHT, { first: HOUR_AGO }, { first: YESTERDAY });
+    expect(choice.act === 'fire' && choice.feature.id).toBe('second');
+  });
+});
+
+describe('landing built steps (plan #2815.2)', () => {
+  const BUILT = 'Built 2026-09-17 on plan/1 (abc1234): the export.';
+  const builtStep = (id: string, parentId: string, module = 'shopping') =>
+    item({ id, parentId, module: module as PlanItem['module'], status: 'in_progress', comment: BUILT, commitSha: 'abc1234' });
+
+  /** A feature with a built step and nothing ready, and one in another module with a ready step. */
+  const landAndBuild = () => [
+    item({ id: 'landing', priority: 1 }),
+    builtStep('landing-a', 'landing'),
+    item({ id: 'news-feature', module: 'news', priority: 3 }),
+    item({ id: 'news-step', parentId: 'news-feature', module: 'news', priority: 3 }),
+  ];
+
+  function landPorts(items: PlanItem[], over: Partial<OvernightPorts> = {}) {
+    const sections = tree(items);
+    const landed: Array<{ feature: string; built: string[] }> = [];
+    const made = ports({
+      loadSections: async () => sections,
+      land: async (feature, built) => {
+        landed.push({ feature: feature.id, built: built.map((step) => step.id) });
+        return { ok: true };
+      },
+      ...over,
+    });
+    return { ...made, landed };
+  }
+
+  it('sends a land run at a feature with built steps before building anything', async () => {
+    const { ports: p, calls, landed } = landPorts(landAndBuild());
+    const tick = await overnightTick(p);
+
+    expect(landed).toEqual([{ feature: 'landing', built: ['landing-a'] }]);
+    expect(calls.fired).toEqual([{ feature: 'news-feature', step: 'news-step' }]);
+    expect(calls.recorded).toEqual([6, 5]);
+    expect(tick).toMatchObject({ act: 'fired', landed: [expect.any(Number)], running: 2 });
+    expect(tick.act === 'fired' && tick.features).toHaveLength(2);
+  });
+
+  it('lands a feature that also has ready steps, and does not build it in the same tick', async () => {
+    const { ports: p, calls, landed } = landPorts([
+      item({ id: 'feature' }),
+      builtStep('built', 'feature'),
+      item({ id: 'ready', parentId: 'feature' }),
+    ]);
+    await overnightTick(p);
+
+    expect(landed.map((one) => one.feature)).toEqual(['feature']);
+    expect(calls.fired).toEqual([]);
+  });
+
+  it('counts a land run against the sessions it keeps going at once', async () => {
+    const { ports: p, calls, landed } = landPorts(landAndBuild(), { atOnce: 1 });
+    const tick = await overnightTick(p);
+
+    expect(landed).toHaveLength(1);
+    expect(calls.fired).toEqual([]);
+    expect(tick).toMatchObject({ act: 'fired', running: 1 });
+  });
+
+  it('leaves alone a feature whose session is still going', async () => {
+    const { ports: p, landed } = landPorts(landAndBuild(), {
+      runsInFlight: async () => [{ featureId: 'landing', liveness: 'working' }],
+    });
+    await overnightTick(p);
+    expect(landed).toEqual([]);
+  });
+
+  it('does not send a second land run while the last is inside its retry window', async () => {
+    const { ports: p, calls, landed } = landPorts(landAndBuild(), {
+      lastLandAt: async () => ({ landing: HOUR_AGO }),
+    });
+    await overnightTick(p);
+
+    expect(landed).toEqual([]);
+    expect(calls.fired).toEqual([{ feature: 'news-feature', step: 'news-step' }]);
+  });
+
+  it('builds as before when a land send fails', async () => {
+    const { ports: p, calls } = landPorts(landAndBuild(), {
+      land: async () => ({ ok: false, error: 'no routine' }),
+    });
+    const tick = await overnightTick(p);
+
+    expect(calls.recorded).toEqual([6]);
+    expect(calls.fired).toEqual([{ feature: 'news-feature', step: 'news-step' }]);
+    expect(tick.act === 'fired' && tick.landed).toBeUndefined();
+  });
+
+  it('is not one of the jobs whose runs closing nothing make a stall', () => {
+    expect(STALL_JOBS).not.toContain('land');
   });
 });

@@ -15,7 +15,7 @@ import {
   type Push,
   type RunLiveness,
 } from '@/lib/plan/liveness';
-import { loadPlan } from '@/lib/plan/load';
+import { isClosed, loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
   OVERNIGHT_AT_ONCE,
@@ -25,7 +25,13 @@ import {
   stopOvernightRun,
   type OvernightRun,
 } from '@/lib/plan/overnight';
-import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
+import {
+  chooseOvernightFeature,
+  finishedFeatureLine,
+  finishedFeatures,
+  OVERNIGHT_NOTHING_READY,
+  type FinishedFeature,
+} from '@/lib/plan/overnight-choice';
 import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun, holdsSlot, IN_FLIGHT_LOOKBACK_MS } from '@/lib/plan/run-end';
 import {
@@ -45,6 +51,8 @@ import {
   waitingSteps,
 } from '@/lib/plan/stall';
 import { startUnstick } from '@/lib/plan/unstick-run';
+import { featuresToLand } from '@/lib/plan/land';
+import { startLand } from '@/lib/plan/land-run';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { besideRunning } from '@/lib/plan/module-share';
@@ -345,6 +353,27 @@ export type OvernightFireChoice =
   | { act: 'end'; reason: string; passedOver: PassedOver[] };
 
 /**
+ * Whether an open step was added beneath the feature since the given instant.
+ *
+ * A session that closed nothing ran out of the work it was sent with. A step
+ * written beneath the feature afterwards is work it never saw, so holding the
+ * feature for the old session's failure holds the new step for no reason. On
+ * 2 November #2644.6 to #2644.8 were added under #2644 after a session sent
+ * at it had found nothing left to build, and the guard kept them from the
+ * runner.
+ */
+export function stepAddedSince(feature: PlanNode, since: string): boolean {
+  const at = new Date(since).getTime();
+  if (!Number.isFinite(at)) return false;
+  return flatten([feature]).some(
+    (node) =>
+      node.id !== feature.id &&
+      !isClosed(node.status) &&
+      new Date(node.createdAt).getTime() >= at,
+  );
+}
+
+/**
  * Whether the zero-progress guard holds a feature back, and until when.
  *
  * A feature whose last session closed nothing is held for
@@ -363,6 +392,7 @@ export function heldBack(
 ): PassedOver | null {
   if (!last || !closedNothingSince(feature, last)) return null;
   if (personAnsweredSince(feature, last)) return null;
+  if (stepAddedSince(feature, last)) return null;
   const said = {
     id: feature.id,
     number: feature.number,
@@ -440,6 +470,8 @@ export type OvernightTick =
       refused: number[];
       /** Every feature this tick started, in order; the first is `feature`. */
       features?: number[];
+      /** Those of `features` sent to land their built steps rather than build (plan #2815.2). */
+      landed?: number[];
       /** Sessions going now, these included. */
       running: number;
     }
@@ -451,6 +483,12 @@ export type OvernightTick =
    * a write that errored, a routine that would not start -- lands here.
    */
   | { act: 'failed'; error: string };
+
+/** "#1", "#1 and #2", "#1, #2 and #3". */
+function refList(numbers: readonly number[]): string {
+  const refs = numbers.map((one) => `#${one}`);
+  return refs.length > 1 ? `${refs.slice(0, -1).join(', ')} and ${refs[refs.length - 1]}` : refs[0];
+}
 
 /**
  * What a tick decided, as the sentence the page shows under the runner.
@@ -474,12 +512,17 @@ export function tickNote(tick: OvernightTick): string | null {
     case 'nothing-ready':
       return `Waiting until something is ready. ${tick.reason}`;
     case 'fired': {
-      const refs = (tick.features ?? [tick.feature]).map((one) => `#${one}`);
-      const named =
-        refs.length > 1 ? `${refs.slice(0, -1).join(', ')} and ${refs[refs.length - 1]}` : refs[0];
+      const named = refList(tick.features ?? [tick.feature]);
+      const landing = tick.landed ?? [];
+      const landed =
+        landing.length === 0
+          ? ''
+          : landing.length === 1
+            ? ` #${landing[0]} is landing its built steps.`
+            : ` ${refList(landing)} are landing their built steps.`;
       return tick.running > 1
-        ? `Started ${named}. ${tick.running} sessions are running.`
-        : `Started ${named}.`;
+        ? `Started ${named}.${landed} ${tick.running} sessions are running.`
+        : `Started ${named}.${landed}`;
     }
     case 'ended':
       return tick.reason;
@@ -524,6 +567,11 @@ export type OvernightPorts = {
   /** Put back the claims of sessions that died. Run on every tick of a running night. */
   sweepClaims: () => Promise<void>;
   /**
+   * Close the features whose steps are all done (`finishedFeatures`). Left
+   * out, nothing is closed; the runner still never sends them.
+   */
+  closeFinished?: (features: readonly FinishedFeature[]) => Promise<void>;
+  /**
    * Send the feature. `refused` says the feature itself cannot be taken --
    * a proposal, a re-shape rewriting it, a claim still live beneath it -- as
    * opposed to the send having broken, which is every feature's problem and
@@ -543,6 +591,19 @@ export type OvernightPorts = {
    * released. Left out, nothing is sent, raised or held.
    */
   stalls?: (sections: readonly PlanSection[]) => Promise<StallVerdict>;
+  /**
+   * When each feature was last sent a land run, by feature id. A feature
+   * landed within `LAND_RETRY_AFTER_MINUTES` is not sent another.
+   */
+  lastLandAt?: () => Promise<Record<string, string>>;
+  /**
+   * Send a session to put a feature's built steps on main (plan #2815.2).
+   * Left out, the tick lands nothing and only builds.
+   */
+  land?: (
+    feature: PlanNode,
+    built: readonly PlanNode[],
+  ) => Promise<{ ok: boolean; error?: string }>;
 };
 
 /** A feature session that is still going, as the tick counts it. */
@@ -683,6 +744,24 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   const lastFiredAt = thisRun(allFires);
   const previousFiredAt = thisRun(earlierFires);
 
+  // A feature whose steps are all done is closed here rather than sent: a
+  // session sent at it has nothing to build, and while it stays open every
+  // feature waiting on it waits too. The chooser already passes it over
+  // (`runnerOrder`), so a close that fails costs the features behind it one
+  // more tick, not a session. Logged and stepped over like the claim sweep.
+  const finished = finishedFeatures(sections);
+  if (finished.length > 0 && ports.closeFinished) {
+    try {
+      await ports.closeFinished(finished);
+    } catch (err) {
+      console.error(
+        `finished features could not be closed on the overnight tick: ${
+          err instanceof Error ? err.message : 'failed'
+        }`,
+      );
+    }
+  }
+
   // A refused feature is the same case as one whose last run closed nothing:
   // take it out of the tree and ask again.
   //
@@ -721,16 +800,70 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // features the whole time. Each feature started here joins `runningIds`, so
   // the next choice sees its module as busy exactly as the next tick would.
   const started: Array<{ feature: number; step: number }> = [];
+  const landed: number[] = [];
   let featuresLeft = run.featuresLeft;
   const firedSoFar = (): OvernightTick => ({
     act: 'fired',
     feature: started[0].feature,
     step: started[0].step,
     features: started.map((one) => one.feature),
+    ...(landed.length > 0 ? { landed: [...landed] } : {}),
     featuresLeft,
     refused: refused.map((one) => one.number),
     running: inFlight.length + started.length,
   });
+  const full = (): boolean => inFlight.length + started.length >= atOnce || featuresLeft === 0;
+
+  // Built steps land before anything new is built (plan #2815.2). A feature
+  // with steps built on its branch and no session going is sent a session
+  // whose only job is to merge them to main, which checks first that the app
+  // works without the rest of the feature. It takes a slot and a fire from
+  // the budget like a build, and joins `runningIds`, so the passes below
+  // neither build that feature nor start another in its module this tick.
+  //
+  // Not a stall: a land run is not one of `STALL_JOBS`, and `featureFires`
+  // reads only feature runs, so a land that closes nothing neither sends the
+  // feature to the stall check nor holds it from the next build.
+  if (ports.land) {
+    let lastLandAt: Record<string, string> = {};
+    try {
+      lastLandAt = (await ports.lastLandAt?.()) ?? {};
+    } catch (err) {
+      console.error(
+        `land runs could not be read on the overnight tick: ${err instanceof Error ? err.message : 'failed'}`,
+      );
+    }
+    const landing = featuresToLand(sections, {
+      runningIds,
+      heldIds: stalls.held,
+      lastLandAt,
+      now: ports.now,
+    });
+    for (const { feature, built } of landing) {
+      if (full()) break;
+      let sent: { ok: boolean; error?: string };
+      try {
+        sent = await ports.land(feature, built);
+      } catch (err) {
+        sent = { ok: false, error: err instanceof Error ? err.message : 'failed' };
+      }
+      if (!sent.ok) {
+        console.error(`#${feature.number} could not be sent to land: ${sent.error ?? 'failed'}`);
+        continue;
+      }
+      console.log(
+        `overnight: sent #${feature.number} to land ${built.length} built step(s): ${built
+          .map((step) => `#${step.outline}`)
+          .join(', ')}.`,
+      );
+      await ports.recordFire(featuresLeft);
+      featuresLeft = featuresLeft === null ? null : Math.max(0, featuresLeft - 1);
+      started.push({ feature: feature.number, step: built[0].number });
+      landed.push(feature.number);
+      runningIds.push(feature.id);
+    }
+    if (started.length > 0 && full()) return firedSoFar();
+  }
 
   fill: for (;;) {
     // Two passes. The first offers only modules with no session going, the way
@@ -817,7 +950,7 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
           runningIds.push(choice.feature.id);
           // A spent budget is left for the next tick to end, as it always was,
           // so this tick's answer names what it started.
-          if (inFlight.length + started.length >= atOnce || featuresLeft === 0) return firedSoFar();
+          if (full()) return firedSoFar();
           continue fill;
         }
 
@@ -866,26 +999,36 @@ type Db = SupabaseClient<any, 'public'>;
 async function featureFires(
   supabase: Db,
   userId: string,
-): Promise<{ last: Record<string, string>; previous: Record<string, string> }> {
+): Promise<{
+  last: Record<string, string>;
+  previous: Record<string, string>;
+  /** When each feature was last sent a land run. Not a build, so kept apart. */
+  landed: Record<string, string>;
+}> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('plan_item_id, created_at')
+    .select('job, plan_item_id, created_at')
     .eq('user_id', userId)
-    .eq('job', 'feature')
+    .in('job', ['feature', 'land'])
     .not('plan_item_id', 'is', null)
     .order('created_at', { ascending: false });
   if (error) {
     console.error(`plan_runs could not be read for the overnight tick: ${error.message}`);
-    return { last: {}, previous: {} };
+    return { last: {}, previous: {}, landed: {} };
   }
 
   const last: Record<string, string> = {};
   const previous: Record<string, string> = {};
-  for (const row of (data ?? []) as Array<{ plan_item_id: string; created_at: string }>) {
+  const landed: Record<string, string> = {};
+  for (const row of (data ?? []) as Array<{ job: string; plan_item_id: string; created_at: string }>) {
+    if (row.job === 'land') {
+      if (!landed[row.plan_item_id]) landed[row.plan_item_id] = row.created_at;
+      continue;
+    }
     if (!last[row.plan_item_id]) last[row.plan_item_id] = row.created_at;
     else if (!previous[row.plan_item_id]) previous[row.plan_item_id] = row.created_at;
   }
-  return { last, previous };
+  return { last, previous, landed };
 }
 
 /** How many of the newest build runs the stall check reads. */
@@ -1147,7 +1290,8 @@ type FeatureRunRow = { plan_item_id: string | null; status: string; created_at: 
  *
  * Every feature run started in the last six hours is read, not only this
  * night's, because a feature sent by hand is a session in a module like any
- * other and counts against the three. A row already written back as finished
+ * other and counts against the three. A land run is read the same way: it is
+ * a session at a feature, and it takes one of the three (plan #2815.2). A row already written back as finished
  * or failed is over and costs nothing further; one still marked started is
  * judged from its own rows and from what has been pushed since it began, by
  * the same `runLiveness` the plan page uses.
@@ -1171,7 +1315,8 @@ export async function featureRunsInFlight(input: {
     .from('plan_runs')
     .select('plan_item_id, status, created_at')
     .eq('user_id', userId)
-    .eq('job', 'feature')
+    // A land run holds a slot like a build (plan #2815.2).
+    .in('job', ['feature', 'land'])
     .gte('created_at', new Date(since).toISOString())
     .order('created_at', { ascending: false })
     .limit(50);
@@ -1316,7 +1461,26 @@ function portsFor(input: {
     loadSections,
     lastFiredAt: async () => (await readFires()).last,
     previousFiredAt: async () => (await readFires()).previous,
+    lastLandAt: async () => (await readFires()).landed,
     runsInFlight: (run) => featureRunsInFlight({ supabase, userId, run, now, fetch: input.fetch }),
+    closeFinished: async (features) => {
+      const line = finishedFeatureLine(new Date(now).toISOString().slice(0, 10));
+      for (const feature of features) {
+        const update: Record<string, unknown> = {
+          status: 'done',
+          comment: feature.comment ? `${feature.comment}\n\n${line}` : line,
+        };
+        if (feature.commitSha) update.commit_sha = feature.commitSha;
+        const { error } = await supabase
+          .from('plan_items')
+          .update(update)
+          .eq('user_id', userId)
+          .eq('id', feature.id)
+          .in('status', ['not_started', 'in_progress']);
+        if (error) throw new Error(`#${feature.outline}: ${error.message}`);
+        console.log(`overnight: closed #${feature.outline}, every step beneath it done.`);
+      }
+    },
     sweepClaims: async () => {
       // The same sweep the daily cron runs, and every account's claims at once
       // -- a claim nobody is working is wrong in the same way in every account,
@@ -1378,6 +1542,8 @@ function portsFor(input: {
         diagnose: (feature, runs) =>
           startUnstick({ supabase, userId, sections: planSections, feature, runs }),
       }),
+    land: async (feature, built) =>
+      startLand({ supabase, userId, sections: await loadSections(), feature, built }),
   };
 }
 
