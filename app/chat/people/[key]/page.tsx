@@ -4,7 +4,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, loadThreadPage, type ThreadPage } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
-import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, savePersonCard } from '../../actions';
+import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, retryReply, savePersonCard } from '../../actions';
 import { PeopleView } from '../../people-view';
 import { PersonForm } from '../person-form';
 import { ThreadView } from './thread-view';
@@ -68,7 +68,7 @@ export default async function ChatThreadPage({
         typingUntil={person.typingUntil}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderMessages, read: readThread }}
+        actions={{ older: olderMessages, read: readThread, retryReply }}
       />
     </PeopleView>
   );

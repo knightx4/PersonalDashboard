@@ -6,6 +6,7 @@ import {
   loadAskChatCost,
   loadAskChatMetaInRequest,
   loadAskConversation,
+  loadAskReply,
 } from '@/lib/talk/ask-request';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import { AskConversation } from '../view';
@@ -40,9 +41,11 @@ export default async function AskConversationPage({
   // Not there, or not theirs: RLS answers both with nothing.
   if (turns.length === 0) notFound();
   const first = turns.find((turn) => turn.role === 'user') ?? turns[0];
-  const [costMicros, subject] = await Promise.all([
+  const [costMicros, subject, reply] = await Promise.all([
     loadAskChatCost(turns),
     rowSubject(toRef('core.conversations', ref)),
+    // Still being written, or failed, after the page that asked had gone (plan #2854.4).
+    loadAskReply(ref, turns).catch(() => null),
   ]);
 
   return (
@@ -54,6 +57,7 @@ export default async function AskConversationPage({
       turns={turns}
       changes={changes}
       openHandoffs={openHandoffs}
+      reply={reply}
       used={{
         rows: chatReadRows(turns),
         changes,

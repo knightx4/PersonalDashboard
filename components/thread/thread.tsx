@@ -15,6 +15,7 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
 import { IconButton } from '@/components/ui/icon-button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -268,9 +269,18 @@ function Composer({
   holdSend = false,
   send,
   autoFocus = true,
+  roomy = false,
+  beneath,
 }: {
   /** Take the caret when drawn; a chat's docked box waits to be pressed. */
   autoFocus?: boolean;
+  /**
+   * A larger, rounder box with room for a few lines before it grows, as
+   * Claude's is: the Dash tab of Chat (plan #2863).
+   */
+  roomy?: boolean;
+  /** Under the box, outside it, in quiet text: the pickers on the Dash tab of Chat (plan #2863). */
+  beneath?: React.ReactNode;
   formRef: React.RefObject<HTMLFormElement | null>;
   boxRef?: React.RefObject<HTMLTextAreaElement | null>;
   action?: (formData: FormData) => void;
@@ -325,7 +335,8 @@ function Composer({
     >
       {hidden}
       {over}
-      <ComposeBox>
+      {/* Roomy, the faint outline sets the box off, as Claude's does. */}
+      <ComposeBox className={roomy ? 'rounded-card border-border px-3 pb-2 pt-3' : undefined}>
         {attached}
         <div className="flex items-start gap-2">
           {lead}
@@ -340,7 +351,7 @@ function Composer({
             id={boxId}
             name={name}
             rows={1}
-            className="min-h-11 sm:min-h-0"
+            className={roomy ? 'min-h-11 min-[720px]:min-h-14' : 'min-h-11 sm:min-h-0'}
             autoFocus={autoFocus}
             maxLength={maxLength}
             placeholder={placeholder}
@@ -393,6 +404,7 @@ function Composer({
           </div>
         </div>
       </ComposeBox>
+      {beneath && <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-end gap-0.5 px-1">{beneath}</div>}
       {error}
     </form>
   );
@@ -907,7 +919,19 @@ function RowThread({
 // ---------------------------------------------------------------------------
 
 /** What `send` hands back: the turns it kept, and why it stopped short, if it did. */
-export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
+export type TalkSend = (
+  body: string,
+  files?: UploadedAttachment[],
+  /** Try again (plan #2854.4): answer the last question, already kept, instead of sending `body` as a new one. */
+  options?: { retry?: boolean },
+) => Promise<{ turns?: TalkTurn[]; error?: string }>;
+
+/**
+ * Where the reply to the thread's last question stands on the server when
+ * the thread is drawn (plan #2854.4): still being written by a run this page
+ * did not start, or failed. The caller reads it again until it changes.
+ */
+export type ServerReply = { state: 'answering' } | { state: 'failed'; error: string } | null;
 
 /**
  * One choice in the menu over the box (plan #1899.5): a row to add with @,
@@ -1136,6 +1160,14 @@ type TalkThreadProps = {
   activity?: DashActivity;
   /** Turns written elsewhere since the thread was drawn (plan #1402). */
   incoming?: readonly TalkTurn[];
+  /**
+   * The reply to the last question as the server holds it (plan #2854.4):
+   * drawn as the waiting line while it is being written, and as a failure
+   * with Try again when it could not be. A send from here takes over.
+   */
+  serverReply?: ServerReply;
+  /** Offer Try again on a failed reply to a kept question, which answers it with `send`'s retry (plan #2854.4). */
+  canRetry?: boolean;
   /** Under the waiting line while a reply is coming: what Dash is looking up (plan #1438). */
   working?: React.ReactNode;
   /** The reply as far as it has been written, while it is coming (plan #1902). */
@@ -1202,6 +1234,8 @@ function TalkThread({
   assistant = DASH,
   activity,
   incoming,
+  serverReply = null,
+  canRetry = false,
   working,
   written = '',
   pendingQuestion,
@@ -1228,11 +1262,17 @@ function TalkThread({
   const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
+  const [localFailed, setFailed] = useState<string | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
   const [inFlight, startSend] = useTransition();
+  // The server's word on the reply counts until a send from here takes over (plan #2854.4).
+  const [overtaken, setOvertaken] = useState<ServerReply>(null);
+  const fromServer = serverReply && serverReply !== overtaken ? serverReply : null;
+  const failed = localFailed ?? (fromServer?.state === 'failed' ? fromServer.error : null);
   // The gallery's question on its way stays on its way until something replaces it.
   const sending = inFlight || (Boolean(pendingQuestion) && own.some((turn) => turn.id === PENDING));
+  // A reply this page did not start, still being written: drawn with the waiting line.
+  const elsewhere = !inFlight && fromServer?.state === 'answering';
   const form = useRef<HTMLFormElement>(null);
   // Keep the box, and with it Stop, in view while the answer is written
   // beneath the question: a phone's screen is shorter than the lookups and
@@ -1337,6 +1377,7 @@ function TalkThread({
     setError(null);
     setFailed(null);
     setLanded(null);
+    setOvertaken(serverReply);
     if (fromBox) {
       setDraft('');
       setFiles([]);
@@ -1378,6 +1419,42 @@ function TalkThread({
     if (sending) return;
     submit(body, false);
   };
+  // Try again (plan #2854.4): the question is kept already, so only the answer is asked for.
+  const lastTurn = turns[turns.length - 1];
+  const retryable = canRetry && Boolean(failed) && !sending && !elsewhere && lastTurn?.role === 'user' && lastTurn.id !== PENDING;
+  const retry = () => {
+    if (!retryable || !lastTurn) return;
+    setError(null);
+    setFailed(null);
+    setLanded(null);
+    setOvertaken(serverReply);
+    onSubmit?.();
+    startSend(async () => {
+      const result = await send(lastTurn.body, undefined, { retry: true }).catch(() => ({
+        turns: undefined,
+        error: 'That was not sent. Check your connection.',
+      }));
+      const kept = (result.turns ?? []).filter((turn) => turn.id !== lastTurn.id);
+      startSend(() => {
+        setTurns((current) => [...current, ...kept.filter((turn) => !current.some((c) => c.id === turn.id))]);
+        if (result.error) setFailed(result.error);
+        else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
+      });
+    });
+  };
+  // Answering again is another reply paid for, so it carries the reply's price as Send does.
+  const retryPress = retryable ? (
+    <DashAction
+      type="button"
+      variant="secondary"
+      size="sm"
+      wrapperClassName="mt-2"
+      onClick={retry}
+      {...(cost ? { paid: cost.action, what: cost.what } : {})}
+    >
+      Try again
+    </DashAction>
+  ) : null;
   const edit = (body: string) => {
     setError(null);
     setDraft(body);
@@ -1442,7 +1519,7 @@ function TalkThread({
     });
 
   // A new chat keeps its box in the middle of the pane until the first question is out.
-  const held = bubbles && dock && (turns.length > 0 || sending || Boolean(failed));
+  const held = bubbles && dock && (turns.length > 0 || sending || elsewhere || Boolean(failed));
 
   const chatTurns = bubbles && (
     <ul className="space-y-6">
@@ -1481,7 +1558,7 @@ function TalkThread({
           </ChatTurn>
         );
       })}
-      {sending && (
+      {(sending || elsewhere) && (
         <ChatTurn
           mine={false}
           head
@@ -1490,7 +1567,7 @@ function TalkThread({
           aria-busy={fresh ? true : undefined}
           mark={mark('working', fresh ? 'writing' : activity)}
         >
-          {!fresh && <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>}
+          {!fresh && <p className="text-body text-ink-muted">{elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}</p>}
           {working}
           {fresh && <Words body={fresh} refs="outlines" />}
         </ChatTurn>
@@ -1498,6 +1575,7 @@ function TalkThread({
       {!sending && failed && (
         <ChatTurn mine={false} head role="alert" mark={mark('failed')}>
           <p className="text-body text-danger">{failed}</p>
+          {retryPress}
         </ChatTurn>
       )}
     </ul>
@@ -1510,7 +1588,7 @@ function TalkThread({
       {held && <div
           ref={end}
           aria-hidden
-          className="h-28 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
+          className="h-40 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
         />}
       {!bubbles && (turns.length > 0 || failed || opening) && (
         <ul className="space-y-2.5">
@@ -1552,7 +1630,7 @@ function TalkThread({
               </ThreadTurn>
             );
           })}
-          {sending && (
+          {(sending || elsewhere) && (
             <ThreadTurn
               voice="dash"
               name={assistant.name}
@@ -1562,7 +1640,7 @@ function TalkThread({
               aria-busy={fresh ? true : undefined}
               mark={mark('working', fresh ? 'writing' : activity)}
             >
-              {!fresh && <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>}
+              {!fresh && <p className="text-body text-ink-muted">{elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}</p>}
               {working}
               {fresh && <Words body={fresh} refs="outlines" />}
             </ThreadTurn>
@@ -1570,6 +1648,7 @@ function TalkThread({
           {!sending && failed && (
             <ThreadTurn voice="dash" name={assistant.name} now={now} role="alert" mark={mark('failed')}>
               <p className="text-body text-danger">{failed}</p>
+              {retryPress}
             </ThreadTurn>
           )}
         </ul>
@@ -1604,6 +1683,10 @@ function TalkThread({
             // A phone keeps its own dock at the foot of the screen, so there
             // the box stays in the flow and is scrolled to as before.
             dock && 'mt-auto pb-1 pt-3 min-[720px]:sticky min-[720px]:bottom-0 min-[720px]:z-over-link',
+            // Room under the pickers beneath the box (plan #2863).
+            // The pane's own colour keeps the turns from showing round the
+            // box and the pickers under it as they scroll beneath.
+            dock && bubbles && 'pb-3 min-[720px]:bg-surface',
             // The Dash tab of Chat holds it right above the phone's tab bar
             // as well, so the box never scrolls away with the thread (plan #2748.12).
             held &&
@@ -1719,8 +1802,13 @@ function TalkThread({
           onPaste={(event) => {
             if (adder.current?.paste(event.clipboardData)) event.preventDefault();
           }}
+          roomy={bubbles}
+          // The Dash tab of Chat keeps the box to the words, a + and Send,
+          // with what the answer reaches and who writes it in quiet text
+          // under the box, as Claude's is (plan #2863).
+          beneath={bubbles ? boxStart : undefined}
           footer={
-            withFiles || boxStart ? (
+            withFiles || (boxStart && !bubbles) ? (
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 {withFiles && (
                   <AddFile
@@ -1730,9 +1818,10 @@ function TalkThread({
                     disabled={sending}
                     onUploadingChange={setUploading}
                     iconOnPhone={Boolean(boxStart)}
+                    plus={bubbles}
                   />
                 )}
-                {boxStart}
+                {!bubbles && boxStart}
               </div>
             ) : undefined
           }

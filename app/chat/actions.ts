@@ -8,6 +8,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, type ThreadPage } from '@/lib/you/chat-threads';
+import { retryMentorReplyInRequest } from '@/lib/you/mentor-reply-request';
 import {
   addPerson,
   ASK_MAX,
@@ -56,6 +57,19 @@ export async function readThread(chatId: string, advisorId: string): Promise<voi
     await Promise.all([markThreadRead(client, user.id, chatId), markMentorRead(client, user.id, advisorId)]);
   } catch (error) {
     console.error('thread not marked read', error);
+  }
+}
+
+/** Try again on a mentor's reply that failed (plan #2854.4); the reply comes over Realtime as a sent one does. */
+// latency: instant
+export async function retryReply(chatId: string, advisorId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(chatId) || !UUID.test(advisorId)) return { error: 'That thread is not there any more.' };
+  try {
+    return await retryMentorReplyInRequest(user.id, chatId, advisorId);
+  } catch (error) {
+    console.error('mentor reply not retried', error);
+    return { error: 'The reply could not start. Try again.' };
   }
 }
 
