@@ -641,7 +641,7 @@ The one-on-one talks they started with one of their advisors, by title.
 - Search: `title`
 - Name a row by `title`; link it by `id`
 - Opens at `/you/council`
-- advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).
+- advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029). kind is direct or group; a group has a null advisor_id and its bots in you.advisor_chat_members, and title is the name they gave it or null (you 0042).
 
 ### `you.advisor_messages` (You)
 
@@ -650,7 +650,7 @@ What they said to an advisor in a one-on-one talk, and what the advisor answered
 - Search: `text`
 - Name a row by `text`; link it by `id`
 - Opens at `/you/council`
-- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038).
+- role is person (what they said) or advisor (written by Dash in the advisor's voice), so cite only role person as theirs. chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038). speaker_id is the bot that wrote an advisor message in a group chat (you 0042).
 
 ### `you.advisor_episodes` (You)
 

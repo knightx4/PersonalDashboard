@@ -114,6 +114,10 @@ function deleteClient(advisor: { key: string; kind: string } | null, deleteError
           call.filters.push([col, value]);
           return chain;
         },
+        is: (col: string, value: unknown) => {
+          call.filters.push([col, value]);
+          return chain;
+        },
         maybeSingle: () => Promise.resolve({ data: advisor, error: null }),
         then: (resolve: (v: unknown) => void) => resolve(answer()),
       };
@@ -141,13 +145,22 @@ describe('deletePerson (plan #2879.3)', () => {
     ]);
   });
 
-  it('retires a guest the board minutes hold, deleting its chats', async () => {
+  it('retires a guest the board minutes hold, deleting its direct chats and leaving its groups (plan #2879.1.1)', async () => {
     const { client, calls } = deleteClient({ key: 'franklin', kind: 'guest' }, { code: '23503', message: 'board_turns' });
     expect(await deletePerson(client, USER, 'a1')).toBe(true);
     const chats = calls.find((c) => c.table === 'advisor_chats' && c.op === 'delete');
     expect(chats?.filters).toEqual([
       ['user_id', USER],
       ['advisor_id', 'a1'],
+      ['kind', 'direct'],
+    ]);
+    const left = calls.find((c) => c.table === 'advisor_chat_members' && c.op === 'update');
+    expect(left?.values).toMatchObject({ typing_until: null });
+    expect(typeof left?.values?.left_at).toBe('string');
+    expect(left?.filters).toEqual([
+      ['user_id', USER],
+      ['advisor_id', 'a1'],
+      ['left_at', null],
     ]);
     const retired = calls.find((c) => c.table === 'board_advisors' && c.op === 'update');
     expect(retired?.values).toEqual({ active: false, joins_meetings: false });
