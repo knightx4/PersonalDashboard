@@ -946,6 +946,7 @@ export function GoalTopSurface({
     <GoalDetail
       goal={passive ? { ...cards, activity: 'passive' } : cards}
       activityDrawn={activityDrawn}
+      unreadFiles={1}
       areaName="Money"
       places={PLACES}
       review={cardsReview}
@@ -966,20 +967,22 @@ export function GoalTopSurface({
         <GoalDashboard
           strip={<GoalStripRow strip={CARDS_STRIP} />}
           top={<GoalDoneWhen goal={cards} />}
+          lead={
+            <NoLayoutLine
+              ask={
+                <AskDash
+                  goals={[cards]}
+                  areas={[]}
+                  defaultAreaId={null}
+                  only
+                  label="Ask Dash to lay it out"
+                  defaultBody="Lay out this goal’s dashboard with the tiles that fit it."
+                />
+              }
+            />
+          }
           main={
             <>
-              <NoLayoutLine
-                ask={
-                  <AskDash
-                    goals={[cards]}
-                    areas={[]}
-                    defaultAreaId={null}
-                    only
-                    label="Ask Dash to lay it out"
-                    defaultBody="Lay out this goal’s dashboard with the tiles that fit it."
-                  />
-                }
-              />
               <GoalStatusCard
                 line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
                 brief={{
@@ -993,6 +996,7 @@ export function GoalTopSurface({
                 current
                 change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
                 review={cardsReview}
+                now={CARDS_STRIP.now}
               />
               <GoalLogDone goalId={cards.id} />
               <GoalNumber
@@ -1004,15 +1008,9 @@ export function GoalTopSurface({
                 readings={readings}
                 today={TODAY}
               />
+              {/* The question is the Now card, so Waiting on you leaves it out, as the page does. */}
               <WaitingOnYou
                 rows={[
-                  {
-                    id: 'which',
-                    kind: 'question',
-                    label: 'Answer',
-                    title: 'Which card first?',
-                    href: '#step-which',
-                  },
                   {
                     id: 'compare',
                     kind: 'read',
@@ -1050,7 +1048,7 @@ export function GoalTopSurface({
                       ? 'Dash · 24 Sep · for “Compare the two cards’ rates”'
                       : 'Dash · 20 Sep · for “Draft the letter asking for a lower rate”',
                 }))}
-                unread="1 not read"
+                unread="1 unread"
               />
             </>
           }
@@ -1508,7 +1506,7 @@ export function GoalActivitySurface() {
 
 /** The credit cards goal's strip: the question first, then the call, then what waits on the answer. */
 const CARDS_STRIP: GoalStrip = {
-  now: { id: 'which', title: 'Which card first?', line: 'Answer', href: '#step-which' },
+  now: { id: 'which', title: 'Which card first?', line: null, href: '#step-which', action: 'Answer' },
   next: { id: 'call', title: 'Call the card company', line: 'By 3 Oct', href: '#step-call' },
   later: {
     id: 'plan',
@@ -1755,7 +1753,7 @@ export function GoalDashboardPageSurface({
                 />
               }
             />
-            <RecentFiles files={LOANS_FILES} unread="2 not read" />
+            <RecentFiles files={LOANS_FILES} unread="2 unread" />
           </>
         }
       />

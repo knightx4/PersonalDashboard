@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { LiveDot } from '@/components/ui/live-dot';
@@ -7,6 +8,7 @@ import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
 import { FileLinks } from '@/components/files/file-links';
 import { cn } from '@/lib/cn';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
+import { fileTypeLabel } from '@/lib/goals/goal-files-tab';
 import { LastFinished } from './last-finished';
 import { StripDone } from './strip-done';
 import type { GoalStrip, StripCard } from '@/lib/goals/goal-strip';
@@ -70,14 +72,9 @@ export function GoalDashboard({
 
 /** The three cards at the top of the Dashboard: what is on you now, next, and later. */
 export function GoalStripRow({ strip }: { strip: GoalStrip }) {
-  // Nothing open at all: one line rather than three cards that each say so.
-  if (!strip.now && !strip.next && !strip.later) {
-    return (
-      <Card padding="dense" role="region" aria-label="Now, next and later">
-        <p className="text-small text-ink-muted">Nothing is open on this goal yet.</p>
-      </Card>
-    );
-  }
+  // Nothing open at all: no strip, so the tab shows one empty state, the
+  // offer to lay the goal out and map it (plan #2778.11).
+  if (!strip.now && !strip.next && !strip.later) return null;
   return (
     <section aria-label="Now, next and later" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <StripCell label="Now" card={strip.now} now empty="Nothing is on you on this goal." />
@@ -124,9 +121,17 @@ function StripCell({
           </a>
           <p className="mt-auto flex items-baseline justify-between gap-3 pt-1 text-small text-ink-muted">
             <span className="tabular min-w-0">{line}</span>
-            {/* Now ends with Done when it is a step you can tick; Next and Later say where the rest of the plan is. */}
+            {/* Now ends with Done when it is a step you can tick, or the button that opens it (Answer); Next and Later say where the rest of the plan is. */}
             {now ? (
-              card.canClose && <StripDone stepId={card.id} />
+              card.canClose ? (
+                <StripDone stepId={card.id} />
+              ) : (
+                card.action && (
+                  <a href={card.href} className={cn('shrink-0', buttonVariants({ size: 'sm' }))}>
+                    {card.action}
+                  </a>
+                )
+              )
             ) : (
               <a href={card.href} className={cn('press-area shrink-0', linkVariants())}>
                 See the plan
@@ -221,14 +226,17 @@ export function DashOnCard({
   );
 }
 
-/** The goal's three newest files, with the way to all of them on Work & files. */
+/** The goal's three newest files, each on its small page as on Work & files, with the way to all of them there. */
 export function RecentFiles({
   files,
   unread,
 }: {
-  files: ComponentProps<typeof FileLinks>['files'];
+  /** With each file's type, which its small page names (Note, PDF, Img). */
+  files: (ComponentProps<typeof FileLinks>['files'][number] & { contentType?: string | null })[];
   unread: string | null;
 }) {
+  // No files yet: left out, so an empty goal shows one empty state (plan #2778.11).
+  if (files.length === 0) return null;
   return (
     <Card padding="none" role="region" aria-labelledby="recent-files-heading">
       <SectionHeading
@@ -242,13 +250,10 @@ export function RecentFiles({
           </Link>
         }
       />
-      {files.length > 0 ? (
-        <FileLinks files={files} bare />
-      ) : (
-        <p className="card-pad-x pt-1 pb-3 text-small text-ink-muted">
-          Nothing filed yet. What Dash writes for this goal lands here.
-        </p>
-      )}
+      <FileLinks
+        files={files.map(({ contentType, ...file }) => ({ ...file, sheet: fileTypeLabel(contentType) }))}
+        bare
+      />
     </Card>
   );
 }

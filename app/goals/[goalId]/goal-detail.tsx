@@ -67,7 +67,13 @@ export function GoalDetail({
   const line = goalLine(goal, timeZone);
   const tabs = tabsWithLists(
     GOAL_TABS.map((t) =>
-      t.id === 'plan' ? { ...t, count: open } : t.id === 'files' ? { ...t, count: unreadFiles } : t,
+      // Each count says what it counts, as the approved mockup's '5 left' and
+      // '2 unread' do (plan #2778.11).
+      t.id === 'plan'
+        ? { ...t, count: open, countWord: 'left' }
+        : t.id === 'files'
+          ? { ...t, count: unreadFiles, countWord: 'unread' }
+          : t,
     ),
     lists,
   );
@@ -138,6 +144,7 @@ export function GoalDetail({
       tabs={tabs}
       address={GOAL_TAB_ADDRESS}
       label="Goal"
+      titleSize="headline"
       className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
     >
       {children}
