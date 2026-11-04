@@ -46,6 +46,7 @@ export function AvatarEditor({
   draw,
   save,
   onDone,
+  onDrawn,
 }: {
   advisor: { id: string; key: string; name: string; avatar: AdvisorAvatar };
   /** The drawing of their current look, made when the editor was opened. */
@@ -53,6 +54,12 @@ export function AvatarEditor({
   draw: DrawAvatar;
   save: SaveAvatar;
   onDone: () => void;
+  /**
+   * Each new drawing, for a page that shows the look being tried in its own
+   * avatar (the profile's header, plan #2581.5). Given it, the editor draws no
+   * picture of its own, only the controls.
+   */
+  onDrawn?: (drawn: Drawn) => void;
 }) {
   const [avatar, setAvatar] = useState(advisor.avatar);
   const [drawn, setDrawn] = useState<Drawn>(start);
@@ -76,6 +83,7 @@ export function AvatarEditor({
         return;
       }
       setDrawn({ svg: result.svg, look: result.look });
+      onDrawn?.({ svg: result.svg, look: result.look });
     });
   };
   const step = (trait: AvatarTrait, by: 1 | -1) =>
@@ -97,14 +105,16 @@ export function AvatarEditor({
   return (
     <div className="space-y-3 rounded-card bg-sunken p-3 sm:w-fit sm:pr-6" aria-busy={drawing || undefined}>
       <div className="flex items-center gap-3">
-        <AvatarPicture
-          advisorKey={advisor.key}
-          name={`${advisor.name}, as drawn now`}
-          size="lg"
-          svg={drawn.svg}
-          className={drawing ? 'opacity-60 transition-opacity duration-quick' : undefined}
-        />
-        <div className="flex min-w-0 flex-col items-start gap-1">
+        {!onDrawn && (
+          <AvatarPicture
+            advisorKey={advisor.key}
+            name={`${advisor.name}, as drawn now`}
+            size="lg"
+            svg={drawn.svg}
+            className={drawing ? 'opacity-60 transition-opacity duration-quick' : undefined}
+          />
+        )}
+        <div className={onDrawn ? 'flex flex-wrap items-center gap-2' : 'flex min-w-0 flex-col items-start gap-1'}>
           <Button
             type="button"
             variant="secondary"

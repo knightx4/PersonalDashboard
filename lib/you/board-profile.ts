@@ -105,10 +105,22 @@ export function advisorDecisions(
     .sort((a, b) => b.askedAt.localeCompare(a.askedAt));
 }
 
-/** "12 scored · mean 0.14", or that none is scored yet. */
+/**
+ * A mean Brier score in words: 0 is a perfect forecast and 0.25 what a coin
+ * toss scores, so under 0.1 is usually right and 0.25 or more no better than
+ * guessing.
+ */
+export function brierWords(brier: number): string {
+  if (brier <= 0.1) return 'usually right';
+  if (brier <= 0.18) return 'more right than wrong';
+  if (brier < 0.25) return 'a little better than a coin toss';
+  return 'no better than a coin toss';
+}
+
+/** "12 scored · usually right", or that none is scored yet. */
 export function recordLine(record: TrackRecord | null): string {
   if (!record) return 'No forecasts scored yet';
-  return `${record.scored} scored · mean ${record.brier.toFixed(2)}`;
+  return `${record.scored} scored · ${brierWords(record.brier)}`;
 }
 
 /** "62%", for a probability from 0 to 1. */

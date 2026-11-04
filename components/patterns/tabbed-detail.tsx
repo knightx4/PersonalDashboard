@@ -42,6 +42,7 @@ export function TabbedDetail({
   title,
   lead,
   portrait,
+  under,
   description,
   actions,
   glance,
@@ -65,6 +66,8 @@ export function TabbedDetail({
    * drawn left of the title and its one line, which sit centred beside it.
    */
   portrait?: React.ReactNode;
+  /** Drawn under the title for a moment, such as the controls for changing the portrait while it is being changed. */
+  under?: React.ReactNode;
   /** One line under the title: what kind of thing this is, or its state. */
   description?: React.ReactNode;
   /** The action that belongs to the whole page, whatever tab is open. */
@@ -138,6 +141,7 @@ export function TabbedDetail({
               )}
             </>
           )}
+          {under && <div className="mt-3">{under}</div>}
         </header>
       }
       properties={

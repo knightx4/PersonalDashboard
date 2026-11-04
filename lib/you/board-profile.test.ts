@@ -80,7 +80,7 @@ describe('recordLine', () => {
   it('says how many were scored and the mean, or that none is yet', () => {
     expect(recordLine(null)).toBe('No forecasts scored yet');
     expect(recordLine({ advisor: 'cfo', name: 'CFO', scored: 7, brier: 0.1234, topics: [] })).toBe(
-      '7 scored · mean 0.12',
+      '7 scored · more right than wrong',
     );
   });
 });

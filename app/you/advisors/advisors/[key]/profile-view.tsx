@@ -13,6 +13,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { LiveDot } from '@/components/ui/live-dot';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { Tooltip } from '@/components/ui/tooltip';
+import { cn } from '@/lib/cn';
 import { brainState, type RosterAdvisor } from '@/lib/you/board-advisors';
 import type { Brain } from '@/lib/you/board-brain';
 import {
@@ -78,6 +79,8 @@ export function ProfileView({
   useRefreshWhileRunning(state.kind === 'building');
 
   const [look, setLook] = useState<Drawn | null>(editing);
+  /** The look being tried on, drawn in the header's avatar while the editor is open. */
+  const [trying, setTrying] = useState<string | null>(editing?.svg ?? null);
   const [opening, setOpening] = useState(false);
   const [active, setActive] = useState(advisor.active);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +89,7 @@ export function ProfileView({
   const openEditor = () => {
     if (look) {
       setLook(null);
+      setTrying(null);
       return;
     }
     setOpening(true);
@@ -98,7 +102,12 @@ export function ProfileView({
         return;
       }
       setLook({ svg: result.svg, look: result.look });
+      setTrying(result.svg);
     });
+  };
+  const closeEditor = () => {
+    setLook(null);
+    setTrying(null);
   };
   const toggle = (next: boolean) => {
     setActive(next);
@@ -132,9 +141,27 @@ export function ProfileView({
             onClick={openEditor}
             className="press-area rounded-pill transition-opacity duration-quick hover:opacity-80"
           >
-            <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="lg" decorative />
+            <AdvisorAvatar
+              advisorKey={advisor.key}
+              name={advisor.name}
+              size="lg"
+              decorative
+              svg={trying ?? undefined}
+            />
           </button>
         </Tooltip>
+      }
+      under={
+        look && (
+          <AvatarEditor
+            advisor={advisor}
+            start={look}
+            draw={actions.drawAvatar}
+            save={actions.saveAvatar}
+            onDone={closeEditor}
+            onDrawn={(drawn) => setTrying(drawn.svg)}
+          />
+        )
       }
       title={advisor.name}
       description={
@@ -146,14 +173,14 @@ export function ProfileView({
       glance={
         <>
           <Property label="Seat" value={guest ? 'Guest' : 'Seat'} />
-          <Property label="Track record" value={record ? `${record.scored} scored` : 'None yet'} />
+          {record && <Property label="Track record" value={`${record.scored} scored`} />}
         </>
       }
-      detailCount={guest ? 3 : 2}
+      detailCount={(record ? 1 : 0) + (brain ? 1 : 0) + (guest ? 1 : 0)}
       properties={
         <PropertyList>
-          <Property label="Mean score" value={record ? record.brier.toFixed(2) : 'None yet'} />
-          <Property label="Sources" value={brain ? String(brain.sources.length) : 'None yet'} />
+          {record && <Property label="Mean score" value={record.brier.toFixed(2)} hint="0 is a perfect forecast, 0.25 a coin toss" />}
+          {brain && <Property label="Sources" value={String(brain.sources.length)} />}
           {guest && (
             <Property
               label="In meetings"
@@ -177,15 +204,6 @@ export function ProfileView({
       label="Advisor"
     >
       <div className="space-y-4">
-        {look && (
-          <AvatarEditor
-            advisor={advisor}
-            start={look}
-            draw={actions.drawAvatar}
-            save={actions.saveAvatar}
-            onDone={() => setLook(null)}
-          />
-        )}
         {error && <FieldError>{error}</FieldError>}
         {state.kind === 'building' && <Building />}
         {state.kind === 'failed' && <Failed advisorId={advisor.id} why={state.why} retry={actions.retry} />}
@@ -260,18 +278,14 @@ function Failed({
 /** How they think, from the brain: the assessment, their voice, their questions, rules and frameworks. */
 function AboutTab({ advisor, brain }: { advisor: RosterAdvisor; brain: Brain | null }) {
   if (!brain) {
-    return (
+    // The question they own is already under their name.
+    return advisor.focus ? (
       <DetailCard>
-        <DetailPart label="The question they own">
-          <p className="text-body text-ink [overflow-wrap:anywhere]">{advisor.question}</p>
+        <DetailPart label="What they look at">
+          <p className="text-body text-ink [overflow-wrap:anywhere]">{advisor.focus}</p>
         </DetailPart>
-        {advisor.focus && (
-          <DetailPart label="What they look at">
-            <p className="text-body text-ink [overflow-wrap:anywhere]">{advisor.focus}</p>
-          </DetailPart>
-        )}
       </DetailCard>
-    );
+    ) : null;
   }
   return (
     <DetailCard>
@@ -328,36 +342,59 @@ function AboutTab({ advisor, brain }: { advisor: RosterAdvisor; brain: Brain | n
   );
 }
 
-/** "A 70% · B 30%", the chosen option marked. */
-function ForecastLine({ decision }: { decision: AdvisorDecision }) {
+/** Their forecast option by option, named, the one you chose marked. */
+function Forecast({ decision }: { decision: AdvisorDecision }) {
+  const name = (letter: string) => decision.options.find((o) => o.letter === letter)?.text ?? `Option ${letter}`;
   if (!decision.forecast) {
-    return decision.pick ? <>Backed {decision.pick}, before forecasts had probabilities</> : <>No single pick</>;
+    return (
+      <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
+        {decision.pick
+          ? `Backed ${name(decision.pick)}, before forecasts had probabilities`
+          : 'No single pick, before forecasts had probabilities'}
+      </p>
+    );
   }
   const letters = Object.keys(decision.forecast).sort();
   return (
-    <span className="tabular">
-      {letters.map((letter, i) => (
-        <span key={letter}>
-          {i > 0 && ' · '}
-          <span className={letter === decision.chosen ? 'font-medium text-ink' : undefined}>
-            {letter} {percent(decision.forecast![letter])}
-          </span>
-        </span>
-      ))}
-    </span>
+    <ul className="space-y-0.5 text-small text-ink-muted">
+      {letters.map((letter) => {
+        const chosen = letter === decision.chosen;
+        return (
+          <li key={letter} className="flex items-baseline gap-2">
+            <span className={cn('tabular w-9 shrink-0 text-right', chosen && 'font-medium text-ink')}>
+              {percent(decision.forecast![letter])}
+            </span>
+            <span className={cn('min-w-0 [overflow-wrap:anywhere]', chosen && 'text-ink')}>
+              {name(letter)}
+              {chosen && ' (you chose this)'}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
 function happened(decision: AdvisorDecision): string {
   if (!decision.chosen) return 'Not decided yet';
-  const chose = `You chose ${decision.chosen}`;
-  if (!decision.outcome) return `${chose}, how it went is not in yet`;
-  const scored = decision.brier !== null ? `, scored ${decision.brier.toFixed(2)}` : '';
-  return `${chose}: ${OUTCOME_LABELS[decision.outcome].toLowerCase()}${scored}`;
+  if (!decision.outcome) return 'How it went is not in yet';
+  const scored = decision.brier !== null ? `, their forecast scored ${decision.brier.toFixed(2)}` : '';
+  return `${OUTCOME_LABELS[decision.outcome]}${scored}`;
 }
 
 /** The scores by topic, then every decision they weighed in on. */
 function RecordTab({ record, decisions }: { record: TrackRecord | null; decisions: readonly AdvisorDecision[] }) {
+  if (!record && decisions.length === 0) {
+    return (
+      <Card padding="standard">
+        <p className="text-ui text-ink">No track record yet.</p>
+        <p className="mt-1 text-ui text-ink-muted">
+          It starts with their first scored forecast: bring them a decision from the Advisors tab, and once you say
+          how it went, their probability for what you chose is scored.
+        </p>
+      </Card>
+    );
+  }
   return (
     <div className="space-y-5">
       <section className="space-y-2">
@@ -382,8 +419,7 @@ function RecordTab({ record, decisions }: { record: TrackRecord | null; decision
             </>
           ) : (
             <p className="text-ui text-ink-muted">
-              No track record yet. It starts with their first scored forecast: when you say how a decision they
-              weighed in on went, their probability for what you chose is scored.
+              None scored yet. It starts once you say how one of the decisions below went.
             </p>
           )}
         </Card>
@@ -408,9 +444,7 @@ function RecordTab({ record, decisions }: { record: TrackRecord | null; decision
                   ) : (
                     <p className="text-ui text-ink [overflow-wrap:anywhere]">{d.question}</p>
                   )}
-                  <p className="text-small text-ink-muted">
-                    Forecast: <ForecastLine decision={d} />
-                  </p>
+                  <Forecast decision={d} />
                   <p className="text-small text-ink-muted">{happened(d)}</p>
                 </li>
               ))}

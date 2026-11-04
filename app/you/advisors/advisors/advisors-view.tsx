@@ -313,17 +313,17 @@ function AdvisorCard({
       href={advisorHref(advisor.key)}
       className={cn(
         cardVariants({ padding: 'standard', interactive: true }),
-        'flex h-full flex-col items-center gap-2 text-center',
+        'flex h-full flex-col items-start gap-2',
       )}
     >
       <AdvisorAvatar advisorKey={advisor.key} name={advisor.name} size="md" decorative className="size-16" />
-      <span className="flex min-w-0 flex-col items-center gap-0.5">
+      <span className="flex min-w-0 flex-col items-start gap-0.5">
         <span className="text-ui font-medium text-ink [overflow-wrap:anywhere]">{advisor.name}</span>
         <BrainStatus state={state} />
         <span className="text-small text-ink-muted [overflow-wrap:anywhere]">
           {advisor.assessment ?? advisor.question}
         </span>
-        <span className="tabular mt-1 text-small text-ink-muted">{recordLine(record)}</span>
+        {record && <span className="tabular mt-1 text-small text-ink">{recordLine(record)}</span>}
         {off && <span className="text-small text-ink-muted">Off in meetings</span>}
       </span>
     </Link>
