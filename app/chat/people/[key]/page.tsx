@@ -1,10 +1,23 @@
 import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { todayInTimezone } from '@/lib/money';
+import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, loadThreadPage, type ThreadPage } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
-import { correctPersonMemory, draftPersonCard, olderMessages, readThread, removePersonMemory, retryReply, savePersonCard } from '../../actions';
+import {
+  correctPersonMemory,
+  draftPersonCard,
+  olderMessages,
+  readThread,
+  removePersonMemory,
+  retryReply,
+  savePersonCard,
+  threadChanges,
+} from '../../actions';
+import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '../../dash/actions';
 import { PeopleView } from '../../people-view';
 import { PersonForm } from '../person-form';
 import { ThreadView } from './thread-view';
@@ -55,9 +68,20 @@ export default async function ChatThreadPage({
       </PeopleView>
     );
   }
-  const page: ThreadPage = person.chatId
-    ? await loadThreadPage(client, user.id, person.chatId)
-    : { messages: [], hasOlder: false };
+  // What they did in the thread is drawn as cards with its presses (plan #2854.2.1).
+  const chatId = person.chatId;
+  const [page, changes]: [ThreadPage, DashChange[]] = chatId
+    ? await Promise.all([
+        loadThreadPage(client, user.id, chatId),
+        // The thread still opens when its cards cannot be read; a reply re-reads them.
+        createCoreClient()
+          .then((core) => loadPeopleChanges(core, chatId))
+          .catch((error: unknown) => {
+            console.error('thread changes not read', error);
+            return [];
+          }),
+      ])
+    : [{ messages: [], hasOlder: false }, []];
   return (
     <PeopleView rows={rows} current={key} timezone={settings.timezone} now={now}>
       <ThreadView
@@ -68,7 +92,10 @@ export default async function ChatThreadPage({
         typingUntil={person.typingUntil}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderMessages, read: readThread, retryReply }}
+        actions={{ older: olderMessages, read: readThread, retryReply, changes: threadChanges }}
+        changes={changes}
+        presses={{ confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange }}
+        today={todayInTimezone(settings.timezone)}
       />
     </PeopleView>
   );

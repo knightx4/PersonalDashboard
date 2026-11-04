@@ -507,7 +507,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
+import { ChatArrivalMomentSurface, ChatPeopleSurface, ChatThreadChangesSurface, ChatThreadSurface, ChatTypingMomentSurface } from './chat-surfaces';
 import { ChatPersonAddSurface, ChatPersonEditSurface } from './chat-person-surfaces';
 import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
@@ -8923,6 +8923,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface />,
+  },
+  {
+    /* What they did when asked (plan #2854.2.1): a todo they added, as a card with Undo after their reply, and a build and a delete they proposed, each with Confirm and nothing written until it is pressed. */
+    id: 'chat-people-thread-changes',
+    label: 'Chat · A thread, what they did when asked',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadChangesSurface />,
   },
   {
     /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
