@@ -60,6 +60,8 @@ export const coreActions: ModuleActions = {
     startSessionThreadAction: none('own', 'The person opening a conversation with a Claude Code session.'),
     sendSessionMessageAction: none('own', "The person's own words to a Claude Code session."),
     answerSessionMessageAction: none('theirs', "The person's answer to a session's question."),
+    pickSessionMockupAction: none('theirs', "The person's choice among a session's mockups."),
+    commentOnSessionMockupAction: none('own', "The person's own note to a session on a mockup."),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),
