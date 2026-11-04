@@ -26,6 +26,8 @@ const FILES: Record<RunJob, string> = {
   comment: `${PLAN}/reference/comments.md`,
   raise: `${PLAN}/reference/raising.md`,
   unstick: `${PLAN}/reference/unsticking.md`,
+  // The part headed "When the feature's steps are built" (plan #2815.2).
+  land: `${PLAN}/SKILL.md`,
   check_back: `${PLAN}/SKILL.md`,
   ci_fix: 'CLAUDE.md',
   posts: '.claude/skills/posts/SKILL.md',

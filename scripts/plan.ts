@@ -139,6 +139,7 @@ import {
   type DevProject,
 } from '../lib/plan/projects';
 import { endsWithBuiltLine } from '../lib/plan/built';
+import { landNowLine } from '../lib/plan/land';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
@@ -1947,6 +1948,26 @@ async function main(): Promise<void> {
       console.log(
         `${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`,
       );
+      // A batch lands once its feature holds four built steps, so a long
+      // feature ships in pieces rather than all at the end (plan #2815.2).
+      const root = await rootId(sql, userId, item.number);
+      if (root) {
+        const under = await sql<{ number: number; comment: string | null }[]>`
+          with recursive tree as (
+            select id from plan_items where id = ${root} and user_id = ${userId}
+            union all
+            select p.id from plan_items p join tree on p.parent_id = tree.id
+            where p.user_id = ${userId}
+          )
+          select p.number, p.comment from plan_items p
+          where p.id in (select id from tree) and p.user_id = ${userId}
+            and p.status = 'in_progress' and p.commit_sha is not null`;
+        const feature = await sql<{ number: number }[]>`
+          select number from plan_items where id = ${root} and user_id = ${userId}`;
+        const count = under.filter((row) => endsWithBuiltLine(row.comment)).length;
+        const line = feature[0] ? landNowLine(ref(feature[0].number), count) : null;
+        if (line) console.log(line);
+      }
       await checkRowWriting(sql, userId, item, { note });
       return;
     }
