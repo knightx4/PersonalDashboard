@@ -11,6 +11,7 @@ import { isOwner, type OwnerCheck } from '@/lib/dev/owner';
 import { moveNoteToIdea, routesToPlan } from '@/lib/feedback/move';
 import { triageRow } from '@/lib/feedback/triage-run';
 import { scoreIdeaRow } from '@/lib/ideas/score-run';
+import { shapeIdeaRun } from '@/lib/ideas/shape';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /**
@@ -32,7 +33,8 @@ const PagePath = z.string().max(300).nullable();
  *
  * Triage runs once the note is saved, so saving never waits on Jev. A note
  * triage is sure needs planning moves to the ideas page (plan #1675), the
- * owner's notes only, and that idea is then scored.
+ * owner's notes only, and that idea is then scored and sent to be shaped into
+ * a proposed feature on the plan (note 677a1cdd).
  */
 export async function writeDevNote(
   supabase: Supabase,
@@ -71,6 +73,10 @@ export async function writeDevNote(
       const scoreSpend: SpendReport[] = [];
       await scoreIdeaRow(supabase, { userId: user.id, id: moved.ideaId, triage, spend: scoreSpend });
       await recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, scoreSpend);
+      // Then straight on to be shaped into a proposed feature (note 677a1cdd),
+      // as Shape on the ideas page would, rather than waiting there for a press.
+      const shaped = await shapeIdeaRun(supabase, user.id, moved.ideaId);
+      if (!shaped.ok) console.warn('[capture] shaping a moved note failed', shaped.error);
     } catch (problem) {
       console.warn('[capture] triaging a note failed', problem);
     }

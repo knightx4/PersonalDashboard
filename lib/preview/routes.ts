@@ -706,7 +706,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-settings': ['/dev/settings'],
   'goals-settings': ['/goals/settings'],
   'learn-settings': ['/learn/settings'],
-  'dev-runner-crew': ['/dev/plan', '/dev/settings'],
+  'dev-runner-crew': ['/dev/raised', '/dev/settings'],
   'dev-specs': ['/dev/specs'],
   'dev-specs-interview-empty': ['/dev/specs'],
   'dev-specs-interview-half': ['/dev/specs'],

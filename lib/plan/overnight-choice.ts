@@ -125,7 +125,7 @@ export function finishedFeatures(sections: readonly PlanSection[]): FinishedFeat
 
 /** The line a feature closed this way carries in its history. */
 export function finishedFeatureLine(day: string): string {
-  return `Done ${day}: every step beneath it is done, so the overnight runner closed it.`;
+  return `Done ${day}: every step beneath it is done, so the runner closed it.`;
 }
 
 /**
