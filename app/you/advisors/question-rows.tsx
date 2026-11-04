@@ -12,6 +12,7 @@ import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { MeetingState } from '@/lib/you/board';
 import type { BoardAdvisor, BoardQuestion } from '@/lib/you/board-questions';
 import type { AskWhen } from './ask-board';
+import { AdvisorAvatar } from './advisor-avatar';
 
 /**
  * The Advisors tab's question rows (plan #2561.4): the board's suggestions, each
@@ -43,11 +44,23 @@ function OptionsLine({ question }: { question: BoardQuestion }) {
   );
 }
 
-/** "Hear from: the CFO, WB" style line, guests by name since the row has room. */
-function advisorsLine(keys: readonly string[], roster: readonly BoardAdvisor[]): string | null {
-  if (keys.length === 0) return null;
-  const names = keys.map((key) => roster.find((a) => a.key === key)?.name ?? key);
-  return `Hearing from ${names.join(', ')}`;
+/** "Hearing from" and each advisor the question waits on, by avatar and name (plan #2581.3). */
+function AdvisorsLine({ keys, roster }: { keys: readonly string[]; roster: readonly BoardAdvisor[] }) {
+  return (
+    <>
+      Hearing from{' '}
+      {keys.map((key, i) => {
+        const name = roster.find((a) => a.key === key)?.name ?? key;
+        return (
+          <span key={key} className="whitespace-nowrap">
+            <AdvisorAvatar advisorKey={key} name={name} decorative className="mr-1 size-4 align-[-3px]" />
+            {name}
+            {i < keys.length - 1 ? ', ' : ''}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 export function SuggestionRow({
@@ -160,14 +173,24 @@ export function AskedRow({
           : question.status === 'deferred'
             ? 'Put off'
             : `For ${nextMeeting}`;
-  const meta = [
+  const parts = [
     state,
     question.lean ? `you lean ${question.lean}` : null,
     question.options.length === 0 ? 'the chair writes the options' : null,
-    advisorsLine(question.advisors, roster),
   ]
     .filter(Boolean)
     .join(' · ');
+  const meta = (
+    <>
+      {parts}
+      {question.advisors.length > 0 && (
+        <>
+          {' · '}
+          <AdvisorsLine keys={question.advisors} roster={roster} />
+        </>
+      )}
+    </>
+  );
   const canConvene =
     !inMeeting &&
     (question.status === 'queued' ||
@@ -198,7 +221,8 @@ export function AskedRow({
     <li className="card-pad-x row-pad">
       {/* The question keeps the row's full width; the press sits at the right of its details line, so it takes no line of its own. */}
       <span className="line-clamp-2 block text-ui text-ink">{question.question}</span>
-      <div className="flex items-start gap-3">
+      {/* On a phone the press goes under the details, so they keep the row's width (plan #2581.3). */}
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
         <span className="min-w-0 flex-1 text-small text-ink-muted">{meta}</span>
         {canConvene && (
           <DashAction

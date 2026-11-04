@@ -46,7 +46,7 @@ export function VerdictCard({
   return (
     <Card padding="standard" className="space-y-3" data-board-verdict>
       <p className="text-body font-semibold text-ink [overflow-wrap:anywhere]">
-        {recommended ? `The advisors recommends ${recommended}` : 'The advisors did not settle on one option'}
+        {recommended ? `The advisors recommend ${recommended}` : 'The advisors did not settle on one option'}
       </p>
       {verdict.conditions.length > 0 && (
         <VerdictList title="On these conditions" items={verdict.conditions} />

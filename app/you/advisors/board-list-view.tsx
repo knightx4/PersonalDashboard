@@ -198,7 +198,7 @@ export function BoardListView({
             </Group>
           )}
           {asks.length > 0 && (
-            <Group title="The advisors asks you" count={asks.length}>
+            <Group title="The advisors ask you" count={asks.length}>
               {groupByQuestion(asks).map((group, index) => (
                 <AskQuestionRow
                   key={group.questionId}
