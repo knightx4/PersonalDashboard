@@ -3294,6 +3294,28 @@ form[data-auto-submit] [data-fallback-submit] {
   margin-top: 1em;
 }
 
+/* A note inside the thing it serves, such as Dash's how-to inside a step's
+ * card on a goal's Plan tab: the interface's 13px, muted, the list tight, so
+ * it reads smaller than the step's title above it (plan #2778.12). */
+.vault-prose.prose-aside {
+  color: var(--c-ink-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vault-prose.prose-aside > * + * {
+  margin-top: 0.4em;
+}
+
+.vault-prose.prose-aside ul,
+.vault-prose.prose-aside ol {
+  padding-left: 1.125rem;
+}
+
+.vault-prose.prose-aside li + li {
+  margin-top: 3px;
+}
+
 /* ---------------------------------------------------------------------------
  * Jobs prose.
  *

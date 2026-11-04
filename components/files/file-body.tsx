@@ -12,13 +12,23 @@ import { cn } from '@/lib/cn';
  * The typography is the vault's (.vault-prose in app/globals.css), since a
  * note and a file are the same kind of reading. `compact` is the smaller size
  * for text inside a step's row or a card, where the page's own type sets the
- * scale.
+ * scale. `aside` is smaller again, muted and tightly listed, for a note set
+ * inside something it serves, as Dash's how-to sits inside a step's card on
+ * a goal's Plan tab (plan #2778.12).
  */
-export function FileBody({ markdown, compact = false }: { markdown: string; compact?: boolean }) {
+export function FileBody({
+  markdown,
+  compact = false,
+  aside = false,
+}: {
+  markdown: string;
+  compact?: boolean;
+  aside?: boolean;
+}) {
   return (
     <Markdown
       markdown={markdown}
-      className={cn('vault-prose break-words', compact && 'prose-compact')}
+      className={cn('vault-prose break-words', compact && 'prose-compact', aside && 'prose-aside')}
     />
   );
 }

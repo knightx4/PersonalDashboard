@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from 'react';
 import { ArrowRight, CalendarClock, ListTree, MessageSquare, Repeat, UserRound } from 'lucide-react';
 import Link from '@/components/ui/link';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { DashMark } from '@/components/ui/dash-mark';
@@ -12,7 +12,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { Tooltip } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLabel } from '@/components/ui/section-heading';
-import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
+import { segmentedTrack, trackSegmentClass } from '@/components/ui/segmented';
 import type { LinkedFile } from '@/lib/files/files';
 import { cn } from '@/lib/cn';
 import { stepHref } from '@/lib/goals/all-goals';
@@ -30,6 +30,7 @@ import { awaitsReview } from '@/lib/goals/daily';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { useDashArrival } from './dash-arrival';
 import { DashDraft } from './dash-draft';
+import { NotNow } from './not-now';
 import { workOnGoalAction, type ShapingActionState } from './shaping-actions';
 import { Question } from './step-parts';
 import { StripDone } from './strip-done';
@@ -40,7 +41,6 @@ const NO_FILES: Record<string, LinkedFile[]> = {};
 const NO_INSET = {};
 const NO_ARRIVALS: readonly string[] = [];
 
-/** The chip's colour for what a later step waits on: a date in accent, another step in caution. */
 /** The glyph before each kind of wait, so the chip does not say it by colour alone. */
 const WAIT_ICON: Record<PlanWait['kind'], typeof ArrowRight> = {
   date: CalendarClock,
@@ -49,12 +49,27 @@ const WAIT_ICON: Record<PlanWait['kind'], typeof ArrowRight> = {
   rhythm: Repeat,
 };
 
+/**
+ * The chip's colour for what a later step waits on, as the approved mockups
+ * draw it: a date and a named person in blue, another step in caution, a
+ * rhythm plain. Blue is the app's base accent, which the goals workspace's
+ * own accent (green) stands in for everywhere else on the page (plan
+ * #2778.12).
+ */
 const WAIT_TONE: Record<PlanWait['kind'], ChipTone> = {
   date: 'neutral',
   step: 'caution',
   person: 'neutral',
   rhythm: 'neutral',
 };
+const BLUE = 'bg-w-chat-tint text-w-chat';
+
+/** A wait's blue, for a date, and for a person only when the chip names them. */
+function waitClass(wait: PlanWait): string | undefined {
+  if (wait.kind === 'date') return BLUE;
+  if (wait.kind === 'person' && wait.label !== 'Blocked') return BLUE;
+  return undefined;
+}
 
 /**
  * A goal's Plan tab (plan #2778.5), as the approved mockups draw it: what is
@@ -122,7 +137,7 @@ export function GoalPlan({
   }, [map.steps]);
   const open = map.goal.status === 'open';
   const empty = order.now.length + order.next.length + order.later.length === 0;
-  const help = open && canRun && <HelpMePlan goalId={map.goal.id} />;
+  const help = open && canRun && <HelpMePlan goalId={map.goal.id} small />;
 
   if (map.steps.length === 0) {
     return (
@@ -133,7 +148,7 @@ export function GoalPlan({
         size="box"
         align="start"
       >
-        {help}
+        {open && canRun && <HelpMePlan goalId={map.goal.id} />}
       </EmptyState>
     );
   }
@@ -141,19 +156,21 @@ export function GoalPlan({
   const stageLabel = stageWord === 'room' ? 'By room' : 'By stage';
   const draftOf = (entry: PlanEntry) => {
     const draft = draftFor(entry, preps[entry.id], files);
-    return draft && { ...draft, defaultOpen: draftOpen, summary: false };
+    return draft && { ...draft, defaultOpen: draftOpen, summary: false, aside: true };
   };
   const comments = (entry: PlanEntry) => map.threads[entry.id]?.length ?? 0;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span role="group" aria-label="Show the plan" className={segmentedFrame}>
+        {/* A grey track with the picked view raised on it, so the switch
+            weighs less than the Now card under it (plan #2778.12). */}
+        <span role="group" aria-label="Show the plan" className={segmentedTrack}>
           <Link
             href="?tab=plan"
             scroll={false}
             aria-current={view === 'next' ? 'true' : undefined}
-            className={segmentClass(view === 'next')}
+            className={trackSegmentClass(view === 'next')}
           >
             What’s next
           </Link>
@@ -161,7 +178,7 @@ export function GoalPlan({
             href="?tab=plan&view=stage"
             scroll={false}
             aria-current={view === 'stage' ? 'true' : undefined}
-            className={segmentClass(view === 'stage')}
+            className={trackSegmentClass(view === 'stage')}
           >
             {stageLabel}
           </Link>
@@ -335,6 +352,9 @@ function StepCard({
   now?: boolean;
 }) {
   const step = entry.node;
+  // Not now hides the card at once; the page then draws the step under Later.
+  const [aside, setAside] = useState(false);
+  if (aside) return null;
   // The step's detail as written, held to three lines; else its done-when's first sentence.
   const why = step.detail?.trim() || firstSentence(step.acceptance ?? '');
   const where = [entry.stage?.title, entry.under].filter(Boolean).join(' · ');
@@ -357,7 +377,7 @@ function StepCard({
         </Link>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-ink-muted">
           {step.dueOn && (
-            <Chip size="sm" className="font-semibold">
+            <Chip size="sm" className={cn('font-semibold', BLUE)}>
               Before {formatDay(step.dueOn)}
             </Chip>
           )}
@@ -377,10 +397,10 @@ function StepCard({
         )}
         {now && entry.whose === 'you' && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
+            {/* Done and Not now, as the mockup draws the Now step; its title
+                opens the step (plan #2778.12). */}
             <StripDone stepId={entry.id} />
-            <Link href={stepHref(goalId, entry.id)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
-              Open the step
-            </Link>
+            <NotNow stepId={entry.id} title={step.title} onAside={setAside} />
           </div>
         )}
         {draft && (
@@ -420,11 +440,12 @@ function LaterList({
           {shown.map((entry) => {
             // The step's own why, else where it sits; never a line every row repeats.
             const where = [entry.stage?.title, entry.under].filter(Boolean).join(' · ');
-            // What holds the step, said here since its chip is kept short (plan #2778.11).
-            const line =
-              entry.waits?.detail ||
-              firstSentence(entry.node.detail ?? '') ||
-              (sameWhere ? '' : where);
+            const line = firstSentence(entry.node.detail ?? '') || (sameWhere ? '' : where);
+            // What holds the step, on a line of its own under that, since its
+            // chip is kept short (plan #2778.11, #2778.12). A chip that names
+            // the person holding it says enough, so that row keeps one line.
+            const named = entry.waits?.kind === 'person' && entry.waits.label !== 'Blocked';
+            const holds = named ? null : entry.waits?.detail;
             const Icon = entry.waits ? WAIT_ICON[entry.waits.kind] : null;
             return (
               <li
@@ -446,15 +467,20 @@ function LaterList({
                       <CommentCount count={comments(entry)} />
                     </p>
                   )}
+                  {holds && <p className="text-small break-words text-ink-muted">{holds}</p>}
                 </div>
                 {entry.waits && (
                   <Chip
                     tone={WAIT_TONE[entry.waits.kind]}
                     size="sm"
-                    className="max-w-40 justify-self-end font-semibold sm:max-w-xs"
+                    className={cn('max-w-40 justify-self-end font-semibold sm:max-w-xs', waitClass(entry.waits))}
                   >
                     {Icon && <Icon strokeWidth={1.75} aria-hidden />}
                     <span className="min-w-0 truncate">{entry.waits.label}</span>
+                    {/* What the named person is to do, for a screen reader. */}
+                    {named && entry.waits.detail && (
+                      <span className="sr-only">: {entry.waits.detail}</span>
+                    )}
                   </Chip>
                 )}
               </li>
@@ -473,13 +499,23 @@ function LaterList({
   );
 }
 
-/** Help me plan this: asks Dash to map the goal's steps, on a goal with none open. */
-function HelpMePlan({ goalId }: { goalId: string }) {
+/**
+ * Help me plan this: asks Dash to map the goal's steps. The small button on
+ * the bar above the plan, as the approved mockup draws it; the ordinary one
+ * as the one thing a goal with no steps offers.
+ */
+function HelpMePlan({ goalId, small = false }: { goalId: string; small?: boolean }) {
   const [state, work, starting] = useActionState(workOnGoalAction, {} as ShapingActionState);
   return (
     <form action={work} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="goalId" value={goalId} />
-      <Button type="submit" size="sm" variant="secondary" pending={starting}>
+      <Button
+        type="submit"
+        size={small ? 'xs' : 'sm'}
+        variant="secondary"
+        pending={starting}
+        className={cn(small && 'px-2.5')}
+      >
         Help me plan this
       </Button>
       {state.error ? (

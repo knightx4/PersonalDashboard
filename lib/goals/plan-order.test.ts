@@ -3,6 +3,7 @@ import { dailyView } from './daily';
 import {
   NEXT_MAX,
   NOW_MAX,
+  holderOf,
   laneOf,
   planEntries,
   planOrder,
@@ -154,6 +155,30 @@ describe('planOrder', () => {
       ['b', 'Blocked', 'Alex to say yes'],
       ['c1', 'Blocked', 'The letter'],
     ]);
+  });
+
+  it('names the person on the chip when the ask and the step both name them', () => {
+    const order = planOrder([
+      node('a'),
+      node('map', {
+        title: 'Walk through the room map with Alex',
+        status: 'blocked',
+        blockAsk: 'Alex free for an evening',
+        blockKind: 'outside',
+      }),
+    ]);
+    expect(order.later.map((entry) => [entry.waits?.kind, entry.waits?.label, entry.waits?.detail])).toEqual([
+      ['person', 'Alex', 'Alex free for an evening'],
+    ]);
+  });
+
+  it('reads a holder only from a name the step title also carries', () => {
+    expect(holderOf('Alex free for an evening', 'Walk through the room map with Alex')).toBe('Alex');
+    expect(holderOf('Sam’s go-ahead', 'Agree the shelves with Sam')).toBe('Sam');
+    expect(holderOf('Alex to say yes', 'b')).toBeNull();
+    expect(holderOf('The letter', 'Save the letter')).toBeNull();
+    expect(holderOf('Waiting on the servicer', 'Waiting for the payment')).toBeNull();
+    expect(holderOf('waiting on Alex', 'Talk to Alex')).toBeNull();
   });
 
   it('is empty for a goal with nothing open', () => {
