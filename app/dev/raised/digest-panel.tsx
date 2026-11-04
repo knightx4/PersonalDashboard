@@ -1,6 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { whenDate } from '@/lib/core/when';
-import { Moon } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
 import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
@@ -151,7 +151,7 @@ function Night({ night }: { night: DigestNight }) {
     <section aria-label="The runner" className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
-          <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
+          <Repeat strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
           Runner
         </span>
         <OvernightState standing={night.standing} />

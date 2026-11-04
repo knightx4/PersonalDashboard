@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCheck, Moon, Pause, Play, Square } from 'lucide-react';
+import { CheckCheck, Pause, Play, Repeat, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
@@ -498,7 +498,7 @@ export function OvernightControl({
   // the mark puts it in a column of its own.
   const labelText = (
     <span className="inline-flex min-h-(--control-h) items-center gap-1.5 text-ui font-medium text-ink">
-      <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
+      <Repeat strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
       {label}
     </span>
   );
@@ -688,6 +688,10 @@ export function OvernightControl({
         </div>
       </div>
 
+      {/* While it is off, what Start would run comes straight under the
+          ready count, ahead of the idle Dashes (plan #578.12). */}
+      {!live && next.length > 0 && <NextUp next={next} />}
+
       {/* One Dash for each thing the runner can run at once, on or off
           (plan #1704): working on its step, asleep with nothing ready, or
           idle while the runner is off. */}
@@ -746,7 +750,7 @@ export function OvernightControl({
         </div>
       )}
 
-      {next.length > 0 && standing !== 'paused' && <NextUp next={next} />}
+      {live && next.length > 0 && standing !== 'paused' && <NextUp next={next} />}
 
       {/* Law 2: a runner that cannot fire says so where the button is, rather
           than starting a night that writes a row and then sends nothing. */}
