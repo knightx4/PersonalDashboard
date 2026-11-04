@@ -38,7 +38,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
 import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import type { ActivitySwitchDrawn } from '@/app/goals/[goalId]/goal-activity-switch';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
-import { closedSteps, goalStages } from '@/lib/goals/goal-page';
+import { closedSteps } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
 import { MONTH_DAYS } from './burn-up-surfaces';
@@ -1429,18 +1429,6 @@ export function TabbedGoal({
     >
       {children}
     </GoalDetail>
-  );
-}
-
-/** A goal's page on its Steps tab: the step tree with its stages and rhythm. */
-export function GoalStepsTabSurface() {
-  return (
-    <>
-      <SetTab tab="plan" />
-      <TabbedGoal>
-        <StepTree map={tabbedMap} stages={goalStages(tabbedMap.steps)} todoOn={false} />
-      </TabbedGoal>
-    </>
   );
 }
 
