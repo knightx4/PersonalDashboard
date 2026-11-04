@@ -36,6 +36,10 @@ export type RosterAdvisor = {
   active: boolean;
   addedBy: 'person' | 'dash';
   updatedAt: string;
+  /** Someone the person made up in Chat (plan #2748.11), who talks from their card alone. */
+  madeByYou: boolean;
+  /** They have a persona card. */
+  hasPersona: boolean;
 };
 
 /** What a guest's row says about its brain right now. */
@@ -83,10 +87,12 @@ export function rosterOf(row: Record<string, unknown>): RosterAdvisor | null {
     active: row.active !== false,
     addedBy: row.added_by === 'dash' ? 'dash' : 'person',
     updatedAt: str(row.updated_at),
+    madeByYou: row.made_by_you === true,
+    hasPersona: str(row.persona) !== '',
   };
 }
 
-export const ROSTER_COLUMNS = 'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain';
+export const ROSTER_COLUMNS = 'id, key, name, kind, question, focus, brain_status, active, added_by, updated_at, brain, made_by_you, persona';
 
 /** Every advisor on or off the board, the seats first. The brain is read for its source count and failure only. */
 export async function listRoster(client: YouSupabaseClient, userId: string): Promise<RosterAdvisor[]> {

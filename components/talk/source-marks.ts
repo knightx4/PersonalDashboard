@@ -21,10 +21,11 @@ export const SOURCE_NUMBER =
 
 /**
  * The mark in an answer: a link to the row it stands for, drawn inline so it
- * reads as part of the sentence (a citation in a run of text is exempt from
- * the 44px press target, as WCAG exempts inline links), with the chip inside.
+ * reads as part of the sentence, with the chip inside. `press-area` gives it
+ * the 44px press target on a phone (the phone check counts the chip's own
+ * 18px as too small), reaching a little over the lines either side.
  */
-const MARK_LINK = 'group/mark no-underline!';
+const MARK_LINK = 'group/mark press-area no-underline!';
 const MARK_CHIP = `${SOURCE_NUMBER} mx-px align-[2px] group-hover/mark:ring-1 group-hover/mark:ring-accent`;
 
 type Node = {

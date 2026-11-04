@@ -1,5 +1,5 @@
-import { ListPageSkeleton } from '@/components/ui/skeleton';
+import { PeopleSkeleton } from './people-skeleton';
 
 export default function Loading() {
-  return <ListPageSkeleton />;
+  return <PeopleSkeleton />;
 }

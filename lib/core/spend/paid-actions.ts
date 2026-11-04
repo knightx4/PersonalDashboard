@@ -191,6 +191,8 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // Draft or redraft a person's persona card on Chat's People form (plan #2748.11)
+  'app/chat/actions.ts#draftPersonCard': ['draft-persona'],
   // The one explain prompt on a graded course (plan #2172.4.2)
   'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   // Summarise on a file kept under a course (plan #2401.4)

@@ -74,7 +74,11 @@ act on, and for a reply the chat says so too (step R5).
 ## Who the mentors are
 
 Every row of `you.board_advisors` for the owner with `active` true. A seat
-can always speak. A guest speaks only when `brain_status` is `ready`.
+can always speak. A guest speaks only when `brain_status` is `ready`, or,
+for someone the person made up in Chat (`made_by_you`, plan #2748.11), when
+they have a `persona`; brief them with that card in place of a brain.
+`joins_meetings` is about board meetings only and does not stop a mentor
+writing here.
 
 Brief each mentor the way `SKILL.md` **The advisors** briefs them: a seat
 with its paragraph word for word, then its brain; a guest with the guest

@@ -1,0 +1,240 @@
+import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
+import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
+
+/**
+ * The People tab's threads (plan #2748.6), kept pure so the tests fix the
+ * clock: the rows of the list, the messages of a thread, how they fall into
+ * days and groups, and what is said under your last message.
+ *
+ * A thread is one you.advisor_chats row per mentor (you 0038). Its messages
+ * are you.advisor_messages: yours (role person) and the mentor's (role
+ * advisor, of kind reply, ack or text_first). The mentor is typing while
+ * now() is before typing_until, and their messages after last_read_at are
+ * unread until you open the thread.
+ */
+
+/** How many messages a thread opens with, and how many each scroll back adds. */
+export const THREAD_PAGE = 50;
+/** The most messages a search shows. */
+export const SEARCH_MAX = 30;
+/** The longest search the box takes. */
+export const SEARCH_TEXT_MAX = 200;
+/** Two messages from one sender further apart than this start a new group. */
+export const GROUP_GAP_MS = 10 * 60 * 1000;
+
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at';
+
+export type MessageKind = 'reply' | 'ack' | 'text_first';
+
+export type ThreadMessage = {
+  id: string;
+  chatId: string;
+  role: 'person' | 'advisor';
+  kind: MessageKind;
+  text: string;
+  receipts: CouncilReceipt[];
+  createdAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+};
+
+/** A page of a thread, oldest first, and whether there is more before it. */
+export type ThreadPage = { messages: ThreadMessage[]; hasOlder: boolean };
+
+const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+const strOrNull = (value: unknown): string | null => str(value) || null;
+
+/** A message row as the database or Realtime gives it, or null when it is not one. */
+export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | null {
+  const text = str(row.text);
+  if (typeof row.id !== 'string' || !text || !str(row.created_at)) return null;
+  const kind: MessageKind = row.kind === 'ack' || row.kind === 'text_first' ? row.kind : 'reply';
+  return {
+    id: row.id,
+    chatId: str(row.chat_id),
+    role: row.role === 'advisor' ? 'advisor' : 'person',
+    kind,
+    text,
+    receipts: receiptsOf(row.receipts),
+    createdAt: str(row.created_at),
+    deliveredAt: strOrNull(row.delivered_at),
+    readAt: strOrNull(row.read_at),
+  };
+}
+
+/** How far a message's receipts have got: read, delivered, neither. */
+const progress = (m: ThreadMessage): number => (m.readAt ? 2 : m.deliveredAt ? 1 : 0);
+
+/**
+ * Messages oldest first, each id once. Of two copies the incoming one wins
+ * unless the other's receipts are further on: Realtime sends a row again when
+ * its receipts change, and the copy a send keeps has none.
+ */
+export function mergeMessages(list: readonly ThreadMessage[], incoming: readonly ThreadMessage[]): ThreadMessage[] {
+  const byId = new Map<string, ThreadMessage>();
+  for (const m of list) byId.set(m.id, m);
+  for (const m of incoming) {
+    const had = byId.get(m.id);
+    if (!had || progress(m) >= progress(had)) byId.set(m.id, m);
+  }
+  return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+
+/** The mentor is typing while now is before typing_until. */
+export function isTyping(typingUntil: string | null, now: number): boolean {
+  if (!typingUntil) return false;
+  const until = Date.parse(typingUntil);
+  return Number.isFinite(until) && until > now;
+}
+
+// ---------------------------------------------------------------------------
+// The mentor's colour.
+// ---------------------------------------------------------------------------
+
+/**
+ * The colours a mentor's avatar is drawn in when they have none of their
+ * own, each dark enough to carry white initials at 4.5:1 in either theme.
+ */
+export const MENTOR_PALETTE = [
+  '#4a5fd0',
+  '#8a6d3b',
+  '#2f7d4f',
+  '#b0527a',
+  '#7a4fb0',
+  '#b04a3a',
+  '#3d7690',
+  '#6b6b3a',
+] as const;
+
+/** Their own colour when it is set, else one picked from the key, so a mentor keeps theirs. */
+export function mentorColour(key: string, colour: string | null): string {
+  if (colour && /^#[0-9a-f]{6}$/.test(colour)) return colour;
+  let hash = 0;
+  for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return MENTOR_PALETTE[hash % MENTOR_PALETTE.length];
+}
+
+/** Up to two initials from a name, skipping a leading "The": "The CFO" is "C", "Ben Franklin" is "BF". */
+export function personInitials(name: string): string {
+  const words = name
+    .replace(/[^\p{L}\p{N}\s'-]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const kept = words.length > 1 && words[0].toLowerCase() === 'the' ? words.slice(1) : words;
+  const letters = kept.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '');
+  return letters.join('') || '?';
+}
+
+// ---------------------------------------------------------------------------
+// The list.
+// ---------------------------------------------------------------------------
+
+/** One person in the People list. */
+export type PersonRow = {
+  /** The mentor's id, which the send names. */
+  id: string;
+  key: string;
+  name: string;
+  /** One quiet line about them, under their name in the thread. */
+  about: string;
+  colour: string;
+  canTalk: boolean;
+  chatId: string | null;
+  last: { text: string; role: 'person' | 'advisor'; at: string } | null;
+  unread: boolean;
+  typingUntil: string | null;
+  lastReadAt: string | null;
+};
+
+/** Newest thread first; people with nothing said yet after them, by name. */
+export function sortPeople(rows: readonly PersonRow[]): PersonRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.last && b.last) return b.last.at.localeCompare(a.last.at);
+    if (a.last) return -1;
+    if (b.last) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** The line under a name: their typing, the last thing said, or why there is nothing yet. */
+export function previewOf(row: PersonRow, now: number): string {
+  if (isTyping(row.typingUntil, now)) return 'typing…';
+  if (row.last) return row.last.role === 'person' ? `You: ${row.last.text}` : row.last.text;
+  return row.canTalk ? 'No messages yet' : 'Not ready to talk yet';
+}
+
+/** Where a person's thread is. */
+export function threadHref(key: string): string {
+  return `/chat/people/${key}`;
+}
+
+/** A thread's time in the list: the clock today, the day this week, the date before that. */
+export function threadTime(at: string, options: { timeZone: string; now: number }): string {
+  if (zoneDay(at, options.timeZone) === zoneDay(options.now, options.timeZone)) return whenTime(at, options);
+  return whenDay(at, options);
+}
+
+/** The search as kept: trimmed and cut to the box's length, or null for nothing to look for. */
+export function searchTextOf(value: unknown): string | null {
+  const text = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, SEARCH_TEXT_MAX) : '';
+  return text || null;
+}
+
+/** A message a search found, with whose thread it is in. */
+export type SearchHit = {
+  id: string;
+  key: string;
+  name: string;
+  colour: string;
+  role: 'person' | 'advisor';
+  text: string;
+  at: string;
+};
+
+// ---------------------------------------------------------------------------
+// The thread.
+// ---------------------------------------------------------------------------
+
+export type ThreadBlock =
+  | { kind: 'day'; key: string; label: string }
+  | { kind: 'group'; key: string; from: 'you' | 'them'; messages: ThreadMessage[] };
+
+/**
+ * The thread as it is drawn: a day label wherever the day changes, and
+ * consecutive messages from one sender grouped while they are under ten
+ * minutes apart.
+ */
+export function threadBlocks(messages: readonly ThreadMessage[], options: { timeZone: string; now: number }): ThreadBlock[] {
+  const out: ThreadBlock[] = [];
+  let day: string | null = null;
+  let group: Extract<ThreadBlock, { kind: 'group' }> | null = null;
+  let lastAt = 0;
+  for (const m of messages) {
+    const d = zoneDay(m.createdAt, options.timeZone);
+    if (d !== day) {
+      day = d;
+      group = null;
+      out.push({ kind: 'day', key: `day-${d}`, label: whenDay(m.createdAt, options) });
+    }
+    const from = m.role === 'person' ? 'you' : 'them';
+    const at = Date.parse(m.createdAt);
+    if (!group || group.from !== from || at - lastAt > GROUP_GAP_MS) {
+      group = { kind: 'group', key: `group-${m.id}`, from, messages: [] };
+      out.push(group);
+    }
+    group.messages.push(m);
+    lastAt = at;
+  }
+  return out;
+}
+
+/**
+ * What is said under your last message while it is the newest in the
+ * thread: Read once the mentor's reply has read it, Delivered once the reply
+ * run has it, Sent before either. A message of theirs after it says the rest.
+ */
+export function receiptOf(messages: readonly ThreadMessage[]): { id: string; label: 'Sent' | 'Delivered' | 'Read' } | null {
+  const last = messages.at(-1);
+  if (!last || last.role !== 'person') return null;
+  return { id: last.id, label: last.readAt ? 'Read' : last.deliveredAt ? 'Delivered' : 'Sent' };
+}
