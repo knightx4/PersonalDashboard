@@ -313,8 +313,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
   actions: TreeActions;
   /** The row's anchor. The dev plan's, which a `#494` in a comment lands on, by default. */
   anchorId?: string;
-  /** The answer that produced this row, when a re-shape wrote it. */
+  /** The answer (or the built step) that produced this row, when a re-shape wrote it. */
   origin?: {
+    /** An answer to a decision, or what building a step found. */
+    source?: 'answer' | 'build';
     number: number | null;
     /** As the stamp wrote it, to find its line: `1084` or `1073.4`. */
     written?: string;
@@ -414,7 +416,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
       .find(
         (line) =>
           line.trim() &&
-          !(origin && line.includes(`#${origin.written ?? origin.number}'s answer:`)) &&
+          !(
+            origin &&
+            line.includes(`#${origin.written ?? origin.number}'s ${origin.source ?? 'answer'}:`)
+          ) &&
           !sessionOrigin(line),
       ) ?? '';
   const glossText = readable(gloss);
@@ -638,7 +643,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             never think to open. */}
       {origin && (
         <span className="block truncate text-small text-ink-ghost">
-          From {origin.ref ?? `#${origin.written ?? origin.number}`}&apos;s answer:{' '}
+          From {origin.ref ?? `#${origin.written ?? origin.number}`}&apos;s {origin.source ?? 'answer'}:{' '}
           {readable(origin.gist)}
         </span>
       )}
