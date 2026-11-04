@@ -109,6 +109,7 @@ export const devSources: ModuleSources = {
     'public.plan_items',
     'public.plan_dependencies',
     'public.plan_history',
+    'public.plan_item_mockups',
     'public.plan_item_pictures',
     'public.post_preferences',
     'public.plan_runs',

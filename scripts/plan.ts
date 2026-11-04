@@ -14,6 +14,10 @@
  *                                [--detail "…"] [--done-when "…"]
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision|setup] [--from <n>] [--because "…"]
+ *                                [--mockup <html file> [--link <page>] | --no-mockup "<why>"]
+ *                                # a decision about a screen takes --mockup (#2810.3):
+ *                                # each data-option="A" element is photographed at 390 and 1280
+ *   npx tsx scripts/plan.ts mockup <n> --mockup <html file> [--link <page>]
  *                                # --from: the answered decision, or the built step
  *                                # whose finding (--because) made this step
  *                                # under an approved feature a step is ready
@@ -219,6 +223,9 @@ import {
   type PlanSection,
 } from '../lib/plan/tree';
 import { requireSupabaseProjectUrl } from '../lib/db/project';
+import { createClient } from '@supabase/supabase-js';
+import { PLAN_MOCKUPS_BUCKET, mockupRefusal, mockupStoragePath, optionLettersIn } from '../lib/plan/mockups';
+import { shootMockup, type MockupShot } from './mockup-shoot';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -295,6 +302,50 @@ async function checkRowWriting(
 }
 
 const argv = process.argv.slice(2);
+
+/**
+ * Photograph a mockup file and keep the pictures with a question (plan
+ * #2810.3). Shots are taken first, so a file that cannot be photographed fails
+ * before anything is written; the upload and the rows follow. A row is written
+ * per option and width, replacing the one already there.
+ */
+async function photographMockup(file: string): Promise<{ html: string; shots: MockupShot[] }> {
+  let html: string;
+  try {
+    html = readFileSync(file, 'utf8');
+  } catch {
+    fail(`Cannot read the mockup file ${file}.`);
+  }
+  const shots = await shootMockup(file, optionLettersIn(html));
+  return { html, shots };
+}
+
+async function keepMockup(
+  sql: Sql,
+  userId: string,
+  item: { id: string; number: number },
+  file: string,
+  link: string | null,
+  shots: MockupShot[],
+): Promise<void> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) fail('SUPABASE_SERVICE_ROLE_KEY is needed to upload the mockup pictures.');
+  const storage = createClient(requireSupabaseProjectUrl(), key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  }).storage.from(PLAN_MOCKUPS_BUCKET);
+  for (const shot of shots) {
+    const path = mockupStoragePath(userId, item.number, shot.optionLetter, shot.width);
+    const { error } = await storage.upload(path, shot.png, { contentType: 'image/png', upsert: true });
+    if (error) fail(`Uploading ${path} failed: ${error.message}. Attach it with: plan.ts mockup ${item.number} --mockup ${file}`);
+    await sql`
+      insert into plan_item_mockups (user_id, item_id, option_letter, width, storage_path, link, html_path)
+      values (${userId}, ${item.id}, ${shot.optionLetter}, ${shot.width}, ${path}, ${link}, ${file})
+      on conflict (item_id, coalesce(option_letter, ''), width)
+      do update set storage_path = excluded.storage_path, link = excluded.link, html_path = excluded.html_path`;
+  }
+  const letters = [...new Set(shots.map((s) => s.optionLetter ?? 'whole'))].join(', ');
+  console.log(`Kept ${shots.length} mockup pictures with #${item.number} (${letters}, at 390 and 1280).`);
+}
 
 function arg(flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -1115,6 +1166,16 @@ async function main(): Promise<void> {
      * where a routine on the account would otherwise be scheduled: this one is
      * on the Dash tab, and any session can finish it.
      */
+    /** Attach (or replace) the mockup pictures on a question already written. */
+    if (command === 'mockup') {
+      const file = arg('--mockup');
+      if (!target || !file) fail('mockup <n> --mockup <file.html> [--link <published page>]');
+      const item = await byNumber(sql, userId, target);
+      const photographed = await photographMockup(file);
+      await keepMockup(sql, userId, item, file, arg('--link'), photographed.shots);
+      return;
+    }
+
     if (command === 'check-back') {
       const title = target?.trim();
       if (!title) fail('Give it: check-back "<what to look at>" --after 2h [--detail "…"].');
@@ -1274,6 +1335,21 @@ async function main(): Promise<void> {
       const kind = arg('--kind') ?? 'build';
       if (!isPlanKind(kind)) fail('Kind is build, decision or setup.');
 
+      // A question about a screen carries a picture of each option (#2810.3).
+      const mockupFile = arg('--mockup');
+      const mockupLink = arg('--link');
+      const noMockup = arg('--no-mockup');
+      const missingMockup = mockupRefusal({
+        kind,
+        title,
+        detail: arg('--detail'),
+        mockup: mockupFile,
+        noMockupReason: noMockup,
+      });
+      if (missingMockup) fail(missingMockup);
+      if (mockupFile && kind !== 'decision') fail('--mockup goes with --kind decision.');
+      const photographed = mockupFile ? await photographMockup(mockupFile) : null;
+
       const [last] = parent
         ? await sql<{ position: number }[]>`
             select position from plan_items where user_id = ${userId} and parent_id = ${parent.id}
@@ -1364,6 +1440,7 @@ async function main(): Promise<void> {
         returning id, number`;
       // Read again, so the new row is named by the outline it just took.
       await loadOutlines(sql, userId, true);
+      if (photographed && mockupFile) await keepMockup(sql, userId, row, mockupFile, mockupLink, photographed.shots);
 
       const ideaPrefix = arg('--idea');
       if (ideaPrefix) {

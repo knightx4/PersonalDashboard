@@ -397,6 +397,13 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
+**A decision about a screen carries a mockup.** Draw each option in one HTML
+file, mark each with `data-option="A"`, `data-option="B"`, and add
+`--mockup <file> [--link <published page>]` to the `add`. The pictures at 390
+and 1280 wide show beside each option in the Inbox and on the plan page. `add`
+refuses a screen question without one; if it is not about how something looks,
+pass `--no-mockup "<why>"`. See `shaping.md`.
+
 A block always waits on a step, so a step that waits on data that does not
 exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
 --at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as

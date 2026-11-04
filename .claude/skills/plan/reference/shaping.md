@@ -161,6 +161,16 @@ goes in approved, and its procedure is the last section of this file.
    Recommend <A or B>: <why>."
    ```
 
+   **A decision about a screen carries a mockup of each option.** Draw the
+   options in one HTML file, put `data-option="A"`, `data-option="B"` on the
+   element that holds each, and add `--mockup <file>` (and `--link <published
+   page>` if you published it) to the `add`. It photographs each option at 390
+   and 1280 wide and keeps the pictures beside the question. `add` refuses a
+   decision whose title or detail names a screen, layout, pattern or tab
+   without one; a question that is not about how something looks takes
+   `--no-mockup "<why>"`. Keep the file in `docs/mockups/`. `plan.ts mockup
+   <n> --mockup <file>` attaches or replaces them on a question already written.
+
    Until it is answered, the step's detail says `Pattern: none fits, see
    #<the decision>`. The brief reads any name that is not one of the three
    as waiting on the person.
