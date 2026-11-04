@@ -3,7 +3,7 @@ import type { PushPayload } from '@/lib/push/send';
 
 /**
  * Where the reply to an Ask Dash chat's last question stands (plan #2854.4),
- * from the columns migration 0295 adds to core.conversations.
+ * from the columns migration 0296 adds to core.conversations.
  *
  * The answer runs on the server whether or not the page that asked is still
  * open (app/api/ask/route.ts). The chat keeps `reply_state` while it does, so
