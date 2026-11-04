@@ -46,7 +46,7 @@ const NO_INBOX_YET = new Set(['you', 'finances', 'chat']);
  * folded into its Now page (plan #1496.9); /vault/inbox opens Now. Such a
  * workspace has Now first and no Inbox tab, and so no badge anywhere.
  */
-const INBOX_ON_NOW = new Set<TabWorkspace>(['vault']);
+const INBOX_ON_NOW = new Set<TabWorkspace>(['vault', 'news']);
 
 function stringProp(node: ts.ObjectLiteralExpression, name: string): string | null {
   for (const prop of node.properties) {
