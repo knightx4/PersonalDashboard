@@ -13,6 +13,24 @@ export const segmentedFrame =
   '*:first:rounded-l-control *:last:rounded-r-control';
 
 /**
+ * The quiet frame: a grey track with no border, the picked segment a raised
+ * pill on it (`trackSegmentClass`). For a view switch that sits above the
+ * content it changes and should weigh less than it, as a goal's Plan tab
+ * draws What's next / By stage in its approved mockup (plan #2778.12).
+ */
+export const segmentedTrack = 'inline-flex gap-0.5 rounded-control bg-sunken p-0.75 *:press-area';
+
+/** One segment inside `segmentedTrack`: 13px muted, or ink on a raised pill when picked. */
+export function trackSegmentClass(on: boolean): string {
+  return cn(
+    'press inline-flex h-7 items-center gap-1.5 rounded-[calc(var(--radius-control)-2px)] px-3 text-ui font-medium',
+    'transition-colors duration-quick',
+    'focus-visible:outline-2 focus-visible:-outline-offset-2',
+    on ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink',
+  );
+}
+
+/**
  * One segment's classes, for a set whose segments are links: a view switch
  * or a scope switch that is an address. Inside `segmentedFrame`. Nine files
  * used to copy this string, and one had drifted to h-7, off the dial.

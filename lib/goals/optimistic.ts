@@ -60,7 +60,7 @@ export function withStepStatus(node: GoalRowNode, status: StepStatusChange): Goa
     ...node,
     status: 'not_started',
     blockAsk: null,
-    need: yours ? YOURS_ASK : waitLine(node.waitingOn, () => false),
+    need: yours ? null : waitLine(node.waitingOn, () => false),
     step,
     health: yours ? { ...words, word: YOURS_WORD, title: YOURS_ASK } : words,
   };
