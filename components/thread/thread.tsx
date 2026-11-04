@@ -268,9 +268,18 @@ function Composer({
   holdSend = false,
   send,
   autoFocus = true,
+  roomy = false,
+  beneath,
 }: {
   /** Take the caret when drawn; a chat's docked box waits to be pressed. */
   autoFocus?: boolean;
+  /**
+   * A larger, rounder box with room for a few lines before it grows, as
+   * Claude's is: the Dash tab of Chat (plan #2863).
+   */
+  roomy?: boolean;
+  /** Under the box, outside it, in quiet text: the pickers on the Dash tab of Chat (plan #2863). */
+  beneath?: React.ReactNode;
   formRef: React.RefObject<HTMLFormElement | null>;
   boxRef?: React.RefObject<HTMLTextAreaElement | null>;
   action?: (formData: FormData) => void;
@@ -325,7 +334,8 @@ function Composer({
     >
       {hidden}
       {over}
-      <ComposeBox>
+      {/* Roomy, the faint outline sets the box off, as Claude's does. */}
+      <ComposeBox className={roomy ? 'rounded-card border-border px-3 pb-2 pt-3' : undefined}>
         {attached}
         <div className="flex items-start gap-2">
           {lead}
@@ -340,7 +350,7 @@ function Composer({
             id={boxId}
             name={name}
             rows={1}
-            className="min-h-11 sm:min-h-0"
+            className={roomy ? 'min-h-11 min-[720px]:min-h-14' : 'min-h-11 sm:min-h-0'}
             autoFocus={autoFocus}
             maxLength={maxLength}
             placeholder={placeholder}
@@ -393,6 +403,7 @@ function Composer({
           </div>
         </div>
       </ComposeBox>
+      {beneath && <div className="mt-1.5 flex min-w-0 flex-wrap items-center justify-end gap-0.5 px-1">{beneath}</div>}
       {error}
     </form>
   );
@@ -1510,7 +1521,7 @@ function TalkThread({
       {held && <div
           ref={end}
           aria-hidden
-          className="h-28 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
+          className="h-40 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
         />}
       {!bubbles && (turns.length > 0 || failed || opening) && (
         <ul className="space-y-2.5">
@@ -1604,6 +1615,10 @@ function TalkThread({
             // A phone keeps its own dock at the foot of the screen, so there
             // the box stays in the flow and is scrolled to as before.
             dock && 'mt-auto pb-1 pt-3 min-[720px]:sticky min-[720px]:bottom-0 min-[720px]:z-over-link',
+            // Room under the pickers beneath the box (plan #2863).
+            // The pane's own colour keeps the turns from showing round the
+            // box and the pickers under it as they scroll beneath.
+            dock && bubbles && 'pb-3 min-[720px]:bg-surface',
             // The Dash tab of Chat holds it right above the phone's tab bar
             // as well, so the box never scrolls away with the thread (plan #2748.12).
             held &&
@@ -1719,8 +1734,13 @@ function TalkThread({
           onPaste={(event) => {
             if (adder.current?.paste(event.clipboardData)) event.preventDefault();
           }}
+          roomy={bubbles}
+          // The Dash tab of Chat keeps the box to the words, a + and Send,
+          // with what the answer reaches and who writes it in quiet text
+          // under the box, as Claude's is (plan #2863).
+          beneath={bubbles ? boxStart : undefined}
           footer={
-            withFiles || boxStart ? (
+            withFiles || (boxStart && !bubbles) ? (
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 {withFiles && (
                   <AddFile
@@ -1730,9 +1750,10 @@ function TalkThread({
                     disabled={sending}
                     onUploadingChange={setUploading}
                     iconOnPhone={Boolean(boxStart)}
+                    plus={bubbles}
                   />
                 )}
-                {boxStart}
+                {!bubbles && boxStart}
               </div>
             ) : undefined
           }

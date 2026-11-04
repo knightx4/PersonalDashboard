@@ -107,7 +107,7 @@ const NEW_PROJECTS = [
   { id: 'recipes', label: 'Recipes' },
 ];
 
-export type SessionSurfacePart = 'open' | 'working' | 'question' | 'attach' | 'empty' | 'failed';
+export type SessionSurfacePart = 'open' | 'working' | 'question' | 'attach' | 'empty' | 'failed' | 'comment' | 'picked';
 
 export function SessionThreadSurface({ part = 'open' }: { part?: SessionSurfacePart }) {
   const thread = SESSION_THREADS[0];
@@ -147,6 +147,43 @@ export function SessionThreadSurface({ part = 'open' }: { part?: SessionSurfaceP
       <SessionThreadView
         thread={{ ...thread, state: 'waiting' }}
         messages={[...OPENING, QUESTION]}
+        live={false}
+        now={NOW}
+      />
+    );
+  } else if (part === 'comment') {
+    // The mockup's Comment pressed, before anything is typed.
+    view = (
+      <SessionThreadView
+        thread={{ ...thread, state: 'waiting' }}
+        messages={[...OPENING, QUESTION]}
+        initialCommentOn="m3"
+        live={false}
+        now={NOW}
+      />
+    );
+  } else if (part === 'picked') {
+    // Pick pressed: the card carries the mark and your pick follows it as a turn.
+    view = (
+      <SessionThreadView
+        thread={{ ...thread, state: 'working' }}
+        messages={[
+          ...OPENING,
+          message({
+            id: 'm6',
+            author: 'person',
+            createdAt: at(10, 14),
+            body: 'Picked the mockup \u201cSeason page with Export CSV beside the season name\u201d',
+            artifactUrl: 'https://claude.ai/artifact/preview-jam-export',
+          }),
+          message({
+            id: 'm7',
+            author: 'person',
+            createdAt: at(10, 15),
+            body: 'About the mockup \u201cSeason page with Export CSV beside the season name\u201d: Make the button the accent colour, it is the main thing on that page.',
+            artifactUrl: 'https://claude.ai/artifact/preview-jam-export',
+          }),
+        ]}
         live={false}
         now={NOW}
       />

@@ -200,21 +200,26 @@ function ChatRow({
       <Link
         href={`/chat/dash/${chat.ref}`}
         aria-current={on ? 'page' : undefined}
+        title={snippet === undefined ? exactTime(chat.lastAt) : undefined}
         className={cn(
-          'flex min-h-11 items-start gap-2.5 rounded-control py-2 pl-2 pr-9 transition-colors duration-quick',
+          // Close-set, as Claude's sidebar is (plan #2863); a finger keeps its 44 pixels.
+          'flex min-h-11 items-center gap-2.5 rounded-control py-1.5 pl-2 pr-9 transition-colors duration-quick sm:min-h-8',
+          snippet !== undefined && 'items-start',
           on ? 'bg-accent-tint' : 'hover:bg-sunken',
         )}
       >
-        {/* A name and a day (plan #2748.1): the workspaces a chat used are
-            no longer drawn on its row, since Dash's tab is one list. */}
+        {/* The name alone in the list, under the day it falls in (plan
+            #2863); a found chat carries its day, since the search mixes them. */}
         <span className="block min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className={cn('min-w-0 flex-1 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
             {name}
           </span>
-          <time dateTime={chat.lastAt} title={exactTime(chat.lastAt)} className="tabular shrink-0 text-small text-ink-muted">
-            {when}
-          </time>
+          {snippet !== undefined && (
+            <time dateTime={chat.lastAt} title={exactTime(chat.lastAt)} className="tabular shrink-0 text-small text-ink-muted">
+              {when}
+            </time>
+          )}
         </span>
         {snippet && (
           <span className="mt-0.5 line-clamp-2 block text-small text-ink-muted">
@@ -231,7 +236,7 @@ function ChatRow({
         items={items}
         defaultOpen={menuOpen}
         className={cn(
-          'absolute right-0.5 top-1.5',
+          'absolute right-0.5 top-1/2 -translate-y-1/2',
           // A pointer that hovers finds it on the row; a finger always sees it.
           !menuOpen &&
             '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:has-[[aria-expanded=true]]:opacity-100 [@media(hover:hover)]:focus-within:opacity-100',
@@ -427,15 +432,13 @@ export function AskChats({
           sessions={sessions}
           failed={sessionsFailed}
           active={activeSession}
-          whenOf={(at) => {
-            const since = commentWhen(at, now);
-            return since === at.slice(0, 10) ? shortDay(at.slice(0, 10)) : since;
-          }}
         />
       )}
 
       {chats.length === 0 ? (
-        <div className="px-2">
+        // From laptop width the list has no card of its own (plan #2863), so
+        // the line saying it is empty sits on a quiet panel, as on a phone.
+        <div className="px-2 min-[720px]:rounded-card min-[720px]:bg-surface min-[720px]:p-3">
           {failed ? (
             <p className="text-ui text-danger">Your chats could not be read. Reload to try again.</p>
           ) : (
@@ -457,11 +460,11 @@ export function AskChats({
           )}
         </section>
       ) : (
-        <nav aria-label="Chats with Dash" className="space-y-3">
+        <nav aria-label="Chats with Dash" className="space-y-4">
           {groups.map(({ group, chats: inGroup }) => (
             <section key={group} aria-label={group}>
               <h3 className="px-2 text-small font-medium text-ink-muted">{group}</h3>
-              <ul className="mt-1 space-y-0.5">{inGroup.map((chat) => row(chat, whenOf(chat)))}</ul>
+              <ul className="mt-0.5">{inGroup.map((chat) => row(chat, whenOf(chat)))}</ul>
             </section>
           ))}
           {listed.length === 0 && (
@@ -477,7 +480,7 @@ export function AskChats({
           defaultOpen={initialArchivedOpen}
           summaryClassName="px-2 text-small font-medium"
         >
-          <ul className="mt-1 space-y-0.5">{archived.map((chat) => row(chat, whenOf(chat)))}</ul>
+          <ul className="mt-0.5">{archived.map((chat) => row(chat, whenOf(chat)))}</ul>
         </Disclosure>
       )}
 
@@ -510,12 +513,10 @@ function SessionThreads({
   sessions,
   failed,
   active,
-  whenOf,
 }: {
   sessions: readonly SessionThread[];
   failed: boolean;
   active: string | null;
-  whenOf: (at: string) => string;
 }) {
   // An empty group is not drawn: with no threads, the way in is the quiet
   // line at the foot of the list (TalkToASession).
@@ -534,7 +535,7 @@ function SessionThreads({
       {failed ? (
         <p className="px-2 text-small text-danger">Your session threads could not be read. Reload to try again.</p>
       ) : (
-        <ul className="mt-1 space-y-0.5">
+        <ul className="mt-0.5">
           {sessions.map((thread) => {
             const on = thread.id === active;
             const word = stateWord(thread.state);
@@ -543,18 +544,15 @@ function SessionThreads({
                 <Link
                   href={sessionThreadPath(thread.id)}
                   aria-current={on ? 'page' : undefined}
+                  title={exactTime(thread.lastAt)}
                   className={cn(
-                    'block min-h-11 rounded-control px-2 py-2 transition-colors duration-quick',
+                    'block min-h-11 rounded-control px-2 py-1.5 transition-colors duration-quick',
                     on ? 'bg-accent-tint' : 'hover:bg-sunken',
                   )}
                 >
-                  <span className="flex items-baseline gap-2">
-                    <span className={cn('min-w-0 flex-1 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
-                      {thread.title}
-                    </span>
-                    <time dateTime={thread.lastAt} title={exactTime(thread.lastAt)} className="tabular shrink-0 text-small text-ink-muted">
-                      {whenOf(thread.lastAt)}
-                    </time>
+                  {/* The name alone on its line, as the chats below it (plan #2863). */}
+                  <span className={cn('block min-w-0 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
+                    {thread.title}
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-small text-ink-muted">
                     <span className="min-w-0 truncate">{thread.projectLabel}</span>

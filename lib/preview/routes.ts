@@ -416,6 +416,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-session-attach': ['/chat/dash/session/[id]'],
   'chat-session-empty': ['/chat/dash/session/[id]'],
   'chat-session-failed': ['/chat/dash/session/[id]'],
+  'chat-session-comment': ['/chat/dash/session/[id]'],
+  'chat-session-picked': ['/chat/dash/session/[id]'],
   'chat-people': ['/chat'],
   'chat-people-empty': ['/chat'],
   'chat-people-failed': ['/chat'],
