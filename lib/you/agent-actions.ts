@@ -213,6 +213,19 @@ export const youActions: ModuleActions = {
       "Who sits on a panel is the person's own call on whom to hear from (plan #2561.12).",
     ),
     deleteBoardPanel: none('deletes'),
+    drawAdvisorAvatar: none(
+      'page',
+      'Draws a look the person is trying on in the avatar editor and keeps nothing; it is the editor\'s preview (plan #2581.3).',
+    ),
+    saveAdvisorAvatar: none('own', "How an advisor is drawn is the person's own choice of look (plan #2581.3)."),
+  },
+  // The Talk tab of an advisor's profile (plan #2581.6).
+  'app/you/council/advisors/[key]/talk-actions.ts': {
+    sendToAdvisor: none(
+      'spends',
+      "Sends the person's own message to an advisor and pays for the advisor's reply; in the Claude app the connector's talk_to_advisor runs the same send.",
+    ),
+    forgetAdvisorMemory: none('theirs', 'Having an advisor forget something is the person correcting what Dash noted about them.'),
   },
   'app/you/details/actions.ts': {
     letterheadAction: none(

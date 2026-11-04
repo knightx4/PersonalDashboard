@@ -16,6 +16,11 @@ const RUNNERS: Record<SlotId, DashRunner> = {
   'feature-3': 'feature-3',
   'feature-4': 'goals',
   goals: 'goals',
+  // A Dev project's seats reuse the four Dashes, in the same order.
+  'project-1': 'feature-1',
+  'project-2': 'feature-2',
+  'project-3': 'feature-3',
+  'project-4': 'goals',
 };
 
 /** What a slot is doing, in the few words a tip has room for. */

@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadYourInitial } from '@/lib/core/account/your-initial';
 import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
@@ -46,9 +47,8 @@ import { sectionSubject } from '@/lib/core/section-path';
 import { Thread } from '@/components/thread/thread';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
-import { repoKey } from '@/lib/plan/github';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { ProjectMainLine } from './project-main-line';
+import { ProjectLiveLoading } from './project-live';
+import { ProjectLiveSection } from './project-live-section';
 import { NowSection } from './now-section';
 import { loadNow } from '@/lib/plan/now-load';
 import { outlineIndex } from '@/lib/plan/ref';
@@ -255,10 +255,6 @@ export async function renderPlanPage({
   const projectTurns = projectRef
     ? await loadThread(supabase, projectRef, { userId: user.id }).catch(() => [])
     : [];
-  // A project's own main, read from its row the tick keeps (plan #2553.2).
-  const projectMain = project
-    ? { repo: repoKey(project.repo), check: await loadMainCheck(repoKey(project.repo)) }
-    : null;
   const renderedAt = Date.now();
   // What is running now, at the top of the page (plan #2800.3): the sessions'
   // own reports, and the push-based reading for runs that have not reported.
@@ -318,8 +314,12 @@ export async function renderPlanPage({
         }
       />
       <NowSection list={now} />
-      {projectMain && (
-        <ProjectMainLine check={projectMain.check} repo={projectMain.repo} now={renderedAt} />
+      {/* Whether its latest work is live, read from GitHub and Vercel when
+          the page opens (plan #2800.6); the plan below does not wait on it. */}
+      {project && (
+        <Suspense fallback={<ProjectLiveLoading />}>
+          <ProjectLiveSection project={project} now={renderedAt} />
+        </Suspense>
       )}
       {sync.added > 0 && (
         <p className="text-small text-ink-muted">

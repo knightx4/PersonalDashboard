@@ -4,6 +4,8 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { loadCouncilHome } from '@/lib/you/council';
 import { listOpenReviews } from '@/lib/you/board-reviews';
 import { listDueTripwires } from '@/lib/you/board-tripwires';
+import { loadAvatarSprite } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from './advisor-avatar';
 import { CouncilView } from './council-view';
 
 export const metadata = { title: 'Council' };
@@ -24,19 +26,22 @@ export default async function Page() {
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
-  const [home, reviews, tripwires, settings] = await Promise.all([
+  const [home, reviews, tripwires, settings, avatars] = await Promise.all([
     loadCouncilHome(client, user.id, now),
     listOpenReviews(client, user.id),
     listDueTripwires(client, user.id),
     loadAccountSettings(user.id),
+    loadAvatarSprite(client, user.id),
   ]);
   return (
-    <CouncilView
-      mentors={home.mentors}
-      unreadTexts={home.unreadTexts}
-      due={reviews.length + tripwires.length}
-      timezone={settings.timezone}
-      now={now}
-    />
+    <AdvisorAvatars {...avatars}>
+      <CouncilView
+        mentors={home.mentors}
+        unreadTexts={home.unreadTexts}
+        due={reviews.length + tripwires.length}
+        timezone={settings.timezone}
+        now={now}
+      />
+    </AdvisorAvatars>
   );
 }

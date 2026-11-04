@@ -20,8 +20,6 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
   ],
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-    { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
     {
       href: '/news/all',
       label: 'Newsletters',
@@ -29,7 +27,6 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
       exact: true,
       alsoMatches: ['/news/i/'],
     },
-    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ],
   todo: [
     { href: '/todo', label: 'Now', icon: 'agenda', exact: true },
@@ -39,11 +36,8 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ],
   vault: [
+    // Inbox and Triage folded into Now, Map and Maya frozen (plan #1496.9).
     { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-    { href: '/vault/inbox', label: 'Inbox', icon: 'inbox' },
-    { href: '/vault/triage', label: 'Triage', icon: 'triage' },
-    { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-    { href: '/vault/maya', label: 'Maya', icon: 'maya' },
   ],
   you: [
     { href: '/you/personality', label: 'Personality', icon: 'personality' },

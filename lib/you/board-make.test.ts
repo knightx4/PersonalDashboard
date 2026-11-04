@@ -14,6 +14,11 @@ const options = [
   { letter: 'B', text: 'Keep the search full time' },
 ];
 const verdict = {
+  method: null,
+  probability: null,
+  spread: null,
+  forecasts: [],
+  steelman: null,
   recommended: 'A',
   conditions: ['Get one evening written in by 2026-11-13.', 'Keep two applications a week.'],
   dissent: [],

@@ -2,12 +2,18 @@ import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { AskInputError, type AskDb, type AskRow, type AskToolResult, type SchemaClient } from '@/lib/ask/db';
+import { AskInputError, type AskContext, type AskDb, type AskRow, type AskToolResult, type SchemaClient } from '@/lib/ask/db';
 import { recordDashAction } from '@/lib/core/dash-actions';
 import type { DashWriteContext } from '@/lib/dash/registry';
 import { WRITE_TOOLS } from '@/lib/dash/writes';
 import type { ModuleId } from '@/lib/modules';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { executeAskTool } from '@/lib/ask/tools';
+import { chatRef } from '@/lib/you/advisor-talk-run';
+import { sendToAdvisorWith } from '@/lib/you/advisor-talk-send';
 import {
   MAX_CHAT_ITEMS,
   addChatReadings,
@@ -100,6 +106,12 @@ export type ConnectorWriteContext = {
    * (connectorAccess): a write into a workspace that is off is refused.
    */
   account?: { enabledModules: readonly ModuleId[]; today: string; timezone?: string };
+  /**
+   * The lookups the verified person's token reads through (connectorAccess),
+   * which an advisor talked to over the connector reads their rows with.
+   * Absent: talk_to_advisor is refused.
+   */
+  lookups?: AskContext;
 };
 
 export type ConnectorWriteTool = {
@@ -1008,6 +1020,66 @@ const reportProgress: ConnectorWriteTool = {
   },
 };
 
+/**
+ * Talking to one advisor (plan #2581.7): the same exchange as the Talk tab of
+ * their profile (lib/you/advisor-talk-send.ts), so the talk is kept there and
+ * what the advisor learns is remembered. The reply comes back in the advisor's
+ * own voice; the Claude app passes it on as theirs.
+ */
+const talkToAdvisor: ConnectorWriteTool = {
+  definition: {
+    name: 'talk_to_advisor',
+    description:
+      "Talk to one of the person's advisors alone (Buffett, Munger, Dalio or any other in their council) and get that advisor's reply, in character. Use it when they ask to talk to, ask or hear from an advisor by name, such as \"talk to Buffett about taking the Stripe offer\". The advisor knows their goals and open decisions, remembers earlier talks, and can look up their rows. Pass the advisor's key (their lower-case name, such as buffett) and the person's message in their own words. The first call starts a talk and returns its chat_id; pass that chat_id back on every later message so the talk goes on. Quote the reply as the advisor's, do not rewrite it, and do not answer for the advisor yourself. What the advisor should remember of the exchange is kept by Dash, and the talk shows on the advisor's page in the dashboard.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        advisor: { type: 'string', description: "The advisor's key: their lower-case name, such as buffett or munger." },
+        message: { type: 'string', description: "What the person says to the advisor, in their words." },
+        chat_id: { type: 'string', description: 'The chat_id a first message returned, to go on with the same talk. Leave out to start a new one.' },
+      },
+      required: ['advisor', 'message'],
+      additionalProperties: false,
+    },
+  },
+  async run(ctx, input) {
+    if (!ctx.db || !ctx.account || !ctx.lookups) refuse();
+    if (!ctx.account.enabledModules.includes('you')) {
+      throw new AskInputError('The You workspace is switched off, so no advisor can be talked to.');
+    }
+    const lookups = ctx.lookups;
+    const sent = await sendToAdvisorWith({
+      you: (await ctx.db('you')) as unknown as YouSupabaseClient,
+      goals: (await ctx.db('goals')) as unknown as GoalsSupabaseClient,
+      core: ctx.core as unknown as CoreSupabaseClient,
+      userId: ctx.userId,
+      key: required(input, 'advisor', 40).toLowerCase(),
+      chatId: str(input, 'chat_id', 40),
+      raw: required(input, 'message', 100_000),
+      today: ctx.account.today,
+      execute: (name, args) => executeAskTool(name, args, lookups),
+      anthropicApiKey: ctx.anthropicApiKey,
+      later: ctx.later,
+    });
+    if (sent.error) throw new AskInputError(sent.error);
+    const reply = sent.turns?.[sent.turns.length - 1];
+    if (!reply) throw new AskInputError(`${sent.advisorName ?? 'The advisor'} did not reply.`);
+    return {
+      ok: true,
+      rows: [
+        {
+          table: 'you.advisor_chats',
+          ref: chatRef(sent.chatId ?? ''),
+          title: `${sent.advisorName ?? 'Advisor'}, in a talk`,
+          href: sent.href ?? '/you/council',
+          detail: { chat_id: sent.chatId ?? null, advisor: sent.advisorName ?? null, reply: reply.body },
+        },
+      ],
+      note: `${sent.advisorName}'s reply is in rows[0].detail.reply. Pass chat_id ${sent.chatId} back to go on with this talk.`,
+    };
+  },
+};
+
 /** Every write the connector offers, in the order clients are sent them. */
 export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   addToReadingList,
@@ -1037,6 +1109,7 @@ export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
   ...LEARN_TOOLS,
   ...TODO_TOOLS,
   ...YOU_TOOLS,
+  talkToAdvisor,
   ...NEWS_TOOLS,
   ...GOALS_TOOLS,
   ...SHOPPING_TOOLS,

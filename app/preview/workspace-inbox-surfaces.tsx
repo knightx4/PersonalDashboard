@@ -1,10 +1,12 @@
 'use client';
 
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
+import { NewsInboxFold } from '@/app/news/now-fold-views';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
+import { VaultNowInbox } from '@/components/vault/now-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
 import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
-import { reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
+import { ReviewViewChips, reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
 import type { MessageOpen } from '@/components/jobs/review/rows';
 
 /**
@@ -152,7 +154,6 @@ export const TODO: InboxRow[] = [
 ];
 
 const VAULT: InboxRow[] = [
-  ...queue(queueRow('vault-triage', 3)),
   {
     ref: 'obsidian.notes:n1',
     section: 'questions',
@@ -181,12 +182,32 @@ const LEARN: InboxRow[] = [
   },
 ];
 
+/** News's Inbox is mostly empty; the Now fold is drawn with one question on it. */
+const NEWS_ON_YOU: InboxRow[] = [
+  {
+    ref: 'news.issues:n1',
+    section: 'questions',
+    title: 'Should the Slow Technology Weekly digest keep coming, or should Dash mute it?',
+    line: 'Dash asked on a newsletter you have not opened in six weeks',
+    href: '/news/all',
+    move: onYou,
+    later,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/news/all' }],
+    decline,
+  },
+];
+
+/** The Inbox fold as News's Now draws it; the rows are built here because functions in them cannot cross from the server. */
+export function NewsInboxFoldSurface() {
+  return <NewsInboxFold rows={NEWS_ON_YOU} />;
+}
+
 export function ShoppingInboxSurface() {
   return <WorkspaceInbox workspace="shopping" rows={SHOPPING} />;
 }
 
 /**
- * The Jobs Inbox with its review items listed (plan #2502.2): the gallery
+ * The Jobs Inbox with every review item listed (plans #2502.2, #1496.7.3): the gallery
  * passes the review queue's fixtures, and which message has its picker or
  * form open, or a failed press, for the hidden parts.
  */
@@ -202,7 +223,8 @@ export function JobsInboxSurface({
   return (
     <WorkspaceInbox
       workspace="jobs"
-      rows={[...reviewInboxRows(review, 'Europe/London', { open, failed }), ...JOBS_ON_YOU]}
+      rows={[...reviewInboxRows(review, 'Europe/London', 'all', { open, failed }), ...JOBS_ON_YOU]}
+      sectionTools={{ review: <ReviewViewChips counts={review.counts} view="all" /> }}
     />
   );
 }
@@ -211,14 +233,15 @@ export function TodoInboxSurface() {
   return <WorkspaceInbox workspace="todo" rows={TODO} />;
 }
 
+/**
+ * The Vault's Inbox on its Now page (plan #1496.9): its on-you rows, without
+ * the quick notes' count row, which the triage deck below lists one by one.
+ */
 export function VaultInboxSurface() {
-  return <WorkspaceInbox workspace="vault" rows={VAULT} />;
+  return <VaultNowInbox rows={VAULT.filter((row) => !row.ref.startsWith('queue:'))} />;
 }
 
 export function LearnInboxSurface() {
   return <WorkspaceInbox workspace="learn" rows={LEARN} />;
 }
 
-export function NewsInboxSurface() {
-  return <WorkspaceInbox workspace="news" rows={[]} />;
-}

@@ -94,7 +94,22 @@ const PERMISSION_FOR: ReadonlyArray<readonly [string, string]> = [
  * those are a sentence rather than a number. The status stays in the text
  * because it is the thing to search for if the sentence turns out wrong.
  */
-export function refusalFor(status: number, path: string): string {
+/**
+ * Whether a refusal came from a cloud session's network proxy, not GitHub.
+ *
+ * A Claude Code cloud session sends api.github.com through a proxy that puts
+ * its own short-lived credential on each request in place of the one sent,
+ * and refuses with a 403 any repository not attached to the session. On
+ * 4 November 2026 that refusal on knightx4/music-pipeline was reported as
+ * GITHUB_READ_TOKEN lacking access, and the person was sent to change a token
+ * that already read every repository they own. GitHub's own 403s never carry
+ * this wording, so the body tells the two apart.
+ */
+export function isSessionRefusal(body: string | null | undefined): boolean {
+  return !!body && /not enabled for this session|use add_repo/i.test(body);
+}
+
+export function refusalFor(status: number, path: string, body?: string | null): string {
   // The repository the refused path is about, so a token that reads this app
   // but not a project's repository is told which one it is missing.
   // A path with no repository in it is asked of nobody, and GitHub's 404 for
@@ -104,6 +119,9 @@ export function refusalFor(status: number, path: string): string {
   }
   const named = /^\/repos\/([^/]+)\/([^/?]+)/.exec(path);
   const where = named ? `${named[1]}/${named[2]}` : REPO_KEY;
+  if (status === 403 && isSessionRefusal(body)) {
+    return `This session does not have ${where} attached, so its proxy refused the request (403) before it reached GitHub; GITHUB_READ_TOKEN was never tried. Call add_repo for ${where} and ask again, or, in a routine run, which has no add_repo, close it from a session that has the repository attached. Nothing in the token's settings needs changing.`;
+  }
   if (status === 401) {
     return `GITHUB_READ_TOKEN was rejected by GitHub (401) — it has expired or is mistyped. Set a new one in Vercel and redeploy.`;
   }
@@ -132,7 +150,9 @@ export async function ask<T>(
     cache: 'no-store',
   });
   if (!res.ok) {
-    throw new Error(refusalFor(res.status, path));
+    // The body is read only to tell a session proxy's refusal from GitHub's.
+    const body = res.status === 403 ? await res.text().catch(() => null) : null;
+    throw new Error(refusalFor(res.status, path, body));
   }
   return (await res.json()) as T;
 }

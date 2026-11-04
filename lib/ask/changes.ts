@@ -177,7 +177,7 @@ export function changePaths(change: DashChange): string[] {
       ];
     }
     case 'add_quick_note':
-      return ['/vault', '/vault/triage'];
+      return ['/vault'];
     case 'start_build':
       return ['/dev/plan', `/dev/plan/${change.input.number}`];
     case 'paid_action':
