@@ -8,7 +8,6 @@ import { IconButton } from '@/components/ui/icon-button';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Popover } from '@/components/ui/popover';
 import { SectionHeading } from '@/components/ui/section-heading';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { usePopover } from '@/lib/use-popover';
@@ -473,54 +472,53 @@ function OptionsCard({ question, forecasts }: { question: DebateQuestion; foreca
           );
         })}
       </ol>
-      <Table stack={false} fit>
-        <caption className="sr-only">
-          Each advisor’s chance for each option, the points they bet on it, and their 90% range
-        </caption>
-        <THead>
-          <tr className="border-b border-border">
-            <TH>Advisor</TH>
-            {question.options.map((option) => (
-              <TH key={option.letter} num>
-                {option.letter}
-              </TH>
-            ))}
-          </tr>
-        </THead>
-        <TBody>
-          {forecasts.map((f) => {
-            const top = topOf(f);
-            return (
-              <TR key={f.advisor.id}>
-                <TD primary className="align-top">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <AdvisorAvatar advisorKey={f.advisor.key} name={f.advisor.name} decorative />
-                    <span className="[overflow-wrap:anywhere]">{f.advisor.name}</span>
-                  </span>
-                </TD>
+      <ul className="divide-y divide-border" aria-label="Each advisor on each option">
+        {forecasts.map((f) => {
+          const top = topOf(f);
+          return (
+            <li key={f.advisor.id} className="card-pad-x space-y-1.5 py-3">
+              <p className="flex min-w-0 items-center gap-1.5 text-ui font-medium text-ink">
+                <AdvisorAvatar advisorKey={f.advisor.key} name={f.advisor.name} decorative />
+                <span className="[overflow-wrap:anywhere]">{f.advisor.name}</span>
+              </p>
+              <dl
+                className="grid gap-x-3"
+                style={{ gridTemplateColumns: `repeat(${question.options.length}, minmax(0, 1fr))` }}
+              >
                 {question.options.map((option) => {
                   const p = f.probabilities[option.letter];
                   const range = f.ranges?.[option.letter];
                   const points = f.budget?.[option.letter];
+                  const backs = top === option.letter;
                   return (
-                    <TD key={option.letter} num className="align-top">
-                      <span className={cn('block', top === option.letter ? 'font-semibold text-ink' : 'text-ink-muted')}>
-                        {typeof p === 'number' ? pct(p) : '–'}
-                      </span>
-                      {typeof points === 'number' && (
-                        <span className="block text-small text-ink-muted">{points} pts</span>
-                      )}
-                      {range && <span className="block text-small text-ink-muted">{rangeText(range, true)}</span>}
-                    </TD>
+                    <div key={option.letter} className="min-w-0">
+                      <dt className="sr-only">Option {option.letter}</dt>
+                      <dd className="tabular text-ui">
+                        <span className="text-small text-ink-muted">{option.letter} </span>
+                        <span className={backs ? 'font-semibold text-ink' : 'text-ink-muted'}>
+                          {typeof p === 'number' ? pct(p) : '–'}
+                        </span>
+                        {typeof points === 'number' && (
+                          <span className={cn('block text-small', backs ? 'text-ink' : 'text-ink-muted')}>
+                            {points} pts
+                          </span>
+                        )}
+                        {range && (
+                          <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
+                            {rangeText(range, true)}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
                   );
                 })}
-              </TR>
-            );
-          })}
-        </TBody>
-      </Table>
+              </dl>
+            </li>
+          );
+        })}
+      </ul>
       <p className="card-pad-x border-t border-border py-2 text-small text-ink-muted">
-        Under each option, every advisor’s chance that it meets your measure, the points of 100 they bet
+        For each advisor and option: their chance that it meets your measure, the points of 100 they bet
         on it, and their 90% range. In bold, the option each bet most on. Beside each option above, the
         weighted chance.
       </p>

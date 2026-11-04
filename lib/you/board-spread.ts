@@ -181,8 +181,13 @@ export function quotable(text: string): string | null {
   return `${cut.slice(0, Math.max(cut.lastIndexOf(' '), 100)).replace(/[,;:\s]+$/, '')}…`;
 }
 
-/** The exchange between the two most opposed: round 2 turns addressed to one another. */
+/**
+ * The exchange between the two most opposed: round 2 turns addressed to one
+ * another. A unanimous decision has a steelman in its place, whose answer is
+ * addressed too, so it has no exchange.
+ */
 export function theExchange(question: DebateQuestion): DebateTurn[] {
+  if (question.turns.some((t) => BRIEF_OPENING.test(t.text))) return [];
   return question.turns.filter(
     (t) => t.round === 2 && t.addressedTo !== null && !BRIEF_OPENING.test(t.text),
   );
@@ -209,7 +214,7 @@ export function leanReplies(question: DebateQuestion): DebateTurn[] {
  * gets the first row where it is at least `gap` from every dot already
  * there, in order of value.
  */
-export function stackDots<T extends { p: number }>(dots: readonly T[], gap = 0.09): (T & { row: number })[] {
+export function stackDots<T extends { p: number }>(dots: readonly T[], gap = 0.13): (T & { row: number })[] {
   const rows: number[][] = [];
   return [...dots]
     .sort((a, b) => a.p - b.p)

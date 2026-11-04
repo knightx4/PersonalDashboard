@@ -110,6 +110,21 @@ describe('quotable', () => {
   });
 });
 
+it('gives a unanimous decision its steelman and no exchange', () => {
+  const debate = debateFrom(
+    [question()],
+    [
+      turn({ advisor_id: 'a1', probabilities: { A: 0.7, B: 0.3 }, blind: true }),
+      turn({ advisor_id: 'a2', round: 2, kind: 'reply', addressed_to: 'a1', text: 'Arguing for B, which nobody backed: the wall.' }),
+      turn({ advisor_id: 'a1', round: 2, kind: 'reply', addressed_to: 'a2', text: 'Skeptic, it does not hold.' }),
+    ],
+    advisors,
+  );
+  const q = debate.questions[0];
+  expect(theExchange(q)).toEqual([]);
+  expect(steelmanOf(q)?.answer?.text).toBe('Skeptic, it does not hold.');
+});
+
 describe('stackDots', () => {
   it('stacks dots that would overlap', () => {
     const got = stackDots([{ p: 0.5 }, { p: 0.52 }, { p: 0.9 }]);
