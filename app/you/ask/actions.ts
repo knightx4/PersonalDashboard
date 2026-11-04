@@ -10,14 +10,16 @@ import {
   answerDashQuestion,
   editDashAnswer,
   skipDashQuestion,
+  unskipDashQuestion,
   type DashQuestionResult,
 } from '@/lib/you/dash-questions';
 import { startQuestionRun } from '@/lib/you/dash-questions-run';
 
 /**
- * The Answer tab's three presses (plan #2617.2): answer an open or skipped
- * question, skip an open one, change an answer already given. Each runs as the
- * person, on their client, and names their id as well.
+ * The Ask tab's presses (plans #2617.2, #2635.3): answer an open or skipped
+ * question, skip an open one, put a skipped one back, change an answer
+ * already given. Each runs as the person, on their client, and names their
+ * id as well.
  */
 
 const NOT_A_QUESTION: DashQuestionResult = { ok: false, error: 'That is not one of your questions.' };
@@ -51,6 +53,13 @@ export async function answerQuestion(id: string, answer: string): Promise<DashQu
 export async function skipQuestion(id: string): Promise<DashQuestionResult> {
   if (!isId(id)) return NOT_A_QUESTION;
   return run((client, userId) => skipDashQuestion(client, userId, id));
+}
+
+/** Put a skipped question back with the open ones (plan #2635.3). */
+// latency: pending
+export async function unskipQuestion(id: string): Promise<DashQuestionResult> {
+  if (!isId(id)) return NOT_A_QUESTION;
+  return run((client, userId) => unskipDashQuestion(client, userId, id));
 }
 
 /** Change the answer to a question already answered. */

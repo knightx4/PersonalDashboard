@@ -627,11 +627,11 @@ The schools, certifications, honors, skills and courses on their LinkedIn profil
 
 ### `you.dash_questions` (You)
 
-Their answers to the questions Dash asked them about themselves on the Answer tab, in their own words.
+Their answers to the questions Dash asked them about themselves on the Ask tab, in their own words.
 
 - Search: `question`, `answer`
 - Name a row by `question`; link it by `id`
-- Opens at `/you/answer`
+- Opens at `/you/ask`
 - question and why are written by Dash; answer is theirs, so cite the answer. status is open, answered or skipped: only an answered row says anything about them, so leave open and skipped rows out. answered_at is when they first answered; updated_at moves when they change the answer (you 0033).
 
 ### `you.advisor_chats` (You)

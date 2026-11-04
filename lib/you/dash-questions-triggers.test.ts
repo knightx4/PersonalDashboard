@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { runDashQuestionsTick } from '@/inngest/you/dash-questions-tick';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { QUESTION_RUN_STALE_AFTER_MS, WEEKLY_BRIEF_LINE } from '@/lib/you/dash-questions-run';
-import { decideQuestionRun, type QuestionTickRun } from '@/lib/you/dash-questions-triggers';
+import { decideQuestionRun, nextWeeklyAskAt, type QuestionTickRun } from '@/lib/you/dash-questions-triggers';
 
 const NOW = Date.parse('2026-11-01T12:00:00Z');
 const daysAgo = (d: number) => new Date(NOW - d * 24 * 3600_000).toISOString();
@@ -22,6 +22,33 @@ const base = {
   staleAfterMs: QUESTION_RUN_STALE_AFTER_MS,
 };
 const decide = (over: Partial<typeof base> = {}) => decideQuestionRun({ ...base, ...over });
+
+describe('nextWeeklyAskAt (plan #2635.3)', () => {
+  const next = (over: Partial<Parameters<typeof nextWeeklyAskAt>[0]> = {}) =>
+    nextWeeklyAskAt({ now: NOW, latest: run('ready', 3), openCount: 0, lastResponseAt: daysAgo(1), ...over });
+
+  it('is the first daily tick a week after the newest run', () => {
+    // Asked at noon on 29 October: a week on is noon on 5 November.
+    expect(next()).toBe('2026-11-05T12:00:00.000Z');
+    // Asked at 13:00 ends the week after that day's tick, so it is the next day's.
+    expect(next({ latest: { status: 'failed', requestedAt: '2026-10-30T13:00:00Z', finishedAt: null } })).toBe(
+      '2026-11-07T12:00:00.000Z',
+    );
+  });
+
+  it('is the next tick when the week has passed or there was never a run', () => {
+    expect(next({ latest: run('ready', 10) })).toBe('2026-11-01T12:00:00.000Z');
+    expect(next({ latest: null, lastResponseAt: null, now: Date.parse('2026-11-01T15:00:00Z') })).toBe(
+      '2026-11-02T12:00:00.000Z',
+    );
+  });
+
+  it('is null while three wait or nothing was answered since the last run', () => {
+    expect(next({ openCount: 3 })).toBeNull();
+    expect(next({ lastResponseAt: daysAgo(5) })).toBeNull();
+    expect(next({ lastResponseAt: null })).toBeNull();
+  });
+});
 
 describe('decideQuestionRun', () => {
   it('starts with fewer than three open, a week since the last run and an answer since', () => {

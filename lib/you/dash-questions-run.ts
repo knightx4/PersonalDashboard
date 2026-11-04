@@ -2,7 +2,7 @@ import { fireFeatureRoutine, type RoutineTarget } from '@/lib/feedback/routine';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 
 /**
- * The run that has Dash write new questions for the Answer tab of You (plan
+ * The run that has Dash write new questions for the Ask tab of You (plan
  * #2617.3), modelled on the Insights run (lib/you/insights-start.ts).
  *
  * The button on the tab queues a you.dash_question_runs row, then fires the

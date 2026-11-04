@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     // insights skill only when the last ready run is over 30 days old.
     { name: 'insight-signals', run: () => runInsightSignals() },
     { name: 'insights-monthly', run: () => runInsightsTick() },
-    // New questions for the Answer tab of You, at most weekly, only when
+    // New questions for the Ask tab of You, at most weekly, only when
     // fewer than three are open and one was answered or skipped since the
     // last run (plan #2635.1).
     { name: 'dash-questions-weekly', run: () => runDashQuestionsTick() },

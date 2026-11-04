@@ -210,7 +210,7 @@ export const NAV_ICONS = {
   places: MapPin,
   workSchool: GraduationCap,
   insights: Sparkles,
-  // Answer (plan #2617.2): Dash's questions about you, so a question in a bubble.
+  // Ask (plans #2617.2, #2635.3): Dash's questions about you, so a question in a bubble.
   answer: MessageCircleQuestionMark,
   // The board's meetings (plan #2540.3): five advisors round a table.
   board: Users,

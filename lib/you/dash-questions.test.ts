@@ -5,8 +5,10 @@ import {
   answerDashQuestion,
   answerError,
   editDashAnswer,
+  groupByArea,
   loadDashQuestions,
   skipDashQuestion,
+  unskipDashQuestion,
   splitDashQuestions,
   type DashQuestion,
 } from '@/lib/you/dash-questions';
@@ -197,6 +199,46 @@ describe('skipDashQuestion', () => {
   it('reports a failed write', async () => {
     const { client } = fakeClient({ data: null, error: { message: 'boom' } });
     expect(await skipDashQuestion(client, 'u1', 'q1')).toEqual({ ok: false, error: 'Skipping the question failed: boom' });
+  });
+});
+
+describe('unskipDashQuestion (plan #2635.3)', () => {
+  it('puts only a skipped question of theirs back with the open ones', async () => {
+    const { client, calls } = fakeClient({ data: [{ id: 'q1' }], error: null });
+    expect(await unskipDashQuestion(client, 'u1', 'q1')).toEqual({ ok: true });
+    expect(calls).toContainEqual({ op: 'update', args: [{ status: 'open', skipped_at: null }] });
+    expect(calls).toContainEqual({ op: 'eq', args: ['status', 'skipped'] });
+    expect(calls).toContainEqual({ op: 'eq', args: ['user_id', 'u1'] });
+  });
+
+  it('says so when it is no longer skipped', async () => {
+    const { client } = fakeClient({ data: [], error: null });
+    expect(await unskipDashQuestion(client, 'u1', 'q1')).toEqual({
+      ok: false,
+      error: 'That question is no longer skipped.',
+    });
+  });
+});
+
+describe('groupByArea (plan #2635.3)', () => {
+  it('keeps the order questions came in, an area where its first one was, and Other last', () => {
+    const groups = groupByArea([
+      q('a', { areaId: 'career', areaName: 'Career' }),
+      q('b'),
+      q('c', { areaId: 'home', areaName: 'Home' }),
+      q('d', { areaId: 'career', areaName: 'Career' }),
+      q('e', { areaId: 'gone', areaName: null }),
+    ]);
+    expect(groups.map((g) => [g.name, g.questions.map((x) => x.id)])).toEqual([
+      ['Career', ['a', 'd']],
+      ['Home', ['c']],
+      ['Other', ['b', 'e']],
+    ]);
+  });
+
+  it('leaves Other out when every question has an area, and returns nothing for none', () => {
+    expect(groupByArea([q('a', { areaId: 'x', areaName: 'X' })]).map((g) => g.name)).toEqual(['X']);
+    expect(groupByArea([])).toEqual([]);
   });
 });
 
