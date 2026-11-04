@@ -3,7 +3,7 @@
 import { whenDate } from '@/lib/core/when';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname } from 'next/navigation';
-import { Search, X } from 'lucide-react';
+import { Search, SquareTerminal, X } from 'lucide-react';
 import Link from '@/components/ui/link';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -495,6 +495,8 @@ export function AskChats({
           </div>
         </Disclosure>
       )}
+
+      {!searching && sessions.length === 0 && !sessionsFailed && <TalkToASession />}
     </div>
   );
 }
@@ -515,6 +517,9 @@ function SessionThreads({
   active: string | null;
   whenOf: (at: string) => string;
 }) {
+  // An empty group is not drawn: with no threads, the way in is the quiet
+  // line at the foot of the list (TalkToASession).
+  if (sessions.length === 0 && !failed) return null;
   return (
     <section aria-label="Sessions">
       <div className="flex items-center justify-between gap-2 px-2">
@@ -528,8 +533,6 @@ function SessionThreads({
       </div>
       {failed ? (
         <p className="px-2 text-small text-danger">Your session threads could not be read. Reload to try again.</p>
-      ) : sessions.length === 0 ? (
-        <p className="px-2 text-small text-ink-muted">Start one to have a session work on a project&rsquo;s code.</p>
       ) : (
         <ul className="mt-1 space-y-0.5">
           {sessions.map((thread) => {
@@ -568,5 +571,18 @@ function SessionThreads({
         </ul>
       )}
     </section>
+  );
+}
+
+/** With no session threads yet, the way to start one: one quiet line at the foot of the list. */
+function TalkToASession() {
+  return (
+    <Link
+      href={newSessionThreadHref()}
+      className="inline-flex min-h-11 items-center gap-1.5 px-2 text-small font-medium text-ink-muted transition-colors duration-quick hover:text-accent sm:min-h-0"
+    >
+      <SquareTerminal className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      Talk to a session about a project&rsquo;s code
+    </Link>
   );
 }
