@@ -507,6 +507,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // You: a personality result, its trait themes and up to fifteen cut notes
   // in, a few points out.
   'read-personality': run(SONNET, 7_000, 1_200),
+  // The advisor's brain, memory and the person's decisions and goals, about
+  // 6,000 tokens cached, resent over three or four rounds with the lookups;
+  // a short reply out (plan #2581.6).
+  'talk-to-advisor': run(SONNET, 30_000, 700),
+  // Two messages and up to sixty memories in, at most four lines out.
+  'remember-advisor-talk': run(HAIKU, 3_000, 250),
   // Every result with its themes, a dozen record lines and up to fifteen cut
   // notes in, the analysis out.
   'personality-profile': run(SONNET, 12_000, 2_000),

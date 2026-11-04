@@ -5,7 +5,7 @@ import Link from '@/components/ui/link';
 import { ChevronRight } from 'lucide-react';
 import { LinkPending } from '@/components/ui/link-pending';
 import { countLabel } from '@/lib/news/issues/list';
-import { recordArticleOpened } from '../quick/actions';
+import { recordArticleOpened } from './quick/actions';
 
 /** One line of the review, with where it opens. */
 export type ReviewLine = {

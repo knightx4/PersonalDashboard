@@ -104,18 +104,15 @@ describe('where a row is built', () => {
   ];
 
   it("builds a project's row with the project off its section", () => {
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'token');
     const sections = buildPlanTree({ items: site, dependencies: [], projects: PROJECT_FIXTURES });
     const built = builderFor(sections, findNode(sections, 't')!);
-    expect(built).toMatchObject({ ok: true, project: { id: 'website' }, routine: { id: 'trig_site' } });
+    expect(built).toMatchObject({ ok: true, project: { id: 'website' }, routine: { id: 'projects-dispatcher' } });
     vi.unstubAllEnvs();
   });
 
-  it('queues a project with no routine of its own for the dispatcher, naming its repository', async () => {
+  it('queues a project for the dispatcher, naming its repository', async () => {
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
     plan.data = { items: site, dependencies: [], projects: PROJECT_FIXTURES };
     const sections = buildPlanTree(plan.data);
     expect(builderFor(sections, findNode(sections, 't')!)).toMatchObject({
@@ -139,7 +136,7 @@ describe('where a row is built', () => {
   it("names a project's check command for the session to run before it merges", async () => {
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    const checked = [{ ...PROJECT_FIXTURES[0], routineEnv: null, checkCommand: 'npm test' }];
+    const checked = [{ ...PROJECT_FIXTURES[0], checkCommand: 'npm test' }];
     plan.data = { items: site, dependencies: [], projects: checked };
     await handStepToClaude({ supabase, userId: 'u', id: 't' });
     expect(started[0]).toContain('run `npm test` in that repository');
@@ -149,7 +146,7 @@ describe('where a row is built', () => {
   it('tells the session on a project not yet set up how to record its check (plan #2553.6)', async () => {
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    const fresh = [{ ...PROJECT_FIXTURES[0], routineEnv: null, setUpAt: null }];
+    const fresh = [{ ...PROJECT_FIXTURES[0], setUpAt: null }];
     plan.data = { items: site, dependencies: [], projects: fresh };
     await handStepToClaude({ supabase, userId: 'u', id: 't' });
     expect(started[0]).toContain('has not been set up for Dash yet');
@@ -158,19 +155,6 @@ describe('where a row is built', () => {
     plan.data = { items: site, dependencies: [], projects: [{ ...fresh[0], setUpAt: '2026-10-27T00:00:00Z' }] };
     await handStepToClaude({ supabase, userId: 'u', id: 't' });
     expect(started[0]).not.toContain('has not been set up');
-    vi.unstubAllEnvs();
-  });
-
-  it("keeps the website's own routine and its old preamble while that routine is set", async () => {
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'site-token');
-    plan.data = { items: site, dependencies: [], projects: PROJECT_FIXTURES };
-    await handStepToClaude({ supabase, userId: 'u', id: 't' });
-    expect(routines.at(-1)).toEqual({ id: 'trig_site', token: 'site-token' });
-    expect(started[0]).toContain('Work in that repository');
-    expect(started[0]).not.toContain('add_repo');
     vi.unstubAllEnvs();
   });
 

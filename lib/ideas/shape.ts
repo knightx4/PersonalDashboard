@@ -8,6 +8,7 @@ import { MODULES } from '@/lib/modules';
 import { FOLLOW_ON_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
 import { startRoutineRun } from '@/lib/plan/runs';
 import { loadVisionBodies } from '@/lib/specs/vision';
+import { loadDevProjects } from '@/lib/plan/projects';
 import { withThreads } from '@/lib/thread/store';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,7 +46,18 @@ export async function shapeIdeaRun(supabase: Client, userId: string, ideaId: str
   if (idea.planItem) return { ok: false, error: 'This idea is already in the plan.' };
 
   const scope = idea.module;
-  const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
+  // An idea under a Dev project (filed from its app's note button) is about code in the project's own
+  // repository: the plan rows are written here, but the code to read is there.
+  const project = scope && !MODULES.some((m) => m.id === scope)
+    ? (await loadDevProjects(supabase, userId).catch(() => [])).find((p) => p.id === scope) ?? null
+    : null;
+  const label = project ? `the ${project.label} project` : scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
+  const projectNote = project
+    ? `This idea is about the Dev project ${project.label}, built in its own repository ` +
+      `${project.repo.owner}/${project.repo.repo}. Read the code it touches there (attach the repository, or read its ` +
+      'files through the GitHub tools) before writing the steps, and write the feature with `--module ' +
+      `${project.id}\` so it lands on the project's page. Its steps are built by the projects dispatcher in that repository.\n\n`
+    : '';
   const said = threadText(idea.thread);
   // The feature has to name the part of this vision it serves (shaping.md),
   // chosen by the same rule as a step brief's: the workspace's, or the app's
@@ -59,6 +71,7 @@ export async function shapeIdeaRun(supabase: Client, userId: string, ideaId: str
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
     `${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${QUESTION_RULE}\n\n` +
+    projectNote +
     (vision ? `## Vision\n\n${vision}\n\n` : '') +
     `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
     (said ? `\n${said}` : '');

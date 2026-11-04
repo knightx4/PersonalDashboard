@@ -1,9 +1,11 @@
 /**
- * What each of the runner's four slots is doing.
+ * What each of the runner's slots is doing.
  *
  * The runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, at most
  * two to a module, and one goals run beside them. When goals has nothing to start, a
- * fourth feature takes its seat (`OVERNIGHT_AT_ONCE_GOALS_IDLE`). The runner
+ * fourth feature takes its seat (`OVERNIGHT_AT_ONCE_GOALS_IDLE`). Dev projects
+ * have up to `OVERNIGHT_PROJECTS_AT_ONCE` seats of their own, one per project,
+ * and a project slot is drawn only while a session works in it. The runner
  * card draws one Dash for each seat, and this file says which of three things
  * each Dash is doing so the card has nothing to work out.
  *
@@ -20,7 +22,12 @@
  */
 import type { FeatureProgress, FeatureStep } from '@/lib/digest/night';
 import { elapsedSince } from './elapsed';
-import { OVERNIGHT_AT_ONCE_GOALS_IDLE, overnightStanding, type OvernightRun } from './overnight';
+import {
+  OVERNIGHT_AT_ONCE_GOALS_IDLE,
+  OVERNIGHT_PROJECTS_AT_ONCE,
+  overnightStanding,
+  type OvernightRun,
+} from './overnight';
 
 /** A feature session the runner (or a hand) fired, going or over. */
 export type SlotSession = {
@@ -36,6 +43,8 @@ export type SlotSession = {
   step: { number: number; title: string; ref?: string } | null;
   /** The workspace the step is in, as the plan names it. */
   module: string | null;
+  /** Whether the feature is a Dev project's, which runs in a project slot. */
+  project?: boolean;
   /** What the run last did, one short phrase, or null when nothing is known. */
   doing: string | null;
   /** How far through the feature the plan is, or null when it is not known. */
@@ -85,7 +94,16 @@ export type RunnerSlot =
       line: string;
     };
 
-export type SlotId = 'feature-1' | 'feature-2' | 'feature-3' | 'feature-4' | 'goals';
+export type SlotId =
+  | 'feature-1'
+  | 'feature-2'
+  | 'feature-3'
+  | 'feature-4'
+  | 'goals'
+  | 'project-1'
+  | 'project-2'
+  | 'project-3'
+  | 'project-4';
 
 export type RunnerSlotsInput = {
   run: OvernightRun | null;
@@ -129,7 +147,13 @@ const LABELS: Record<SlotId, string> = {
   'feature-3': 'Feature 3',
   'feature-4': 'Feature 4',
   goals: 'Goals',
+  'project-1': 'Project 1',
+  'project-2': 'Project 2',
+  'project-3': 'Project 3',
+  'project-4': 'Project 4',
 };
+
+const PROJECT_SLOTS: readonly SlotId[] = ['project-1', 'project-2', 'project-3', 'project-4'];
 
 function at(stamp: string): number {
   const t = new Date(stamp).getTime();
@@ -137,13 +161,26 @@ function at(stamp: string): number {
 }
 
 /**
- * The slot each session held, by session id.
+ * The slot each session held, by session id, counted within its group: the
+ * app's four seats, or the projects' own.
  *
  * Replays fires and ends in time order, an end before a fire at the same
- * instant. A session fired when all four slots are taken (one fired by hand
- * beside the night's) has no slot and is left out.
+ * instant. A session fired when its group's slots are all taken (one fired by
+ * hand beside the night's) has no slot and is left out.
  */
 export function assignSlots(sessions: readonly SlotSession[]): Map<string, number> {
+  const app = replaySlots(
+    sessions.filter((session) => !session.project),
+    OVERNIGHT_AT_ONCE_GOALS_IDLE,
+  );
+  const projects = replaySlots(
+    sessions.filter((session) => session.project),
+    OVERNIGHT_PROJECTS_AT_ONCE,
+  );
+  return new Map([...app, ...projects]);
+}
+
+function replaySlots(sessions: readonly SlotSession[], seats: number): Map<string, number> {
   type Event = { time: number; fire: boolean; session: SlotSession };
   const events: Event[] = [];
   for (const session of sessions) {
@@ -160,10 +197,7 @@ export function assignSlots(sessions: readonly SlotSession[]): Map<string, numbe
       a.session.id.localeCompare(b.session.id),
   );
 
-  const held: Array<string | null> = Array.from(
-    { length: OVERNIGHT_AT_ONCE_GOALS_IDLE },
-    () => null,
-  );
+  const held: Array<string | null> = Array.from({ length: seats }, () => null);
   const assigned = new Map<string, number>();
   for (const event of events) {
     if (event.fire) {
@@ -211,7 +245,9 @@ function workOf(
 }
 
 /**
- * The slots, feature 1 to 3 and then the goals seat.
+ * The slots, feature 1 to 3, then the goals seat, then a slot for each Dev
+ * project session going. A project slot with nothing in it is not drawn: the
+ * project seats are there for the nights a project has work.
  *
  * The goals seat is one row. It shows the fourth feature while one is going
  * and goals has nothing on, and goals otherwise. In the moment both are going
@@ -232,10 +268,23 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
 
   const assigned = assignSlots(sessions);
   const going = new Map<number, SlotSession>();
+  const projectsGoing = new Map<number, SlotSession>();
   for (const session of sessions) {
     const index = assigned.get(session.id);
-    if (index !== undefined && session.endedAt === null) going.set(index, session);
+    if (index === undefined || session.endedAt !== null) continue;
+    (session.project ? projectsGoing : going).set(index, session);
   }
+  const withProjects = (slots: RunnerSlot[]): RunnerSlot[] => {
+    // A held runner's sessions carry on, so their slots stay drawn.
+    if (!on) return slots;
+    PROJECT_SLOTS.forEach((slot, index) => {
+      const session = projectsGoing.get(index);
+      if (session) {
+        slots.push({ slot, label: LABELS[slot], state: 'working', work: workOf(session, now) });
+      }
+    });
+    return slots;
+  };
 
   const reason = run?.lastTickNote?.trim() || SLOT_ASLEEP_DEFAULT;
 
@@ -257,7 +306,7 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
       state: 'working',
       work: workOf(fourth, now),
     });
-    if (!goalRun) return slots;
+    if (!goalRun) return withProjects(slots);
   }
 
   const label = LABELS.goals;
@@ -290,5 +339,5 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
   } else {
     slots.push({ slot: 'goals', label, state: 'idle' });
   }
-  return slots;
+  return withProjects(slots);
 }

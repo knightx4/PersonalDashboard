@@ -127,6 +127,36 @@ describe('runnerSlots', () => {
     });
   });
 
+  it('draws a project slot only while a project session works, after the app seats', () => {
+    const project = (id: string, fired: number, ended: number | null = null): SlotSession => ({
+      ...session(id, fired, ended),
+      project: true,
+    });
+    const sessions = [
+      session('a', 0),
+      session('b', 1),
+      session('c', 2),
+      project('m1', 3),
+      project('s1', 4, 20),
+      project('g1', 5),
+    ];
+    const slots = runnerSlots({ run: night(), sessions, goalRun: null, now: T0 + 30 * 60_000 });
+    expect(slots.map((s) => s.slot)).toEqual([
+      'feature-1',
+      'feature-2',
+      'feature-3',
+      'goals',
+      'project-1',
+      'project-3',
+    ]);
+    expect(states(slots)).toEqual(['working', 'working', 'working', 'asleep', 'working', 'working']);
+    expect(slots[4].state === 'working' && slots[4].work.title).toBe('Step for m1');
+
+    // With no project session going, no project slot is drawn at all.
+    const quiet = runnerSlots({ run: night(), sessions: [], goalRun: null, now: T0 });
+    expect(quiet.map((s) => s.slot)).toEqual(['feature-1', 'feature-2', 'feature-3', 'goals']);
+  });
+
   it('keeps a session in its slot while another one ends', () => {
     // a, b and c fire in turn; a ends. b and c stay where they were.
     const sessions = [session('a', 0, 40), session('b', 10), session('c', 20)];

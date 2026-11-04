@@ -531,10 +531,11 @@ describe('overnightTick', () => {
         running: 3,
         atOnce: 3,
       });
-      // The tree is not read: every slot is taken. The claims are still
-      // swept, because the ones that go stale belong to other sessions and
-      // the night spends most of its ticks here.
-      expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
+      // The tree is read once, to see whether a Dev project has work for a
+      // seat of its own; it has none, so nothing is started. The claims are
+      // still swept, because the ones that go stale belong to other sessions
+      // and the night spends most of its ticks here.
+      expect(calls).toMatchObject({ sections: 1, swept: 1, fired: [], recorded: [], stopped: [] });
     }
   });
 
@@ -964,6 +965,115 @@ describe('overnightTick', () => {
     // "Every feature left refused" would not be true: one was never offered.
     expect(reason).toContain('what had not already been tried');
     expect(reason).toContain(`#${first.number} is only a proposal.`);
+  });
+});
+
+describe('Dev project seats', () => {
+  /** A feature with one ready step, in a workspace of this app or a Dev project. */
+  const feature = (id: string, module: string, priority: 1 | 2 | 3 = 2) => [
+    item({ id, module, priority }),
+    item({ id: `${id}-step`, parentId: id, module, priority }),
+  ];
+  const appFull = [
+    { featureId: 'news-feature', liveness: 'working' as const },
+    { featureId: 'learn-feature', liveness: 'working' as const },
+    { featureId: 'todo-feature', liveness: 'working' as const },
+  ];
+
+  it("starts a project's ready work while every app seat is taken", async () => {
+    const sections = tree([
+      ...feature('news-feature', 'news'),
+      ...feature('learn-feature', 'learn'),
+      ...feature('todo-feature', 'todo'),
+      ...feature('music-feature', 'music'),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => appFull,
+      atOnce: 3,
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 4 });
+    expect(calls.fired).toEqual([{ feature: 'music-feature', step: 'music-feature-step' }]);
+  });
+
+  it('runs one session a project, and fills a seat for each project with work', async () => {
+    const sections = tree([
+      ...feature('music-a', 'music', 1),
+      ...feature('music-b', 'music', 1),
+      ...feature('site-a', 'site', 3),
+      ...feature('vault-feature', 'vault', 3),
+    ]);
+    const { ports: p, calls } = ports({ loadSections: async () => sections, atOnce: 3 });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 3 });
+    const fired = calls.fired.map((one) => one.feature).sort();
+    expect(fired).toHaveLength(3);
+    expect(fired).toContain('site-a');
+    expect(fired).toContain('vault-feature');
+    expect(fired.filter((id) => id.startsWith('music-'))).toHaveLength(1);
+  });
+
+  it('gives a busy project no second session, even beside work that does not meet', async () => {
+    const sections = tree([
+      item({ id: 'music-a', module: 'music', detail: 'lib/a/one.ts' }),
+      item({ id: 'music-a-step', parentId: 'music-a', module: 'music', detail: 'lib/a/one.ts' }),
+      item({ id: 'music-b', module: 'music', detail: 'app/b/two.tsx' }),
+      item({ id: 'music-b-step', parentId: 'music-b', module: 'music', detail: 'app/b/two.tsx' }),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'music-a', liveness: 'working' }],
+    });
+
+    const tick = await overnightTick(p);
+    expect(tick.act).not.toBe('fired');
+    expect(calls.fired).toEqual([]);
+  });
+
+  it("does not let the app's work into a project seat", async () => {
+    const sections = tree([
+      ...feature('news-feature', 'news'),
+      ...feature('learn-feature', 'learn'),
+      ...feature('todo-feature', 'todo'),
+      ...feature('vault-feature', 'vault'),
+    ]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => appFull,
+      atOnce: 3,
+    });
+
+    await expect(overnightTick(p)).resolves.toEqual({
+      act: 'waiting',
+      liveness: 'working',
+      running: 3,
+      atOnce: 3,
+    });
+    expect(calls.fired).toEqual([]);
+  });
+
+  it("does not let a project's work into an app seat", async () => {
+    const sections = tree([...feature('music-a', 'music'), ...feature('music-b', 'music')]);
+    const { ports: p, calls } = ports({
+      loadSections: async () => sections,
+      runsInFlight: async () => [{ featureId: 'music-a', liveness: 'working' }],
+    });
+
+    await overnightTick(p);
+    expect(calls.fired).toEqual([]);
+  });
+
+  it('starts no more than four project sessions at once', async () => {
+    const projects = ['music', 'site', 'game', 'blog', 'shop'];
+    const sections = tree(projects.flatMap((one) => feature(`${one}-feature`, one)));
+    const { ports: p, calls } = ports({
+      loadRun: async () => night({ featuresBudget: 10, featuresLeft: 10 }),
+      loadSections: async () => sections,
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired', running: 4 });
+    expect(calls.fired).toHaveLength(4);
   });
 });
 

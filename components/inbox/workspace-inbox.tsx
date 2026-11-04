@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { InboxPage, type InboxRow } from '@/components/inbox/inbox-page';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
@@ -43,9 +44,12 @@ export function WorkspaceInbox({
   workspace,
   rows,
   failed = [],
+  sectionTools,
 }: {
   workspace: AgendaInbox;
   rows: readonly InboxRow[];
+  /** What a section is narrowed by, drawn under its heading. */
+  sectionTools?: ComponentProps<typeof InboxPage>['sectionTools'];
   /** What could not be read just now, named so a short list is not taken for a quiet one. */
   failed?: readonly string[];
 }) {
@@ -58,7 +62,7 @@ export function WorkspaceInbox({
           {failed.length > 1 ? 'them' : 'it'} is missing here.
         </Banner>
       )}
-      <InboxPage rows={rows} empty={WORKSPACE_INBOX_EMPTY[workspace]}>
+      <InboxPage rows={rows} empty={WORKSPACE_INBOX_EMPTY[workspace]} sectionTools={sectionTools}>
         {/* Todo's other half: what waits on someone else, which is not on you. */}
         {workspace === 'todo' && (
           <p className="text-small text-ink-muted">

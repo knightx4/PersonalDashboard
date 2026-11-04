@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { allowedOrigin, bearerToken } from '@/lib/project-notes/keys';
-import { authoriseProjectApp, fileProjectNote, scoreProjectIdea, serviceClients } from '@/lib/project-notes/file';
+import { authoriseProjectApp, fileProjectNote, sendProjectNoteToPlan, serviceClients } from '@/lib/project-notes/file';
 import { outcomeLine } from '@/lib/project-notes/route';
 import { loadDevProjects } from '@/lib/plan/projects';
 
@@ -66,7 +66,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
   if (!filed.ok) return fail(filed.status, filed.error);
 
-  if (filed.outcome.as === 'idea') after(() => scoreProjectIdea(db, who.ownerId, filed.ideaId));
+  // Not one fix: shaped into a feature on the plan straight away, as a note from Dash's own header is.
+  if (filed.outcome.as === 'idea') after(() => sendProjectNoteToPlan(db, who.ownerId, filed.ideaId));
   return NextResponse.json(
     { ok: true, ...filed.outcome, message: outcomeLine(filed.outcome) },
     { headers },

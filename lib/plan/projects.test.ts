@@ -33,8 +33,6 @@ const WEBSITE_ROW = {
   check_command: null,
   set_up_at: '2026-10-26T00:00:00Z',
   archived_at: null,
-  routine_id_env: 'CLAUDE_WEBSITE_ROUTINE_ID',
-  routine_token_env: 'CLAUDE_WEBSITE_ROUTINE_TOKEN',
   created_at: '2026-10-26T00:00:00Z',
 };
 
@@ -51,26 +49,11 @@ describe('project rows', () => {
     ]);
   });
 
-  it('goes to the projects dispatcher when the row names no variables', () => {
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    const plain = projectFromRow({ ...WEBSITE_ROW, id: 'blog', routine_id_env: null, routine_token_env: null })!;
-    expect(plain.routineEnv).toBeNull();
-    expect(projectRoutine(plain)).toEqual({ id: 'projects-dispatcher', token: 'projects-dispatcher' });
-  });
-
-  it("prefers a project's own routine while its id is set, and falls back once it is not", () => {
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_projects');
-    vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'projects-token');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', 'trig_site');
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_TOKEN', 'site-token');
-    expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'trig_site', token: 'site-token' });
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
+  it('goes to the projects dispatcher', () => {
     expect(projectRoutine(WEBSITE_FIXTURE)).toEqual({ id: 'projects-dispatcher', token: 'projects-dispatcher' });
   });
 
   it('never sends a project to the plan routine, which builds in this repository', () => {
-    vi.stubEnv('CLAUDE_WEBSITE_ROUTINE_ID', '');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_ID', 'trig_plan');
     vi.stubEnv('CLAUDE_PLAN_ROUTINE_TOKEN', 'plan-token');
     expect(projectRoutine(WEBSITE_FIXTURE).id).toBe('projects-dispatcher');

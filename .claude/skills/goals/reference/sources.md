@@ -737,6 +737,29 @@ Every post on their X account read by the dashboard, including ones they wrote t
 - Opens at `/dev/posts`
 - created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.
 
+### `public.studio_songs` (Dev)
+
+Songs in the music pipeline’s studio: each one’s document (name, seed, starting tempo, key and form), its edit operations and its revision.
+
+- Search: `doc`
+- Name a row by `id`; link it by `id`
+- doc.name is the song’s name; the id is the studio’s own key. rev counts saves.
+
+### `public.studio_tracks` (Dev)
+
+Tracks in the music pipeline’s studio: a named take built against a reference piece, with its edit history.
+
+- Search: `doc`, `reference`
+- Name a row by `name`; link it by `name`
+- reference names the piece the track follows, such as work/bamboleo. rev counts saves.
+
+### `public.studio_maps` (Dev)
+
+Maps in the music pipeline’s studio: a named map of a piece with the notes written on it.
+
+- Search: `notes`, `map`
+- Name a row by `name`; link it by `name`
+
 ## Mentions (leads only)
 
 ### `job_search.company_research` (Job search)

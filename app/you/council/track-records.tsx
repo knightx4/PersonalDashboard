@@ -1,9 +1,12 @@
 import { Fragment } from 'react';
+import Link from '@/components/ui/link';
+import { advisorHref } from '@/lib/you/board-profile';
 import { TOPIC_LABELS } from '@/lib/you/board-reviews';
 import type { TrackRecord } from '@/lib/you/board-scoring';
+import { AdvisorAvatar } from './advisor-avatar';
 
 /**
- * Who has been right about what (plan #2581.10), as rows of the Board tab's
+ * Who has been right about what (plan #2581.10), as rows of the Council tab's
  * surface: a line on how to read the scores, then every advisor with a scored
  * forecast, closest first, their mean Brier score at the end, and each topic
  * under the name with how many were scored and the weight the board now gives
@@ -25,7 +28,13 @@ export function TrackRecordRows({ records }: { records: readonly TrackRecord[] }
       {records.map((record) => (
         <li key={record.advisor} className="card-pad-x row-pad flex items-start gap-3">
           <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="text-ui text-ink [overflow-wrap:anywhere]">{record.name}</p>
+            <Link
+              href={advisorHref(record.advisor, 'record')}
+              className="press-area flex w-fit min-w-0 items-center gap-1.5 rounded-control text-ui text-ink transition-colors duration-quick hover:text-accent"
+            >
+              <AdvisorAvatar advisorKey={record.advisor} name={record.name} decorative />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{record.name}</span>
+            </Link>
             <p className="text-small text-ink-muted">
               {record.topics.map((t, i) => (
                 <Fragment key={t.topic}>

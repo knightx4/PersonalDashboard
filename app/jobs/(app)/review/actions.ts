@@ -74,7 +74,7 @@ export async function linkMessage(
   );
   if (!linked.linked) return { error: linked.error };
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }
@@ -140,7 +140,7 @@ export async function createRoleFromMessage(input: {
   const linked = await linkMessage(parsed.data.messageId, applicationId);
   if (linked.error) return { error: linked.error, roleId: role.id as string };
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/roles');
   revalidatePath('/jobs/pipeline');
   return { error: null, roleId: role.id as string };
@@ -164,7 +164,7 @@ export async function dismissMessage(messageId: string): Promise<{ error: string
   const { error } = await dismissMessageRows(supabase, [messageId]);
 
   if (error) return { error };
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { error: null };
 }
 
@@ -176,7 +176,7 @@ export async function confirmApplication(applicationId: string): Promise<{ error
   const { error } = await confirmApplicationRow(supabase, user.id, applicationId);
 
   if (error) return { error };
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }
@@ -219,7 +219,7 @@ export async function deleteInferredApplication(
     await supabase.from('roles').delete().eq('id', application.role_id).eq('user_id', user.id);
   }
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }
@@ -295,7 +295,7 @@ export async function excludeCompanyForApplication(
     if (removed.error) return { error: removed.error };
   }
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/settings');
   return {
     error: null,
@@ -320,7 +320,7 @@ export async function acknowledgeEvent(eventId: string): Promise<{ error: string
   const { error } = await acknowledgeEventRows(supabase, user.id, [eventId]);
 
   if (error) return { error };
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { error: null };
 }
 
@@ -341,7 +341,7 @@ export async function reopenApplication(
   const { error } = await reopenApplicationRows(supabase, user.id, applicationId, status);
 
   if (error) return { error };
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }
@@ -419,7 +419,7 @@ export async function dismissMessages(
 
   if (error) return { changed: [], restore: [], error };
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { changed, restore };
 }
 
@@ -452,7 +452,7 @@ export async function restoreDismissedMessages(
     if (error) return { changed: [], error };
   }
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { changed: parsed.data.map((row) => row.id) };
 }
 
@@ -481,7 +481,7 @@ export async function acknowledgeEvents(ids: string[]): Promise<JobsBulkResult> 
 
   if (error) return { changed: [], error };
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { changed };
 }
 
@@ -504,6 +504,6 @@ export async function unacknowledgeEvents(ids: readonly string[]): Promise<JobsB
 
   if (error) return { changed: [], error };
 
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   return { changed: [...parsed.data] };
 }
