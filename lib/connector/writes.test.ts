@@ -61,6 +61,7 @@ describe('runConnectorWrite', () => {
       'save_about_me',
       'set_detail',
       'ask_board',
+      'talk_to_advisor',
       'mark_issue_unread',
       'save_story',
       'send_story_to_learn',
@@ -303,6 +304,22 @@ describe('the writes shared with Ask Dash', () => {
         ok: false,
         error: 'The Goals workspace is switched off, so nothing can be changed there.',
       });
+    });
+  });
+
+  it('refuses talking to an advisor on a context with no lookups, or when You is off (plan #2581.7)', async () => {
+    const talk = tool('talk_to_advisor');
+    const input = { advisor: 'buffett', message: 'Should I take the offer?' };
+    expect(await runConnectorWrite(talk, ctx(), input)).toMatchObject({ ok: false });
+    const off = {
+      ...ctx(),
+      db: vi.fn() as never,
+      lookups: {} as never,
+      account: { enabledModules: ['todo' as const], today: '2026-11-04' },
+    };
+    expect(await runConnectorWrite(talk, off, input)).toEqual({
+      ok: false,
+      error: 'The You workspace is switched off, so no advisor can be talked to.',
     });
   });
 
