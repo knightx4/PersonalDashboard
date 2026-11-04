@@ -27,6 +27,7 @@ import {
   personInitials,
   receiptOf,
   threadBlocks,
+  threadDetail,
   threadMessageOf,
   type PersonRow,
   type ThreadMessage,
@@ -280,7 +281,7 @@ export function ThreadView({
   return (
     <MessagingThread
       name={person.name}
-      detail={person.about}
+      detail={threadDetail(person)}
       avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
       back={{ href: '/chat', label: 'People' }}
       crumbs={[{ label: 'People', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
@@ -328,9 +329,6 @@ export function ThreadView({
             </button>
           )}
         </p>
-      )}
-      {!hasOlder && messages.length > 0 && (
-        <p className="mb-2 self-center text-small text-ink-muted">The start of your thread with {person.name}</p>
       )}
       {empty && <EmptyThread person={person} />}
       {blocks.map((block) =>
