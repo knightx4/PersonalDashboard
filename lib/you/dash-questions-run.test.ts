@@ -165,6 +165,14 @@ describe('the dash-questions skill', () => {
     for (const statement of writes) expect(statement).toContain("'<user_id>'");
   });
 
+  it('aims at the thinnest areas and the hunches, saves each question\'s area and caps an area at two', () => {
+    expect(skill).toContain("confidence = 'hunch'");
+    expect(skill).toContain('from goals.areas a');
+    expect(skill).toContain('from you.insight_runs');
+    expect(skill).toContain('no more than\ntwo questions in one area');
+    expect(skill).toContain('insert into you.dash_questions (user_id, run_id, question, why, area_id)');
+  });
+
   it('names Dash, never Claude, in what the person reads', () => {
     expect(skill).not.toMatch(/\$s\$[^$]*Claude/);
   });
