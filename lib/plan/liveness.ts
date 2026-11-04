@@ -20,6 +20,7 @@
  * that died two minutes in read the same. The quiet mark is what separates
  * them, at twenty minutes.
  */
+import { endsWithBuiltLine } from './built';
 import { elapsedSince, isStalledClaim } from './elapsed';
 import { endsRun, RUN_QUIET_AFTER_MINUTES, type StoredRunReading } from './run-end';
 import { stepRef, type Nameable } from './ref';
@@ -414,7 +415,15 @@ export function abandonedClaim(step: { status: string } | null, liveness: RunLiv
 export type ClaimLiveness = 'claimed' | 'working' | 'quiet' | 'abandoned';
 
 /** Enough of a step for the rule: the claim, and when it was made. */
-export type ClaimStep = { status: string; startedAt: string | null };
+export type ClaimStep = {
+  status: string;
+  startedAt: string | null;
+  /**
+   * The step's comment, when the caller has it. A step whose last paragraph is
+   * a Built line is parked on a branch, not claimed by a session.
+   */
+  comment?: string | null;
+};
 
 /**
  * Enough of the last run against it.
@@ -510,6 +519,11 @@ export function claimLiveness(
   now: number,
 ): ClaimLiveness | null {
   if (step.status !== 'in_progress') return null;
+
+  // Built and waiting for its feature to land: finished work, not a claim. It
+  // reads as no claim at all, so the send guard and the overnight tick see its
+  // feature as free to send.
+  if (endsWithBuiltLine(step.comment)) return null;
 
   if (run?.status === 'failed') return 'abandoned';
 
