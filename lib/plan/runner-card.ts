@@ -31,6 +31,7 @@ import { readyFeatureCount, runnerOrder } from './overnight-choice';
 import { topFeatureOf, type PlanSection } from './tree';
 import type { SlotSession } from './overnight-slots';
 import { moduleById, type ModuleId } from '@/lib/modules';
+import { isProjectScope } from './projects';
 
 /** A row a session is on, with how far through its feature the plan is. */
 export type OnLine = OnNow & { progress: FeatureProgress | null };
@@ -221,6 +222,7 @@ export function runnerCard(input: {
         progress: isGoing ? featureProgress(items, `#${item.number}`) : null,
         steps: isGoing ? featureSteps(items, item.number) : undefined,
         module: moduleName(item.module),
+        project: isProjectScope(item.module),
         doing: null,
       });
     }
