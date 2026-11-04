@@ -174,7 +174,14 @@ export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'em
   return (
     <ChatShell path="/chat">
       <PeopleView
-        rows={state === 'empty' || state === 'failed' ? [] : CHAT_PEOPLE}
+        rows={
+          state === 'empty' || state === 'failed'
+            ? []
+            : state === 'people'
+              ? // The Mentor writing back, so the list draws "typing…" in a row (a hidden part of plan #2748.6).
+                CHAT_PEOPLE.map((r) => (r.key === 'mentor' ? { ...r, typingUntil: '2026-11-03T09:00:20Z' } : r))
+              : CHAT_PEOPLE
+        }
         failed={state === 'failed'}
         query={state === 'search' ? 'Northwind' : state === 'nothing-found' ? 'sabbatical' : null}
         hits={state === 'search' ? SEARCH : state === 'nothing-found' ? [] : null}

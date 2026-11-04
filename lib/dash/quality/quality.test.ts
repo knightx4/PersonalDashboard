@@ -16,6 +16,19 @@ describe('grading an answer', () => {
     expect(gradeAnswer(expect_, answered('You applied to one role at Northwind.'))).toEqual([]);
   });
 
+  it('fails a case whose answer never made the call it names, or had every one refused', () => {
+    const expect_ = parseExpect({ calls_all: ['draft_application_answers'] });
+    const drafted = answered('Queued drafts for 16 leads.', {
+      toolCalls: [{ name: 'draft_application_answers', input: {}, result: { ok: true, rows: [] } }],
+    });
+    expect(gradeAnswer(expect_, drafted)).toEqual([]);
+    expect(gradeAnswer(expect_, answered('Press Draft on each role.'))).toEqual(['The answer never called draft_application_answers.']);
+    const refused = answered('I could not.', {
+      toolCalls: [{ name: 'draft_application_answers', input: {}, result: { ok: false, error: 'no' } }],
+    });
+    expect(gradeAnswer({ ...expect_, allow_failed_lookups: true }, refused)).toEqual(['Every call to draft_application_answers was refused.']);
+  });
+
   it('counts a name as shown when it is only in a cited row', () => {
     expect(gradeAnswer(parseExpect({ mentions_all: ['Strategy Lead'] }), answered('One role.'))).toEqual([]);
   });

@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check } from 'lucide-react';
+import { Check, Trash2 } from 'lucide-react';
 import { MessagingPanel, PersonMark } from '@/components/patterns/messaging';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashAction } from '@/components/ui/dash-action';
 import { DashMark } from '@/components/ui/dash-mark';
+import { IconButton } from '@/components/ui/icon-button';
 import { Field, FieldError, Input, Label, Switch, Textarea } from '@/components/ui/field';
 import Link from '@/components/ui/link';
 import { SectionLabel } from '@/components/ui/section-heading';
@@ -240,23 +241,26 @@ export function PersonForm({
         <section id="person-card" className="flex scroll-mt-4 flex-col gap-3">
           <SectionLabel as="h2">Their card</SectionLabel>
           {drafting && (
+            // Drafting is said once, where the card will be: a first draft draws no empty box under this line, and the button keeps its label.
             <p role="status" className="flex items-center gap-1.5 text-ui text-ink">
               <DashMark size="icon" tone="brand" state="working" decorative />
               {persona.trim() ? 'Dash is redrafting the card…' : 'Dash is writing the card…'}
             </p>
           )}
-          <Textarea /* ui-ok: the persona card is the field this form edits, not a composer */
-            id="person-persona"
-            aria-label="Persona card"
-            rows={adding && !persona.trim() && !drafting ? 4 : 12}
-            value={persona}
-            placeholder={drafting ? '' : adding ? 'Dash drafts this from what you filled in; every reply reads it first.' : 'Every reply reads this card first.'}
-            disabled={drafting}
-            maxLength={PERSONA_MAX}
-            aria-busy={drafting}
-            className={cn(drafting && 'disabled:opacity-60')}
-            onChange={(e) => setPersona(e.target.value)}
-          />
+          {!(drafting && !persona.trim()) && (
+            <Textarea /* ui-ok: the persona card is the field this form edits, not a composer */
+              id="person-persona"
+              aria-label="Persona card"
+              rows={adding && !persona.trim() ? 4 : 12}
+              value={persona}
+              placeholder={drafting ? '' : adding ? 'Dash drafts this from what you filled in; every reply reads it first.' : 'Every reply reads this card first.'}
+              disabled={drafting}
+              maxLength={PERSONA_MAX}
+              aria-busy={drafting}
+              className={cn(drafting && 'disabled:opacity-60')}
+              onChange={(e) => setPersona(e.target.value)}
+            />
+          )}
           {adding ? (
             <div className="flex flex-wrap items-center gap-2">
               <DashAction
@@ -264,11 +268,10 @@ export function PersonForm({
                 variant={persona.trim() ? 'secondary' : 'primary'}
                 paid="app/chat/actions.ts#draftPersonCard"
                 what="Cost of the draft"
-                pending={drafting}
                 disabled={drafting}
                 onClick={() => void draft(false)}
               >
-                {drafting ? 'Drafting the card…' : persona.trim() ? 'Draft it again' : 'Draft the card'}
+                {persona.trim() ? 'Draft it again' : 'Draft the card'}
               </DashAction>
             </div>
           ) : (
@@ -442,28 +445,25 @@ function Memory({
                 </div>
               ) : (
                 <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-                  <p className="min-w-0 flex-1 basis-0 text-ui text-ink">
+                  {/* The line itself opens for correcting, and Remove is an icon at its end, so a short line stays a line or two at 390. */}
+                  <button
+                    type="button"
+                    title="Correct this line"
+                    onClick={() => {
+                      setEditing(line.id);
+                      setText(line.text);
+                      setError(null);
+                    }}
+                    // eslint-disable-next-line no-restricted-syntax -- text-base matches the correcting box's 16px on a phone, which stops iOS zooming on focus.
+                    className="press -mx-1 min-w-0 flex-1 rounded-control px-1 text-left text-base text-ink hover:bg-sunken sm:text-ui"
+                  >
                     <span className="text-small text-ink-muted">{MEMORY_KIND_LABELS[line.kind]} · </span>
                     {line.text}
-                  </p>
+                  </button>
                   {confirming !== line.id && (
-                    <div className="-mr-2 -mt-1 flex shrink-0 items-start">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditing(line.id);
-                          setText(line.text);
-                          setError(null);
-                        }}
-                      >
-                        Correct
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(line.id)}>
-                        Remove
-                      </Button>
-                    </div>
+                    <IconButton size="sm" label="Remove this line" className="mt-0.5" onClick={() => setConfirming(line.id)}>
+                      <Trash2 strokeWidth={1.75} aria-hidden />
+                    </IconButton>
                   )}
                   {confirming === line.id && (
                     <div className="flex w-full flex-col gap-2">
