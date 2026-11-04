@@ -139,7 +139,6 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import type { CompanyResearch } from '@/lib/jobs/companies/research';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { JobsSettingsView } from '@/app/jobs/(app)/settings/settings-view';
 import { linkedInPlanFixture, linkedInRunsFixture } from './linkedin-import-fixtures';
 import { GoalsSettingsView } from '@/app/goals/settings/settings-view';
@@ -433,7 +432,7 @@ import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
-import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
+import { NewsReviewFold, type NewsReviewFoldProps } from '@/app/news/now-fold-views';
 import { NeedsConfirming } from '@/app/news/all/needs-confirming';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
@@ -605,7 +604,7 @@ import { HomeInboxSurface } from './home-inbox-surfaces';
 import {
   JobsInboxSurface,
   LearnInboxSurface,
-  NewsInboxSurface,
+  NewsInboxFoldSurface,
   ShoppingInboxSurface,
   TodoInboxSurface,
   VaultInboxSurface,
@@ -666,7 +665,6 @@ import { ACCOUNTS_TODAY as FINANCES_TODAY } from './finances-accounts-fixtures';
 import {
   NewsAllSurface,
   NewsSettingsSurface,
-  NewsStorySurface,
   TodoAllSurface,
   TodoAllTaggedSurface,
   TodoSettingsSurface,
@@ -1444,9 +1442,9 @@ const allRoles: SearchableRole[] = pipelineRows.map((row) => ({
 }));
 
 /**
- * The Jobs Inbox's review items (plan #2502.2): the queue above with one more
- * message, its subject as long as recruiters write them, and nine waiting in
- * all, so the first five show and "Open all 9 in Review" follows them.
+ * The Jobs Inbox's review items (plan #2502.2): the queue above with three
+ * more, one message's subject as long as recruiters write them, seven in all
+ * and every one listed with the kinds to narrow them by (plan #1496.7.3).
  */
 const inboxReview = {
   rows: [
@@ -1480,8 +1478,44 @@ const inboxReview = {
       ],
       sortAt: '2026-09-07T10:12:00.000Z',
     },
+    {
+      kind: 'application' as const,
+      id: 'r6',
+      applicationId: 'p6',
+      roleId: 'role-p6',
+      companyName: 'Halloran-Achterberg',
+      companyDomains: ['halloran-achterberg.example'],
+      roleTitle: 'Staff Software Engineer, Real-Time Risk & Settlement Infrastructure',
+      status: 'submitted',
+      submittedAt: '2026-09-02T08:20:00.000Z',
+      reason: 'Created from a confirmation email. Nobody has confirmed the details.',
+      gmailHref: 'https://mail.google.com/mail/#all/18f2a9c4d1e0b7b9',
+      sortAt: '2026-09-02T08:20:00.000Z',
+    },
+    {
+      kind: 'message' as const,
+      id: 'r7',
+      subject: 'Your application to Tallow',
+      fromAddress: 'no-reply@ashbyhq.example',
+      threadId: 'thread-tallow',
+      replyToAddress: null,
+      roleHint: null,
+      receivedAt: '2026-09-01T17:45:00.000Z',
+      classification: 'rejection',
+      reason: 'Tallow has two pursuits on file and the email names neither.',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/13',
+      candidates: [
+        {
+          applicationId: 'p3',
+          label: 'Tallow · Backend Engineer, Payments',
+          reason: 'Same company',
+          confidence: 0.41,
+        },
+      ],
+      sortAt: '2026-09-01T17:45:00.000Z',
+    },
   ] satisfies ReviewRow[],
-  counts: { all: 9, messages: 5, applications: 2, events: 2 },
+  counts: { all: 7, messages: 4, applications: 2, events: 1 },
   companyNames: [...new Set(pipelineRows.map((row) => row.companyName))].sort(),
   allRoles,
 };
@@ -1855,10 +1889,6 @@ const referrerFixtures: ReferrerOption[] = [
   { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
   { id: 'contact-3', name: 'Sam Okafor', company: null },
 ];
-
-const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({
-  name,
-}));
 
 /**
  * A week with something in every section: two rounds coming up, one of them a
@@ -3138,7 +3168,7 @@ const reviewLines: [string, number][] = [
   ['NASA set a new date in March for the next crewed Moon flyby.', 1],
 ];
 
-const reviewFull: ReviewViewProps = {
+const reviewFull: NewsReviewFoldProps = {
   review: {
     dayLabel: 'Tuesday 6 October',
     writtenAt: '8:04\u00a0PM',
@@ -3148,21 +3178,21 @@ const reviewFull: ReviewViewProps = {
       ...reviewLines.map(([line, sources], i) => ({
         issueId: `issue-${i + 1}`,
         storyIndex: i % 3,
-        href: `/news/i/issue-${i + 1}/s/${i % 3}?from=review`,
+        href: `/news/i/issue-${i + 1}`,
         line,
         sources,
       })),
       {
         issueId: 'issue-local',
         storyIndex: 2,
-        href: '/news/i/issue-local/s/2?from=review',
+        href: '/news/i/issue-local',
         line: 'The council approved protected cycle lanes on Mill Road, with work starting in January.',
         sources: 1,
         local: true,
       },
     ],
   },
-  earlier: { href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' },
+  earlier: { href: '/news?day=2026-10-05', label: 'Mon 5 Oct' },
   later: null,
   todayAt: null,
 };
@@ -3244,10 +3274,9 @@ const savedStories: SavedViewProps = {
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },
-  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/jobs/review'], badge: 3 },
+  { href: '/jobs/inbox', label: 'Inbox', icon: 'inbox', badge: 3 },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
-  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -3356,10 +3385,17 @@ const youSections: NavSection[] = [
   { href: '/you/council', label: 'Council', icon: 'board' },
 ];
 
-const triageCrumbs = [
-  { label: 'Vault', href: '/vault' },
-  { label: 'Quick note triage', href: '/vault/triage' },
-];
+/**
+ * The Vault's Now page heading, as the page draws it: the triage deck and
+ * the Inbox sit on that page since plan #1496.9.
+ */
+const vaultNowHeader = (
+  <PageHeader
+    title="Vault"
+    description="alex-rivera/notes · main"
+    actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+  />
+);
 
 /**
  * The deck's lesson written with a prediction (plan #2522.6), asked or
@@ -5762,10 +5798,17 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'vault-inbox',
-    label: 'Vault · Inbox',
+    label: 'Vault · Now, what is on you',
     module: 'vault',
-    width: 'page',
-    render: () => <VaultInboxSurface />,
+    width: 'narrow',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        {vaultNowHeader}
+        <VaultInboxSurface />
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable onVault />
+      </div>
+    ),
   },
   {
     id: 'learn-inbox',
@@ -5773,13 +5816,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnInboxSurface />,
-  },
-  {
-    id: 'news-inbox',
-    label: 'News · Inbox, empty',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
@@ -6500,27 +6536,6 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    id: 'jobs-review',
-    label: 'Review queue',
-    module: 'jobs',
-    width: 'wide',
-    render: () => (
-      <ReviewQueue
-        rows={reviewRows}
-        counts={{
-          all: reviewRows.length,
-          messages: reviewRows.filter((row) => row.kind === 'message').length,
-          applications: reviewRows.filter((row) => row.kind === 'application').length,
-          events: reviewRows.filter((row) => row.kind === 'event').length,
-        }}
-        view="all"
-        timezone="Europe/London"
-        companyNames={knownCompanies.map((company) => company.name)}
-        allRoles={allRoles}
-      />
-    ),
-  },
-  {
     id: 'jobs-settings',
     label: 'Jobs · Settings, the Search tab',
     module: 'jobs',
@@ -6860,7 +6875,7 @@ export const SURFACES: readonly Surface[] = [
      * with its suggested notes, a search, and a note of its own; Leave for
      * later is the forward press. The list of all waiting folds below. */
     id: 'vault-triage',
-    label: 'Vault · Quick note triage',
+    label: 'Vault · Now, quick notes and the triage deck',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6872,8 +6887,9 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable onVault />
       </div>
     ),
   },
@@ -6881,13 +6897,14 @@ export const SURFACES: readonly Surface[] = [
     /* Make it a note of its own, pressed (note 24fd1e02): the name field,
      * filled with the name the first line gives it, ready to change. */
     id: 'vault-triage-naming',
-    label: 'Vault · Quick note triage · Naming a new note',
+    label: 'Vault · Now, triage naming a new note',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable naming />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable naming onVault />
       </div>
     ),
   },
@@ -6895,7 +6912,7 @@ export const SURFACES: readonly Surface[] = [
     /* Triage on its second note (plan #1931.5): the first is left for later,
      * so Previous sits beside the forward press. */
     id: 'vault-triage-previous',
-    label: 'Vault · Quick note triage, Previous',
+    label: 'Vault · Now, triage on its second note',
     module: 'vault',
     width: 'narrow',
     interaction: {
@@ -6906,21 +6923,23 @@ export const SURFACES: readonly Surface[] = [
     deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable second />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable />
+        <TriagePreview writable second onVault />
       </div>
     ),
   },
   {
     /* Triage with nothing waiting: the deck's last word. */
     id: 'vault-triage-empty',
-    label: 'Vault · Quick note triage, empty',
+    label: 'Vault · Now, every quick note filed',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview empty writable />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={0} writable />
+        <TriagePreview empty writable onVault />
       </>
     ),
   },
@@ -6928,13 +6947,14 @@ export const SURFACES: readonly Surface[] = [
     /* Triage under a vault token that can only read: the reason in place of
      * the buttons, and the suggestions as links. */
     id: 'vault-triage-read-only',
-    label: 'Vault · Quick note triage, read-only token',
+    label: 'Vault · Now, triage with a read-only token',
     module: 'vault',
     width: 'narrow',
     render: () => (
       <div className={SHELL_FOOT}>
-        <PageHeader subject={{ ref: null, path: triageCrumbs }} title="Quick note triage" />
-        <TriagePreview writable={false} />
+        {vaultNowHeader}
+        <QuickNoteRow waiting={3} writable={false} />
+        <TriagePreview writable={false} onVault />
       </div>
     ),
   },
@@ -6947,7 +6967,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'narrow',
     render: () => (
-      <>
+      <div className={SHELL_FOOT}>
         <PageHeader
           title="Vault"
           description="alex-rivera/notes · main"
@@ -6955,7 +6975,8 @@ export const SURFACES: readonly Surface[] = [
         />
         <NewVaultNote />
         <QuickNoteRow waiting={3} writable />
-      </>
+        <TriagePreview writable onVault />
+      </div>
     ),
   },
   {
@@ -11152,10 +11173,7 @@ export const SURFACES: readonly Surface[] = [
           module="news"
           sections={[
             { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-            { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-            { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
-            { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
           ]}
           settingsHref="/news/settings"
           settingsLabel="News settings"
@@ -11190,6 +11208,54 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <div className={SHELL_FOOT}>
         <QuickReadView {...quickPageView} />
+      </div>
+    ),
+  },
+  {
+    /* Inbox and the Daily review as folds under the Quick read (plan #1496.10). */
+    id: 'news-now-folds',
+    label: 'News · Now with the Inbox and Daily review folds',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <>
+              <div className="mt-6">
+                <NewsInboxFoldSurface />
+              </div>
+              <div className="mt-6">
+                <NewsReviewFold {...reviewFull} />
+              </div>
+            </>
+          }
+        />
+      </div>
+    ),
+  },
+  {
+    /* Tonight's review could not be written and is tried again; an earlier day sits behind the arrow. */
+    id: 'news-now-folds-failed',
+    label: 'News · Now when the Daily review could not be written',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          dashToday={
+            <div className="mt-6">
+              <NewsReviewFold
+                review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00 PM', overview: null, lines: [], retrying: true }}
+                earlier={{ href: '/news?day=2026-10-05', label: 'Mon 5 Oct' }}
+                later={null}
+                todayAt={null}
+              />
+            </div>
+          }
+        />
       </div>
     ),
   },
@@ -11267,36 +11333,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView {...savedStories} />,
-  },
-  {
-    id: 'news-review',
-    label: 'News · Daily review',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView {...reviewFull} />,
-  },
-  {
-    id: 'news-review-empty',
-    label: 'News · Daily review before the first one',
-    module: 'news',
-    width: 'page',
-    render: () => <ReviewView review={null} earlier={null} later={null} todayAt={'8:00\u00a0PM'} />,
-  },
-  {
-    /* Tonight's run failed and is tried again on the hour until midnight;
-     * earlier days are still there behind the back arrow. */
-    id: 'news-review-failed',
-    label: 'News · Daily review that could not be written',
-    module: 'news',
-    width: 'page',
-    render: () => (
-      <ReviewView
-        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
-        earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
-        later={null}
-        todayAt={null}
-      />
-    ),
   },
   {
     id: 'news-saved-empty',
@@ -12256,9 +12292,9 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-activity',
-    label: 'Jobs · Activity',
+    label: 'Now · the Activity tab',
     module: 'jobs',
-    width: 'page',
+    width: 'wide',
     render: () => <JobsActivitySurface />,
   },
   {
@@ -13314,13 +13350,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <NewsAllSurface />,
-  },
-  {
-    id: 'news-story',
-    label: 'News · One story on its own page',
-    module: 'news',
-    width: 'page',
-    render: () => <NewsStorySurface />,
   },
   {
     id: 'news-settings',

@@ -29,7 +29,6 @@ const DRAWN_INSIDE: Record<string, string> = {
   'app/learn/topics/draft-form.tsx': 'app/learn/topics/topics-view.tsx',
   'app/learn/topics/review/move-runner.tsx': 'app/learn/topics/review/review-view.tsx',
   'app/shopping/review/review-list.tsx': 'app/shopping/review/page.tsx',
-  'app/jobs/(app)/review/list.tsx': 'app/jobs/(app)/review/page.tsx',
 };
 
 function tsxFiles(dir: string): string[] {

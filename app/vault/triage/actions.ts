@@ -110,7 +110,6 @@ export async function fileQuickNoteAction(
 
   after(() => rebuildTriageNote(vault));
   revalidatePath('/vault');
-  revalidatePath('/vault/triage');
   revalidatePath(noteHref(result.path));
   revalidatePath(noteHref(input.data.quickPath));
   return { filedPath: result.path, filedTitle: result.title, warning: result.warning };

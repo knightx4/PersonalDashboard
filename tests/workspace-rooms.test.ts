@@ -40,6 +40,14 @@ const LAYOUTS: Partial<Record<TabWorkspace, string>> = {
  */
 const NO_INBOX_YET = new Set(['you', 'finances', 'chat']);
 
+/**
+ * Workspaces whose Inbox is drawn on Now rather than in a room of its own.
+ * Vault's Inbox and its quick note triage went unopened for a month and were
+ * folded into its Now page (plan #1496.9); /vault/inbox opens Now. Such a
+ * workspace has Now first and no Inbox tab, and so no badge anywhere.
+ */
+const INBOX_ON_NOW = new Set<TabWorkspace>(['vault', 'news']);
+
 function stringProp(node: ts.ObjectLiteralExpression, name: string): string | null {
   for (const prop of node.properties) {
     if (
@@ -107,6 +115,22 @@ describe('the rooms every workspace opens with', () => {
     describe(workspace, () => {
       const sections = WORKSPACE_TABS[workspace];
       const { badged, settings } = read(file);
+
+      if (INBOX_ON_NOW.has(workspace)) {
+        it('starts with Now, and has no Inbox tab', () => {
+          expect(sections[0]?.label).toBe('Now');
+          expect(sections.some((s) => s.label === 'Inbox' || /\/inbox$/.test(s.href))).toBe(false);
+        });
+
+        it('carries no badge', () => {
+          expect(badged).toEqual([]);
+        });
+
+        it('sets its settings link', () => {
+          expect(settings).toBe(true);
+        });
+        return;
+      }
 
       it('starts with Now, then Inbox', () => {
         expect(sections.slice(0, 2).map((s) => s.label)).toEqual(['Now', 'Inbox']);

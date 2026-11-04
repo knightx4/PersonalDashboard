@@ -3,20 +3,19 @@ import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { CasePageView, type CasePage } from '@/components/jobs/case-page';
-import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
-import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
+import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
 import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
 import { WelcomeForm } from '@/app/jobs/(onboarding)/onboarding/forms';
 import type { Activity, ActivityEntry } from '@/lib/jobs/activity/load';
-import { PageColumn } from '@/components/shell/page-width';
 
 /**
  * The Jobs pages that had no picture in the gallery (plan #1601): Activity,
  * Answers, Career goals, the first onboarding step and the shared case page.
  * Analytics was retired in plan #1496.7.1.
  *
- * Activity, Answers and Career goals are server pages that only read and pass
+ * Activity is a tab of Now since plan #1496.7.2, drawn from Now's own view.
+ * Answers and Career goals are server pages that only read and pass
  * rows to client components, so they are drawn here from those components and
  * the page's own header. Onboarding and the case page write their
  * markup in the server page itself, and that markup is repeated below with the
@@ -24,8 +23,6 @@ import { PageColumn } from '@/components/shell/page-width';
  * other steps change them. A later step that changes one of those two
  * should move its markup into a view both the page and this file import.
  */
-
-const page = (children: React.ReactNode) => <PageColumn>{children}</PageColumn>;
 
 // ---- Activity ---------------------------------------------------------------
 
@@ -67,23 +64,24 @@ const ACTIVITY: Activity = {
   ],
 };
 
+/** Now's Activity tab (plan #1496.7.2), where the Activity page went. */
 export function JobsActivitySurface() {
-  return page(
-    <>
-      <PageHeader title="Activity" />
-      <CheckInboxNow
-        accounts={[
-          {
-            id: 'acc1',
-            emailAddress: 'christopher.kloughton@example.com',
-            status: 'active',
-            lastSyncedAt: '2026-10-06T11:03:41Z',
-            backfillCompletedAt: '2026-08-14T10:00:00Z',
-          },
-        ]}
-      />
-      <ActivityFeed activity={ACTIVITY} timezone="America/New_York" />
-    </>,
+  return (
+    <TodayPage
+      tab="activity"
+      opensOn="activity"
+      timezone="America/New_York"
+      activity={ACTIVITY}
+      accounts={[
+        {
+          id: 'acc1',
+          emailAddress: 'christopher.kloughton@example.com',
+          status: 'active',
+          lastSyncedAt: '2026-10-06T11:03:41Z',
+          backfillCompletedAt: '2026-08-14T10:00:00Z',
+        },
+      ]}
+    />
   );
 }
 

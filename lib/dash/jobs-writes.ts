@@ -1876,7 +1876,7 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   const href = role ? roleHref(role.id) : '/jobs';
   return {
     kind: 'change_role_email',
-    input: { verb, what: subject, rest, href, where: role ? 'Open the role' : 'Open Jobs', paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/jobs/review'] },
+    input: { verb, what: subject, rest, href, where: role ? 'Open the role' : 'Open Jobs', paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/jobs/inbox'] },
     subjectRef: toRef(APPLICATIONS, applicationId),
     op: 'update',
     before: application,
@@ -2007,7 +2007,7 @@ export type RowsUndo = {
  */
 const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events', 'job_search.ingested_messages']);
 
-const REVIEW_HREF = '/jobs/review';
+const REVIEW_HREF = '/jobs/inbox';
 const EVENTS_MAX = 50;
 const REOPEN_STATUSES = ['in_process', 'final_round'] as const;
 
