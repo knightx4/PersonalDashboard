@@ -39,6 +39,12 @@ export const goalsActions: ModuleActions = {
     acknowledgeGoalRunAction: none('theirs'),
     answerGoalRunAction: none('theirs'),
   },
+  'app/goals/[goalId]/dashboard-actions.ts': {
+    addTileRowAction: none('theirs'),
+    logTileReadingAction: none('theirs'),
+    moveTileAction: none('theirs'),
+    removeTileAction: none('theirs'),
+  },
   'app/goals/suggestion-actions.ts': {
     reactToSuggestionAction: none('theirs'),
     undoDeclineAction: none('theirs', 'Undo: takes back their own decline.'),
