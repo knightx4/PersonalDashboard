@@ -6,6 +6,14 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
 import { turnThought } from '@/lib/talk/thought';
 import type { TalkToolCall } from '@/lib/talk/talk';
+import { cn } from '@/lib/cn';
+
+/**
+ * A picker under the box set as quiet words, as Claude sets its model and
+ * effort under its box (plan #2863): grey text, a ground only on hover.
+ */
+export const QUIET_PICKER =
+  'press-area inline-flex h-(--control-h) shrink-0 items-center gap-1 rounded-control px-1.5 text-small text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink [&_svg]:size-3.5 [&_svg]:shrink-0';
 
 /**
  * "Think it through" on Dash's box (plan #2789.10): pressed, the next
@@ -15,7 +23,38 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  * in the model chip's place, since the model is then Opus whatever was
  * picked. It stays on until it is pressed again.
  */
-export function ThinkSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+export function ThinkSwitch({
+  on,
+  onChange,
+  quiet = false,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  /** Plain grey words under the box, with no ring, as Chat's Dash tab sets its pickers (plan #2863). */
+  quiet?: boolean;
+}) {
+  if (quiet) {
+    return (
+      <Tooltip
+        label={
+          on
+            ? 'Dash thinks each answer through on Opus, with the web and the code. Slower, and costs more.'
+            : 'Think it through: a slower, deeper answer on Opus, with the web and the code.'
+        }
+        className="shrink-0"
+      >
+        <button
+          type="button"
+          aria-pressed={on}
+          onClick={() => onChange(!on)}
+          className={cn(QUIET_PICKER, on && 'text-accent hover:text-accent')}
+        >
+          <Lightbulb strokeWidth={1.75} aria-hidden />
+          {on ? 'Think it through' : 'Think'}
+        </button>
+      </Tooltip>
+    );
+  }
   return (
     <Tooltip
       label={
