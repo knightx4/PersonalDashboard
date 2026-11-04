@@ -125,10 +125,11 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       ownerOnly: true,
     },
   ],
+  // A month of opens (plan #1496.10) folded Inbox and the Daily review into
+  // Now and tucked Saved away: its page, route and rows are kept, reached by
+  // address and from the Newsletters list.
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-    { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
     {
       href: '/news/all',
       label: 'Newsletters',
@@ -136,7 +137,6 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       exact: true,
       alsoMatches: ['/news/i/'],
     },
-    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ],
   goals: [
     { href: '/goals', label: 'Now', icon: 'goalsHome', exact: true },

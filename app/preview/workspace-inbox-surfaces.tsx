@@ -1,6 +1,7 @@
 'use client';
 
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
+import { NewsInboxFold } from '@/app/news/now-fold-views';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
 import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
@@ -181,6 +182,26 @@ const LEARN: InboxRow[] = [
   },
 ];
 
+/** News's Inbox is mostly empty; the Now fold is drawn with one question on it. */
+const NEWS_ON_YOU: InboxRow[] = [
+  {
+    ref: 'news.issues:n1',
+    section: 'questions',
+    title: 'Should the Slow Technology Weekly digest keep coming, or should Dash mute it?',
+    line: 'Dash asked on a newsletter you have not opened in six weeks',
+    href: '/news/all',
+    move: onYou,
+    later,
+    verbs: [{ label: 'Reply', tone: 'primary', href: '/news/all' }],
+    decline,
+  },
+];
+
+/** The Inbox fold as News's Now draws it; the rows are built here because functions in them cannot cross from the server. */
+export function NewsInboxFoldSurface() {
+  return <NewsInboxFold rows={NEWS_ON_YOU} />;
+}
+
 export function ShoppingInboxSurface() {
   return <WorkspaceInbox workspace="shopping" rows={SHOPPING} />;
 }
@@ -219,6 +240,3 @@ export function LearnInboxSurface() {
   return <WorkspaceInbox workspace="learn" rows={LEARN} />;
 }
 
-export function NewsInboxSurface() {
-  return <WorkspaceInbox workspace="news" rows={[]} />;
-}

@@ -90,9 +90,9 @@ export function reviewNav(
   return { day: days[i]!, earlier: days[i + 1] ?? null, later: i > 0 ? days[i - 1]! : null };
 }
 
-/** The tab's address for one day; the latest day is the bare address. */
+/** Now's address for one day's review; the latest day is the bare address. */
 export function reviewHref(day: string | null, latest: string | null): string {
-  return day && day !== latest ? `/news/review?day=${day}` : '/news/review';
+  return day && day !== latest ? `/news?day=${day}` : '/news';
 }
 
 /** "Tuesday 6 October", with the year when it is not this year's. */

@@ -20,8 +20,6 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
   ],
   news: [
     { href: '/news', label: 'Now', icon: 'quickRead', exact: true },
-    { href: '/news/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
     {
       href: '/news/all',
       label: 'Newsletters',
@@ -29,7 +27,6 @@ const BEFORE: Partial<Record<TabWorkspace, NavSection[]>> = {
       exact: true,
       alsoMatches: ['/news/i/'],
     },
-    { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
   ],
   todo: [
     { href: '/todo', label: 'Now', icon: 'agenda', exact: true },

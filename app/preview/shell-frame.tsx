@@ -93,7 +93,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   news: {
     sections: [
       { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
-      { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
       {
         href: '/news/all',
         label: 'Newsletters',
@@ -101,7 +100,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         exact: true,
         alsoMatches: ['/news/i/'],
       },
-      { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
     ],
     settingsHref: '/news/settings',
     settingsLabel: 'News settings',
