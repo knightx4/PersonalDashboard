@@ -25,6 +25,8 @@ import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
 import { NewFeatureButton } from './feature-compose';
 import { buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
+import { newSessionThreadHref } from '@/lib/core/session-threads-model';
 import {
   applyView,
   buildPlanTree,
@@ -290,10 +292,21 @@ export async function renderPlanPage({
               <a href="/dev/studio" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                 Open studio
               </a>
+              <Link href={newSessionThreadHref(project.id)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Talk about this project
+              </Link>
+              <NewFeatureButton module={project.id} />
+            </div>
+          ) : project ? (
+            <div className="flex items-center gap-2">
+              {/* A conversation with a session on the project's code, in Chat (plan #2789.7). */}
+              <Link href={newSessionThreadHref(project.id)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Talk about this project
+              </Link>
               <NewFeatureButton module={project.id} />
             </div>
           ) : (
-            <NewFeatureButton module={project?.id ?? null} />
+            <NewFeatureButton module={null} />
           )
         }
         description={

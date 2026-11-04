@@ -524,7 +524,7 @@ const SESSION_QUESTIONS: SessionQuestion[] = [
   {
     id: '00000000-0000-4000-8000-0000000000a1',
     about: 'Music pipeline: split the long tracks before import',
-    href: '/ask?thread=00000000-0000-4000-8000-0000000000b1',
+    href: '/chat/dash/session/00000000-0000-4000-8000-0000000000b1',
     body: 'The import found 14 tracks over 20 minutes. Split them at silence, or import them whole?',
     options: ['Split at silence', 'Import whole'],
     askedAt: '2026-11-04T11:42:00Z',

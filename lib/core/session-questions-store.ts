@@ -13,6 +13,7 @@ import {
   type SessionRoute,
 } from '@/lib/core/session-questions';
 import { refFor } from '@/lib/plan/ref';
+import { sessionThreadPath } from '@/lib/core/session-threads-model';
 import { answerPlanRun } from '@/lib/plan/run-answer';
 
 /**
@@ -119,7 +120,7 @@ export async function loadSessionQuestions(
           step?.name ??
           (row.thread_id ? threads.get(row.thread_id) : undefined) ??
           (row.project ? `Project ${row.project}` : 'A session'),
-        href: step ? step.href : row.thread_id ? `/ask?thread=${encodeURIComponent(row.thread_id)}` : row.project ? `/dev/projects/${row.project}` : '/dev/plan',
+        href: step ? step.href : row.thread_id ? sessionThreadPath(row.thread_id) : row.project ? `/dev/projects/${row.project}` : '/dev/plan',
         body,
         options,
         askedAt: row.updated_at,
