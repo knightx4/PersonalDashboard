@@ -18,11 +18,16 @@ The app posts the note to `POST /api/projects/<project id>/notes` with
    feature "Fixes from notes filed in <project>" and links the idea to the step
    (`ideas.plan_item_id`). The projects routine builds that step in the
    project's repository;
-4. otherwise leaves the idea on the ideas page, scored, for shaping into a
-   feature of its own.
+4. otherwise sends it straight on to be shaped into a feature of its own on
+   the plan, scored first when Jev is on (`sendIdeaToPlan` in
+   `lib/ideas/send-to-plan.ts`). Nothing waits on the ideas page for a press.
+   This is the same path a note from Dash's own header takes, so every app
+   with a note button behaves alike. The shaping brief names the project's
+   repository, so the session reads that code and files the feature under the
+   project.
 
 The answer tells the app which happened: `{ ok, as: 'step', number }` or
-`{ ok, as: 'idea' }`, with a `message` to show.
+`{ ok, as: 'idea' }` (sent to be shaped), with a `message` to show.
 
 Notes from an app never enter Dev · Notes. The notes routine works in this
 repository, and a fix to another project would be made in the wrong place.
