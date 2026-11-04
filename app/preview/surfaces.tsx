@@ -465,7 +465,7 @@ import {
 } from './goal-surfaces';
 import { GoalStepEditingSurface, GoalStepMenuSurface } from './step-frame-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
-import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
+import { GoalDashArrivalDemo, GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
 import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
 import { DashWorkingReadingDemo } from './dash-working-rows';
@@ -6146,7 +6146,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPageCloseDemo />,
   },
   {
-    /* A step Dash finished, on the Steps tab (plan #1672). */
+    /* A step Dash finished, on the Plan tab (plan #1672). */
     id: 'goals-page-arrival',
     label: 'Goal · a step Dash finished, on the Plan tab',
     module: 'goals',
@@ -6155,9 +6155,23 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="goal-page-arrival"]',
       shows:
-        'Draft what to say on the call settles into place in the step list and Dash’s mark beside it swells and takes the accent once, settled within the second.',
+        'Draft what to say on the call settles into place in the finished steps and Dash’s mark beside it swells and takes the accent once, settled within the second.',
     },
     render: () => <GoalPageArrivalDemo />,
+  },
+  {
+    /* The same moment in Dash's card on the Dashboard (plan #2778.10). */
+    id: 'goals-page-dash-arrival',
+    label: 'Goal · a step Dash finished, in Dash’s card',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="goal-dash-arrival"]',
+      shows:
+        'The Last finished line in Dash’s card settles into place and Dash’s mark in it swells and takes the accent once, settled within the second.',
+    },
+    render: () => <GoalDashArrivalDemo />,
   },
   {
     /* The same frame on its History tab: the steps closed, the runs and

@@ -1401,9 +1401,12 @@ const tabbedGoal: Goal = {
 export function TabbedGoal({
   children,
   closed = false,
+  progress = goalProgress(tabbedMap.steps),
 }: {
   children: React.ReactNode;
   closed?: boolean;
+  /** The progress the frame shows, where it holds a plan of its own. */
+  progress?: ReturnType<typeof goalProgress>;
 }) {
   return (
     <GoalDetail
@@ -1411,7 +1414,7 @@ export function TabbedGoal({
       areaName={tabbedMap.areaName}
       places={PLACES}
       review={cardsReview}
-      progress={goalProgress(tabbedMap.steps)}
+      progress={progress}
       timeZone="UTC"
       pace={
         closed

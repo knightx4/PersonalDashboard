@@ -820,6 +820,7 @@ export default async function GoalMapPage({
                 : null
             }
             shaping={shapingUp && shapingPanel}
+            arrivals={arrivals}
             ask={open && <AskDash goals={thisGoal} areas={[]} defaultAreaId={null} only />}
           />
           <RecentFiles
@@ -880,6 +881,7 @@ export default async function GoalMapPage({
             // A goal whose Dashboard has a card per room calls its stages rooms.
             stageWord={tileViews?.some((view) => view.type === 'rooms') ? 'room' : 'stage'}
             files={filesOf}
+            arrivals={arrivals}
             canRun={owner}
             today={today}
             timeZone={account.timezone}

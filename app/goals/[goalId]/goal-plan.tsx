@@ -6,7 +6,10 @@ import Link from '@/components/ui/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
+import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
+import { LinkedText } from '@/components/ui/linked-text';
+import { Tooltip } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
@@ -25,6 +28,7 @@ import {
 } from '@/lib/goals/plan-order';
 import { awaitsReview } from '@/lib/goals/daily';
 import type { GoalMap } from '@/lib/goals/steps-store';
+import { useDashArrival } from './dash-arrival';
 import { DashDraft } from './dash-draft';
 import { workOnGoalAction, type ShapingActionState } from './shaping-actions';
 import { Question } from './step-parts';
@@ -34,6 +38,7 @@ export type PlanView = 'next' | 'stage';
 
 const NO_FILES: Record<string, LinkedFile[]> = {};
 const NO_INSET = {};
+const NO_ARRIVALS: readonly string[] = [];
 
 /** The chip's colour for what a later step waits on: a date in accent, another step in caution. */
 /** The glyph before each kind of wait, so the chip does not say it by colour alone. */
@@ -76,6 +81,7 @@ export function GoalPlan({
   later: laterOpen = false,
   doneOpen = false,
   draftOpen = false,
+  arrivals = NO_ARRIVALS,
 }: {
   map: GoalMap;
   view: PlanView;
@@ -96,6 +102,8 @@ export function GoalPlan({
   doneOpen?: boolean;
   /** Start with Dash's drafts open. A seam for the gallery. */
   draftOpen?: boolean;
+  /** The finished steps Dash closed lately, which arrive with its mark (moment "A step Dash finished"). */
+  arrivals?: readonly string[];
 }) {
   const order = useMemo(() => planOrder(map.steps, { today }), [map.steps, today]);
   const preps = useMemo(() => stepPreps([map.steps]).prepFor, [map.steps]);
@@ -218,17 +226,13 @@ export function GoalPlan({
               <Disclosure title={`${closed.length} done`} defaultOpen={doneOpen}>
                 <ul className="space-y-1 pt-1.5 text-small text-ink-muted">
                   {closed.map((step) => (
-                    <li key={step.id} className="flex items-baseline justify-between gap-3">
-                      <Link
-                        href={stepHref(map.goal.id, step.id)}
-                        className="press-area min-w-0 break-words hover:text-ink"
-                      >
-                        {step.title}
-                      </Link>
-                      <span className="tabular shrink-0 whitespace-nowrap">
-                        {formatDay(dayIn(step.closedAt, timeZone))}
-                      </span>
-                    </li>
+                    <DoneRow
+                      key={step.id}
+                      goalId={map.goal.id}
+                      step={step}
+                      arrived={arrivals.includes(step.id)}
+                      timeZone={timeZone}
+                    />
                   ))}
                 </ul>
               </Disclosure>
@@ -361,7 +365,11 @@ function StepCard({
           <CommentCount count={comments} />
           {where && <span className="min-w-0 break-words">{where}</span>}
         </p>
-        {why && <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">{why}</p>}
+        {why && (
+          <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">
+            <LinkedText text={why} />
+          </p>
+        )}
         {now && entry.whose === 'question' && (
           <div className="-mx-1 pt-1">
             <Question node={step} />
@@ -482,5 +490,47 @@ function HelpMePlan({ goalId }: { goalId: string }) {
         )
       )}
     </form>
+  );
+}
+
+/**
+ * A finished step in the fold at the foot of the Plan tab. One Dash closed
+ * lately settles in with its mark flashing the first time the row is on
+ * screen (moment "A step Dash finished"); under reduced motion it is simply
+ * there.
+ */
+function DoneRow({
+  goalId,
+  step,
+  arrived,
+  timeZone,
+}: {
+  goalId: string;
+  step: ReturnType<typeof closedSteps>[number];
+  arrived: boolean;
+  timeZone: string;
+}) {
+  const markRef = useDashArrival(step.id, arrived);
+  return (
+    <li className="flex items-baseline justify-between gap-3">
+      <span className="flex min-w-0 items-baseline gap-1.5">
+        <Link
+          href={stepHref(goalId, step.id)}
+          className="press-area min-w-0 break-words hover:text-ink"
+        >
+          {step.title}
+        </Link>
+        {arrived && (
+          <Tooltip label="Finished by Dash" className="shrink-0">
+            <span ref={markRef} className="inline-flex translate-y-0.5 text-ink-muted">
+              <DashMark size="2xs" label="Dash's" />
+            </span>
+          </Tooltip>
+        )}
+      </span>
+      <span className="tabular shrink-0 whitespace-nowrap">
+        {formatDay(dayIn(step.closedAt, timeZone))}
+      </span>
+    </li>
   );
 }

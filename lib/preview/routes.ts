@@ -166,6 +166,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-page-plan-empty': ['/goals/[goalId]'],
   'goals-page-close': ['/goals/[goalId]'],
   'goals-page-arrival': ['/goals/[goalId]'],
+  'goals-page-dash-arrival': ['/goals/[goalId]'],
   'goals-page-activity': ['/goals/[goalId]'],
   'goals-file': ['/goals/files/[fileId]'],
   'goals-page-bare': ['/goals/[goalId]'],

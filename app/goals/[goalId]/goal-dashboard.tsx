@@ -7,6 +7,7 @@ import { SectionHeading, SectionLabel } from '@/components/ui/section-heading';
 import { FileLinks } from '@/components/files/file-links';
 import { cn } from '@/lib/cn';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
+import { LastFinished } from './last-finished';
 import { StripDone } from './strip-done';
 import type { GoalStrip, StripCard } from '@/lib/goals/goal-strip';
 
@@ -152,6 +153,7 @@ export function DashOnCard({
   latest,
   shaping,
   ask,
+  arrivals,
 }: {
   /** What Dash is on and finished in the last day, running first (dashWork). */
   items: readonly DashWorkItem[];
@@ -161,6 +163,8 @@ export function DashOnCard({
   shaping?: React.ReactNode;
   /** Ask Dash on this goal. */
   ask?: React.ReactNode;
+  /** The finished steps Dash closed lately, which arrive with its mark. */
+  arrivals?: readonly string[];
 }) {
   const running = items.filter((item) => item.state === 'running');
   const finished = items.find((item) => item.state === 'finished') ?? null;
@@ -204,30 +208,12 @@ export function DashOnCard({
         !shaping && <p className="text-small text-ink-muted">Nothing running on this goal.</p>
       )}
       {(finished || latest) && (
-        <p className="text-small text-ink-muted">
-          Last finished:{' '}
-          {finished ? (
-            <a
-              href={`/goals/runs/${finished.runId}`}
-              className="press-area font-medium text-ink hover:text-accent"
-            >
-              {finished.title}
-            </a>
-          ) : (
-            latest && (
-              <Link
-                href={latest.href}
-                className="press-area font-medium text-ink hover:text-accent"
-              >
-                {latest.title}
-              </Link>
-            )
-          )}
-          {' · '}
-          <Link href="?tab=files" className={cn('press-area', linkVariants({ tone: 'quiet' }))}>
-            All of Dash’s work
-          </Link>
-        </p>
+        <LastFinished
+          stepId={finished?.stepId ?? null}
+          arrived={finished ? (arrivals?.includes(finished.stepId) ?? false) : false}
+          run={finished ? { title: finished.title, href: `/goals/runs/${finished.runId}` } : null}
+          file={latest ?? null}
+        />
       )}
       {shaping}
       {ask}

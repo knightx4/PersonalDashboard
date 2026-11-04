@@ -97,7 +97,11 @@ export function GoalDetail({
             <span className="text-small">{line}</span>
           </GoalActivitySwitch>
         ) : (
-          <span className="text-small">{line}</span>
+          // The height the switch gave the line, so closing the goal does not
+          // pull the page up under the ring (moment "A goal closing").
+          <span className="flex min-h-[calc(var(--control-h)+2px)] items-center text-small">
+            {line}
+          </span>
         )
       }
       actions={
