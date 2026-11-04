@@ -555,11 +555,11 @@ import {
   ProjectsSurface,
 } from './projects-surfaces';
 import { GoalPageErrorSurface } from './goal-page-error-surface';
+import { GoalPlanSurface } from './goal-plan-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
-  GoalStepsTabSurface,
   GoalActivitySurface,
   GoalDashboardPageSurface,
   GoalFilesTabSurface,
@@ -6006,12 +6006,70 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The same frame on its Plan tab: the step tree and its stages. */
+    /* A goal's Plan tab (plan #2778.5): the loans goal's letter Now, autopay
+     * Up next with Dash's how-to folded, and Later with what each waits on. */
     id: 'goals-page-steps',
     label: 'Goal · the Plan tab',
     module: 'goals',
     width: 'page',
-    render: () => <GoalStepsTabSurface />,
+    render: () => <GoalPlanSurface />,
+  },
+  {
+    /* The apartment goal's Plan tab: one step Now, two Up next, and a long
+     * Later in rooms cut at eight with Show all. */
+    id: 'goals-page-plan-apartment',
+    label: 'Goal · the Plan tab, in rooms',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" />,
+  },
+  {
+    /* The same, with every later step listed. */
+    id: 'goals-page-plan-apartment-later',
+    label: 'Goal · the Plan tab, every later step',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" laterAll />,
+  },
+  {
+    /* The loans goal By stage: every stage on one card, open to its steps. */
+    id: 'goals-page-plan-stage',
+    label: 'Goal · the Plan tab by stage',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface view="stage" />,
+  },
+  {
+    /* The apartment goal By room. */
+    id: 'goals-page-plan-apartment-rooms',
+    label: 'Goal · the Plan tab by room',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" view="stage" />,
+  },
+  {
+    /* Dash's how-to opened in place on the step it is for. */
+    id: 'goals-page-plan-draft',
+    label: 'Goal · Dash’s draft open on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface draftOpen />,
+  },
+  {
+    /* The finished steps' fold open, newest first. */
+    id: 'goals-page-plan-done',
+    label: 'Goal · the finished steps on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface doneOpen />,
+  },
+  {
+    /* A goal with no steps yet: Help me plan this. */
+    id: 'goals-page-plan-empty',
+    label: 'Goal · the Plan tab with no plan',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="empty" />,
   },
   {
     /* A goal closing with the Steps tab open (plan #1672): the hexagon in the

@@ -80,6 +80,7 @@ import {
 import { formatDay } from '@/lib/goals/dates';
 import { dayIn } from '@/lib/todo/time';
 import { goalStrip } from '@/lib/goals/goal-strip';
+import { planOrder } from '@/lib/goals/plan-order';
 import { loadGoalDashboardViews } from '@/lib/goals/dashboard-store';
 import type { TileView } from '@/lib/goals/dashboard-tiles';
 import { flagsWaiting } from '@/lib/goals/flags';
@@ -114,6 +115,7 @@ import { GoalMetrics, type MetricView } from './goal-metrics';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
+import { GoalPlan } from './goal-plan';
 import { DashWork } from './dash-work';
 import { DashboardTiles } from './dashboard-tiles';
 import {
@@ -352,7 +354,8 @@ function runRowsOf(history: { runs: RunListing[] }, timeZone: string) {
  *    files beside them; then what feeds the goal (context from the other
  *    modules, Dash's suggestions with the weekly help, links, Learn, related
  *    notes, add lines);
- *  - Plan: the step tree, with Now, Other stages and the rhythms;
+ *  - Plan: what is on you now, what comes next and why the rest waits, or
+ *    By stage, the step tree with every stage open (plan #2778.5);
  *  - Work & files: what Dash is on and every file on the goal;
  *  - History: the steps closed, the runs and the goal's comments.
  *
@@ -370,10 +373,12 @@ export default async function GoalMapPage({
   searchParams,
 }: {
   params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; view?: string | string[] }>;
 }) {
   const { goalId } = await params;
-  const tabParam = (await searchParams).tab;
+  const { tab: tabParam, view: viewParam } = await searchParams;
+  // The Plan tab's switch (plan #2778.5): What's next unless By stage is asked for.
+  const planView = viewParam === 'stage' ? 'stage' : 'next';
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -628,7 +633,13 @@ export default async function GoalMapPage({
       }
     : null;
   const unread = unreadWords(files);
-  const strip = goalStrip(map.steps, status.yourMove);
+  // The Plan tab's order (plan #2778.5), which the strip names the first of
+  // each lane from. A question under Now is answered on the Plan tab, so
+  // Waiting on you leaves it out rather than list it twice.
+  const order = planOrder(map.steps, { today });
+  const strip = goalStrip(map.steps, status.yourMove, order);
+  const inNow = new Set(order.now.map((entry) => entry.id));
+  const waitingRows = status.yourMove.filter((row) => !inNow.has(row.id));
   // Dash's newest file, said in its card when no run finished in the last day.
   const latestByDash = work.some((item) => item.state === 'finished')
     ? null
@@ -704,7 +715,7 @@ export default async function GoalMapPage({
           {tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="rest" />}
           {open && <GoalLogDone goalId={map.goal.id} />}
           {!numberEmpty && <GoalNumber {...number} />}
-          <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
+          <WaitingOnYou rows={waitingRows} flags={flags} questions={questions} />
           <GoalMetrics metrics={metrics} />
           <BurnUpChart days={burnUpDays} />
         </>
@@ -772,19 +783,34 @@ export default async function GoalMapPage({
         </DetailCard>
       ) : tab === 'plan' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
-          {/* Your initial, for the Assignee column (plan #2069.2). */}
-          <YourInitialProvider initial={await loadYourInitial(user)}>
-            <StepTree
-              map={map}
-              stages={stages}
-              todoOn={moduleEnabled(account, 'todo')}
-              runs={stepRunLines(stepRuns)}
-              files={filesOf}
-              progress={stepProgress}
-              arrivals={arrivals}
-              canRun={owner}
-            />
-          </YourInitialProvider>
+          <GoalPlan
+            map={map}
+            view={planView}
+            // A goal whose Dashboard has a card per room calls its stages rooms.
+            stageWord={tileViews?.some((view) => view.type === 'rooms') ? 'room' : 'stage'}
+            files={filesOf}
+            canRun={owner}
+            today={today}
+            timeZone={account.timezone}
+            byStage={
+              planView === 'stage' && (
+                // Your initial, for the Assignee column (plan #2069.2).
+                <YourInitialProvider initial={await loadYourInitial(user)}>
+                  <StepTree
+                    map={map}
+                    stages={stages}
+                    todoOn={moduleEnabled(account, 'todo')}
+                    runs={stepRunLines(stepRuns)}
+                    files={filesOf}
+                    progress={stepProgress}
+                    arrivals={arrivals}
+                    canRun={owner}
+                    byStage
+                  />
+                </YourInitialProvider>
+              )
+            }
+          />
         </GoalStepsFold>
       ) : tab === 'files' ? (
         // Work & files (plan #2778.4): what Dash is on and every file on the

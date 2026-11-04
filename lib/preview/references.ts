@@ -41,6 +41,30 @@ export type Reference = {
   from: string;
 };
 
+/** The loans mockup's Plan view, approved on 3 November 2026 for #2778 (plan #2778.5). */
+const LOANS_PLAN: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/loans-plan-laptop.png',
+    'docs/references/goal-dashboard/loans-plan-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+  source: 'docs/references/goal-dashboard/loans.html',
+  why: "The loans goal's Plan tab the person approved on 3 November 2026 for #2778: a What's next / By stage switch, then NOW in the accent with one step on a faintly ringed card (a filled numbered circle, the title, a muted line of whose and which stage, a sentence on why, and Done beside the other buttons), UP NEXT as plain numbered cards with Dash's how-to folded inside, LATER as one card of numbered rows each ending in a chip saying what it waits on (a date in blue, another step in amber), and the finished steps folded at the foot as '15 done'. The mockup's side column of Progress and Coming up is the page's own properties column here.",
+  from: '2778.5',
+};
+
+/** The apartment mockup's Plan view, approved on 4 November 2026 for #2778 (plan #2778.5). */
+const APARTMENT_PLAN: Reference = {
+  pictures: [
+    'docs/references/goal-dashboard/apartment-plan-laptop.png',
+    'docs/references/goal-dashboard/apartment-plan-phone.png',
+  ],
+  link: 'https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ',
+  source: 'docs/references/goal-dashboard/apartment.html',
+  why: "The apartment goal's Plan tab the person approved on 4 November 2026 for #2778: the same Now, Up next and Later as the loans goal, in rooms, with the room under each step's title, a person's name or a date as the chip on a later step, and a What's next / By room switch. Its 'Right now' focus switch, 'Tidy the list' and 'Not about the apartment' boxes belong to other steps or were turned down, so they are not to copy.",
+  from: '2778.5',
+};
+
 /**
  * The registered references, by gallery surface id. Every key must be a
  * surface in the gallery (tests/preview-routes.test.ts).
@@ -251,6 +275,32 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     source: 'docs/references/goal-dashboard/loans.html',
     why: 'The loans goal page the person approved on 3 November 2026 for #2778: the strip of Now, Next and Later, then the goal\'s parts on the left with Dash is on and Recent files in a column on the right. Here the goal has no tiles laid out yet, so one card says so and offers Dash lay it out where the tiles would be.',
     from: '2778.4',
+  },
+  'goals-page-steps': LOANS_PLAN,
+  'goals-page-plan-draft': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here Dash's how-to under the autopay step is open in place, as the mockup's folded 'Dash's how-to' opens: a quiet sunken box inside the step's card.`,
+  },
+  'goals-page-plan-done': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the finished fold at the foot ('15 done') is open: one muted line per step with the day it closed.`,
+  },
+  'goals-page-plan-stage': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the switch is on By stage, which the mockup draws as each stage with its count and steps; this page keeps the goal's own column header and rows for it, as the step asks, with every stage open on one card.`,
+  },
+  'goals-page-plan-empty': {
+    ...LOANS_PLAN,
+    why: `${LOANS_PLAN.why} Here the goal has no steps yet, which the mockup does not draw: the 'Help me plan this' button of its bar is the one thing offered, in a quiet placeholder.`,
+  },
+  'goals-page-plan-apartment': APARTMENT_PLAN,
+  'goals-page-plan-apartment-later': {
+    ...APARTMENT_PLAN,
+    why: `${APARTMENT_PLAN.why} Here every later step is listed, where the mockup ends Later with a line of how many more.`,
+  },
+  'goals-page-plan-apartment-rooms': {
+    ...APARTMENT_PLAN,
+    why: `${APARTMENT_PLAN.why} Here the switch is on By room, which the mockup draws as each room with its count; this page keeps the goal's own column header and rows for it, as the step asks, with every room open on one card.`,
   },
 };
 
