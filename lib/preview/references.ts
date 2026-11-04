@@ -119,6 +119,71 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'A step\'s Overview should read as a goal\'s: the same header and properties column, then each part headed in small type on the page and on its own card, with the comments the last of them.',
     from: '2373.3',
   },
+  // The loans and apartment goal pages the person approved for #2778
+  // (https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH and
+  // https://claude.ai/artifact/FA35FjHtscwvUWtugSqAgZ). The saved copies,
+  // apartment.html beside loans.html, carry made-up names, lender and amounts,
+  // since the repository is public. Later steps of #2778 reuse them.
+  'goal-dashboard-tiles': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-add': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here the quick add is open, which the mockups draw only as the \'+ Log balances\' line, so it should open in place inside its card as quietly.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-menu': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here a tile\'s menu is open; the mockups draw no menu, so it should sit at the card\'s top right and not disturb the card.',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-empty': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here every tile is empty, which the chart card in the loans mockup shows in one line (\'No balances logged yet. Each one you log draws here as a dot against the line.\').',
+    from: '2778.2',
+  },
+  'goal-dashboard-tiles-broken': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+      'docs/references/goal-dashboard/apartment-laptop.png',
+      'docs/references/goal-dashboard/apartment-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The two goal pages the person approved on 3 and 4 November 2026 for #2778, drawn as dashboards: small tiles three to a row on a laptop, each a card with a small label, one big figure in the display face and a muted line saying where it comes from, and a quiet \'+ Log balances\' under it; then wide cards for a line chart of the balance with its legend and a table of the loans with the numbers lined up right. On a phone every tile is one column. The person turned down the apartment page\'s \'Right now\' focus switch, so it is not something to copy, and the tiles this step draws are the number, countdown, chart and table ones. Here every tile names what is missing; the mockups draw no broken tile, so it should keep the card\'s shape and say it in one line.',
+    from: '2778.2',
+  },
 };
 
 /** The reference registered for a surface, or null for none. */

@@ -10,6 +10,13 @@ import {
   GoalMetricsSurface,
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
+import {
+  GoalDashboardTilesAddSurface,
+  GoalDashboardTilesBrokenSurface,
+  GoalDashboardTilesEmptySurface,
+  GoalDashboardTilesMenuSurface,
+  GoalDashboardTilesSurface,
+} from './goal-dashboard-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
 import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
@@ -5362,6 +5369,45 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalMetricsErrorSurface />,
+  },
+  {
+    /* A goal's dashboard tiles (plan #2778.2): a total, two countdowns, a
+     * line of the balances, a metric's bars and a table, on a loans goal.
+     * Its hidden parts follow: the quick add open, a tile's menu open, every
+     * type empty and every type broken. */
+    id: 'goal-dashboard-tiles',
+    label: 'Goals · Dashboard tiles',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-add',
+    label: 'Goals · Dashboard tiles, quick add open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesAddSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-menu',
+    label: 'Goals · Dashboard tiles, a tile menu open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesMenuSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-empty',
+    label: 'Goals · Dashboard tiles, nothing in them yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesEmptySurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-broken',
+    label: 'Goals · Dashboard tiles, a list or field missing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesBrokenSurface />,
   },
   {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
