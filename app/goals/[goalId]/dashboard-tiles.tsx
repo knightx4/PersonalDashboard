@@ -913,7 +913,7 @@ function Ring({ done, total }: { done: number; total: number }) {
       </svg>
       {/* A finished part shows a tick, which fits the ring where "100%" would not. */}
       {total > 0 && done === total ? (
-        <Check className="relative size-4 text-accent" strokeWidth={2.5} />
+        <Check className="relative size-4 text-accent" strokeWidth={1.75} />
       ) : (
         <span className="tabular relative text-micro font-semibold tracking-tight text-ink">
           {Math.round(share * 100)}%
@@ -1138,7 +1138,7 @@ function TrackerTileBody({ body, goalId }: TileBodyProps<TrackerBody>) {
                 point.state === 'later' && 'border border-border-strong bg-surface',
               )}
             >
-              {point.state === 'done' && <Check className="size-3" strokeWidth={2.5} />}
+              {point.state === 'done' && <Check className="size-3" strokeWidth={1.75} />}
             </span>
             {/* One under another, the date ends the title's line, so the dates line up as the reference's do; read across, it sits under the title. */}
             <span
@@ -1183,7 +1183,7 @@ function TrackerTileBody({ body, goalId }: TileBodyProps<TrackerBody>) {
 function Mark({ yes, label }: { yes: boolean; label: string }) {
   return yes ? (
     <span className="inline-flex items-center text-accent">
-      <Check className="size-4" strokeWidth={2.25} aria-hidden />
+      <Check className="size-4" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">{label}: yes</span>
     </span>
   ) : (
