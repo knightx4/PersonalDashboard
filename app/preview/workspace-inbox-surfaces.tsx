@@ -3,6 +3,7 @@
 import type { InboxRow, InboxWrite } from '@/components/inbox/inbox-page';
 import { NewsInboxFold } from '@/app/news/now-fold-views';
 import { WorkspaceInbox } from '@/components/inbox/workspace-inbox';
+import { VaultNowInbox } from '@/components/vault/now-inbox';
 import { queueRow } from '@/lib/inbox/queue-rows';
 import { WaitingInboxRow } from '@/app/jobs/(app)/inbox/waiting-row';
 import { reviewInboxRows } from '@/app/jobs/(app)/inbox/review-cards';
@@ -153,7 +154,6 @@ export const TODO: InboxRow[] = [
 ];
 
 const VAULT: InboxRow[] = [
-  ...queue(queueRow('vault-triage', 3)),
   {
     ref: 'obsidian.notes:n1',
     section: 'questions',
@@ -232,8 +232,12 @@ export function TodoInboxSurface() {
   return <WorkspaceInbox workspace="todo" rows={TODO} />;
 }
 
+/**
+ * The Vault's Inbox on its Now page (plan #1496.9): its on-you rows, without
+ * the quick notes' count row, which the triage deck below lists one by one.
+ */
 export function VaultInboxSurface() {
-  return <WorkspaceInbox workspace="vault" rows={VAULT} />;
+  return <VaultNowInbox rows={VAULT.filter((row) => !row.ref.startsWith('queue:'))} />;
 }
 
 export function LearnInboxSurface() {

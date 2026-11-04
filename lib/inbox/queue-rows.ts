@@ -43,7 +43,8 @@ const QUEUES: Record<
     many: '{n} quick notes to file',
     line: 'Waiting in the Inbox folder',
     verb: 'File them',
-    href: '/vault/triage',
+    // On the Vault's Now page since its own page folded in (plan #1496.9).
+    href: '/vault#triage',
     section: 'actions',
   },
   'learn-read-now': {
