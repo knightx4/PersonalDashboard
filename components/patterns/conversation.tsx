@@ -317,7 +317,8 @@ export function ConversationChat({
           </div>
           {crumbs && crumbs.length > 0 && <Breadcrumb crumbs={crumbs} className="mb-1 hidden min-[720px]:flex" />}
           <div className="flex items-start gap-2">
-            <h1 className="font-display line-clamp-2 min-w-0 flex-1 break-words text-title font-semibold tracking-tight text-ink">
+            {/* One quiet line, since the question's own bubble sits right under it (plan #2748.12). */}
+            <h1 className="line-clamp-1 min-w-0 flex-1 break-words text-body font-semibold text-ink">
               {title}
             </h1>
             <span className="hidden shrink-0 min-[720px]:flex">{glanceButtons}</span>
