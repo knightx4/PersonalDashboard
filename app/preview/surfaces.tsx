@@ -5832,11 +5832,12 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'narrow',
     render: () => (
-      <>
+      <div className={SHELL_FOOT}>
         {vaultNowHeader}
         <VaultInboxSurface />
         <QuickNoteRow waiting={3} writable />
-      </>
+        <TriagePreview writable onVault />
+      </div>
     ),
   },
   {
@@ -7047,7 +7048,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'narrow',
     render: () => (
-      <>
+      <div className={SHELL_FOOT}>
         <PageHeader
           title="Vault"
           description="alex-rivera/notes · main"
@@ -7055,7 +7056,8 @@ export const SURFACES: readonly Surface[] = [
         />
         <NewVaultNote />
         <QuickNoteRow waiting={3} writable />
-      </>
+        <TriagePreview writable onVault />
+      </div>
     ),
   },
   {

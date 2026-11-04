@@ -28,7 +28,7 @@ export function VaultNowInbox({
           {failed.length > 1 ? 'them' : 'it'} is missing here.
         </Banner>
       )}
-      {rows.length > 0 && <InboxPage rows={rows} empty={WORKSPACE_INBOX_EMPTY.vault} />}
+      {rows.length > 0 && <InboxPage rows={rows} empty={WORKSPACE_INBOX_EMPTY.vault} countLine={false} />}
     </section>
   );
 }

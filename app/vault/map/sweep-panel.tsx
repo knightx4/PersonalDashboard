@@ -48,13 +48,13 @@ export function SweepAction({ sweep }: { sweep: SweepView | null }) {
 
 /** What the page says while the sweep's clock is off. */
 export const SWEEP_PAUSED_LINE =
-  'Sweeps are paused, so no notes are read into the map in the background. What earlier sweeps wrote stays here, and a note’s own Map section still adds to it.';
+  'Sweeps are paused. What earlier sweeps found stays, and a note’s own Map section still adds to it.';
 
 export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
   if (SWEEP_PAUSED) {
     return (
       <div className="mb-4 space-y-2">
-        <p className="text-ui text-ink-muted">{SWEEP_PAUSED_LINE}</p>
+        <Note>{SWEEP_PAUSED_LINE}</Note>
         {sweep && <SweepHistory sweep={sweep} />}
       </div>
     );

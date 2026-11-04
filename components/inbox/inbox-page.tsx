@@ -340,8 +340,15 @@ export function InboxPage({
   alsoWaiting = 0,
   laterOpen = false,
   groups,
+  countLine = true,
   children,
 }: {
+  /**
+   * The total after the last section. Off where the rows are one part of a
+   * longer page (the Vault's Now, plan #1496.9), whose count would land
+   * mid-page; each heading still carries its own.
+   */
+  countLine?: boolean;
   /** Everything on you, in the order each section lists it. */
   rows: readonly InboxRow[];
   /** What was put off, for the Later fold. */
@@ -427,7 +434,7 @@ export function InboxPage({
         </div>
       ))}
 
-      {total > 0 && (
+      {countLine && total > 0 && (
         <p className="tabular text-small text-ink-muted">
           {total === 1 ? '1 thing waiting on you' : `${total} things waiting on you`}
         </p>
