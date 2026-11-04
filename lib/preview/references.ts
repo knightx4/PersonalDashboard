@@ -242,6 +242,16 @@ export const REFERENCES: Readonly<Record<string, Reference>> = {
     why: 'The loans goal page the person approved on 3 November 2026 for #2778, whose Dash is on card ends with an Ask Dash box (\'Ask Dash to figure something out…\' and an Ask button). Here that box is open inside the card, as quietly as the mockup draws it.',
     from: '2778.4',
   },
+  'goal-dashboard-page-answer': {
+    pictures: [
+      'docs/references/goal-dashboard/loans-laptop.png',
+      'docs/references/goal-dashboard/loans-phone.png',
+    ],
+    link: 'https://claude.ai/artifact/MxXPr3jk1E46bXFnwBfXuH',
+    source: 'docs/references/goal-dashboard/loans.html',
+    why: 'The loans goal page the person approved on 3 November 2026 for #2778, whose Dash is on card holds what Dash is working on and the last thing it finished. Here a question handed from Ask Dash has finished and the page is opened at its answer, which the mockup does not draw: it should read as one more card of the same family above the tiles, with the question, the answer in a sentence or two and the suggested changes, each waiting on Add and No, as quietly as the rest of the page.',
+    from: '2778.8',
+  },
   'goals-page-top': {
     pictures: [
       'docs/references/goal-dashboard/loans-laptop.png',

@@ -35,7 +35,7 @@ import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
 import { goalSuggestions, type Suggestion } from '@/lib/goals/suggestions';
-import { loadGoalSuggestions } from '@/lib/goals/suggestions-store';
+import { loadGoalSuggestions, loadRunSuggestions } from '@/lib/goals/suggestions-store';
 import {
   approvalLine,
   countOpenQuestions,
@@ -49,7 +49,7 @@ import {
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
-import { loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
+import { loadQuestionRuns, loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
 import { loadGoalMap, type GoalMap } from '@/lib/goals/steps-store';
 import { loadAreas } from '@/lib/goals/store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -125,7 +125,8 @@ import {
   RecentFiles,
 } from './goal-dashboard';
 import { AskDash } from '../ask-dash';
-import { dashWork } from '@/lib/goals/dash-work';
+import { dashWork, FINISHED_SHOWN_MS, questionWork } from '@/lib/goals/dash-work';
+import { QuestionResults } from './question-results';
 
 export const metadata = { title: 'Goal' };
 
@@ -241,6 +242,33 @@ async function loadGoalPace(
 /** Each sent step's run line (plan #1044). Outside the component because it reads the clock. */
 function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
+}
+
+/**
+ * The questions handed to the goal from a chat (plan #2778.8): those going,
+ * those ended in the last day or named by the link, and what each suggested.
+ * Outside the component because it reads the clock. A failed read leaves them
+ * out rather than the page.
+ */
+async function loadQuestions(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  goalId: string,
+  named: string | null,
+) {
+  const now = Date.now();
+  try {
+    const runs = await loadQuestionRuns(client, goalId, new Date(now - FINISHED_SHOWN_MS).toISOString(), named);
+    const work = questionWork(runs, goalId, now, named);
+    const suggested = await loadRunSuggestions(
+      client,
+      work.results.map((result) => result.runId),
+    );
+    const byRun: Record<string, Suggestion[]> = {};
+    for (const s of suggested) if (s.runId) (byRun[s.runId] ??= []).push(s);
+    return { ...work, suggestions: byRun };
+  } catch {
+    return { running: [], finished: [], results: [], suggestions: {} };
+  }
 }
 
 /** Dash's work at the top of the page (note 03ce0cce). Outside the component because it reads the clock. */
@@ -370,10 +398,13 @@ export default async function GoalMapPage({
   searchParams,
 }: {
   params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; work?: string | string[] }>;
 }) {
   const { goalId } = await params;
-  const tabParam = (await searchParams).tab;
+  const { tab: tabParam, work: workParam } = await searchParams;
+  // The question run a notification or reply line opened the page at (plan #2778.8).
+  const namedWork =
+    typeof workParam === 'string' && /^[0-9a-f-]{36}$/i.test(workParam) ? workParam : null;
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -489,6 +520,7 @@ export default async function GoalMapPage({
     (): ProgressEntry[] => [],
   );
   const suggestionIds = [map.goal.id, ...ownSteps(map.steps).map((step) => step.id)];
+  const questionsRead = loadQuestions(client, map.goal.id, namedWork);
   const [
     stepRuns,
     filesOf,
@@ -585,10 +617,14 @@ export default async function GoalMapPage({
   // a run is going, the goal has no steps yet, or every step is finished and
   // the goal needs its next ones; otherwise it is Ask Dash alone, in the
   // status card.
+  const asked = await questionsRead;
+  // A question handed from a chat shows as its own line of Dash's work, not
+  // as the panel's mapping run (plan #2778.8).
+  const askedRunning = asked.running.some((item) => item.runId === history.runs[0]?.id);
   const shapingUp = Boolean(
     shapingView &&
     (shapingView.approval.approve ||
-      shapingView.running ||
+      (shapingView.running && !askedRunning) ||
       (map.goal.status === 'open' && (map.steps.length === 0 || nothingOpen(map.steps)))),
   );
   const shapingPanel = shapingView && (
@@ -596,7 +632,13 @@ export default async function GoalMapPage({
   );
   const shownItems = shownContext(context);
   const thread = map.threads[map.goal.id] ?? [];
-  const work = dashWorkOn(map, stepRuns);
+  const stepWork = dashWorkOn(map, stepRuns);
+  const work = [
+    ...asked.running,
+    ...stepWork.filter((item) => item.state === 'running'),
+    ...asked.finished,
+    ...stepWork.filter((item) => item.state === 'finished'),
+  ];
   const stepProgress = summariseProgress(progressEntries);
   const line = statusLine(status, {
     running: work.filter((item) => item.state === 'running').length,
@@ -672,7 +714,20 @@ export default async function GoalMapPage({
           />
         </GoalDoneWhen>
       }
-      lead={tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="lead" />}
+      lead={
+        (asked.results.length > 0 || tileViews) && (
+          <>
+            {/* What a question handed from a chat worked out (plan #2778.8), first. */}
+            <QuestionResults
+              goalId={map.goal.id}
+              results={asked.results}
+              suggestions={asked.suggestions}
+              named={namedWork}
+            />
+            {tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="lead" />}
+          </>
+        )
+      }
       main={
         <>
           {/* No tiles yet: the offer to lay them out heads the column, and on a
@@ -733,7 +788,8 @@ export default async function GoalMapPage({
           {open && (
             <GoalSuggestions
               goalId={map.goal.id}
-              suggestions={suggestions}
+              // One a question's result shows is answered there (plan #2778.8).
+              suggestions={suggestions.filter((s) => !(s.runId && asked.suggestions[s.runId]))}
               helpKinds={errand ? [] : help.helpKinds}
               proposedHelpKinds={errand ? [] : help.proposedHelpKinds}
             />

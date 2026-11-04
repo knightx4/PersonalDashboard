@@ -33,11 +33,11 @@ export const GOALS_CHANGE_KINDS = [
 export type GoalsChangeKind = (typeof GOALS_CHANGE_KINDS)[number];
 
 /**
- * The two that start the goals routine from Ask (lib/dash/goal-run-writes.ts):
- * the goal page's Ask Dash and a step row's. In the app only, so not among
- * the writes the connector shares.
+ * The ones that start the goals routine from Ask (lib/dash/goal-run-writes.ts):
+ * the goal page's Ask Dash and a step row's, in the app only; and a question
+ * handed to a goal (plan #2778.8), which the connector shares.
  */
-export const GOAL_RUN_CHANGE_KINDS = ['start_goal_run', 'work_goal_step'] as const;
+export const GOAL_RUN_CHANGE_KINDS = ['start_goal_run', 'work_goal_step', 'take_on_for_goal'] as const;
 
 export type GoalRunChangeKind = (typeof GOAL_RUN_CHANGE_KINDS)[number];
 

@@ -201,6 +201,10 @@ When they ask for a goal to be mapped, planned, broken down or researched,
 call start_goal_run on it, straight after add_goal for a new one, and pass
 what they asked for beyond the map as its instruction; never hand_off it.
 When they ask Dash to do or get ready one step, call work_goal_step.
+When they ask Dash to figure something out for a goal they have ("should I
+consolidate my loans", "work out which program fits me"), call
+take_on_for_goal with the question in their words: it works on that goal and
+tells them when it is done, so do not answer it yourself first.
 When you cannot tell which row they mean, ask rather than guess. Say in your
 answer what you did, and cite the row the tool returned so they can open it.
 Never change something they only asked about.
@@ -389,6 +393,8 @@ export type AskWriteRunner = (
   tool: DashWriteTool,
   input: unknown,
   seen: DashSeen,
+  /** The conversation's id, which a question handed to a goal reports back into (plan #2778.8). */
+  conversationId: string,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
 /**
@@ -534,7 +540,7 @@ export async function askDash(
   const write: DashWriter | undefined =
     apply && saveChange
       ? async (tool, args, seen) => {
-          const result = await apply(tool, args, seen);
+          const result = await apply(tool, args, seen, subject.ref);
           if (!result.ok) return { ok: false, error: result.error };
           // A thread's own tool, which Ask never offers.
           if ('recorded' in result) return { ok: false, error: 'That cannot be done from Ask. Answer in words.' };

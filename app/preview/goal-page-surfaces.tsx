@@ -58,6 +58,7 @@ import {
 } from '@/app/goals/[goalId]/goal-dashboard';
 import { GoalPageSkeleton } from '@/app/goals/[goalId]/goal-skeleton';
 import { AskDash } from '@/app/goals/ask-dash';
+import { QuestionResults } from '@/app/goals/[goalId]/question-results';
 import type { GoalStrip } from '@/lib/goals/goal-strip';
 import { LOANS_GOAL_ID, loansDashboardViews } from './goal-dashboard-surfaces';
 
@@ -1604,13 +1605,80 @@ function LoansGoal({ children }: { children: React.ReactNode }) {
  * tiles, and Dash's card with a run going and the three newest files beside
  * them. With `asking`, Ask Dash is open in Dash's card.
  */
-export function GoalDashboardPageSurface({ asking = false }: { asking?: boolean } = {}) {
+/** The question handed from Ask Dash, and what the run suggested (plan #2778.8). */
+const ANSWERED_RUN = '7d1c2e40-5b8a-4c1e-9f3a-2a6b8c0d4e11';
+const ANSWERED_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'qs-step',
+    itemId: LOANS_GOAL_ID,
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Send this month’s extra payment to Grad PLUS 2024–25',
+    detail: 'At 9.08% it costs the most to carry; the extra goes further there than in a consolidated loan.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-11-04T10:40:00Z',
+    runId: ANSWERED_RUN,
+    tile: null,
+  },
+  {
+    id: 'qs-tile',
+    itemId: LOANS_GOAL_ID,
+    kind: 'tile',
+    acceptedStepId: null,
+    title: 'Interest saved by paying the Grad PLUS loans first',
+    detail: 'One figure beside Total owed, worked out from the rates on the loans list.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-11-04T10:40:00Z',
+    runId: ANSWERED_RUN,
+    tile: { type: 'number', title: 'Interest saved' },
+  },
+];
+
+export function GoalDashboardPageSurface({
+  asking = false,
+  answered = false,
+}: { asking?: boolean; answered?: boolean } = {}) {
+  const tiles = <DashboardTiles goalId={loansGoal.id} views={loansDashboardViews()} part="lead" />;
   return (
     <LoansGoal>
       <GoalDashboard
         strip={<GoalStripRow strip={LOANS_STRIP} />}
         top={<GoalDoneWhen goal={loansGoal} />}
-        lead={<DashboardTiles goalId={loansGoal.id} views={loansDashboardViews()} part="lead" />}
+        lead={
+          answered ? (
+            <>
+              {/* Opened from the notification: the answer first, marked as the one linked to. */}
+              <QuestionResults
+                goalId={loansGoal.id}
+                named={ANSWERED_RUN}
+                results={[
+                  {
+                    runId: ANSWERED_RUN,
+                    question: 'Should I consolidate my loans?',
+                    state: 'done',
+                    text: 'Not yet: a Direct Consolidation Loan would average your rates to about 8.9%, saving nothing, and would restart the count of payments toward forgiveness. Send extra payments to the two Grad PLUS loans instead.\n\n## Why\n…',
+                  },
+                ]}
+                suggestions={{ [ANSWERED_RUN]: ANSWERED_SUGGESTIONS }}
+              />
+              {tiles}
+            </>
+          ) : (
+            tiles
+          )
+        }
         main={
           <>
             <GoalStatusCard
@@ -1627,13 +1695,21 @@ export function GoalDashboardPageSurface({ asking = false }: { asking?: boolean 
           <>
             <DashOnCard
               items={[
-                {
-                  stepId: 'consolidate',
-                  runId: 'run-consolidate',
-                  title: 'Should I consolidate the loans or keep them separate?',
-                  state: 'running',
-                  line: 'reading the four loans and the repayment rules',
-                },
+                answered
+                  ? {
+                      stepId: LOANS_GOAL_ID,
+                      runId: ANSWERED_RUN,
+                      title: 'Should I consolidate my loans?',
+                      state: 'finished',
+                      line: 'Not yet: consolidating would save nothing on the rates.',
+                    }
+                  : {
+                      stepId: 'consolidate',
+                      runId: 'run-consolidate',
+                      title: 'Should I consolidate the loans or keep them separate?',
+                      state: 'running',
+                      line: 'reading the four loans and the repayment rules',
+                    },
                 {
                   stepId: 'script',
                   runId: 'run-script',

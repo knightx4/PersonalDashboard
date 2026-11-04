@@ -91,6 +91,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goal-dashboard-tiles-programs': ['/goals/[goalId]'],
   'goal-dashboard-page': ['/goals/[goalId]'],
   'goal-dashboard-page-ask': ['/goals/[goalId]'],
+  'goal-dashboard-page-answer': ['/goals/[goalId]'],
   'goal-dashboard-page-loading': ['/goals/[goalId]'],
   'goal-dashboard-page-error': ['/goals/[goalId]'],
   'goals-page-files': ['/goals/[goalId]'],

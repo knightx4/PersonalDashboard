@@ -5955,6 +5955,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalDashboardPageSurface asking />,
   },
   {
+    /* The Dashboard opened from the notification for a question handed to
+     * the goal from Ask Dash (plan #2778.8): what Dash worked out first, with
+     * a suggested step and tile waiting on Add and No. */
+    id: 'goal-dashboard-page-answer',
+    label: 'Goal · what Dash worked out for a question',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface answered />,
+  },
+  {
     /* A goal's page while it loads, on any tab (plan #2778.4). */
     id: 'goal-dashboard-page-loading',
     label: 'Goal · loading',

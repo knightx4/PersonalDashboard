@@ -50,6 +50,7 @@ describe('runConnectorWrite', () => {
       'rewrite_post',
       'suggest_post',
       'add_project',
+      'take_on_for_goal',
       'change_reading',
       'add_learn_track',
       'add_track_reading',

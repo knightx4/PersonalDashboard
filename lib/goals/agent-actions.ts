@@ -44,6 +44,7 @@ export const goalsActions: ModuleActions = {
     undoDeclineAction: none('theirs', 'Undo: takes back their own decline.'),
     recordAttendedAction: tool('change_goals_inbox'),
     addSuggestedStepAction: none('theirs'),
+    addSuggestedTileAction: none('theirs'),
   },
   'app/goals/inbox/actions.ts': {
     snoozeInboxRowAction: tool('change_goals_inbox'),

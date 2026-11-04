@@ -269,6 +269,7 @@ for it before your first write:
 | Job | Read |
 |---|---|
 | `goal` (mapping a goal) | `pulling-in.md`, `mapping.md`, `deciding.md`, `files.md` (for the Blind spots file), `records.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps"), `step-states.md`. An errand also needs `working-steps.md`. |
+| `goal` with a `question` on its run row (a question handed from a chat) | `question.md`, `pulling-in.md`, `deciding.md`, `files.md`, `working-steps.md` ("Files") |
 | `goal` with a comment in the brief | `requests.md` ("Replying to a comment"), then whatever the comment asks for: `working-steps.md` for work you do, `records.md` for facts to file |
 | `area` | `pulling-in.md`, `area.md`, `deciding.md` |
 | `reshape` | `reshape.md`, `deciding.md`, `prep.md` ("A Dash step before yours"), `tending.md` ("Merging duplicate steps", and "Moving a step that has sat for a week" for a drop on the person's answer), `step-states.md` |
@@ -297,6 +298,7 @@ not in this file, find it here and read it:
 | A step of yours to prepare, A Dash step before yours | `reference/prep.md` |
 | The weekly run, Researching the help each goal asks for, Suggesting steps, The week's notes | `reference/weekly.md` |
 | What goes in a file | `reference/files.md` |
+| A question handed to a goal | `reference/question.md` |
 | The catalogue of sources | `reference/sources.md` |
 
 Read a whole file when you need one section of it: the sections in a file

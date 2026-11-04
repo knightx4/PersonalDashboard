@@ -91,6 +91,24 @@ export async function loadGoalDashboard(
   return parsed.tiles.map((tile) => ({ tile, problem: tileProblem(tile, context) }));
 }
 
+/** A goal's saved layout as stored, unchecked, or null when it has none (for adding a tile on the end). */
+export async function loadDashboardTiles(
+  client: GoalsSupabaseClient,
+  userId: string,
+  goalId: string,
+): Promise<unknown[] | null> {
+  const { data, error } = await client
+    .from('items')
+    .select('dashboard')
+    .eq('user_id', userId)
+    .eq('id', goalId)
+    .eq('level', 'goal')
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the goal's dashboard: ${error.message}`);
+  const raw = (data as { dashboard: unknown } | null)?.dashboard ?? null;
+  return Array.isArray(raw) ? raw : null;
+}
+
 /**
  * Save a goal's layout, or clear it with null. Refused, naming the tile at
  * fault, when a tile does not hold on the goal; the field is `tile-<n>` from
