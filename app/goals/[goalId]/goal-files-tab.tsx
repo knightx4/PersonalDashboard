@@ -3,6 +3,7 @@
 import { useId, useRef, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { FileSheet } from '@/components/files/file-sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -172,7 +173,7 @@ function FilesCard({
         {files.length > 0 && (
           <span className="tabular text-small text-ink-muted">
             {files.length === 1 ? '1 file' : `${files.length} files`}
-            {unread > 0 && ` · ${unread} not read`}
+            {unread > 0 && ` · ${unread} unread`}
           </span>
         )}
       </div>
@@ -204,7 +205,7 @@ function FilesCard({
       <ul aria-labelledby="files-heading" className="card-pad-x divide-y divide-border">
         {uploading && (
           <li className="row-pad flex items-center gap-3" aria-live="polite">
-            <TypeMark label={fileTypeLabel(uploading.contentType ?? documentContentType(uploading.name))} tone="pending" />
+            <FileSheet label={fileTypeLabel(uploading.contentType ?? documentContentType(uploading.name))} tone="pending" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-ui font-medium text-ink">{uploading.name}</span>
               <span className="mt-0.5 flex items-center gap-1.5 text-small text-ink-muted">
@@ -221,7 +222,7 @@ function FilesCard({
         {(view === 'all' || view === 'waiting') &&
           waiting.map((row) => (
             <li key={row.kindId} className="row-pad flex items-center gap-3">
-              <TypeMark label="Doc" tone="waiting" />
+              <FileSheet label="Doc" tone="waiting" />
               <span className="min-w-0 flex-1">
                 <span className="block text-ui font-medium text-ink">{row.name}</span>
                 <span className="mt-0.5 block text-small text-ink-muted">Waiting · for “{row.stepTitle}”</span>
@@ -240,7 +241,7 @@ function FilesCard({
           ))}
         {!uploading && shown.length === 0 && (view === 'all' || view === 'waiting' ? waiting.length === 0 : true) && (
           <li className="row-pad flex items-center gap-3">
-            <TypeMark label="+" tone="waiting" />
+            <FileSheet label="+" tone="waiting" />
             <span className="min-w-0 flex-1">
               <span className="block text-ui font-medium text-ink">{EMPTY_TITLES[view]}</span>
               <span className="mt-0.5 block text-small text-ink-muted">{emptyViewLine(view)}</span>
@@ -325,7 +326,7 @@ function FileRow({ goalId, file, menuOpen }: { goalId: string; file: TabFile; me
   if (renaming) {
     return (
       <li className="row-pad flex items-center gap-3">
-        <TypeMark label={fileTypeLabel(file.contentType)} tone={file.byDash ? 'dash' : 'yours'} />
+        <FileSheet label={fileTypeLabel(file.contentType)} tone={file.byDash ? 'dash' : 'yours'} />
         <form
           action={async (form) => {
             await renameGoalFileAction(form);
@@ -361,7 +362,7 @@ function FileRow({ goalId, file, menuOpen }: { goalId: string; file: TabFile; me
         href={fileHref(file.fileId)}
         className="row-pad flex min-w-0 items-center gap-3 transition-colors duration-quick hover:text-accent"
       >
-        <TypeMark label={fileTypeLabel(file.contentType)} tone={file.byDash ? 'dash' : 'yours'} />
+        <FileSheet label={fileTypeLabel(file.contentType)} tone={file.byDash ? 'dash' : 'yours'} />
         <span className="min-w-0 flex-1">
           <span className="block pr-9 text-ui font-medium text-ink">
             {file.unread && (
@@ -387,28 +388,6 @@ function FileRow({ goalId, file, menuOpen }: { goalId: string; file: TabFile; me
         className="absolute top-1.5 right-0"
       />
     </li>
-  );
-}
-
-/**
- * The small page before a file, as the mockup draws it: a sheet with its
- * kind at the foot (Note, PDF, Image), tinted in the accent for Dash's,
- * plain for yours, and dashed and empty for a document still waiting.
- */
-function TypeMark({ label, tone }: { label: string; tone: 'dash' | 'yours' | 'waiting' | 'pending' }) {
-  return (
-    <span
-      aria-hidden
-      className={cn(
-        'grid aspect-[5/6] w-10 shrink-0 place-items-end justify-center rounded-control border pb-1 text-micro leading-none font-medium uppercase', // ui-ok: hand-rolled-box hand-rolled-label -- a file's page-shaped mark from the approved mockup, not a grouping or a label over a field
-        tone === 'dash' && 'border-accent/40 bg-accent-tint text-accent',
-        tone === 'yours' && 'border-control bg-canvas text-ink-muted',
-        tone === 'waiting' && 'border border-dashed border-control text-ink-muted',
-        tone === 'pending' && 'border-control bg-sunken text-ink-muted',
-      )}
-    >
-      {label}
-    </span>
   );
 }
 

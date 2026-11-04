@@ -420,7 +420,11 @@ function LaterList({
           {shown.map((entry) => {
             // The step's own why, else where it sits; never a line every row repeats.
             const where = [entry.stage?.title, entry.under].filter(Boolean).join(' · ');
-            const line = firstSentence(entry.node.detail ?? '') || (sameWhere ? '' : where);
+            // What holds the step, said here since its chip is kept short (plan #2778.11).
+            const line =
+              entry.waits?.detail ||
+              firstSentence(entry.node.detail ?? '') ||
+              (sameWhere ? '' : where);
             const Icon = entry.waits ? WAIT_ICON[entry.waits.kind] : null;
             return (
               <li
@@ -494,10 +498,10 @@ function HelpMePlan({ goalId }: { goalId: string }) {
 }
 
 /**
- * A finished step in the fold at the foot of the Plan tab. One Dash closed
- * lately settles in with its mark flashing the first time the row is on
- * screen (moment "A step Dash finished"); under reduced motion it is simply
- * there.
+ * A finished step in the fold at the foot of the Plan tab, with Dash's mark
+ * beside it when Dash closed it. One Dash closed lately settles in with its
+ * mark flashing the first time the row is on screen (moment "A step Dash
+ * finished"); under reduced motion it is simply there.
  */
 function DoneRow({
   goalId,
@@ -513,14 +517,19 @@ function DoneRow({
   const markRef = useDashArrival(step.id, arrived);
   return (
     <li className="flex items-baseline justify-between gap-3">
+      {/* One line: the title gives way with an ellipsis, so Dash's mark stays
+          beside it and the date on the same line (plan #2778.11). */}
       <span className="flex min-w-0 items-baseline gap-1.5">
         <Link
           href={stepHref(goalId, step.id)}
-          className="press-area min-w-0 break-words hover:text-ink"
+          className="press-area min-w-0 truncate hover:text-ink"
         >
           {step.title}
         </Link>
-        {arrived && (
+        {/* Every step Dash closed keeps its mark, small and muted like the
+            date, so the fold says at a glance which were Dash's (plan
+            #2778.11); one closed lately also flashes it on arrival. */}
+        {(step.dash || arrived) && (
           <Tooltip label="Finished by Dash" className="shrink-0">
             <span ref={markRef} className="inline-flex translate-y-0.5 text-ink-muted">
               <DashMark size="2xs" label="Dash's" />

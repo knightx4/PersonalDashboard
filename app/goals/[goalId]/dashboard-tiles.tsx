@@ -654,7 +654,8 @@ function LineChart({ body, title }: { body: ChartBody; title: string }) {
               aria-hidden
               className={cn(
                 'absolute inset-x-0 border-t',
-                tick === 0 ? 'border-border-strong' : 'border-border',
+                // Gridlines are dotted hairlines, quieter than the line on them (plan #2778.11).
+                tick === 0 ? 'border-border-strong' : 'border-dotted border-border',
               )}
               style={{ top: `${y(tick)}%` }}
             />
@@ -936,7 +937,9 @@ function RoomsTileBody({ body, goalId, held }: TileBodyProps<RoomsBody>) {
   );
   const baseId = useId();
   return (
-    <ul className="grid grid-flow-row-dense grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    // Each room's card is as tall as what it holds, so a finished one does not
+    // stretch to its row (plan #2778.11).
+    <ul className="grid grid-flow-row-dense grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {body.parts.map((part) => {
         const open = opened === part.id;
         const listId = `${baseId}-${part.id}`;
@@ -1322,7 +1325,8 @@ function GridTileBody({ body }: TileBodyProps<GridBody>) {
         })}
       </ul>
       {(body.more > 0 || (marks.length > 0 && body.rows.length > 0)) && (
-        <p className="tabular flex flex-wrap gap-x-3 text-small text-ink-muted md:hidden">
+        // Two even columns, so no total sits alone on a line at 390 (plan #2778.11).
+        <p className="tabular grid grid-cols-2 gap-x-3 text-small text-ink-muted md:hidden">
           {marks.map((c) => (
             <span key={c.key} className="whitespace-nowrap">
               {c.label} {body.totals[c.key] ?? 0} of {body.of}

@@ -191,6 +191,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-lists-panel-map-failed': ['/goals/[goalId]'],
   'dev-ui': ['/dev/ui'],
   'dev-ui-corrections': ['/dev/ui'],
+  'dev-ui-moments': ['/dev/ui'],
   'dev-ui-sent-back': ['/dev/ui'],
   'dev-ui-taste': ['/dev/ui'],
   'dev-surfaces': ['/dev/surfaces'],

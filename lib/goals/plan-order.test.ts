@@ -149,9 +149,10 @@ describe('planOrder', () => {
       }),
     ]);
     expect(ids(order.now)).toEqual(['a']);
-    expect(order.later.map((entry) => [entry.id, entry.waits?.label])).toEqual([
-      ['b', 'Alex to say yes'],
-      ['c1', 'The letter'],
+    // The chip says Blocked; what it needs is kept as the row's line.
+    expect(order.later.map((entry) => [entry.id, entry.waits?.label, entry.waits?.detail])).toEqual([
+      ['b', 'Blocked', 'Alex to say yes'],
+      ['c1', 'Blocked', 'The letter'],
     ]);
   });
 

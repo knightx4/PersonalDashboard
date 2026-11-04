@@ -109,7 +109,7 @@ import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModu
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
-import { UiStandard } from '@/app/dev/ui/standard';
+import { UiStandard, WorkspaceMoments } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
@@ -413,7 +413,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import type { DashChange } from '@/lib/talk/changes';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
@@ -6332,6 +6332,20 @@ export const SURFACES: readonly Surface[] = [
         <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
         <CorrectionsChart weeks={[]} />
       </div>
+    ),
+  },
+  {
+    /* Chat's two moments as the catalogue on /dev/ui lists them (plan
+     * #2748.10), alone, since the whole page photographs taller than a
+     * browser shot reaches and the catalogue is near its foot. */
+    id: 'dev-ui-moments',
+    label: 'UI · the Chat moments in the catalogue',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <Card padding="standard">
+        <WorkspaceMoments workspace="chat" label="Chat" />
+      </Card>
     ),
   },
   {

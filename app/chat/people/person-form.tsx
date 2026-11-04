@@ -454,8 +454,7 @@ function Memory({
                       setText(line.text);
                       setError(null);
                     }}
-                    // eslint-disable-next-line no-restricted-syntax -- text-base matches the correcting box's 16px on a phone, which stops iOS zooming on focus.
-                    className="press -mx-1 min-w-0 flex-1 rounded-control px-1 text-left text-base text-ink hover:bg-sunken sm:text-ui"
+                    className="press -mx-1 min-w-0 flex-1 rounded-control px-1 text-left text-ui text-ink hover:bg-sunken"
                   >
                     <span className="text-small text-ink-muted">{MEMORY_KIND_LABELS[line.kind]} · </span>
                     {line.text}
