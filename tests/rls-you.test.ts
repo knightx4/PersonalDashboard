@@ -945,6 +945,12 @@ describe('advisor chats, memory and forecasts', () => {
       asUser(userB, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userB}, ${group.id}, ${bots[3].id})`),
     ).rejects.toThrow();
 
+    // A group never gets a text first or an ack (you 0043): its bots only answer the person.
+    await expect(
+      admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, speaker_id)
+            values (${userA}, ${group.id}, 'advisor', 'ack', 'One sec', ${bots[1].id})`,
+    ).rejects.toThrow(/replies only/);
+
     // Deleting a bot leaves the group, takes its member row, and keeps its words without a speaker.
     await admin`delete from you.board_advisors where id = ${bots[1].id}`;
     const [kept] = await admin`select speaker_id from you.advisor_messages where id = ${said.id}`;
