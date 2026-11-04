@@ -12304,7 +12304,39 @@ export const SURFACES: readonly Surface[] = [
     label: "Dev · A project's plan, main not readable",
     module: 'dev',
     width: 'page',
-    render: () => <ProjectPlanSurface refused />,
+    render: () => <ProjectPlanSurface live="refused" />,
+  },
+  {
+    /* Hidden part (plan #2800.6): a failed check, with why and its run. */
+    id: 'dev-project-plan-failed',
+    label: "Dev · A project's plan, checks failed",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface live="failed" />,
+  },
+  {
+    /* Hidden part (plan #2800.6): neither read token set. */
+    id: 'dev-project-plan-no-token',
+    label: "Dev · A project's plan, tokens not set",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface live="no-token" />,
+  },
+  {
+    /* A repository no Vercel project deploys shows its checks only (plan #2800.6). */
+    id: 'dev-project-plan-checks-only',
+    label: "Dev · A project's plan, not on Vercel",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface live="checks-only" />,
+  },
+  {
+    /* Hidden part (plan #2800.6): the live card while GitHub and Vercel are read. */
+    id: 'dev-project-plan-loading',
+    label: "Dev · A project's plan, reading checks",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface live="loading" />,
   },
   {
     /* What is running now, at the top of a project's page and Dev's plan

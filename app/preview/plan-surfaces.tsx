@@ -23,10 +23,10 @@ import { AssigneeCell, type AssigneeWho } from '@/components/plan-tree/assignee-
 import { ColumnHeader, ROW_GRID } from '@/components/plan-tree/grid';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { ProjectMainLine } from '@/app/dev/plan/project-main-line';
+import { ProjectLiveCard, ProjectLiveLoading } from '@/app/dev/plan/project-live';
+import type { ProjectLive } from '@/lib/plan/project-live';
 import { NowSection } from '@/app/dev/plan/now-section';
 import type { NowList } from '@/lib/plan/now';
-import type { MainCheck } from '@/lib/plan/main-check';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -387,18 +387,86 @@ const site = WEBSITE_FIXTURE;
 /** When the project's main was read, and the clock the page drew it by. */
 const PROJECT_MAIN_NOW = Date.parse('2026-10-26T09:02:00Z');
 
-const projectMainPassed: MainCheck = {
-  sha: 'e81f2a94c0d3b6a7f5e2c1d0b9a8f7e6d5c4b3a2',
-  conclusion: 'passed',
-  checkedAt: '2026-10-26T09:00:00Z',
-  error: null,
-  reason: null,
-  runUrl: null,
-  deployState: 'deployed',
-  deployUrl: null,
+/** A project whose last commit passed and is live (plan #2800.6). */
+const liveGreen: ProjectLive = {
+  repo: 'example-owner/alexrivera-site',
+  branch: 'main',
+  readAt: '2026-10-26T09:02:00Z',
+  commit: {
+    sha: 'e81f2a94c0d3b6a7f5e2c1d0b9a8f7e6d5c4b3a2',
+    subject: "Build the writing feed from the essay list, newest first, with each essay's summary as its description",
+    url: 'https://github.com/example-owner/alexrivera-site/commit/e81f2a9',
+    at: '2026-10-26T08:49:00Z',
+  },
+  checks: { conclusion: 'passed', reason: null, runUrl: null },
+  githubError: null,
+  githubTokenMissing: false,
+  deploy: {
+    state: 'ready',
+    url: 'https://alexrivera-site-k3j2.vercel.app',
+    inspectorUrl: 'https://vercel.com/example-owner/alexrivera-site/k3j2',
+    at: '2026-10-26T08:51:00Z',
+    sha: 'e81f2a94c0d3b6a7f5e2c1d0b9a8f7e6d5c4b3a2',
+  },
+  vercelProject: 'alexrivera-site',
   deployError: null,
-  unapplied: null,
-  migrationsError: null,
+  vercelTokenMissing: false,
+};
+
+/** Hidden part: a red check, with why and the run, and the site still on the commit before. */
+const liveFailed: ProjectLive = {
+  ...liveGreen,
+  checks: {
+    conclusion: 'failed',
+    reason: 'Failed at build › Type-check the essays.',
+    runUrl: 'https://github.com/example-owner/alexrivera-site/actions/runs/11873',
+  },
+  deploy: {
+    ...liveGreen.deploy!,
+    at: '2026-10-25T17:20:00Z',
+    sha: 'b4c19d07e2a1f3c5b6d7e8f9a0b1c2d3e4f5a6b7',
+  },
+};
+
+/** What a token that cannot see the project's repository leaves. */
+const liveRefused: ProjectLive = {
+  ...liveGreen,
+  commit: null,
+  checks: null,
+  githubError:
+    "GITHUB_READ_TOKEN is missing a permission (404). Give it access to example-owner/alexrivera-site in the token's settings, then redeploy.",
+};
+
+/** Hidden part: neither token set. */
+const liveNoToken: ProjectLive = {
+  ...liveGreen,
+  commit: null,
+  checks: null,
+  githubError:
+    "GITHUB_READ_TOKEN is not set, so example-owner/alexrivera-site's last commit and its checks cannot be read. Set it in Vercel and redeploy.",
+  githubTokenMissing: true,
+  deploy: null,
+  vercelProject: null,
+  deployError:
+    "PROJECTS_VERCEL_TOKEN is not set, so example-owner/alexrivera-site's deploys cannot be read. Set it in Vercel and redeploy.",
+  vercelTokenMissing: true,
+};
+
+/** A repository no Vercel project deploys: checks only. */
+const liveChecksOnly: ProjectLive = {
+  ...liveGreen,
+  deploy: null,
+  vercelProject: null,
+};
+
+export type ProjectLiveVariant = 'passed' | 'refused' | 'failed' | 'no-token' | 'checks-only' | 'loading';
+
+const LIVE: Record<Exclude<ProjectLiveVariant, 'loading'>, ProjectLive> = {
+  passed: liveGreen,
+  refused: liveRefused,
+  failed: liveFailed,
+  'no-token': liveNoToken,
+  'checks-only': liveChecksOnly,
 };
 
 /** What is running now on the project (plan #2800.3): one session on its feed step. */
@@ -426,17 +494,7 @@ const projectNow: NowList = {
   finished: null,
 };
 
-/** The reading a token that cannot see the project's repository leaves. */
-const projectMainRefused: MainCheck = {
-  ...projectMainPassed,
-  sha: null,
-  conclusion: null,
-  deployState: null,
-  error:
-    'GITHUB_READ_TOKEN is missing a permission (404). Give it access to alex-rivera/alexrivera-site in the token\'s settings, then redeploy.',
-};
-
-export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = {}) {
+export function ProjectPlanSurface({ live = 'passed' }: { live?: ProjectLiveVariant } = {}) {
   return (
     <ScopeLabelsProvider labels={scopeLabelsOf(project)}>
     <PageColumn className="space-y-6">
@@ -446,11 +504,11 @@ export function ProjectPlanSurface({ refused = false }: { refused?: boolean } = 
         description={`Built in ${site.repo.owner}/${site.repo.repo}`}
       />
       <NowSection list={projectNow} now={PROJECT_MAIN_NOW} live={false} />
-      <ProjectMainLine
-        check={refused ? projectMainRefused : projectMainPassed}
-        repo={`${site.repo.owner}/${site.repo.repo}`}
-        now={PROJECT_MAIN_NOW}
-      />
+      {live === 'loading' ? (
+        <ProjectLiveLoading />
+      ) : (
+        <ProjectLiveCard live={LIVE[live]} siteUrl={site.url} now={PROJECT_MAIN_NOW} />
+      )}
       <PlanView
         basePath="/dev/projects/website"
         sections={applyView(project, 'open')}
