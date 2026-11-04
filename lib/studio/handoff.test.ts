@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { deviceLabel, studioHandoffUrl } from './handoff';
 
 describe('opening the studio from Dash', () => {
+  it('carries where notes go when there is one', () => {
+    const url = studioHandoffUrl('https://studio.example/app', {
+      url: 'https://abc.supabase.co',
+      key: 'k',
+      token: 'f'.repeat(64),
+      notes: 'https://dash.example/api/projects/music-pipeline/notes',
+    });
+    const frag = url.split('#studio=')[1];
+    expect(JSON.parse(Buffer.from(frag, 'base64url').toString('utf8')).notes).toBe(
+      'https://dash.example/api/projects/music-pipeline/notes',
+    );
+  });
+
   it('puts the settings in the fragment as base64url JSON', () => {
     const url = studioHandoffUrl('https://studio.example/app', {
       url: 'https://abc.supabase.co/',

@@ -63,7 +63,7 @@ function PeopleList() {
 function Box() {
   return (
     <form className="flex items-center gap-2">
-      <Input aria-label="Message" placeholder="Message" className="flex-1 max-sm:min-h-11" />
+      <Input aria-label="Message" placeholder="Message" className="min-h-11 flex-1" />
       <Tooltip label="Send">
         <Button type="button" size="sm" aria-label="Send">
           <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />

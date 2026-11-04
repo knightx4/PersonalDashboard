@@ -39,6 +39,7 @@
 import { BODY_MAX, clip } from '@/lib/day-brief/notification';
 import { ARRIVAL_DAYS } from '@/lib/goals/dash-arrivals';
 import { dailyView } from '@/lib/goals/daily';
+import { showsOutside } from '@/lib/goals/plan-order';
 import { firstSentence } from '@/lib/goals/first-sentence';
 import {
   isClosedStatus,
@@ -269,6 +270,8 @@ export function todayCandidates(input: TodayInput): Candidate[] {
 
   // Questions, breakdowns and proposed goals, read the way the home reads them.
   const daily = dailyView(goals as { goal: Goal; areaName: string }[], new Map(byGoal), today);
+  // Only what the goal's Plan tab has under Now or Up next (plan #2778.6).
+  const shows = showsOutside(byGoal, today);
   const questions = new Set<string>();
   for (const item of daily.waiting) {
     if (item.kind === 'question') questions.add(item.id);
@@ -288,8 +291,10 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         const base = { id: node.id, goalId: goal.id, goalTitle: goal.title };
         if (questions.has(node.id)) {
           if (parking.has(goal.id)) continue;
-          const unblocks = unblockedBy(node, nodes);
-          add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
+          if (shows(node)) {
+            const unblocks = unblockedBy(node, nodes);
+            add({ ...base, kind: 'question', title: node.title, detail: null, unblocks, on: null });
+          }
         } else if (node.kind === 'claude' && isStepBlocked(node) && node.blockKind === 'outside') {
           const question = askedOfYou(node.blockAsk);
           if (question) {
@@ -306,7 +311,8 @@ export function todayCandidates(input: TodayInput): Candidate[] {
         } else if (
           node.kind === 'mine' &&
           (node.status === 'open' || isStaleStepBlock(node)) &&
-          waitsOnNothing(node)
+          waitsOnNothing(node) &&
+          shows(node)
         ) {
           const unblocks = unblockedBy(node, nodes);
           const on = node.dueOn === null ? null : node.dueOn < today ? today : node.dueOn;

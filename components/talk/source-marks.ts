@@ -19,8 +19,13 @@ export type SourceMark = { n: number; title: string; href: string };
 export const SOURCE_NUMBER =
   'inline-grid h-[18px] min-w-[18px] place-items-center rounded-control bg-accent-tint px-1 font-mono text-micro font-medium leading-none text-accent tabular';
 
-/** The mark in an answer, a link to the row it stands for. */
-const MARK = `${SOURCE_NUMBER} mx-px align-[2px] no-underline! hover:ring-1 hover:ring-accent`;
+/**
+ * The mark in an answer: a link to the row it stands for, drawn inline so it
+ * reads as part of the sentence (a citation in a run of text is exempt from
+ * the 44px press target, as WCAG exempts inline links), with the chip inside.
+ */
+const MARK_LINK = 'group/mark no-underline!';
+const MARK_CHIP = `${SOURCE_NUMBER} mx-px align-[2px] group-hover/mark:ring-1 group-hover/mark:ring-accent`;
 
 type Node = {
   type: string;
@@ -53,12 +58,18 @@ export function namedAt(text: string, title: string): number | null {
 function markNode(mark: SourceMark): Node {
   return {
     type: 'sourceMark',
-    children: [{ type: 'text', value: String(mark.n) }],
+    children: [
+      {
+        type: 'sourceMarkChip',
+        children: [{ type: 'text', value: String(mark.n) }],
+        data: { hName: 'span', hProperties: { className: MARK_CHIP.split(' ') } },
+      },
+    ],
     data: {
       hName: 'a',
       hProperties: {
         href: mark.href,
-        className: MARK.split(' '),
+        className: MARK_LINK.split(' '),
         ariaLabel: `Source ${mark.n}: ${mark.title}`,
         title: `${mark.n}. ${mark.title}`,
       },

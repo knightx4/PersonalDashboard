@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCheck, Moon, Pause, Play, Square } from 'lucide-react';
+import { CheckCheck, Pause, Play, Repeat, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
@@ -299,7 +299,7 @@ export function OvernightControl({
   readySteps,
   goals = null,
   fresh = false,
-  label = 'Overnight',
+  label = 'Runner',
   bare = false,
   mark = null,
   showBlocked = true,
@@ -343,11 +343,10 @@ export function OvernightControl({
   /**
    * What to call the runner here.
    *
-   * "Overnight" on the plan, where it is the night you set going before bed.
-   * On Dash it is one row of a Status panel standing beside the notes routine,
-   * and there the useful name is the queue it works rather than the hour it
-   * usually works it -- a runner you started at ten in the morning is still
-   * this one.
+   * "Runner" on Home (plan #578.12): it was "Overnight" while it lived on the
+   * plan, but it runs around the clock now. On Dev settings it is one row
+   * standing beside the notes routine, and there the useful name is the queue
+   * it works.
    */
   label?: string;
   /**
@@ -499,14 +498,14 @@ export function OvernightControl({
   // the mark puts it in a column of its own.
   const labelText = (
     <span className="inline-flex min-h-(--control-h) items-center gap-1.5 text-ui font-medium text-ink">
-      <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
+      <Repeat strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
       {label}
     </span>
   );
 
   return (
     <section
-      aria-label="The overnight runner"
+      aria-label="The runner"
       className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
       {/* With a mark, the mark sits beside the label on the heading line
@@ -689,6 +688,10 @@ export function OvernightControl({
         </div>
       </div>
 
+      {/* While it is off, what Start would run comes straight under the
+          ready count, ahead of the idle Dashes (plan #578.12). */}
+      {!live && next.length > 0 && <NextUp next={next} />}
+
       {/* One Dash for each thing the runner can run at once, on or off
           (plan #1704): working on its step, asleep with nothing ready, or
           idle while the runner is off. */}
@@ -747,7 +750,7 @@ export function OvernightControl({
         </div>
       )}
 
-      {next.length > 0 && standing !== 'paused' && <NextUp next={next} />}
+      {live && next.length > 0 && standing !== 'paused' && <NextUp next={next} />}
 
       {/* Law 2: a runner that cannot fire says so where the button is, rather
           than starting a night that writes a row and then sends nothing. */}

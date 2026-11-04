@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The app's own pages that core rows open under. They belong to no
  * workspace, so a path to one starts at Home (refPath in lib/core/refs.ts).
  */
-const ASK: Section = { href: '/chat/dash', label: 'Questions to Dash' };
+const ASK: Section = { href: '/chat/dash', label: 'Dash' };
 const TIMELINE: Section = { href: '/timeline', label: 'Timeline' };
 const HOME: Section = { href: '/home', label: 'Home' };
 
@@ -155,6 +155,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.run_activities', reason: 'What each Dash run did, line by line, for its run page; the rows a run wrote are sources in their own modules.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
+    { table: 'core.session_progress', reason: 'What each session working for them is doing now and what it waits on, for the project pages and Dev; bookkeeping written by the sessions, and what they build is recorded on the plan.' },
     { table: 'core.scope_days', reason: 'Steps under each open goal or feature at the end of each day, counted by the daily run from rows that are sources in their own modules.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'core.writing_style', reason: 'Dash\'s analysis of how they write, read from their sent mail and shown on its own page; derived, and not read by anything else yet.' },
