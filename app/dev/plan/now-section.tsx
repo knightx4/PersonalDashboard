@@ -146,14 +146,15 @@ function StepName({ session }: { session: NowSession }) {
     return (
       <Link
         href={session.step.href}
-        className="press-area min-w-0 text-ui font-semibold break-words text-ink transition-colors duration-quick hover:text-accent"
+        title={`${session.step.ref} ${session.step.title}`}
+        className="press-area block min-w-0 truncate text-ui font-semibold text-ink transition-colors duration-quick hover:text-accent"
       >
         <span className="tabular text-ink-muted">{session.step.ref}</span> {session.step.title}
       </Link>
     );
   }
   return (
-    <span className="min-w-0 text-ui font-semibold break-words text-ink">
+    <span className="block min-w-0 truncate text-ui font-semibold text-ink">
       {session.project ? `A session on ${session.project}` : 'A session on no step'}
     </span>
   );
@@ -173,12 +174,16 @@ function NowRow({ session, now }: { session: NowSession; now: number }) {
           <LiveDot tone={stale ? 'caution' : 'accent'} still={stale} />
         )}
       </span>
-      <div className="flex min-w-0 items-baseline justify-between gap-3">
-        <StepName session={session} />
+      {/* Two lines a session at any width (law 9): the step, then its latest
+          line with the age after it; the full text is in each line's title
+          and on the step's own page. */}
+      <StepName session={session} />
+      <p className="col-start-2 flex min-w-0 items-baseline gap-1.5 text-ui text-ink">
+        <span className="min-w-0 truncate" title={withoutTitle(session.action, session.step?.title)}>
+          <LinkedText text={withoutTitle(session.action, session.step?.title)} />
+        </span>
+        <span aria-hidden className="shrink-0 text-small text-ink-muted">·</span>
         <Age at={session.at} now={now} />
-      </div>
-      <p className="col-start-2 text-ui break-words text-ink">
-        <LinkedText text={withoutTitle(session.action, session.step?.title)} />
       </p>
       {(stale || session.source === 'guess') && !waiting && (
         <p className="col-start-2 text-small text-ink-muted">
