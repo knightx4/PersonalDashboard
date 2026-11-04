@@ -529,6 +529,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'mentor-reply': run(SONNET, 23_000, 250),
   // The persona and the last few messages in, one line out (plan #2748.4).
   'mentor-ack': background(run(HAIKU, 3_500, 30)),
+  // The cast's cards and the last thirty messages in, a short plan out (plan #2879.1.2).
+  'group-director': background(run(HAIKU, 3_000, 120)),
+  // The bot's persona, memory and the last thirty messages in, one text out (plan #2879.1.2).
+  'group-speaker': run(SONNET, 5_000, 120),
   // The rules, the form and for a redraft the current card in; a card of
   // about 2,500 characters out (plan #2748.11).
   'draft-persona': run(SONNET, 1_800, 700),

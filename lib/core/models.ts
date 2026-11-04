@@ -137,6 +137,12 @@ export const MODELS = {
    * slow to start (plan #2748.4). The reply itself is the model chosen for Dash.
    */
   mentorAck: HAIKU,
+  /**
+   * lib/you/group-burst.ts, the director that picks who speaks next in a
+   * group chat, or waits on the person (plan #2879.1.2). Each bot then
+   * writes with the model chosen for Dash.
+   */
+  groupDirector: HAIKU,
   /** lib/you/people-cards.ts, a persona card drafted or redrafted on the People form (plan #2748.11) */
   personaDraft: SONNET,
   /** lib/learn/graph/from-note.ts */
