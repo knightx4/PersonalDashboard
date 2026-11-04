@@ -21,10 +21,10 @@ import {
   type QuestionInput,
 } from '@/lib/you/board-questions';
 import { panelPicked, panelSeats, type BoardPanel } from '@/lib/you/board-panels';
-import { AdvisorMark } from './advisor-mark';
+import { AdvisorAvatar } from './advisor-avatar';
 
 /**
- * Ask the board (plan #2561.4): the header's one action on the Board tab, and
+ * Ask the council (plan #2561.4): the header's one action on the Council tab, and
  * the compose card that opens under the header when it is pressed. It took
  * the place of Call a meeting (plan #2540.5).
  *
@@ -371,6 +371,7 @@ export function AskBoardForm({
                   <div className="flex flex-wrap gap-2">
                     {seats.map((a) => (
                       <ToggleChip key={a.key} on={!seatsOff.includes(a.key)} onClick={() => toggleSeat(a.key)}>
+                        <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
                         {a.name}
                       </ToggleChip>
                     ))}
@@ -388,7 +389,7 @@ export function AskBoardForm({
                           on={value.advisors.includes(a.key)}
                           onClick={() => toggle(a.key)}
                         >
-                          <AdvisorMark name={a.name} />
+                          <AdvisorAvatar advisorKey={a.key} name={a.name} decorative />
                           {a.name}
                         </ToggleChip>
                       ))}

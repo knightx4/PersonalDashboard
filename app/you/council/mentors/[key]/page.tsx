@@ -12,6 +12,8 @@ import {
   sendMentorMessage,
   setCommitment,
 } from '../../council-actions';
+import { loadAvatarSprite } from '@/lib/you/advisor-avatar-draw';
+import { AdvisorAvatars } from '../../advisor-avatar';
 import { MentorView } from './mentor-view';
 
 export const dynamic = 'force-dynamic';
@@ -44,38 +46,44 @@ export default async function Page({
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
-  const [page, settings] = await Promise.all([loadMentorPage(client, user.id, key, now), loadAccountSettings(user.id)]);
+  const [page, settings, avatars] = await Promise.all([
+    loadMentorPage(client, user.id, key, now),
+    loadAccountSettings(user.id),
+    loadAvatarSprite(client, user.id),
+  ]);
   if (!page) notFound();
   const aboutNote = about && UUID.test(about) ? await loadNote(client, user.id, about) : null;
 
   return (
-    <MentorView
-      mentor={page.mentor}
-      brain={page.brain}
-      notes={page.notes}
-      chat={page.chat}
-      messages={page.messages}
-      memory={page.memory}
-      about={aboutNote && aboutNote.advisorId === page.mentor.id ? aboutNote : null}
-      timezone={settings.timezone}
-      now={now}
-      subject={{
-        ref: null,
-        path: [
-          { label: 'You', href: '/you' },
-          { label: 'Council', href: '/you/council' },
-          { label: page.mentor.name, href: `/you/council/mentors/${key}` },
-        ],
-      }}
-      actions={{
-        read: readCouncilNotes,
-        react: reactToCouncilNote,
-        todo: makeTodoFromNote,
-        readMentor,
-        send: sendMentorMessage,
-        commitment: setCommitment,
-        forget: forgetMentorMemory,
-      }}
-    />
+    <AdvisorAvatars {...avatars}>
+      <MentorView
+        mentor={page.mentor}
+        brain={page.brain}
+        notes={page.notes}
+        chat={page.chat}
+        messages={page.messages}
+        memory={page.memory}
+        about={aboutNote && aboutNote.advisorId === page.mentor.id ? aboutNote : null}
+        timezone={settings.timezone}
+        now={now}
+        subject={{
+          ref: null,
+          path: [
+            { label: 'You', href: '/you' },
+            { label: 'Council', href: '/you/council' },
+            { label: page.mentor.name, href: `/you/council/mentors/${key}` },
+          ],
+        }}
+        actions={{
+          read: readCouncilNotes,
+          react: reactToCouncilNote,
+          todo: makeTodoFromNote,
+          readMentor,
+          send: sendMentorMessage,
+          commitment: setCommitment,
+          forget: forgetMentorMemory,
+        }}
+      />
+    </AdvisorAvatars>
   );
 }

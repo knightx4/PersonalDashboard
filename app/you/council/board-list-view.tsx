@@ -40,7 +40,7 @@ import { AskedRow, SuggestionRow, type QuestionActions } from './question-rows';
 import { useRefreshWhileRunning } from './refresh-while-running';
 
 /**
- * The Board tab's list (plans #2540.3 and #2561.4), on the list pattern
+ * The Council tab's list (plans #2540.3 and #2561.4), on the list pattern
  * (components/patterns/list-detail.tsx): the header's one action, Ask the
  * board, which opens the compose card under it; then one surface of rows in
  * groups. What fell due comes first (plan #2581.10): the check-backs waiting
