@@ -162,6 +162,19 @@ function Rows({
   );
 }
 
+/** A moment's note with each gallery address ("/preview?s=<id>") a link that plays it. */
+function withGalleryLinks(text: string): React.ReactNode[] {
+  return text.split(/(\/preview\?s=[a-z0-9-]+)/).map((part, i) =>
+    i % 2 === 1 ? (
+      <a key={i} href={part} className="underline hover:text-ink">
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}
+
 /** One moment: its name and state, then what sets it off, what you see, and the reduced-motion version. */
 function MomentRow({ moment, outlines }: { moment: Moment; outlines: OutlineIndex }) {
   const { state } = moment;
@@ -183,13 +196,31 @@ function MomentRow({ moment, outlines }: { moment: Moment; outlines: OutlineInde
       <p className="text-body text-ink">{moment.sees}</p>
       <p className="text-body text-ink-muted">When: {moment.trigger}</p>
       <p className="text-body text-ink-muted">Reduced motion: {moment.reducedMotion}</p>
-      {'where' in state ? <p className="text-small text-ink-muted">{state.where}</p> : null}
+      {'where' in state ? <p className="text-small text-ink-muted">{withGalleryLinks(state.where)}</p> : null}
       {moment.demo ? (
         <a href={`#${moment.demo}`} className="text-small text-ink-muted underline hover:text-ink">
           See the demo
         </a>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * One workspace's moments as the catalogue lists them, for the gallery's
+ * dev-ui-moments, since the whole page photographs taller than a browser
+ * shot can reach and the catalogue sits near its foot.
+ */
+export function WorkspaceMoments({ workspace, label }: { workspace: Moment['workspace']; label: string }) {
+  const moments = MOMENTS.filter((moment) => moment.workspace === workspace);
+  return (
+    <CardSection title={label} meta={`${moments.length} of ${MOMENTS_PER_WORKSPACE}`}>
+      <ul className="divide-y divide-border">
+        {moments.map((moment) => (
+          <MomentRow key={moment.name} moment={moment} outlines={new Map()} />
+        ))}
+      </ul>
+    </CardSection>
   );
 }
 

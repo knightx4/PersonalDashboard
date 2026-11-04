@@ -133,5 +133,6 @@ export function newestFiles<T extends Pick<GoalFileRow, 'updatedAt'>>(
 /** "2 not read", for beside the Files heading; null when every file is read. */
 export function unreadWords(rows: readonly { unread?: boolean }[]): string | null {
   const n = rows.filter((row) => row.unread).length;
-  return n > 0 ? `${n} not read` : null;
+  // The tab's word, so the card and the tab say it the same way (plan #2778.11).
+  return n > 0 ? `${n} unread` : null;
 }

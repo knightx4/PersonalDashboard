@@ -128,8 +128,10 @@ export function PeopleList({
         </form>
       </div>
       {hits ? (
-        <SearchResults hits={hits} query={query ?? ''} timezone={timezone} now={now} />
+        <SearchResults hits={hits} query={query ?? ''} current={current} wide={currentWide} timezone={timezone} now={now} />
       ) : (
+        // One run, as the reference: the threads newest first, then those never
+        // written to, whose quiet "Say hello" is never a line of theirs (sortPeople).
         <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
           {rows.map((row) => (
             <PersonItem key={row.id} row={row} current={row.key === current} wide={currentWide} timezone={timezone} now={now} />
@@ -173,8 +175,7 @@ function PersonItem({
             data-person-preview
             className={cn(
               'line-clamp-2 text-small',
-              typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted',
-            )}
+              typing ? 'text-accent' : row.unread ? 'text-ink' : 'text-ink-muted',            )}
           >
             {previewOf(row, now)}
           </span>
@@ -190,7 +191,23 @@ function PersonItem({
   );
 }
 
-function SearchResults({ hits, query, timezone, now }: { hits: readonly SearchHit[]; query: string; timezone: string; now: number }) {
+function SearchResults({
+  hits,
+  query,
+  current,
+  wide,
+  timezone,
+  now,
+}: {
+  hits: readonly SearchHit[];
+  query: string;
+  /** The key of the open thread: its first result is lit, as the open row is. */
+  current: string | null;
+  wide: boolean;
+  timezone: string;
+  now: number;
+}) {
+  const lit = hits.find((hit) => hit.key === current)?.id ?? null;
   if (hits.length === 0) {
     return (
       <div className="px-4 py-2">
@@ -214,7 +231,11 @@ function SearchResults({ hits, query, timezone, now }: { hits: readonly SearchHi
           <li key={hit.id}>
             <Link
               href={threadHref(hit.key)}
-              className="grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken"
+              aria-current={hit.id === lit && !wide ? 'page' : undefined}
+              className={cn(
+                'grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken',
+                hit.id === lit && (wide ? 'min-[720px]:bg-accent-tint' : 'bg-accent-tint hover:bg-accent-tint'),
+              )}
             >
               <PersonMark initials={personInitials(hit.name)} colour={hit.colour} />
               <span className="min-w-0">

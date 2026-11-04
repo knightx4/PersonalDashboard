@@ -4,6 +4,7 @@ import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   mentorColour,
   SEARCH_MAX,
+  seatAreaOf,
   sortPeople,
   THREAD_MESSAGE_COLUMNS,
   THREAD_PAGE,
@@ -60,10 +61,6 @@ async function readChats(client: YouSupabaseClient, userId: string): Promise<{ c
   return { chats: byAdvisor, colours: colourOf };
 }
 
-function aboutOf(advisor: RosterAdvisor): string {
-  return advisor.focus ?? advisor.question;
-}
-
 async function personRow(
   client: YouSupabaseClient,
   userId: string,
@@ -75,7 +72,7 @@ async function personRow(
     id: advisor.id,
     key: advisor.key,
     name: advisor.name,
-    about: aboutOf(advisor),
+    about: seatAreaOf(advisor),
     colour: mentorColour(advisor.key, colour),
     canTalk: canTalkOf(advisor),
     chatId: chat?.id ?? null,
