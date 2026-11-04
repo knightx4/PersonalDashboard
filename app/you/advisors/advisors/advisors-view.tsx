@@ -279,13 +279,21 @@ function AdvisorGrid({
 }) {
   if (advisors.length === 0) return null;
   return (
-    <section className="mt-6 space-y-2">
-      <h2 className="flex items-center gap-2">
-        <SectionLabel as="span" count={advisors.length}>
-          {title}
-        </SectionLabel>
-        {note}
-      </h2>
+    <section className="mt-6">
+      <Disclosure
+        defaultOpen
+        remember={`you.board.advisors.fold.${title}`}
+        title={
+          <span className="inline-flex items-center gap-2">
+            <SectionLabel as="span" count={advisors.length}>
+              {title}
+            </SectionLabel>
+            {note}
+          </span>
+        }
+        summaryClassName="rounded-control pb-2"
+        bodyClassName=""
+      >
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {advisors.map((advisor, i) => (
           <li key={advisor.id} className="min-w-0">
@@ -293,6 +301,7 @@ function AdvisorGrid({
           </li>
         ))}
       </ul>
+      </Disclosure>
     </section>
   );
 }
