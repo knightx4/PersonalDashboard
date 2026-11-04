@@ -11,6 +11,7 @@ import {
   type DashOffer,
 } from '@/lib/goals/hand-off';
 import type { HomeGoal } from '@/lib/goals/home';
+import { showsOutside } from '@/lib/goals/plan-order';
 import { dashLane, laterLane, type DashLaneItem, type LaterLaneItem } from '@/lib/goals/lanes';
 import { isCurrent } from '@/lib/goals/reviews';
 import type { RunListing } from '@/lib/goals/runs';
@@ -94,7 +95,7 @@ export async function loadHome(
   const { reviews } = input;
   // The drafts come from the tree already read: a prep step's result, or the step's own.
   const ranked = withPrepared(todayRanked(input), tree.byGoal);
-  const goals = dailyView(tree.goals, tree.byGoal, today).goals.map((daily): HomeGoal => {
+  const goals = dailyView(tree.goals, tree.byGoal, today, showsOutside(tree.byGoal, today)).goals.map((daily): HomeGoal => {
     const review = reviews.get(daily.goal.id) ?? null;
     return {
       goal: daily.goal,
@@ -123,7 +124,7 @@ export async function loadHome(
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
     preparable: preparableSteps({ byGoal: tree.byGoal, onYou: ranked, runs, now }),
     dash,
-    laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
+    laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today, showsOutside: showsOutside(tree.byGoal, today) }),
     waitingRuns,
     suggested: suggestedItems({ goals: tree.goals, byGoal: tree.byGoal, suggestions: input.suggestions }),
     mentions: mentionStates

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useId, useState } from 'react';
 import { Folder, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
@@ -26,6 +26,10 @@ export function AskDash({
   goals,
   areas,
   defaultAreaId,
+  only = false,
+  defaultOpen = false,
+  label = 'Ask Dash',
+  defaultBody = '',
   className,
 }: {
   goals: { id: string; title: string }[];
@@ -33,6 +37,17 @@ export function AskDash({
   areas: { id: string; name: string; learn?: boolean }[];
   /** The area a new errand starts in (errandAreaDefault). */
   defaultAreaId: string | null;
+  /**
+   * On a goal's own page (plan #2778.4): the ask is about that goal alone, so
+   * the chip naming where it goes is left out.
+   */
+  only?: boolean;
+  /** For the gallery: drawn with the box open. */
+  defaultOpen?: boolean;
+  /** The words on the closed button. */
+  label?: string;
+  /** What the box holds when it opens, for an ask the page has already worded. */
+  defaultBody?: string;
   className?: string;
 }) {
   const toast = useToast();
@@ -41,9 +56,11 @@ export function AskDash({
   const [target, setTarget] = useState<string>(
     goals[0]?.id ?? (goalsOn ? GOAL : errandsOn ? ERRAND : ''),
   );
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(defaultBody);
+  // Two boxes can stand on one page, as on a goal with no dashboard yet.
+  const boxId = useId();
   // Closed until pressed (law 14): a button, not a box waiting for words.
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   // The area picked for a new goal or errand, null until the chip is changed.
   const [areaPick, setAreaPick] = useState<string | null>(null);
   const [state, ask, asking] = useActionState(async (prev: AskDashState, form: FormData) => {
@@ -62,7 +79,7 @@ export function AskDash({
       <div className={className}>
         <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
           <DashMark size="2xs" tone="brand" decorative />
-          Ask Dash
+          {label}
         </Button>
       </div>
     );
@@ -77,12 +94,12 @@ export function AskDash({
 
   return (
     <form action={ask} className={cn('space-y-2', className)}>
-      <label htmlFor="ask-dash" className="sr-only">
+      <label htmlFor={boxId} className="sr-only">
         Ask Dash
       </label>
       <ComposeBox>
         <ComposeBody
-          id="ask-dash"
+          id={boxId}
           autoFocus
           name="body"
           required
@@ -103,24 +120,28 @@ export function AskDash({
           }}
         />
         <div className="flex flex-wrap items-center gap-2 pt-1.5">
-          <ChipSelect
-            name="target"
-            value={target}
-            onChange={(event) => {
-              setTarget(event.target.value);
-              setAreaPick(null);
-            }}
-            icon={<Target className="size-3.5" strokeWidth={1.75} />}
-            aria-label="What it is for"
-          >
-            {goals.map((goal) => (
-              <option key={goal.id} value={goal.id}>
-                {goal.title}
-              </option>
-            ))}
-            {goalsOn && <option value={GOAL}>A new goal</option>}
-            {errandsOn && <option value={ERRAND}>A new errand</option>}
-          </ChipSelect>
+          {only ? (
+            <input type="hidden" name="target" value={target} />
+          ) : (
+            <ChipSelect
+              name="target"
+              value={target}
+              onChange={(event) => {
+                setTarget(event.target.value);
+                setAreaPick(null);
+              }}
+              icon={<Target className="size-3.5" strokeWidth={1.75} />}
+              aria-label="What it is for"
+            >
+              {goals.map((goal) => (
+                <option key={goal.id} value={goal.id}>
+                  {goal.title}
+                </option>
+              ))}
+              {goalsOn && <option value={GOAL}>A new goal</option>}
+              {errandsOn && <option value={ERRAND}>A new errand</option>}
+            </ChipSelect>
+          )}
           {errand && (
             <ChipInput
               type="date"

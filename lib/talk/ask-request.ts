@@ -153,7 +153,7 @@ export async function askDashInRequest(input: {
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
-      write: (tool, args, seen) =>
+      write: (tool, args, seen, conversationId) =>
         tool.apply(
           {
             ...ctx,
@@ -162,6 +162,7 @@ export async function askDashInRequest(input: {
             createTask,
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
+            origin: { kind: 'ask_dash', ref: conversationId },
           },
           args,
         ),
@@ -256,6 +257,8 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a thread is answered on the page it was asked on.
+          origin: { kind: 'goal_page', ref: null },
           thread: acts,
         },
         args,

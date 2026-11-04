@@ -11,6 +11,16 @@ import {
   GoalMetricsSurface,
   GoalMetricsTooltipSurface,
 } from './goal-metrics-surfaces';
+import {
+  GoalDashboardTilesAddSurface,
+  GoalDashboardTilesApartmentOpenSurface,
+  GoalDashboardTilesApartmentSurface,
+  GoalDashboardTilesBrokenSurface,
+  GoalDashboardTilesEmptySurface,
+  GoalDashboardTilesMenuSurface,
+  GoalDashboardTilesProgramsSurface,
+  GoalDashboardTilesSurface,
+} from './goal-dashboard-surfaces';
 import { GoalHoursSurface } from './goal-hours-surfaces';
 import { FollowUpCard } from '@/app/jobs/(app)/follow-ups/follow-up-card';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
@@ -462,7 +472,7 @@ import {
 } from './goal-surfaces';
 import { GoalStepEditingSurface, GoalStepMenuSurface } from './step-frame-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
-import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
+import { GoalDashArrivalDemo, GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
 import { DashRunButtonDemo, DashSeenDemo } from './dash-moment-demos';
 import { DashWorkingReadingDemo } from './dash-working-rows';
@@ -551,12 +561,16 @@ import {
   ProjectsSearchEmptySurface,
   ProjectsSurface,
 } from './projects-surfaces';
+import { GoalPageErrorSurface } from './goal-page-error-surface';
+import { GoalPlanSurface } from './goal-plan-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
-  GoalStepsTabSurface,
   GoalActivitySurface,
+  GoalDashboardPageSurface,
+  GoalFilesTabSurface,
+  GoalPageLoadingSurface,
   FileSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
@@ -5371,6 +5385,70 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalMetricsErrorSurface />,
   },
   {
+    /* A goal's dashboard tiles (plan #2778.2): a total, two countdowns, a
+     * line of the balances, a metric's bars and a table, on a loans goal.
+     * Its hidden parts follow: the quick add open, a tile's menu open, every
+     * type empty and every type broken. */
+    id: 'goal-dashboard-tiles',
+    label: 'Goals · Dashboard tiles',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-add',
+    label: 'Goals · Dashboard tiles, quick add open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesAddSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-menu',
+    label: 'Goals · Dashboard tiles, a tile menu open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesMenuSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-empty',
+    label: 'Goals · Dashboard tiles, nothing in them yet',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesEmptySurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-broken',
+    label: 'Goals · Dashboard tiles, a list or field missing',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesBrokenSurface />,
+  },
+  {
+    /* The parts tile (plan #2778.3): an apartment goal's rooms, a card each
+     * with its ring and next step. Its hidden part, a card pressed open to
+     * list its open steps, follows. */
+    id: 'goal-dashboard-tiles-apartment',
+    label: 'Goals · Dashboard tiles, rooms of an apartment',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentSurface />,
+  },
+  {
+    id: 'goal-dashboard-tiles-apartment-open',
+    label: 'Goals · Dashboard tiles, a room pressed open',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesApartmentOpenSurface />,
+  },
+  {
+    /* The slots and grid tiles (plan #2778.3) on a graduate programs goal. */
+    id: 'goal-dashboard-tiles-programs',
+    label: 'Goals · Dashboard tiles, slots and a checklist grid',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardTilesProgramsSurface />,
+  },
+  {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
      * Dash's latest update (plan #1666), the detail, a question, what it
      * waits on and the thread, and the properties column. */
@@ -5855,15 +5933,116 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAreaSurface />,
   },
   {
-    /* A goal's page on its Overview tab (plan #1671), in the tabbed detail
-     * pattern: the path, title and done-when, the properties column, then
-     * Dash's status card, the number and its readings, Waiting on you, one
-     * Learn goal linked and a file. */
+    /* A goal's page on its Dashboard tab (plan #2778.4) before Dash has laid
+     * out its tiles: the done-when, the Now / Next / Later strip, Dash's
+     * status card, the line offering Dash lay it out, the number, Waiting on
+     * you, and Dash's card with the newest files beside them. */
     id: 'goals-page-top',
-    label: 'Goal · the Overview tab',
+    label: 'Goal · the Dashboard tab with no tiles yet',
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* A goal's Dashboard with its tiles (plan #2778.4): the strip, the
+     * status, the figures, the line of the balance, the table and the
+     * tracker, with Dash's card (a run going) and Recent files beside them. */
+    id: 'goal-dashboard-page',
+    label: 'Goal · the Dashboard tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface />,
+  },
+  {
+    /* The same Dashboard with Ask Dash open in Dash's card. */
+    id: 'goal-dashboard-page-ask',
+    label: 'Goal · asking Dash from the Dashboard',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface asking />,
+  },
+  {
+    /* The Dashboard opened from the notification for a question handed to
+     * the goal from Ask Dash (plan #2778.8): what Dash worked out first, with
+     * a suggested step and tile waiting on Add and No. */
+    id: 'goal-dashboard-page-answer',
+    label: 'Goal · what Dash worked out for a question',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalDashboardPageSurface answered />,
+  },
+  {
+    /* A goal's page while it loads, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-loading',
+    label: 'Goal · loading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageLoadingSurface />,
+  },
+  {
+    /* A goal's page when it could not be read, on any tab (plan #2778.4). */
+    id: 'goal-dashboard-page-error',
+    label: 'Goal · could not be loaded',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPageErrorSurface />,
+  },
+  {
+    /* A goal's Work & files tab (plan #2778.7): the files on All, the drop
+     * zone, and Dash's work beside them. */
+    id: 'goals-page-files',
+    label: 'Goal · the Work & files tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface />,
+  },
+  {
+    /* Work & files on Waiting for: the documents the goal's steps still need. */
+    id: 'goals-page-files-waiting',
+    label: 'Goal · Work & files, Waiting for',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="waiting" />,
+  },
+  {
+    /* Work & files on Yours, once a PDF you added has gone on its step. */
+    id: 'goals-page-files-yours',
+    label: 'Goal · Work & files, Yours',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface view="yours" added />,
+  },
+  {
+    /* The drop zone with a file held over it. */
+    id: 'goals-page-files-drag',
+    label: 'Goal · Work & files, a file dragged over',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface dragging />,
+  },
+  {
+    /* A file uploading, before Dash has put it on its step. */
+    id: 'goals-page-files-uploading',
+    label: 'Goal · Work & files, uploading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface uploading />,
+  },
+  {
+    /* A file's menu open: Pin, Rename, Remove. */
+    id: 'goals-page-files-menu',
+    label: 'Goal · Work & files, a file’s menu',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface menu />,
+  },
+  {
+    /* A goal with no files, nothing waiting and no work from Dash. */
+    id: 'goals-page-files-empty',
+    label: 'Goal · Work & files, empty',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalFilesTabSurface empty />,
   },
   {
     /* A passive goal's page (plan #2503.2): the switch in the header on
@@ -5893,18 +6072,76 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* The same frame on its Steps tab: the step tree and its stages. */
+    /* A goal's Plan tab (plan #2778.5): the loans goal's letter Now, autopay
+     * Up next with Dash's how-to folded, and Later with what each waits on. */
     id: 'goals-page-steps',
-    label: 'Goal · the Steps tab',
+    label: 'Goal · the Plan tab',
     module: 'goals',
     width: 'page',
-    render: () => <GoalStepsTabSurface />,
+    render: () => <GoalPlanSurface />,
+  },
+  {
+    /* The apartment goal's Plan tab: one step Now, two Up next, and a long
+     * Later in rooms cut at eight with Show all. */
+    id: 'goals-page-plan-apartment',
+    label: 'Goal · the Plan tab, in rooms',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" />,
+  },
+  {
+    /* The same, with every later step listed. */
+    id: 'goals-page-plan-apartment-later',
+    label: 'Goal · the Plan tab, every later step',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" laterAll />,
+  },
+  {
+    /* The loans goal By stage: every stage on one card, open to its steps. */
+    id: 'goals-page-plan-stage',
+    label: 'Goal · the Plan tab by stage',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface view="stage" />,
+  },
+  {
+    /* The apartment goal By room. */
+    id: 'goals-page-plan-apartment-rooms',
+    label: 'Goal · the Plan tab by room',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="flat" view="stage" />,
+  },
+  {
+    /* Dash's how-to opened in place on the step it is for. */
+    id: 'goals-page-plan-draft',
+    label: 'Goal · Dash’s draft open on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface draftOpen />,
+  },
+  {
+    /* The finished steps' fold open, newest first. */
+    id: 'goals-page-plan-done',
+    label: 'Goal · the finished steps on the Plan tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface doneOpen />,
+  },
+  {
+    /* A goal with no steps yet: Help me plan this. */
+    id: 'goals-page-plan-empty',
+    label: 'Goal · the Plan tab with no plan',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalPlanSurface goal="empty" />,
   },
   {
     /* A goal closing with the Steps tab open (plan #1672): the hexagon in the
      * title completes with its ring, then the steps fold into one line. */
     id: 'goals-page-close',
-    label: 'Goal · closing it on the Steps tab',
+    label: 'Goal · closing it on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
@@ -5916,24 +6153,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalPageCloseDemo />,
   },
   {
-    /* A step Dash finished, on the Steps tab (plan #1672). */
+    /* A step Dash finished, on the Plan tab (plan #1672). */
     id: 'goals-page-arrival',
-    label: 'Goal · a step Dash finished, on the Steps tab',
+    label: 'Goal · a step Dash finished, on the Plan tab',
     module: 'goals',
     width: 'page',
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="goal-page-arrival"]',
       shows:
-        'Draft what to say on the call settles into place in the step list and Dash’s mark beside it swells and takes the accent once, settled within the second.',
+        'Draft what to say on the call settles into place in the finished steps and Dash’s mark beside it swells and takes the accent once, settled within the second.',
     },
     render: () => <GoalPageArrivalDemo />,
   },
   {
-    /* The same frame on its Activity tab: the steps closed, the runs and
+    /* The same moment in Dash's card on the Dashboard (plan #2778.10). */
+    id: 'goals-page-dash-arrival',
+    label: 'Goal · a step Dash finished, in Dash’s card',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="goal-dash-arrival"]',
+      shows:
+        'The Last finished line in Dash’s card settles into place and Dash’s mark in it swells and takes the accent once, settled within the second.',
+    },
+    render: () => <GoalDashArrivalDemo />,
+  },
+  {
+    /* The same frame on its History tab: the steps closed, the runs and
      * the goal's comments. */
     id: 'goals-page-activity',
-    label: 'Goal · the Activity tab',
+    label: 'Goal · the History tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalActivitySurface />,

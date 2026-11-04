@@ -135,6 +135,11 @@ export function dailyRunText(input: {
    * marked optional, and nothing else is done about it.
    */
   mentions?: PassiveMention[];
+  /**
+   * The open goals with steps and no dashboard yet (plan #2778.9), each laid
+   * out from its template through scripts/goal-dashboard.ts.
+   */
+  unlaid?: { id: string; title: string }[];
 }): string {
   const answers = input.answers ?? [];
   const review = input.review ?? [];
@@ -143,6 +148,7 @@ export function dailyRunText(input: {
   const stalled = input.underWay?.stalled ?? [];
   const finished = input.underWay?.finished ?? [];
   const mentions = input.mentions ?? [];
+  const unlaid = input.unlaid ?? [];
   const lines = input.steps.map(
     (step) =>
       `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
@@ -263,6 +269,17 @@ export function dailyRunText(input: {
           'goal", on passive goals.',
           '',
           ...mentions.map(mentionLine),
+          '',
+        ]
+      : []),
+    ...(unlaid.length > 0
+      ? [
+          'These goals have no dashboard yet. Lay out each one from the template for its kind of',
+          'goal, and save it with `npm run goals:dashboard -- save <goal id> <file> --run ' + input.runId + '`,',
+          'which checks it and lists it on the Goals home with an Undo. Follow',
+          '.claude/skills/goals/reference/dashboards.md.',
+          '',
+          ...unlaid.map((g) => `- "${g.title}" (goals.items id ${g.id})`),
           '',
         ]
       : []),

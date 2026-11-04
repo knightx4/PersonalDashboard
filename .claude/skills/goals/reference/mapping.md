@@ -505,6 +505,12 @@ Never write `help_kinds` or `help_kinds_settled_at`. A guard refuses a write
 of yours to either, and refuses a proposal on a goal whose help is settled.
 Say in the run's summary which kinds you proposed and why.
 
+### The dashboard
+
+Once the map and its lists are written, lay out the goal's dashboard when it
+has none: pick the template for its kind and save it through the script, as
+`dashboards.md` says. Lay it out after the lists, so its tiles can read them.
+
 ### A goal that is several goals
 
 A goal that turns out to be several goals gets them proposed as goals:

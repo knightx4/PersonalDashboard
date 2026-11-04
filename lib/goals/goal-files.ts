@@ -18,6 +18,16 @@ export type GoalFileRow = {
   byDash: boolean;
   /** Dash wrote it and its newest version has not been opened. */
   unread: boolean;
+  /** When it last changed, for putting the newest first. */
+  updatedAt: string;
+  /** The step it was written for, or null for the goal itself. */
+  stepTitle: string | null;
+  /** That step's id (plan #2778.7). */
+  stepId?: string | null;
+  /** Pinned to the top of the goal's files (plan #2778.7). */
+  pinned?: boolean;
+  /** A file the person added rather than a piece of writing: its type, as "application/pdf". */
+  contentType?: string | null;
 };
 
 /** Each step in the trees by id, at any depth, for naming the step a file came from. */
@@ -86,8 +96,38 @@ export function goalFileRows(
       meta: goalFileMeta(file, stepTitle),
       byDash: file.madeBy !== 'you',
       unread: isUnread(file),
+      updatedAt: file.updatedAt,
+      stepTitle,
+      stepId: stepTitle ? stepId : null,
+      pinned: Boolean(file.pinnedAt),
+      contentType: file.stored?.contentType ?? null,
     };
   });
+}
+
+/** How many files the Dashboard shows beside the tiles (plan #2778.4). */
+export const RECENT_FILES_SHOWN = 3;
+
+/**
+ * A file's one line in Recent files and on Work & files (plan #2778.4): who
+ * wrote it, the day it last changed and the step it was for, as
+ * "Dash · 2 Nov · for “Apply for the plan”". `day` is that day, already
+ * formatted in the person's time zone.
+ */
+export function fileByline(row: Pick<GoalFileRow, 'byDash' | 'stepTitle'>, day: string): string {
+  return [row.byDash ? 'Dash' : 'You', day, row.stepTitle ? `for “${row.stepTitle}”` : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** The goal's newest files, last changed first, for Recent files on the Dashboard. */
+export function newestFiles<T extends Pick<GoalFileRow, 'updatedAt'>>(
+  rows: readonly T[],
+  count = RECENT_FILES_SHOWN,
+): T[] {
+  return [...rows]
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .slice(0, count);
 }
 
 /** "2 not read", for beside the Files heading; null when every file is read. */
