@@ -56,6 +56,7 @@ export const goalsActions: ModuleActions = {
     snoozeInboxRowAction: tool('change_goals_inbox'),
     unsnoozeInboxRowAction: tool('change_goals_inbox'),
     leaveQuestionsAction: none('theirs'),
+    answerSessionQuestionAction: none('theirs'),
     dismissStepNoticeAction: none('own', 'Marks a finished-step notice as read, which means something only when the person has read it.'),
     restoreStepNoticeAction: none('theirs', 'Undo: takes back their own dismissal.'),
   },

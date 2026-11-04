@@ -37,7 +37,13 @@ function mentionOf(hit: SearchHit): AskMention {
 }
 
 /** How the box starts, for the gallery. */
-export type AskBoxStart = { rows?: readonly AskMention[]; scope?: ModuleId | null; scopeOpen?: boolean };
+export type AskBoxStart = {
+  rows?: readonly AskMention[];
+  scope?: ModuleId | null;
+  scopeOpen?: boolean;
+  /** "Think it through" drawn on (plan #2789.10). */
+  think?: boolean;
+};
 
 /** What a question takes from the box when it is sent. */
 export type AskBoxSent = { rows: AskMention[]; scope: ModuleId | null };

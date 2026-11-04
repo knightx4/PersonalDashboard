@@ -30,13 +30,15 @@ export const dynamic = 'force-dynamic';
  *
  * The person comes from the session and nowhere else; the body names only the
  * question, the conversation it continues, the page it was asked on, the filter
- * of a list sent with it (plan #1658), the rows added with @ and the workspace
- * the lookups are kept to (plan #1899.5), all
+ * of a list sent with it (plan #1658), the rows added with @, the workspace
+ * the lookups are kept to (plan #1899.5) and whether to think it through
+ * (plan #2789.10), all
  * checked by parseAskInput. JSON only, so a form on another site cannot post
  * here without the browser asking first.
  *
  * The time budget is TIME_BUDGET_MS, forty seconds, with the answer call and
- * the writes after it; 300 matches the pages the action used to run under.
+ * the writes after it; 300 matches the pages the action used to run under,
+ * and holds a thought-through answer's THINK_TIME_BUDGET_MS of 150.
  */
 export const maxDuration = 300;
 
@@ -63,6 +65,7 @@ export async function POST(request: Request) {
     body.list,
     body.rows,
     body.scope,
+    body.think,
   );
 
   const stopping = new AbortController();

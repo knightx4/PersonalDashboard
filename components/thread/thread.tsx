@@ -20,6 +20,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { ReplyMockups } from '@/components/talk/reply-mockup';
 import { PaidCard } from '@/components/talk/paid-card';
 import { paidCardHosts } from '@/lib/dash/paid-card';
 import type { ChangePresses } from '@/components/talk/dash-changes';
@@ -1542,6 +1543,8 @@ function TalkThread({
                 {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
+                {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
+                {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}
                 {turn.id === PENDING
                   ? undefined
