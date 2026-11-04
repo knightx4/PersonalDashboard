@@ -63,18 +63,9 @@ const BEFORE: Record<
     badge: '/shopping/inbox',
     bar: [
       { href: '/shopping/orders', label: 'Now', icon: 'orders' },
-      {
-        href: '/shopping/inbox',
-        label: 'Inbox',
-        icon: 'inbox',
-        alsoMatches: ['/shopping/review'],
-        badge: 7,
-      },
+      { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', badge: 7 },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-      { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-      { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-      { href: '/shopping/share', label: 'Share', icon: 'share' },
     ],
   },
 };

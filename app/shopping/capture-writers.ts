@@ -209,7 +209,7 @@ async function saveOrder(
       await supabase.from('orders').delete().eq('id', built.order.id);
       return { ok: false, error: 'That email has already left the review queue.' };
     }
-    revalidatePath('/shopping/review');
+    revalidatePath('/shopping/orders/review');
     // The layout reads the review count for the nav badge.
     revalidatePath('/', 'layout');
   }

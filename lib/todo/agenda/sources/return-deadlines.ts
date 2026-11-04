@@ -67,7 +67,7 @@ export const returnDeadlinesSource: AgendaSource = {
         day: row.return_deadline as string,
         at: null,
         link: { href: `/shopping/orders/${row.id as string}`, label: 'Open the order' },
-        action: { href: '/shopping/returns', label: 'Returns' },
+        action: { href: '/shopping/inventory/returns', label: 'Returns' },
         detail: number ? `#${number}` : null,
         // A date is not a task. See the note at the top of this file.
         completable: false,

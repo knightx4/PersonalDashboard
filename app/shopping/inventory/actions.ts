@@ -203,7 +203,7 @@ export async function markInventoryReturned(
   revalidatePath(`/shopping/inventory/${id.data}`);
   revalidatePath('/shopping/orders');
   revalidatePath(`/shopping/orders/${marked.orderId}`);
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   revalidatePath('/finances/spending');
   return { message: 'Marked as returned.' };
 }
@@ -369,7 +369,7 @@ export async function deleteInventoryItem(formData: FormData): Promise<void> {
   revalidatePath('/shopping/inventory');
   revalidatePath(`/shopping/inventory/${item.id}`);
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   revalidatePath('/finances/spending');
 }
 
@@ -465,7 +465,7 @@ export async function deleteInventoryItems(
 
   revalidateSellSurfaces(mine);
   revalidatePath('/shopping/orders');
-  revalidatePath('/shopping/returns');
+  revalidatePath('/shopping/inventory/returns');
   revalidatePath('/finances/spending');
   return {
     message: `${mine.length} ${mine.length === 1 ? 'item' : 'items'} deleted.`,

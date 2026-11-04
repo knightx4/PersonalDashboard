@@ -42,16 +42,16 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/home/inbox', label: 'Inbox', icon: 'inbox' },
   ],
   // Orders leads: Spending and Recurring moved to Finances (plan #2593.1), and
-  // the orders list is the page Shopping lands on now.
+  // the orders list is the page Shopping lands on now. A month of opens
+  // (plan #1496.8) folded Review into Now (/shopping/orders/review) and
+  // Returns into Inventory (/shopping/inventory/returns), each lit by the tab
+  // it sits under, and took Sell and Share out of the bar: their pages and
+  // rows are kept, reached from Inventory's rail and by address.
   shopping: [
     { href: '/shopping/orders', label: 'Now', icon: 'orders' },
-    // The review queue keeps its address and lights the Inbox.
-    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', alsoMatches: ['/shopping/review'] },
+    { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox' },
     { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-    { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-    { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
     { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-    { href: '/shopping/share', label: 'Share', icon: 'share' },
   ],
   jobs: [
     { href: '/jobs', label: 'Now', icon: 'jobsHome', exact: true },

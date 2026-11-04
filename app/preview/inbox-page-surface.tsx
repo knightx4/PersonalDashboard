@@ -25,11 +25,11 @@ const rows: InboxRow[] = [
     section: 'actions',
     title: 'Take the Bosch drill back to Screwfix',
     line: 'Shopping · the refund window closes Fri 17 Oct',
-    href: '/shopping/returns',
+    href: '/shopping/inventory/returns',
     move: { state: 'on_you' },
     verbs: [
       { label: 'Done', tone: 'primary', write: write('Done.') },
-      { label: 'Open', tone: 'ghost', href: '/shopping/returns' },
+      { label: 'Open', tone: 'ghost', href: '/shopping/inventory/returns' },
     ],
     later,
   },

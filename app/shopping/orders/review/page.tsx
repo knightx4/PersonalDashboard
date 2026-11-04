@@ -8,14 +8,14 @@ import {
   REVIEW_VIEWS,
   type ReviewView,
 } from '@/lib/review/load';
-import { ReviewQueue } from './review-list';
+import { ReviewQueue } from '@/app/shopping/review/review-list';
 import { PageWide } from '@/components/shell/page-width';
 
 export const metadata = { title: 'Review' };
 
 function reviewHref(view: ReviewView): string {
-  if (view === 'all') return '/shopping/review';
-  return `/shopping/review?view=${view}`;
+  if (view === 'all') return '/shopping/orders/review';
+  return `/shopping/orders/review?view=${view}`;
 }
 
 /**
