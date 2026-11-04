@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/shell/app-shell';
 import { tabsFor } from '@/lib/shell/tabs';
-import { MENTOR_PALETTE, type PersonRow, type SearchHit, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import { MENTOR_PALETTE, withChats, type PersonRow, type SearchHit, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import { NewMessage } from '@/app/chat/new-message';
 import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
@@ -162,12 +163,51 @@ function ChatShell({ path, children }: { path: string; children: React.ReactNode
   );
 }
 
-/** People with its threads, with no one, not read, while loading, or searched. */
-export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'empty' | 'failed' | 'loading' | 'search' | 'nothing-found' }) {
+/**
+ * The Messages list's rows (plan #2879.2): only the chats there are, so the
+ * Skeptic's is one just started from New message, nothing said yet, and
+ * Richard Feynman, with no chat, is reached only through New message.
+ */
+const STARTED = CHAT_PEOPLE.map((r) => (r.key === 'skeptic' ? { ...r, chatId: 'chat-m4' } : r));
+export const MESSAGE_ROWS = withChats(STARTED);
+
+/** Everyone New message offers: the people above, and one more with no chat yet. */
+export const EVERYONE: PersonRow[] = [
+  ...CHAT_PEOPLE,
+  {
+    id: 'm7',
+    key: 'seneca',
+    name: 'Seneca',
+    about: 'Calm',
+    colour: MENTOR_PALETTE[6],
+    canTalk: true,
+    chatId: null,
+    last: null,
+    unread: false,
+    typingUntil: null,
+    lastReadAt: null,
+  },
+];
+
+/** Messages with its chats, with none, not read, while loading, searched, or with New message open. */
+export function ChatPeopleSurface({
+  state = 'people',
+}: {
+  state?: 'people' | 'empty' | 'failed' | 'loading' | 'search' | 'nothing-found' | 'new';
+}) {
   if (state === 'loading') {
     return (
       <ChatShell path="/chat">
         <PeopleSkeleton />
+      </ChatShell>
+    );
+  }
+  if (state === 'new') {
+    return (
+      <ChatShell path="/chat">
+        <PeopleView rows={MESSAGE_ROWS} timezone={ZONE} now={NOW} live={false} adding>
+          <NewMessage everyone={EVERYONE} />
+        </PeopleView>
       </ChatShell>
     );
   }
@@ -179,8 +219,8 @@ export function ChatPeopleSurface({ state = 'people' }: { state?: 'people' | 'em
             ? []
             : state === 'people'
               ? // The Mentor writing back, so the list draws "typing…" in a row (a hidden part of plan #2748.6).
-                CHAT_PEOPLE.map((r) => (r.key === 'mentor' ? { ...r, typingUntil: '2026-11-03T09:00:20Z' } : r))
-              : CHAT_PEOPLE
+                MESSAGE_ROWS.map((r) => (r.key === 'mentor' ? { ...r, typingUntil: '2026-11-03T09:00:20Z' } : r))
+              : MESSAGE_ROWS
         }
         failed={state === 'failed'}
         query={state === 'search' ? 'Northwind' : state === 'nothing-found' ? 'sabbatical' : null}
@@ -210,7 +250,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
     );
   }
   const who = state === 'new' ? CHAT_PEOPLE[4] : state === 'not-ready' ? CHAT_PEOPLE[5] : FRANKLIN;
-  const rows = CHAT_PEOPLE.map((r) =>
+  // The open thread keeps its row, as the page draws it, even for someone with no chat yet.
+  const rows = withChats(STARTED, who.key).map((r) =>
     state === 'typing' && r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r.id === who.id ? { ...r, unread: false } : r,
   );
   const messages =
@@ -259,7 +300,7 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
  * text, and rise in again while another is coming.
  */
 export function ChatTypingMomentSurface() {
-  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  const rows = MESSAGE_ROWS.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
   return (
     <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
       <ChatTypingDemo
@@ -284,12 +325,12 @@ export function ChatArrivalMomentSurface() {
       unread: true,
       last: { role: 'advisor' as const, text: 'You said you would call Dana by Friday. Have you picked a time?', at: '2026-11-03T08:59:00Z' },
     },
-    ...CHAT_PEOPLE.filter((r) => r.id !== mentor.id),
+    ...MESSAGE_ROWS.filter((r) => r.id !== mentor.id),
   ];
   return (
     <ChatShell path="/chat">
       <ChatArrivalDemo
-        before={CHAT_PEOPLE}
+        before={MESSAGE_ROWS}
         after={after}
         timezone={ZONE}
         now={NOW}

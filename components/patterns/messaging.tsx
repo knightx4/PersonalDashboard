@@ -219,6 +219,12 @@ export function MessageGroup({
   );
 }
 
+// A tucked corner is three quarters of a control's round (6px against the
+// bubble's 16px), as the reference draws it (6 against 18): half the round
+// read as no tuck at all. It follows the theme through --radius-control.
+const TUCK_YOU = 'rounded-br-[calc(var(--radius-control)*0.75)]'; /* ui-ok: derived from the theme's control radius, the reference's tucked corner */
+const TUCK_THEM = 'rounded-bl-[calc(var(--radius-control)*0.75)]'; /* ui-ok: derived from the theme's control radius, the reference's tucked corner */
+
 /**
  * One message. Bubbles are round; within a group every bubble but the last
  * tucks its corner on the sender's side, so the run reads as one turn.
@@ -242,7 +248,7 @@ export function MessageBubble({
         'whitespace-pre-wrap break-words rounded-pane px-3 py-2 text-body',
         from === 'you' ? 'bg-accent text-fill-ink' : 'bg-them text-ink',
         // The corner tucked on the sender's side marks a run from one sender.
-        !last && (from === 'you' ? 'rounded-br-control' : 'rounded-bl-control'),
+        !last && (from === 'you' ? TUCK_YOU : TUCK_THEM),
       )}
     >
       <LinkedText text={children} />
