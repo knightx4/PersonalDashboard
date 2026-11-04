@@ -612,6 +612,7 @@ export function AppShell({
           <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
           More
           {folded > 0 && (
+            {/* ui-ok: hand-rolled-chip -- the count badge on a dock tab, drawn like the other tabs' counts and placed over the icon, not a label or a choice */}
             <span className="tabular absolute left-1/2 top-1.5 ml-1.5 rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold leading-none text-caution-fill-ink">
               {folded}
               <span className="sr-only"> waiting</span>
