@@ -6,7 +6,7 @@ import { publicEnv } from '@/lib/env';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { triageRow } from '@/lib/feedback/triage-run';
-import { scoreIdeaRow } from '@/lib/ideas/score-run';
+import { sendIdeaToPlan } from '@/lib/ideas/send-to-plan';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { insertPlanItem } from '@/lib/plan/insert-item';
 import { nextPlanPosition } from '@/lib/plan/position';
@@ -77,8 +77,9 @@ export async function authoriseProjectApp(
 
 /**
  * Save the note as an idea under the project, triage it, and move it to a
- * step when triage is sure it is one fix. Triage is short (two seconds at
- * most), so the app hears where the note went.
+ * step when triage is sure it is one fix; otherwise the caller sends it to be
+ * shaped (`sendProjectNoteToPlan`). Triage is short (two seconds at most), so
+ * the app hears where the note went.
  */
 export async function fileProjectNote(
   db: Service,
@@ -114,16 +115,19 @@ export async function fileProjectNote(
   return { ok: true, outcome: { as: 'idea' }, ideaId };
 }
 
-/** Score an idea left on the ideas page, as an idea filed in Dash is. Never throws. */
-export async function scoreProjectIdea(db: Service, ownerId: string, ideaId: string): Promise<void> {
-  try {
-    if (!(await jevEnabledFor(db.core, ownerId))) return;
-    const spend: SpendReport[] = [];
-    await scoreIdeaRow(db.pub, { userId: ownerId, id: ideaId, spend });
-    await recordSpendReports(db.core, ownerId, { module: 'core', operation: 'score-idea' }, spend);
-  } catch (problem) {
-    console.warn('[project-notes] scoring the idea failed', problem);
-  }
+/**
+ * A note that is not one fix: scored when Jev is on, then straight on to be
+ * shaped into a proposed feature on the plan, the path a note from Dash's own
+ * header takes (lib/ideas/send-to-plan.ts). Never throws.
+ */
+export async function sendProjectNoteToPlan(db: Service, ownerId: string, ideaId: string): Promise<void> {
+  const score = await jevEnabledFor(db.core, ownerId).catch(() => false);
+  await sendIdeaToPlan(db.pub, {
+    userId: ownerId,
+    ideaId,
+    score,
+    record: (spend) => recordSpendReports(db.core, ownerId, { module: 'core', operation: 'score-idea' }, spend),
+  });
 }
 
 /** The step, under the project's feedback feature (made the first time). */

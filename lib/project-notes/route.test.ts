@@ -31,6 +31,6 @@ describe('where a note from a project app goes', () => {
 
   it('tells the app where the note went', () => {
     expect(outcomeLine({ as: 'step', number: 2812 })).toBe('Added to the plan as step #2812.');
-    expect(outcomeLine({ as: 'idea' })).toMatch(/idea/);
+    expect(outcomeLine({ as: 'idea' })).toBe('Sent to Dash to shape into the plan.');
   });
 });

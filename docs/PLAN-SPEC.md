@@ -211,6 +211,14 @@ fell over cost the night the same as one that worked. Pausing is not stopping:
 the budget and the stop time survive it, so resuming carries on the same night
 rather than starting a second one.
 
+The tick fills two groups of seats. The app's work takes up to three feature
+sessions beside the goals run, or four while goals has nothing to start
+(`OVERNIGHT_AT_ONCE`, `OVERNIGHT_AT_ONCE_GOALS_IDLE`). Dev projects get up to
+four more (`OVERNIGHT_PROJECTS_AT_ONCE`), one session per project. A
+project's feature never takes an app seat and the app's never takes a project
+seat, so the project seats stay empty on a night no project has a ready step.
+The runner card draws a project slot only while a session works in it.
+
 `ended_reason` is a written sentence, not a code, because the morning report
 reads it back to a person: *It fired every one of the 6 features you allowed.*
 The set of reasons is not closed — the budget and the clock are decided from
