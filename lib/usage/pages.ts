@@ -75,6 +75,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/jobs/review',
   '/jobs/roles',
   '/jobs/roles/[id]',
+  '/jobs/roles/new',
   '/jobs/settings',
   '/jobs/thoughts',
   '/jobs/today',

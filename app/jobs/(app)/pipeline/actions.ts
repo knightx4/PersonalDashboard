@@ -100,7 +100,6 @@ export async function setChannel(
   );
   if (error) return { error };
   revalidatePath('/jobs/pipeline');
-  revalidatePath('/jobs/analytics');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
