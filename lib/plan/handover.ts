@@ -19,7 +19,6 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  ownProjectRoutine,
   planRoutine,
   projectRoutine,
   type RoutineTarget,
@@ -94,24 +93,15 @@ export function builderFor(
  * What tells a project's session where it is and what to read, ahead of the
  * brief.
  *
- * A project with a routine of its own is checked out by that routine, so its
- * session is only told which repository it is in. The shared routine checks
- * out this repository, so its session is told to add the project's beside it
- * and build there, keeping this checkout for the plan rows
+ * A project's session is told to add the project's repository beside the
+ * checkout it was started in and build there, keeping that checkout for the
+ * plan rows
  * (.claude/skills/plan/reference/project-routine.md).
  */
 export function projectPreamble(project: DevProject): string {
   const { owner, repo, branch } = project.repo;
   const where = `${owner}/${repo}`;
   const site = project.url ? ` (${project.url})` : '';
-  if (ownProjectRoutine(project)) {
-    return (
-      `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
-      `dashboard. Work in that repository and follow its ${project.skill}. Merge each closed ` +
-      `step to ${branch} and push. Plan rows are read and written through the Supabase ` +
-      'connector, as that skill says.\n\n'
-    );
-  }
   const check = project.checkCommand
     ? `Before merging a closed step to ${branch} there, run \`${project.checkCommand}\` in that ` +
       'repository and merge only when it passes; then push. '

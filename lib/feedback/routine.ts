@@ -177,7 +177,7 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
- * Where a project's steps go when the project has no routine of its own: the
+ * Where a project's steps go: the
  * projects dispatcher (.claude/skills/plan/reference/project-dispatch.md).
  *
  * No routine can build in a project's repository unless that repository is
@@ -197,26 +197,15 @@ export function projectsRoutine(): RoutineTarget {
 }
 
 /**
- * The routine of a project's own, when its row names one and the deployment
- * sets its id: the override the website keeps until the shared routine has
- * built one of its steps (#2553.4). Its token falls back to the shared one,
- * as it did before there was a shared routine.
- */
-export function ownProjectRoutine(project: DevProject): RoutineTarget | null {
-  const env = project.routineEnv;
-  const id = env ? firstSet(process.env[env.id]) : null;
-  if (!env || !id) return null;
-  return { id, token: firstSet(process.env[env.token], process.env.CLAUDE_API_KEY) };
-}
-
-/**
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan, a reply to a run's
- * question, and the overnight runner: the project's own when it has one, and
- * the plan routine otherwise.
+ * question, and the overnight runner: the projects dispatcher, for every
+ * project.
  */
-export function projectRoutine(project: DevProject): RoutineTarget {
-  return ownProjectRoutine(project) ?? projectsRoutine();
+// The project stays in the signature: callers and the routine table name one.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function projectRoutine(_project: DevProject): RoutineTarget {
+  return projectsRoutine();
 }
 
 /**
