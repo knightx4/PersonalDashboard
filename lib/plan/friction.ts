@@ -146,6 +146,13 @@ export function gateLesson(step: string, log: string): { key: string; title: str
     const rule = rules[0];
     if (rule) return { key: lessonKey(`gate-lint-${rule}`), title: `Lint keeps failing on ${rule}` };
   }
+  if (/^test$/i.test(step)) {
+    const file = /FAIL\s+(?:\|\w+\|\s+)?([\w./-]+\.test\.tsx?)/.exec(log)?.[1];
+    if (file) {
+      const name = file.replace(/^.*\//, '').replace(/\.test\.tsx?$/, '');
+      return { key: lessonKey(`gate-test-${name}`), title: `The gate's tests keep failing in ${file}` };
+    }
+  }
   if (/spec counts/i.test(step)) {
     const counter = /([a-z][\w-]+) rose from/i.exec(log)?.[1] ?? /count (\S+) rose/i.exec(log)?.[1];
     if (counter) return { key: lessonKey(`gate-spec-${counter}`), title: `The spec count ${counter} rose` };

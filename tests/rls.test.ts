@@ -271,6 +271,23 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_runs = planRun.id;
 
+  const [buildLesson] = await admin<{ id: string }[]>`
+    insert into build_lessons (user_id, key, title)
+    values (${userId}, ${`lesson-${tag}`.toLowerCase().replace(/[^a-z0-9-]/g, '-')}, ${`${tag} kept hitting a wall`})
+    returning id`;
+  ids.build_lessons = buildLesson.id;
+
+  const [buildFriction] = await admin<{ id: string }[]>`
+    insert into build_friction (user_id, lesson_id, plan_item_id, run_id, kind, what)
+    values (${userId}, ${buildLesson.id}, ${planItem.id}, ${planRun.id}, 'guard', ${`${tag} was refused`})
+    returning id`;
+  ids.build_friction = buildFriction.id;
+
+  const [buildReview] = await admin<{ id: string }[]>`
+    insert into build_reviews (user_id, note) values (${userId}, ${`${tag} reviewed`})
+    returning id`;
+  ids.build_reviews = buildReview.id;
+
   const [planUpdate] = await admin<{ id: string }[]>`
     insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
                               steps_done_after, steps_total, run_id)

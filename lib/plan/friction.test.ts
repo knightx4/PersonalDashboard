@@ -76,6 +76,7 @@ describe('lesson keys', () => {
     const log = '/app/x.tsx\n  12:5  error  Unexpected any  @typescript-eslint/no-explicit-any\n';
     expect(gateLesson('Lint', log).key).toBe('gate-lint-typescript-eslint-no-explicit-any');
     expect(gateLesson('Build', '').key).toBe('gate-build');
+    expect(gateLesson('Test', ' FAIL  |db| tests/rls.test.ts > cross-user reads').key).toBe('gate-test-rls');
   });
 
   it('files a critic fix by the law it breaks', () => {
