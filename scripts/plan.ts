@@ -469,7 +469,7 @@ async function doneRefusal(
   }
   const checks = inputs.surfaces.length
     ? await sql<CheckRound[]>`
-        select surface, round, verdict, (layout->>'ok')::boolean as layout_ok from ui_checks
+        select surface, round, verdict, (layout->>'ok')::boolean as layout_ok, fixes, notes from ui_checks
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
@@ -507,7 +507,7 @@ async function featureScreensHeld(
   const screenSteps = inputs.filter((s) => s.files.some(isScreenFile) && s.surfaces.length > 0);
   if (screenSteps.length === 0) return held;
   const all = await sql<FeatureRound[]>`
-    select surface, round, verdict, (layout->>'ok')::boolean as layout_ok, commit_sha from ui_checks
+    select surface, round, verdict, (layout->>'ok')::boolean as layout_ok, commit_sha, fixes, notes from ui_checks
     where user_id = ${userId} and step = ${feature}`;
   const counting = roundsAtHead(all, { contains: screenSteps.map((s) => s.commit) }, localGit);
   const check = featureLandCheck({ feature, outline: outlines.get(feature), steps: inputs, all, counting });
