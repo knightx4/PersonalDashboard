@@ -38,7 +38,7 @@ describe('why there is no report', () => {
   it('calls out a reply that was cut off, which is a budget problem', () => {
     const why = whyNoReport({ content: [{ type: 'text' }], stop_reason: 'max_tokens' });
     expect(why).toContain('cut off');
-    expect(why).toContain('too long');
+    expect(why).toContain('budget');
   });
 
   it('says so when the model answered in prose instead', () => {

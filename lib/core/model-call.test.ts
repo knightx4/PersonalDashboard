@@ -98,7 +98,7 @@ describe('reading a reply', () => {
     const read = readReply({ content: [{ type: 'text', text: 'Half' }], stop_reason: 'max_tokens' }, 'report');
     expect(read.kind).toBe('cut_off');
     expect(read.reason).toContain('cut off');
-    expect(read.reason).toContain('too long');
+    expect(read.reason).toContain('budget');
   });
 
   it('refused, with the category and explanation when given', () => {
