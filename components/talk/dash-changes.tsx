@@ -5,15 +5,12 @@ import { useMemo, useState, useTransition } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { Check, CircleSlash, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DashAction } from '@/components/ui/dash-action';
+import { cn } from '@/lib/cn';
 import { FieldError } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { CloseButton } from '@/components/inbox/close-button';
-import {
-  CHANGE_STATUS_LABEL,
-  changeHref,
-  changeWhere,
-  changeWords,
-} from '@/lib/ask/change-view';
+import { CHANGE_STATUS_LABEL, changeHref, changeWhere, changeWords } from '@/lib/ask/change-view';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
@@ -53,15 +50,28 @@ export function DashChanges({
   presses,
   onChanged,
   today,
+  by = 'Dash',
+  inThread = false,
 }: {
   changes: readonly DashChange[];
   presses: ChangePresses;
   onChanged?: (change: DashChange) => void;
   /** YYYY-MM-DD, so a due date this year leaves the year off. */
   today?: string;
+  /** Who made them, for the list's name: someone on People names themselves (plan #2854.2.1). */
+  by?: string;
+  /**
+   * Drawn in a People thread as the end of the reply (plan #2854.2.1): no
+   * gap above and the corner tucked toward the reply. The fill stays sunken:
+   * on their bubble's fill a link falls short of 4.5:1 in light.
+   */
+  inThread?: boolean;
 }) {
   // Kept by identity, so the card's own state is reset only by a newer list.
-  const paid = useMemo(() => changes.filter((change): change is PaidChange => change.kind === 'paid_action'), [changes]);
+  const paid = useMemo(
+    () => changes.filter((change): change is PaidChange => change.kind === 'paid_action'),
+    [changes],
+  );
   if (changes.length === 0) return null;
   const free = changes.filter((change) => change.kind !== 'paid_action');
   const verb = free.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
@@ -69,12 +79,20 @@ export function DashChanges({
     <>
       {free.length > 0 && (
         <ul
-          aria-label={free.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
-          className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
+          aria-label={free.length === 1 ? `The change ${by} ${verb}` : `The changes ${by} ${verb}`}
+          className={cn(
+            'divide-y divide-border bg-sunken px-3',
+            inThread ? 'rounded-pane rounded-tl-control' : 'mt-2 rounded-card',
+          )}
         >
           {free.map((change) => (
             <li key={change.id} className="py-2.5">
-              <DashChangeRow change={change} presses={presses} onChanged={onChanged} today={today} />
+              <DashChangeRow
+                change={change}
+                presses={presses}
+                onChanged={onChanged}
+                today={today}
+              />
             </li>
           ))}
         </ul>
@@ -125,7 +143,11 @@ export function DashChangeRow({
     setPressing(which);
     startPress(async () => {
       const outcome = await presses[which](change.id).catch(
-        (): ChangeOutcome => ({ ok: false, error: 'That did not go through. Check your connection and try again.', change: null }),
+        (): ChangeOutcome => ({
+          ok: false,
+          error: 'That did not go through. Check your connection and try again.',
+          change: null,
+        }),
       );
       setPressing(null);
       const next = outcome.change;
@@ -194,24 +216,35 @@ export function DashChangeRow({
 
       {change.status === 'proposed' && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            pending={pressing === 'confirm'}
-            disabled={pressing !== null}
-            onClick={() => {
-              if (change.kind === 'delete_rows') {
-                setError(null);
-                setConfirming(true);
-              } else press('confirm');
-            }}
-          >
-            {pressing === 'confirm' && !confirming
-              ? change.kind === 'start_build'
-                ? 'Starting…'
-                : 'Writing…'
-              : 'Confirm'}
-          </Button>
+          {/* A build runs on the Plan routine, which is not metered per press. */}
+          {change.kind === 'start_build' ? (
+            <DashAction
+              routine="plan"
+              what="Cost of starting the build"
+              type="button"
+              size="sm"
+              pending={pressing === 'confirm'}
+              disabled={pressing !== null}
+              onClick={() => press('confirm')}
+            >
+              {pressing === 'confirm' ? 'Starting…' : 'Confirm'}
+            </DashAction>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              pending={pressing === 'confirm'}
+              disabled={pressing !== null}
+              onClick={() => {
+                if (change.kind === 'delete_rows') {
+                  setError(null);
+                  setConfirming(true);
+                } else press('confirm');
+              }}
+            >
+              {pressing === 'confirm' && !confirming ? 'Writing…' : 'Confirm'}
+            </Button>
+          )}
           <CloseButton
             lifecycle="declined"
             variant="secondary"

@@ -12,7 +12,7 @@ import {
   type ThreadPage,
 } from '@/lib/you/chat-threads';
 import { loadGroupRows, type GroupRow } from '@/lib/you/group-chats';
-import { olderMessages, readThread, startChatWith, startGroupWith } from './actions';
+import { olderMessages, readThread, retryReply, startChatWith, startGroupWith } from './actions';
 import { NewMessage } from './new-message';
 import { ThreadView } from './people/[key]/thread-view';
 import { PeopleView } from './people-view';
@@ -102,7 +102,7 @@ export default async function ChatMessagesPage({
           typingUntil={newest.person.typingUntil}
           timezone={settings.timezone}
           now={now}
-          actions={{ older: olderMessages, read: readThread }}
+          actions={{ older: olderMessages, read: readThread, retryReply }}
         />
       )}
     </PeopleView>

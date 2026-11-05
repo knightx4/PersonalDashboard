@@ -435,6 +435,8 @@ export async function readUnreadTexts(
       .select('chat_id, created_at, read_at')
       .eq('user_id', userId)
       .eq('kind', 'text_first')
+      // The Council's own: a rule's texts (plan #2854.1) keep their own limit.
+      .is('text_rule', null)
       .is('read_at', null)
       .order('created_at', { ascending: false })
       .limit(200),
@@ -534,6 +536,7 @@ export async function maybeStartAdviceRun(input: {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('kind', 'text_first')
+      .is('text_rule', null)
       .gte('created_at', dayStart.toISOString()),
     client.from('board_advisors').select('id').eq('user_id', userId).eq('active', true),
     // Over and unsummarised, or ended lately and perhaps grown after its

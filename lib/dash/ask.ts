@@ -270,6 +270,17 @@ points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
+/**
+ * Ask's rules for making changes, from "YOU MAKE THE CHANGES" through the
+ * delete proposal, word for word: what the people on People act by (plan
+ * #2854.2, lib/you/people-actions.ts), so a change has one set of rules
+ * wherever it is asked for. Read out of SYSTEM so the two cannot drift.
+ */
+export const ASK_ACTION_RULES = SYSTEM.slice(
+  SYSTEM.indexOf('YOU MAKE THE CHANGES THEY ASK FOR'),
+  SYSTEM.indexOf('ANYTHING ELSE THEY ASK YOU TO DO, HAND ON'),
+).trim();
+
 /** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 
@@ -511,6 +522,11 @@ export async function askDash(
     onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
     /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
     signal?: AbortSignal;
+    /**
+     * Try again (plan #2854.4): answer the chat's last question, which has no
+     * answer, instead of adding `question` to it. Needs `conversationRef`.
+     */
+    retry?: boolean;
     /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
     mentions?: readonly TalkCitation[];
     /** The workspace the question is kept to (plan #1899.5). */
@@ -544,9 +560,17 @@ export async function askDash(
       if (earlier.length === 0) return { turns: [], error: 'That conversation is not there any more.' };
       subject = { kind: 'ask', ref: input.conversationRef, title: askTitle(earlier[0].body) || null };
     } else {
+      if (input.retry) return { turns: [], error: 'That conversation is not there any more.' };
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [
+    // Try again (plan #2854.4): the chat's last question is answered as it
+    // was kept, and nothing new is added for it.
+    if (input.retry) {
+      const last = earlier[earlier.length - 1];
+      if (last.role !== 'user') return { turns: [], error: 'That question already has its answer.' };
+      earlier = earlier.slice(0, -1);
+      asked = [last];
+    } else asked = await stores.append(subject, [
       {
         role: 'user',
         body: question,
@@ -696,7 +720,7 @@ export async function askDash(
   await stores.recordSpend(spent);
   // Filed whether or not the answer is kept: the gap is real either way.
   if (answer.ok && answer.couldNot && handed.length === 0) {
-    await stores.noteGap?.(gapNote(answer.couldNot, question), subject.ref);
+    await stores.noteGap?.(gapNote(answer.couldNot, asked[0]?.body ?? question), subject.ref);
   }
   if (!answer.ok) {
     await discard();

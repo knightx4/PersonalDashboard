@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } f
 import { ArrowUp } from 'lucide-react';
 import {
   MessageBubble,
+  MessageCard,
   MessageDay,
   MessageGroup,
   MessageLink,
@@ -26,6 +27,7 @@ import {
   mergeMessages,
   personInitials,
   receiptOf,
+  replyFailedOf,
   threadBlocks,
   threadDetail,
   threadMessageOf,
@@ -34,6 +36,9 @@ import {
   type ThreadPage,
 } from '@/lib/you/chat-threads-model';
 import { editHref } from '@/lib/you/people-cards-model';
+import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
+import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
+import type { DashChange } from '@/lib/talk/changes';
 
 /**
  * One thread on the People tab (plan #2748.6): every message with one person,
@@ -46,6 +51,13 @@ import { editHref } from '@/lib/you/people-cards-model';
  * - The mentor's messages and the receipts on yours (Delivered, then Read)
  *   arrive over Realtime on you.advisor_messages, and their typing on
  *   you.advisor_chats.typing_until, so nothing waits for a reload.
+ * - The reply is written on the server, so leaving does not stop it; one
+ *   that failed (advisor_chats.reply_status) says so under your message,
+ *   with Try again (plan #2854.4).
+ * - What they did when you asked (plan #2854.2.1), a todo added or a build
+ *   or delete proposed, is a card after their reply to the text that asked:
+ *   a change made carries Undo, a proposal writes nothing until Confirm.
+ *   The cards are read again whenever a text of theirs comes in.
  */
 
 export type ThreadActions = {
@@ -53,12 +65,24 @@ export type ThreadActions = {
   older: (chatId: string, before: string) => Promise<ThreadPage | { error: string }>;
   /** Reading the thread, as having it open does. */
   read: (chatId: string, advisorId: string) => Promise<void>;
+  /** Try again on a reply that failed (plan #2854.4): the mentor answers your last message once more. */
+  retryReply?: (chatId: string, advisorId: string) => Promise<{ error: string | null }>;
+  /** The thread's changes as they now stand, or null when they could not be read. */
+  changes?: (chatId: string) => Promise<DashChange[] | null>;
 };
 
-/** What the gallery reads with: nothing further back, and reading changes nothing. */
+/** What the gallery reads with: nothing further back, and reading and trying again change nothing. */
 const NO_ACTIONS: ThreadActions = {
   older: async () => ({ messages: [], hasOlder: false }),
   read: async () => {},
+  retryReply: async () => ({ error: null }),
+};
+
+/** The gallery's presses: each answers with the change as the press would leave it. */
+const NO_PRESSES: ChangePresses = {
+  confirm: async () => ({ ok: false, error: 'Nothing is written in the gallery.', change: null }),
+  decline: async () => ({ ok: false, error: 'Nothing is written in the gallery.', change: null }),
+  undo: async () => ({ ok: false, error: 'Nothing is written in the gallery.', change: null }),
 };
 
 type Pending = { id: string; text: string; at: string; failed: string | null };
@@ -74,6 +98,12 @@ const NEAR_FOOT_PX = 120;
 /** Within this many pixels of the top, the page before is read. */
 const NEAR_TOP_PX = 80;
 
+/**
+ * No changes, as one array: a fresh `[]` default on every draw made the
+ * redraw check below see new changes each time and draw again without end.
+ */
+const NO_CHANGES: DashChange[] = [];
+
 export function ThreadView({
   person,
   chatId: initialChatId,
@@ -85,6 +115,9 @@ export function ThreadView({
   live = true,
   pending: initialPending = [],
   loadingOlder: initialLoadingOlder = false,
+  changes: initialChanges = NO_CHANGES,
+  presses = NO_PRESSES,
+  today,
 }: {
   person: PersonRow;
   chatId: string | null;
@@ -100,6 +133,12 @@ export function ThreadView({
   pending?: Pending[];
   /** The page before is being read, for the gallery. */
   loadingOlder?: boolean;
+  /** What they made or proposed in this thread, oldest first (loadPeopleChanges). */
+  changes?: DashChange[];
+  /** Confirm, decline and undo on those changes: Ask's own, in app/chat/dash/actions.ts. */
+  presses?: ChangePresses;
+  /** YYYY-MM-DD in the person's zone, so a due date this year leaves the year off. */
+  today?: string;
 }) {
   const [startedChatId, setChatId] = useState<string | null>(null);
   const chatId = initialChatId ?? startedChatId;
@@ -120,6 +159,18 @@ export function ThreadView({
   const [heardTyping, setTypingUntil] = useState<string | null | undefined>(undefined);
   const typingUntil = heardTyping === undefined ? initialTyping : heardTyping;
   const [pending, setPending] = useState<Pending[]>(initialPending);
+  // Why the reply failed, as Realtime last said or as the server drew it (plan #2854.4).
+  const [heardFailed, setReplyFailed] = useState<string | null | undefined>(undefined);
+  const replyFailed = heardFailed === undefined ? (person.replyFailed ?? null) : heardFailed;
+  const [retryError, setRetryError] = useState<string | null>(null);
+  // The changes as the server drew them, then as a press or a re-read left them.
+  const [changes, setChanges] = useState<DashChange[]>(initialChanges);
+  const [drawnChanges, setDrawnChanges] = useState(initialChanges);
+  if (initialChanges !== drawnChanges) {
+    setDrawnChanges(initialChanges);
+    setChanges(initialChanges);
+  }
+  const onChanged = useCallback((change: DashChange) => setChanges((list) => withItem(list, change)), []);
   const [draft, setDraft] = useState('');
   const [now, setNow] = useState(start);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -147,10 +198,15 @@ export function ThreadView({
         if (!row) return;
         setMessages((list) => mergeMessages(list, [row]));
         if (row.role === 'advisor' && !row.readAt && shown()) void act.current.read(chatId, person.id);
+        // A text of theirs may be the reply to something they did: read the cards again.
+        if (row.role === 'advisor' && event.eventType === 'INSERT') {
+          void act.current.changes?.(chatId).then((next) => next && setChanges(next));
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chats', filter: `id=eq.${chatId}` }, (event) => {
         const next = (event.new ?? {}) as Record<string, unknown>;
         setTypingUntil(typeof next.typing_until === 'string' ? next.typing_until : null);
+        if ('reply_status' in next) setReplyFailed(replyFailedOf(next));
       })
       .subscribe();
     return () => {
@@ -273,10 +329,28 @@ export function ThreadView({
     void send(again);
   };
 
+  const retryReply = async () => {
+    const tryAgain = act.current.retryReply;
+    if (!chatId || !tryAgain) return;
+    setReplyFailed(null);
+    setRetryError(null);
+    atFoot.current = true;
+    setTypingUntil(new Date(Date.now() + 15_000).toISOString());
+    const outcome = await tryAgain(chatId, person.id).catch(() => ({ error: 'Not sent. Check your connection.' }));
+    if (outcome.error) {
+      setTypingUntil(null);
+      setRetryError(outcome.error);
+    }
+  };
+
   const typing = isTyping(typingUntil, now);
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
+  const cards = placeAfterReplies(messages, changes, (change) => change.advisorMessageId);
   const empty = messages.length === 0 && pending.length === 0;
+  // A failed reply is said under your last message, while nothing newer is on its way.
+  const failedNote =
+    !typing && pending.length === 0 && messages.at(-1)?.role === 'person' ? (retryError ?? replyFailed) : null;
 
   return (
     <MessagingThread
@@ -338,7 +412,8 @@ export function ThreadView({
           <MessageGroup key={block.key} from={block.from}>
             {block.messages.map((m, i) => (
               <Fragment key={m.id}>
-                <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={arrives(m)}>
+                {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
+                <MessageBubble from={block.from} last={i === block.messages.length - 1 && !cards.has(m.id)} arriving={arrives(m)}>
                   {m.text}
                 </MessageBubble>
                 {m.receipts.map((r) => (
@@ -346,6 +421,11 @@ export function ThreadView({
                     {r.label}
                   </MessageLink>
                 ))}
+                {cards.has(m.id) && (
+                  <MessageCard>
+                    <DashChanges changes={cards.get(m.id) ?? []} presses={presses} onChanged={onChanged} today={today} by={person.name} inThread />
+                  </MessageCard>
+                )}
               </Fragment>
             ))}
             {receipt && block.messages.at(-1)?.id === receipt.id && <MessageNote>{receipt.label}</MessageNote>}
@@ -374,6 +454,21 @@ export function ThreadView({
             </div>
           ))}
         </MessageGroup>
+      )}
+      {failedNote && (
+        <div role="alert" className="flex flex-col items-start">
+          <MessageNote tone="danger">
+            {failedNote}
+            {actions.retryReply && chatId && (
+              <>
+                {' '}
+                <button type="button" onClick={() => void retryReply()} className="font-medium text-accent hover:underline">
+                  Try again
+                </button>
+              </>
+            )}
+          </MessageNote>
+        </div>
       )}
       {typing && <TypingBubble name={person.name} />}
     </MessagingThread>

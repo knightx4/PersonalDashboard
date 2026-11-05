@@ -839,14 +839,15 @@ async function confirmPaid(
 }
 
 /**
- * A change to confirm or decline, with the surface it was kept on: Ask's, or
- * a paid press a thread queued (plan #2228.1), which is approved the same way.
+ * A change to confirm or decline, with the surface it was kept on: Ask's, a
+ * paid press a thread queued (plan #2228.1), which is approved the same way,
+ * or anything someone on People proposed in their thread (plan #2854.2).
  */
 async function loadPressable(deps: ChangeDeps, id: string): Promise<{ change: DashChange; surface: ChangeSurface } | null> {
   const asked = await loadOne(deps, id);
   if (asked) return { change: asked, surface: 'ask' };
   const queued = await loadOne(deps, id, 'thread');
-  return queued?.kind === 'paid_action' ? { change: queued, surface: 'thread' } : null;
+  return queued?.kind === 'paid_action' || queued?.advisorMessageId ? { change: queued, surface: 'thread' } : null;
 }
 
 /**
@@ -859,7 +860,8 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
   if (!found) return { ok: false, error: GONE, change: null };
   const { change, surface } = found;
   if (change.status !== 'proposed') return { ok: false, error: notProposed(change.status), change };
-  if (!change.turnId) {
+  // One proposed on People hangs from the text it answered, which is kept before the reply starts.
+  if (!change.turnId && !change.advisorMessageId) {
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
   if (change.kind === 'paid_action') return confirmPaid(deps, change, surface);
