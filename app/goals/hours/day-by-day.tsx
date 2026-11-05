@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
@@ -8,12 +9,20 @@ import { formatDay } from '@/lib/goals/dates';
 import { GRID_WEEKS, hoursText, shadeOf, type HoursPage } from '@/lib/goals/hours';
 import { loadHoursDay } from './actions';
 import { DayDrawer, type DayState } from './day-drawer';
+import type { EntryRowDrawn } from './entry-row';
 
 const SHADES = ['bg-sunken', 'bg-accent/25', 'bg-accent/45', 'bg-accent/70', 'bg-accent'] as const;
 const WEEKDAY = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 /** A day drawn open, for the gallery: the day and what its read returned. */
-export type OpenDay = { day: string; state: DayState; logOpen?: boolean; contained?: boolean };
+export type OpenDay = {
+  day: string;
+  state: DayState;
+  logOpen?: boolean;
+  contained?: boolean;
+  /** Entries drawn mid-change or with an error, by id. */
+  drawn?: Record<string, EntryRowDrawn>;
+};
 
 /**
  * The last four weeks, one cell a day, one row per metric and a row for all
@@ -23,7 +32,8 @@ export type OpenDay = { day: string; state: DayState; logOpen?: boolean; contain
  * hours; a table holds the same for a screen reader.
  *
  * Tapping a day, on any row, opens that day's entries in a drawer (plan
- * #2907.2), read each time it opens.
+ * #2907.2), read each time it opens, and again after an entry in it is
+ * changed or undone (plan #2907.3).
  */
 export function DayByDay({
   page,
@@ -38,8 +48,11 @@ export function DayByDay({
 }) {
   const [open, setOpen] = useState<OpenDay | null>(initialOpen ?? null);
 
-  const read = useCallback((day: string) => {
-    setOpen({ day, state: { status: 'loading' } });
+  const router = useRouter();
+  // `quiet` keeps the list in view while it is read again after a change,
+  // rather than blanking it to the loading line.
+  const read = useCallback((day: string, quiet = false) => {
+    if (!quiet) setOpen({ day, state: { status: 'loading' } });
     loadHoursDay(day)
       .catch(() => ({ entries: [], error: 'The hours for this day could not be read.' }))
       .then((result) => {
@@ -55,6 +68,14 @@ export function DayByDay({
         );
       });
   }, []);
+  // A change moves the week bars, the day cells and the charts too.
+  const changed = useCallback(
+    (day: string) => {
+      read(day, true);
+      router.refresh();
+    },
+    [read, router],
+  );
   const close = useCallback(() => setOpen(null), []);
 
   const rows = [
@@ -145,7 +166,9 @@ export function DayByDay({
           state={open.state}
           logOpen={open.logOpen}
           contained={open.contained}
+          drawn={open.drawn}
           onRetry={() => read(open.day)}
+          onChanged={() => changed(open.day)}
           onClose={close}
         />
       )}

@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect } from 'react';
+import { ToastProvider, useToast } from '@/components/ui/toast';
 import type { OpenDay } from '@/app/goals/hours/day-by-day';
 import { HoursView } from '@/app/goals/hours/hours-view';
 import { LogHours } from '@/app/goals/hours/log-hours';
@@ -102,6 +106,23 @@ const DAY_ENTRIES: HoursEntry[] = [
 /** The days each drawn state of the drawer opens on. */
 const OPEN_DAYS = {
   entries: { day: '2026-10-26', state: { status: 'ready', entries: DAY_ENTRIES } },
+  // Change pressed on the first entry: its hours, day and note in place (plan #2907.3).
+  change: {
+    day: '2026-10-26',
+    state: { status: 'ready', entries: DAY_ENTRIES },
+    drawn: { 'e-1': { editing: true } },
+  },
+  // Undo pressed on the half hour of applying: gone from the list, the toast offering it back.
+  undone: {
+    day: '2026-10-26',
+    state: { status: 'ready', entries: DAY_ENTRIES.filter((entry) => entry.id !== 'e-2') },
+  },
+  // An Undo that failed says so under its own row.
+  rowError: {
+    day: '2026-10-26',
+    state: { status: 'ready', entries: DAY_ENTRIES },
+    drawn: { 'e-3': { error: 'That could not be undone. Try again.' } },
+  },
   empty: { day: '2026-10-25', state: { status: 'ready', entries: [] }, logOpen: true },
   loading: { day: '2026-10-26', state: { status: 'loading' } },
   error: {
@@ -109,6 +130,19 @@ const OPEN_DAYS = {
     state: { status: 'error', message: 'The hours for this day could not be read.' },
   },
 } satisfies Record<string, OpenDay>;
+
+function UndoneToast() {
+  const toast = useToast();
+  useEffect(() => {
+    toast({
+      text: '0.5 h off Land your next role',
+      undo: () => undefined,
+      undoLabel: 'Restore',
+      duration: 600_000,
+    });
+  }, [toast]);
+  return null;
+}
 
 export function GoalHoursSurface({
   logOpen = false,
@@ -118,7 +152,7 @@ export function GoalHoursSurface({
   /** A day's drawer drawn open, in one of its states. */
   day?: keyof typeof OPEN_DAYS;
 }) {
-  return (
+  const body = (
     // With a drawer open the page is held to a phone's height and the sheet
     // drawn inside it, so the full-page shot shows what the window shows.
     <div className={day ? 'relative h-[52rem] space-y-4 overflow-hidden' : 'space-y-4'}>
@@ -129,5 +163,13 @@ export function GoalHoursSurface({
         openDay={day ? { ...OPEN_DAYS[day], contained: true } : undefined}
       />
     </div>
+  );
+  return day === 'undone' ? (
+    <ToastProvider>
+      {body}
+      <UndoneToast />
+    </ToastProvider>
+  ) : (
+    body
   );
 }

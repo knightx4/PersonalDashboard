@@ -175,13 +175,9 @@ const ofEight = (value: number | null) => (value === null ? '–' : `${value}/8`
 function WeekByWeek({ page }: { page: HoursPage }) {
   return (
     <Card padding="standard" className="space-y-3">
-      <div className="space-y-0.5">
-        <h2 className="text-ui font-semibold text-ink">Week by week</h2>
-        <p className="text-small text-ink-muted">
-          The full weeks before this one: hours per weekday over the last four, the best of twelve,
-          how many of the last eight reached the aim, and how many in a row up to last week.
-        </p>
-      </div>
+      {/* The column names carry what each counts; the sentence that explained
+          them went (plan #2907.3's critic, law 15). */}
+      <h2 className="text-ui font-semibold text-ink">Week by week</h2>
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="tabular w-full min-w-[22rem] whitespace-nowrap text-small">
           <thead>
@@ -189,9 +185,9 @@ function WeekByWeek({ page }: { page: HoursPage }) {
               <th scope="col" className="py-1 pr-3 font-medium">
                 <span className="sr-only">Metric</span>
               </th>
-              <th scope="col" className="py-1 pr-3 text-right font-medium">Per weekday</th>
+              <th scope="col" className="py-1 pr-3 text-right font-medium">Per day, 4 wk</th>
               <th scope="col" className="py-1 pr-3 text-right font-medium">Last week</th>
-              <th scope="col" className="py-1 pr-3 text-right font-medium">Best</th>
+              <th scope="col" className="py-1 pr-3 text-right font-medium">Best of 12</th>
               <th scope="col" className="py-1 pr-3 text-right font-medium">On aim</th>
               <th scope="col" className="py-1 text-right font-medium">Streak</th>
             </tr>

@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { scrim } from '@/components/ui/popover';
 import { formatWeekday } from '@/lib/goals/dates';
 import { hoursText, type HoursEntry } from '@/lib/goals/hours';
+import { HoursEntryRow, type EntryRowDrawn } from './entry-row';
 
 const noSubscribe = () => () => {};
 
@@ -24,7 +25,8 @@ export type DayState =
  * right on a laptop, so the grid stays in view beside it, as the Quick read's
  * Discuss sheet does. Each entry shows its goal, its hours and what was
  * written; a day with none says so and offers Log hours with the date chip
- * already on that day.
+ * already on that day. Each entry can be changed or undone in place (plan
+ * #2907.3, entry-row.tsx).
  */
 export function DayDrawer({
   day,
@@ -32,8 +34,10 @@ export function DayDrawer({
   earliest,
   state,
   onRetry,
+  onChanged,
   onClose,
   logOpen = false,
+  drawn,
   contained = false,
 }: {
   day: string;
@@ -41,9 +45,13 @@ export function DayDrawer({
   earliest: string;
   state: DayState;
   onRetry: () => void;
+  /** An entry was changed, undone or brought back: read the day again. */
+  onChanged: () => void;
   onClose: () => void;
   /** Draw the empty day's Log hours open, for the gallery. */
   logOpen?: boolean;
+  /** Entries drawn mid-change or with an error, by id, for the gallery. */
+  drawn?: Record<string, EntryRowDrawn>;
   /**
    * Drawn inside the nearest positioned box instead of over the window, for
    * the gallery, whose full-page shots would otherwise cut a window-fixed
@@ -100,7 +108,9 @@ export function DayDrawer({
           </IconButton>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {/* The foot leaves a toast's height on a phone, so the Undo toast never
+            sits over the last entry (plan #2907.3's critic, round 1). */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-32 lg:pb-3">
           {state.status === 'loading' ? (
             <p className="text-ui text-ink-muted" aria-live="polite">
               Reading the day’s hours…
@@ -128,18 +138,15 @@ export function DayDrawer({
           ) : (
             <ul className="divide-y divide-border">
               {state.entries.map((entry) => (
-                <li key={entry.id} className="space-y-0.5 py-2.5 first:pt-0 last:pb-0">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="min-w-0 text-ui font-medium text-ink">{entry.goalTitle}</p>
-                    <p className="tabular shrink-0 text-ui font-semibold text-ink">
-                      {hoursText(entry.hours)}
-                    </p>
-                  </div>
-                  <p className="break-words text-small text-ink-muted">
-                    {entry.stepTitle && <span>{entry.stepTitle}: </span>}
-                    {entry.note}
-                  </p>
-                </li>
+                <HoursEntryRow
+                  key={entry.id}
+                  entry={entry}
+                  day={day}
+                  today={today}
+                  earliest={earliest}
+                  onChanged={onChanged}
+                  drawn={drawn?.[entry.id]}
+                />
               ))}
             </ul>
           )}

@@ -4,6 +4,7 @@ import {
   addProgressEntry,
   loadProgressEntries,
   setProgressEstimate,
+  restoreProgressEntry,
   undoProgressEntry,
   updateProgressEntry,
 } from '@/lib/goals/progress-store';
@@ -20,7 +21,7 @@ function fakeClient(answers: Record<string, { data: unknown; error: null | { mes
     from(table: string) {
       const result = answers[table] ?? { data: null, error: null };
       const query: Record<string, unknown> = {};
-      for (const op of ['select', 'insert', 'update', 'eq', 'is', 'in', 'order']) {
+      for (const op of ['select', 'insert', 'update', 'eq', 'is', 'not', 'in', 'order']) {
         query[op] = (...args: unknown[]) => {
           calls.push({ table, op, args });
           return query;
@@ -176,6 +177,18 @@ describe('undoProgressEntry', () => {
   it('says so when there was nothing left to undo', async () => {
     const { client } = fakeClient({ progress_entries: { data: [], error: null } });
     expect(await undoProgressEntry(client, 'e1')).toBe(false);
+  });
+
+  it('brings back an undone entry, and only an undone one', async () => {
+    const { client, calls } = fakeClient({ progress_entries: { data: [{ id: 'e1' }], error: null } });
+    expect(await restoreProgressEntry(client, 'e1')).toBe(true);
+    expect(calls).toContainEqual({ table: 'progress_entries', op: 'update', args: [{ undone_at: null }] });
+    expect(calls).toContainEqual({ table: 'progress_entries', op: 'not', args: ['undone_at', 'is', null] });
+  });
+
+  it('says so when there was nothing to bring back', async () => {
+    const { client } = fakeClient({ progress_entries: { data: [], error: null } });
+    expect(await restoreProgressEntry(client, 'e1')).toBe(false);
   });
 });
 

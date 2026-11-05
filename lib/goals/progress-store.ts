@@ -121,6 +121,21 @@ export async function undoProgressEntry(client: GoalsSupabaseClient, id: string)
 }
 
 /**
+ * Bring back an entry that was undone, for the Restore an Undo offers
+ * (plan #2907.3). False when there is no such entry or it is not undone.
+ */
+export async function restoreProgressEntry(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('progress_entries')
+    .update({ undone_at: null })
+    .eq('id', id)
+    .not('undone_at', 'is', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
  * Change a logged entry in place (plan #2907.1): its text, amount, unit or
  * day. The result says what happened: `changed`, `gone` (no such entry, or
  * it was undone, or its step or goal is archived), or `refused` with the

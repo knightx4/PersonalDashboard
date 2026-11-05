@@ -5366,6 +5366,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalHoursSurface day="entries" />,
   },
   {
+    /* Change pressed on an entry in a day's drawer: hours, day and note in place (plan #2907.3). */
+    id: 'goals-hours-day-change',
+    label: 'Goals · Hours, changing an entry',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="change" />,
+  },
+  {
+    /* Undo pressed on an entry: gone from the day, the toast offering it back. */
+    id: 'goals-hours-day-undone',
+    label: 'Goals · Hours, an entry undone',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="undone" />,
+  },
+  {
+    /* An Undo that failed, said under its own row. */
+    id: 'goals-hours-day-row-error',
+    label: 'Goals · Hours, an entry that could not be undone',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="rowError" />,
+  },
+  {
     /* A day with nothing logged: the drawer's empty state, Log hours on that day. */
     id: 'goals-hours-day-empty',
     label: 'Goals · Hours, a day with nothing logged',

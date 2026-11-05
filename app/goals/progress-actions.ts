@@ -5,7 +5,11 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { undoProgressEntry, updateProgressEntry } from '@/lib/goals/progress-store';
+import {
+  restoreProgressEntry,
+  undoProgressEntry,
+  updateProgressEntry,
+} from '@/lib/goals/progress-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
@@ -66,5 +70,23 @@ export async function undoLoggedProgress(id: string): Promise<ProgressEntryState
     return { ok: true };
   } catch {
     return { error: 'That could not be undone. Try again.' };
+  }
+}
+
+/** Bring back an entry just undone, from the toast's Undo (plan #2907.3). */
+// latency: pending
+export async function restoreLoggedProgress(id: string): Promise<ProgressEntryState> {
+  await requireUser();
+  const parsed = z.string().uuid().safeParse(id);
+  if (!parsed.success) return { error: 'Could not tell which entry that was.' };
+  try {
+    const client = await createGoalsClient();
+    if (!(await restoreProgressEntry(client, parsed.data))) {
+      return { error: 'That entry is gone or was already brought back.' };
+    }
+    refresh();
+    return { ok: true };
+  } catch {
+    return { error: 'That could not be brought back. Try again.' };
   }
 }

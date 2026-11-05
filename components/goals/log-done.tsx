@@ -329,7 +329,7 @@ function LoggedLines({
  * reaches it as a date field; drawn as itself it printed "25/10/2026" beside
  * a second calendar of its own (plan #2907.2's critic, round 1).
  */
-function DayChip({
+export function DayChip({
   day,
   today,
   earliest,
