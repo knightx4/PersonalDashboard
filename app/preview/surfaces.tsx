@@ -5366,6 +5366,62 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalHoursSurface logOpen />,
   },
   {
+    /* A day tapped in Day by day: its entries in the drawer (plan #2907.2). */
+    id: 'goals-hours-day',
+    label: 'Goals · Hours, a day opened',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="entries" />,
+  },
+  {
+    /* Change pressed on an entry in a day's drawer: hours, day and note in place (plan #2907.3). */
+    id: 'goals-hours-day-change',
+    label: 'Goals · Hours, changing an entry',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="change" />,
+  },
+  {
+    /* Undo pressed on an entry: gone from the day, the toast offering it back. */
+    id: 'goals-hours-day-undone',
+    label: 'Goals · Hours, an entry undone',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="undone" />,
+  },
+  {
+    /* An Undo that failed, said under its own row. */
+    id: 'goals-hours-day-row-error',
+    label: 'Goals · Hours, an entry that could not be undone',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="rowError" />,
+  },
+  {
+    /* A day with nothing logged: the drawer's empty state, Log hours on that day. */
+    id: 'goals-hours-day-empty',
+    label: 'Goals · Hours, a day with nothing logged',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="empty" />,
+  },
+  {
+    /* The drawer while the day's entries are read. */
+    id: 'goals-hours-day-loading',
+    label: 'Goals · Hours, a day loading',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="loading" />,
+  },
+  {
+    /* The drawer when the day's entries could not be read. */
+    id: 'goals-hours-day-error',
+    label: 'Goals · Hours, a day that could not be read',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalHoursSurface day="error" />,
+  },
+  {
     id: 'goals-metrics-tooltip',
     label: 'Goals · Metrics, a bar hovered',
     module: 'goals',
