@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron } from '@/inngest/cron/authorize';
 import { runStepDone } from '@/inngest/goals/step-done-notify';
+import { runTakeOnReport } from '@/inngest/goals/take-on-report';
 
 // A few reads and one notification per step closed; no model is called.
 export const maxDuration = 60;
@@ -23,7 +24,10 @@ async function run(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   try {
-    return NextResponse.json({ ok: true, ...(await runStepDone()) });
+    // Beside it, the report on each question handed to a goal that ended
+    // (plan #2778.8): a notification, and a reply line in Ask Dash.
+    const [steps, questions] = await Promise.all([runStepDone(), runTakeOnReport()]);
+    return NextResponse.json({ ok: true, ...steps, questions });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'failed' },

@@ -98,6 +98,8 @@ export function laterLane(input: {
   goals: readonly GoalRef[];
   byGoal: ReadonlyMap<string, readonly StepNode[]>;
   today: string;
+  /** Plan #2778.6: leaves out a step the goal's plan keeps under Later. */
+  showsOutside?: (node: StepNode) => boolean;
 }): LaterLaneItem[] {
   const out: LaterLaneItem[] = [];
   for (const { goal } of input.goals) {
@@ -106,6 +108,7 @@ export function laterLane(input: {
       for (const node of list) {
         if (node.status === 'proposed' || !isLive(node)) continue;
         if (node.startsOn && node.startsOn > input.today) {
+          if (input.showsOutside && !input.showsOutside(node)) continue;
           out.push({
             id: node.id,
             title: node.title,

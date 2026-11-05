@@ -2,8 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { besideLine } from '@/lib/learn/map/next-topics';
 import { describeDepth, type Depth } from './depth';
 import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
@@ -519,55 +520,52 @@ export async function writeCard(input: {
       model: WRITE_CARD_MODEL,
       max_tokens: 6144 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report whether the section serves what it was picked for, and a card for each of its ideas.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              fit: {
-                type: 'string',
-                description:
-                  'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
-              },
-              matches: { type: 'boolean' },
-              ideas: {
-                type: 'array',
-                description: `One card per idea, as a list of objects, most important first, at most ${MAX_IDEAS}. An empty list when it does not match.`,
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: ideaPart(`The idea in two to six words, as a title. At most ${MAX_NAME_CHARS} characters.`),
-                    claim: ideaPart(`The idea as one plain sentence. At most ${MAX_TAKEAWAY_CHARS} characters.`),
-                    context: ideaPart(`Only the terms and facts this claim needs, in two or three sentences. At most ${MAX_CONTEXT_CHARS} characters.`),
-                    evidence: ideaPart(`The single strongest support from the section: a number, a case or a result, in one or two sentences. At most ${MAX_HOOK_CHARS} characters.`),
-                    why: ideaPart(`Why the claim holds, in two or three sentences. At most ${MAX_SUMMARY_CHARS} characters.`),
-                    example: ideaPart(`The idea applied to one specific case or a worked number. At most ${MAX_EXAMPLE_CHARS} characters.`),
-                    question: ideaPart(`One question that makes them use the idea. At most ${MAX_QUESTION_CHARS} characters.`),
-                    answer: ideaPart(`The answer, with why, in two or three sentences. At most ${MAX_ANSWER_CHARS} characters.`),
-                    mentions: {
-                      type: 'array',
-                      description: `Up to ${MAX_MENTIONS} other ideas the card leans on, each in words copied exactly from the card.`,
-                      items: {
-                        type: 'object',
-                        properties: {
-                          phrase: { type: 'string', description: 'The words exactly as the card has them.' },
-                          why: { type: 'string', description: 'One plain line on why it matters to this card.' },
-                        },
-                        required: ['phrase', 'why'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report whether the section serves what it was picked for, and a card for each of its ideas.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            fit: {
+              type: 'string',
+              description:
+                'One sentence on what the section covers and whether it serves what it was picked for at that depth.',
+            },
+            matches: { type: 'boolean' },
+            ideas: {
+              type: 'array',
+              description: `One card per idea, as a list of objects, most important first, at most ${MAX_IDEAS}. An empty list when it does not match.`,
+              items: {
+                type: 'object',
+                properties: {
+                  name: ideaPart(`The idea in two to six words, as a title. At most ${MAX_NAME_CHARS} characters.`),
+                  claim: ideaPart(`The idea as one plain sentence. At most ${MAX_TAKEAWAY_CHARS} characters.`),
+                  context: ideaPart(`Only the terms and facts this claim needs, in two or three sentences. At most ${MAX_CONTEXT_CHARS} characters.`),
+                  evidence: ideaPart(`The single strongest support from the section: a number, a case or a result, in one or two sentences. At most ${MAX_HOOK_CHARS} characters.`),
+                  why: ideaPart(`Why the claim holds, in two or three sentences. At most ${MAX_SUMMARY_CHARS} characters.`),
+                  example: ideaPart(`The idea applied to one specific case or a worked number. At most ${MAX_EXAMPLE_CHARS} characters.`),
+                  question: ideaPart(`One question that makes them use the idea. At most ${MAX_QUESTION_CHARS} characters.`),
+                  answer: ideaPart(`The answer, with why, in two or three sentences. At most ${MAX_ANSWER_CHARS} characters.`),
+                  mentions: {
+                    type: 'array',
+                    description: `Up to ${MAX_MENTIONS} other ideas the card leans on, each in words copied exactly from the card.`,
+                    items: {
+                      type: 'object',
+                      properties: {
+                        phrase: { type: 'string', description: 'The words exactly as the card has them.' },
+                        why: { type: 'string', description: 'One plain line on why it matters to this card.' },
                       },
+                      required: ['phrase', 'why'],
                     },
                   },
-                  required: ['name', 'claim', 'context', 'evidence', 'why', 'example', 'question', 'answer', 'mentions'],
                 },
+                required: ['name', 'claim', 'context', 'evidence', 'why', 'example', 'question', 'answer', 'mentions'],
               },
             },
-            required: ['fit', 'matches', 'ideas'],
           },
+          required: ['fit', 'matches', 'ideas'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, WRITE_CARD_MODEL),
+      }, WRITE_CARD_MODEL),
       messages: [{ role: 'user', content: cardPrompt(card) }],
     });
   } catch (error) {
@@ -582,13 +580,11 @@ export async function writeCard(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: WRITE_CARD_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use')
-    return { outcome: 'dropped', reason: whyNoReport(response) };
+  const reportRead = readReport(response, TOOL_NAME, WRITE_CARD_MODEL);
+  if (!reportRead.ok)
+    return { outcome: 'dropped', reason: reportRead.reason };
 
-  const report = readCardReport(block.input);
+  const report = readCardReport(reportRead.value);
   if (report.verdict === 'dropped') return { outcome: 'dropped', reason: report.reason };
   const keep = Math.max(1, Math.min(card.maxIdeas ?? MAX_IDEAS, MAX_IDEAS));
   return { outcome: 'ready', ideas: report.ideas.slice(0, keep), why: whyLine(card) };

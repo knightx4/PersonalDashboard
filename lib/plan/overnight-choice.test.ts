@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import {
   chooseOvernightFeature,
+  finishedFeatures,
+  isFinishedFeature,
   OVERNIGHT_NOTHING_READY,
   readyFeatureCount,
   readyFeaturesLine,
@@ -337,5 +339,48 @@ describe('readyFeaturesLine', () => {
   it('agrees with itself about one and about many', () => {
     expect(readyFeaturesLine(1)).toBe('1 feature ready');
     expect(readyFeaturesLine(4)).toBe('4 features ready');
+  });
+});
+
+describe('finished features', () => {
+  it('counts a feature whose steps are done or dropped, with at least one done', () => {
+    const sections = tree([
+      item({ id: 'f' }),
+      item({ id: 'a', parentId: 'f', status: 'done', commitSha: 'old', completedAt: '2026-11-01T21:00:00Z' }),
+      item({ id: 'b', parentId: 'f', status: 'dropped' }),
+      item({ id: 'c', parentId: 'f', status: 'done', commitSha: 'new', completedAt: '2026-11-01T22:00:00Z' }),
+    ]);
+    expect(finishedFeatures(sections)).toMatchObject([{ id: 'f', commitSha: 'new' }]);
+    expect(runnerOrder(sections).map((n) => n.id)).toEqual([]);
+  });
+
+  it('leaves out a feature with an open step, one with every step dropped, and a bare feature', () => {
+    const open = { status: 'not_started' as const, dismissedAt: null };
+    expect(isFinishedFeature({ ...open, children: [{ status: 'done', dismissedAt: null }, open] })).toBe(false);
+    expect(isFinishedFeature({ ...open, children: [{ status: 'dropped', dismissedAt: null }] })).toBe(false);
+    expect(isFinishedFeature({ ...open, children: [] })).toBe(false);
+    expect(isFinishedFeature({ status: 'done', dismissedAt: null, children: [{ status: 'done', dismissedAt: null }] })).toBe(false);
+  });
+
+  it('ignores a dismissed step when judging', () => {
+    expect(
+      isFinishedFeature({
+        status: 'not_started',
+        dismissedAt: null,
+        children: [
+          { status: 'done', dismissedAt: null },
+          { status: 'not_started', dismissedAt: '2026-11-01T00:00:00Z' },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it('lists a finished sub-feature before the feature above it', () => {
+    const sections = tree([
+      item({ id: 'top' }),
+      item({ id: 'sub', parentId: 'top' }),
+      item({ id: 'leaf', parentId: 'sub', status: 'done', commitSha: 'x' }),
+    ]);
+    expect(finishedFeatures(sections).map((f) => f.id)).toEqual(['sub']);
   });
 });

@@ -812,9 +812,9 @@ async function addItems(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade
 
 const ORDERS = 'public.orders';
 const orderHref = (id: string) => `/shopping/orders/${id}`;
-const REVIEW_HREF = '/shopping/review';
+const REVIEW_HREF = '/shopping/orders/review';
 /** The pages an order change shows on, as the order and review actions revalidate them. */
-const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/finances/spending', '/shopping/review', '/shopping/settings'];
+const ORDER_PATHS = ['/shopping/orders', '/shopping/inventory', '/finances/spending', '/shopping/orders/review', '/shopping/settings'];
 /** One selection's worth of review rows, as the queue's bulk bar takes. */
 export const REVIEW_MAX = 100;
 const MESSAGE_KEYS = ['parse_status', 'resulting_order_id', 'error'] as const;
@@ -1409,7 +1409,7 @@ async function attachEmail(env: ShoppingWriteEnv, args: Args): Promise<ShoppingM
       rest: ` to ${title}`,
       href: orderHref(orderId),
       where: 'Open the order',
-      paths: [...ORDER_PATHS, '/shopping/returns', orderHref(orderId)],
+      paths: [...ORDER_PATHS, '/shopping/inventory/returns', orderHref(orderId)],
     },
     subjectRef: toRef(ORDERS, orderId),
     op: 'update',
@@ -1767,7 +1767,7 @@ async function changeRecurring(env: ShoppingWriteEnv, args: Args): Promise<Shopp
 
 const POLICIES_HREF = '/shopping/settings';
 /** Every page that reads a return window, as Shopping's settings refresh them. */
-const POLICY_PATHS = ['/shopping/settings', '/shopping/returns', '/shopping/inventory', '/shopping/orders', '/finances/spending'];
+const POLICY_PATHS = ['/shopping/settings', '/shopping/inventory/returns', '/shopping/inventory', '/shopping/orders', '/finances/spending'];
 const windowWords = (days: unknown) => (typeof days === 'number' ? `a ${days}-day return window` : 'no return window');
 
 async function returnWindow(env: ShoppingWriteEnv, args: Args): Promise<ShoppingMade> {

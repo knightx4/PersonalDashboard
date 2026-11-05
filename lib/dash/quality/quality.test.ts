@@ -16,6 +16,19 @@ describe('grading an answer', () => {
     expect(gradeAnswer(expect_, answered('You applied to one role at Northwind.'))).toEqual([]);
   });
 
+  it('fails a case whose answer never made the call it names, or had every one refused', () => {
+    const expect_ = parseExpect({ calls_all: ['draft_application_answers'] });
+    const drafted = answered('Queued drafts for 16 leads.', {
+      toolCalls: [{ name: 'draft_application_answers', input: {}, result: { ok: true, rows: [] } }],
+    });
+    expect(gradeAnswer(expect_, drafted)).toEqual([]);
+    expect(gradeAnswer(expect_, answered('Press Draft on each role.'))).toEqual(['The answer never called draft_application_answers.']);
+    const refused = answered('I could not.', {
+      toolCalls: [{ name: 'draft_application_answers', input: {}, result: { ok: false, error: 'no' } }],
+    });
+    expect(gradeAnswer({ ...expect_, allow_failed_lookups: true }, refused)).toEqual(['Every call to draft_application_answers was refused.']);
+  });
+
   it('counts a name as shown when it is only in a cited row', () => {
     expect(gradeAnswer(parseExpect({ mentions_all: ['Strategy Lead'] }), answered('One role.'))).toEqual([]);
   });
@@ -154,6 +167,7 @@ describe('a run', () => {
       turns: async () => [],
       spend: async () => [],
       connectorCalls: async () => [],
+      failures: async () => [],
       start: async () => 'run-1',
       finish: async (_id, row) => {
         finished.push(row);
@@ -190,6 +204,24 @@ describe('a run', () => {
     const summary = await runDashQuality(threw.port, { trigger: 'manual', deploy: null });
     expect(summary.passed).toBe(0);
     expect(threw.notes[0]).toContain('The run threw: overloaded');
+  });
+
+  it('asks a think case with Think it through on, and holds a long answer to its length', async () => {
+    const asked: (boolean | undefined)[] = [];
+    const think = ports({
+      cases: async () => [
+        { id: 't1', question: 'think deep on this', expect: { min_chars: 100, mentions_all: ['form'] }, think: true },
+        { id: 't2', question: 'an everyday question', expect: {} },
+      ],
+      ask: async (_user, question, _advisor, thinking) => {
+        asked.push(thinking);
+        return { outcome: answered(question.startsWith('think') ? 'The edit form. '.repeat(3) : 'Fine.'), costMicros: 1 };
+      },
+    });
+    const summary = await runDashQuality(think.port, { trigger: 'manual', deploy: null });
+    expect(asked).toEqual([true, false]);
+    expect(summary.passed).toBe(1);
+    expect(think.notes[0]).toContain('characters, fewer than the 100');
   });
 
   it('still reports the day when the cases cannot be read', async () => {

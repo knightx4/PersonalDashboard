@@ -81,12 +81,22 @@ export function LaterMenu({
   label,
   onChoose,
   compact = false,
+  word = LATER,
+  outlined = false,
 }: {
   /** What the row is, for the control's accessible name. */
   label: string;
   onChoose: (choice: string) => void;
   /** The clock alone, for a row of icon controls; the word beside it otherwise. */
   compact?: boolean;
+  /**
+   * The trigger's word. Later everywhere a row is put off, except under a
+   * section already headed Later, where the goal Plan tab's Now step says
+   * Not now as its approved mockup does (plan #2778.12).
+   */
+  word?: string;
+  /** A small outlined button with the word alone, to sit beside Done as its second choice. */
+  outlined?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
 
@@ -105,18 +115,22 @@ export function LaterMenu({
 
   const menu = (
     <ActionMenu
-      label={`${LATER}: ${label}`}
+      label={`${word}: ${label}`}
       align="end"
       triggerClassName={
-        compact ? undefined : cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-auto')
+        compact
+          ? undefined
+          : cn(buttonVariants({ variant: outlined ? 'secondary' : 'ghost', size: 'sm' }), 'w-auto')
       }
       trigger={
         compact ? (
           <StatusGlyph glyph={LIFECYCLE_GLYPH.later} size={16} />
+        ) : outlined ? (
+          <span>{word}</span>
         ) : (
           <span className="inline-flex items-center gap-1">
             <StatusGlyph glyph={LIFECYCLE_GLYPH.later} />
-            <span>{LATER}</span>
+            <span>{word}</span>
             <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
           </span>
         )
@@ -126,7 +140,7 @@ export function LaterMenu({
   );
 
   return compact ? (
-    <Tooltip label={LATER} align="end" className="flex">
+    <Tooltip label={word} align="end" className="flex">
       {menu}
     </Tooltip>
   ) : (

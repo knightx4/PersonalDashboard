@@ -11,7 +11,7 @@ import { AskDashProvider, AskThread, type AskSource } from '@/components/shell/a
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/ask',
+  usePathname: () => '/chat/dash',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));

@@ -8,6 +8,7 @@ import {
   offAreaFrom,
   strayAreas,
   strayTextAreas,
+  subjectLensFor,
   territorySources,
   textsFor,
   topicsLeft,
@@ -127,6 +128,14 @@ describe('the business territory (plan #2483.2)', () => {
       expect(TERRITORIES[key]).toBeDefined();
       expect(BUSINESS.areas).not.toContain(name);
     }
+  });
+
+  it('puts each area under a subject of its own, never the missing Business subject (plan #2489)', () => {
+    for (const name of BUSINESS.areas ?? []) expect(subjectLensFor(BUSINESS, name)).not.toBe(BUSINESS.subjectLens);
+    expect(subjectLensFor(BUSINESS, 'banking')).toBe('Financial services industry landscape');
+    expect(Object.keys(BUSINESS.areaLenses ?? {}).filter((a) => !BUSINESS.areas?.includes(a))).toEqual([]);
+    expect(subjectLensFor(BUSINESS)).toBe(BUSINESS.subjectLens);
+    expect(subjectLensFor(SAAS_METRICS, 'anything')).toBe(SAAS_METRICS.subjectLens);
   });
 
   it('shares no ask with the SaaS metrics territory', () => {

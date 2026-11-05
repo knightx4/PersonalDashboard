@@ -45,7 +45,7 @@ export function MadeChanges({
                   </time>
                   {', from '}
                   <Link
-                    href={`/ask/${change.conversationId}`}
+                    href={`/chat/dash/${change.conversationId}`}
                     className={linkVariants({ tone: 'quiet' })}
                   >
                     {change.question ?? 'a question'}

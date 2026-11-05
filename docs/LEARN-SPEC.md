@@ -508,3 +508,10 @@ vault after slice 5, not in this document.
 you can demonstrate. A reading queue and a set of notes about what you learned
 is a different claim about yourself and plausibly feeds the same drafting. Not
 a slice, just a place these two will meet.
+
+## Rules
+
+**R1.** Nothing outside `lib/learn/providers` fetches an external URL. A fetch
+anywhere else in Learn skips the public-address check, the redirect cap and the
+size cap that section describes.
+Checked by: audit.

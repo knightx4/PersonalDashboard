@@ -14,7 +14,7 @@ vi.mock('@/inngest/core/day-brief', () => ({ pushPorts: vi.fn() }));
 
 const { runBoardDueWith } = await import('@/inngest/you/board-due');
 
-describe('one pass of the board notification', () => {
+describe('one pass of the council notification', () => {
   const rows = [
     {
       id: 'q1',

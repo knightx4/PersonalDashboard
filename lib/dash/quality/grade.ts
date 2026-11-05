@@ -20,12 +20,16 @@ export type CaseExpect = {
   mentions_none?: string[];
   /** At least one cited row's title must contain one of these. */
   cites_any?: string[];
+  /** The answer must run to at least this many characters: a long answer that fails is caught. */
+  min_chars?: number;
   /** The most lookups the answer may take. */
   max_lookups?: number;
   /** The most seconds the answer may take. */
   max_seconds?: number;
   /** True when a failed lookup is expected and the answer is graded on its words alone. */
   allow_failed_lookups?: boolean;
+  /** Tools the answer must have called, each at least once and without a refusal. */
+  calls_all?: string[];
 };
 
 /** What one run of a case gave back. */
@@ -67,9 +71,11 @@ export function parseExpect(raw: unknown): CaseExpect {
     mentions_any: parsedList(r.mentions_any),
     mentions_none: parsedList(r.mentions_none),
     cites_any: parsedList(r.cites_any),
+    min_chars: parsedNumber(r.min_chars),
     max_lookups: parsedNumber(r.max_lookups),
     max_seconds: parsedNumber(r.max_seconds),
     allow_failed_lookups: r.allow_failed_lookups === true,
+    calls_all: parsedList(r.calls_all),
   };
 }
 
@@ -120,6 +126,11 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   const skipped = skippedLookups(outcome.toolCalls);
   if (skipped > 0) failures.push(`${skipped} lookup${skipped === 1 ? ' was' : 's were'} refused at a limit.`);
 
+  for (const name of expect.calls_all ?? []) {
+    const made = outcome.toolCalls.filter((call) => call.name === name);
+    const worked = made.some((call) => (call.result as { ok?: unknown } | undefined)?.ok !== false);
+    if (!worked) failures.push(made.length === 0 ? `The answer never called ${name}.` : `Every call to ${name} was refused.`);
+  }
   for (const text of expect.mentions_all ?? []) {
     if (!shown(text)) failures.push(`The answer does not mention "${text}".`);
   }
@@ -131,6 +142,9 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   }
   if (expect.cites_any && !expect.cites_any.some((t) => cited.some((title) => title.includes(t.toLowerCase())))) {
     failures.push(`No cited row matches ${expect.cites_any.map((t) => `"${t}"`).join(', ')}.`);
+  }
+  if (expect.min_chars !== undefined && body.length < expect.min_chars) {
+    failures.push(`The answer is ${body.length} characters, fewer than the ${expect.min_chars} it should run to.`);
   }
   const lookups = outcome.toolCalls.length;
   if (expect.max_lookups !== undefined && lookups > expect.max_lookups) {

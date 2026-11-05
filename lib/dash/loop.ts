@@ -3,7 +3,8 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { whyNoReport } from '@/lib/learn/graph/tool-call';
+import { forceTool, requestShape, systemMessage } from '@/lib/core/model-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { LOOKUP_NOT_RUN, MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
@@ -34,7 +35,7 @@ import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
  * naming a row can only name a row a lookup returned, as citations do.
  *
  * Three limits stop the looking, and when one is reached the next call is
- * made to answer with what it has: eight lookups, an input token budget, and
+ * made to answer with what it has: MAX_LOOKUPS lookups, an input token budget, and
  * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
  *
@@ -91,8 +92,11 @@ export const FALLBACK_ROWS = 25;
 
 export const ANSWER_TOOL = 'answer';
 
-const ANSWER: Anthropic.Tool = {
+// Strict, so its input always matches the schema. Widened: the installed
+// SDK's types predate `strict`.
+const ANSWER = {
   name: ANSWER_TOOL,
+  strict: true,
   description:
     'Give the person your answer. Call this once you have what you need, or once the lookups show the data cannot answer the question. It ends your turn.',
   input_schema: {
@@ -122,7 +126,7 @@ const ANSWER: Anthropic.Tool = {
     required: ['answer', 'cited'],
     additionalProperties: false,
   },
-};
+} as Anthropic.Tool;
 
 export const ACKNOWLEDGE_TOOL = 'acknowledge';
 
@@ -192,6 +196,13 @@ export type DashVoice = {
   acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
+  /**
+   * How hard the model thinks, sent as `output_config.effort` (plan
+   * #2789.10, Ask's "Think it through"). Absent: the model's own default.
+   */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Time spent looking before it must answer; TIME_BUDGET_MS when absent. */
+  timeBudgetMs?: number;
 };
 
 /** Where the conversation is happening. */
@@ -298,10 +309,16 @@ export const LOOK_FIRST =
   'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, query_rows filters and counts one, including by whether rows of another table are linked to each (table_info names its columns and links), search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
 
 /**
- * Said to the model when it ended its turn with no answer and no text, before
- * the last call, which allows no tool.
+ * Appended as a system message when the model ended its turn with no answer
+ * and no text (plan #2937.1). Opus 5.5 and Sonnet 5.5 write text longer than a
+ * sentence or two as a progress note in a thinking block, which the person
+ * never sees: on 4 November an answer of 7,350 tokens went that way. The
+ * empty turn is not sent back, since read there the model takes it as an
+ * answer already given and writes almost nothing.
  */
-const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them now, in words, from what you have found.';
+export function hiddenText(finishName: string): string {
+  return `Nothing you wrote reached them: text written outside a tool call is not shown to the person. They see only what you give through ${finishName}. Give your answer through ${finishName} now, from what you have found.`;
+}
 
 /**
  * Sent beside the refused lookups when the model was told to answer and
@@ -309,7 +326,27 @@ const WRITE_IT_OUT = 'Nothing you wrote reached them. Write your answer to them 
  * them came back with a single token and no words (the Northwind question,
  * 21 October 2026).
  */
-const ANSWER_IN_WORDS = 'Write your answer to them now, in words, from what you have found. Say plainly what you could not check.';
+function answerNow(finishName: string): string {
+  return `Give your answer through ${finishName} now, from what you have found. Say plainly what you could not check.`;
+}
+
+/**
+ * Said under an answer kept from the model's progress notes, when it wrote
+ * its answer out of sight twice and only the notes' summaries came back.
+ */
+export const NOTES_ONLY =
+  'This is a summary of my answer: the full answer did not come through. Ask again for all of it.';
+
+/**
+ * The summaries of the progress notes in a reply, in order, one paragraph
+ * each: the text of its thinking blocks, which is empty unless the request
+ * asked for `display: "updates"`.
+ */
+export function progressNotes(content: readonly { type: string; thinking?: unknown }[]): string {
+  return content
+    .flatMap((block) => (block.type === 'thinking' && typeof block.thinking === 'string' && block.thinking.trim() ? [block.thinking.trim()] : []))
+    .join('\n\n');
+}
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = LOOKUP_NOT_RUN;
@@ -368,6 +405,22 @@ export type DashLookupEvent =
   | { phase: 'finished'; id: string; index: number; name: string; input: unknown; ok: boolean; result: unknown };
 
 export type { DashSeen } from './sets';
+
+/**
+ * One model call as it came back (plan #2937.2), for the record a failed
+ * answer keeps in core.dash_failures: why it stopped, which kinds of block
+ * it held, and its tokens. `error` is set, and the rest empty, when the call
+ * threw.
+ */
+export type DashCall = {
+  stop: string | null;
+  blocks: string[];
+  outputTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+  error?: string;
+};
 
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type DashExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
@@ -466,15 +519,23 @@ export function withNewestFiles(
   return [...messages.slice(0, -1), { role: 'user', content: [...fileBlocks(files), ...words] }];
 }
 
-/** Moves the one rolling cache breakpoint onto the newest tool results. */
+/**
+ * Moves the one rolling cache breakpoint onto the newest tool results, or the
+ * words sent after them in the same message. A system message appended after them (hiddenText) is
+ * passed over, so the request that carries it still reads the history from
+ * the cache.
+ */
 function withRollingBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
-  const last = messages[messages.length - 1];
-  if (!last || typeof last.content === 'string' || last.content.length === 0) return messages;
+  let at = messages.length - 1;
+  if (at > 0 && (messages[at].role as string) === 'system') at--;
+  const last = messages[at];
+  if (!last || last.role !== 'user' || typeof last.content === 'string' || last.content.length === 0) return messages;
   const blocks = [...last.content];
   const tail = blocks[blocks.length - 1];
-  if (tail.type !== 'tool_result') return messages;
+  const afterResults = tail.type === 'text' && blocks.some((block) => block.type === 'tool_result');
+  if (tail.type !== 'tool_result' && !afterResults) return messages;
   blocks[blocks.length - 1] = { ...tail, cache_control: { type: 'ephemeral' } };
-  return [...messages.slice(0, -1), { ...last, content: blocks }];
+  return [...messages.slice(0, at), { ...last, content: blocks }, ...messages.slice(at + 1)];
 }
 
 /**
@@ -668,11 +729,10 @@ export function answerSoFar(partial: string): string {
 
 /**
  * One call to the model. With `onText`, streamed: the answer's text is handed
- * out as the model writes it, from the `answer` call's input or, on the last
- * call that may not use a tool, from its prose (plan #1902). The answer tool
- * is sent with eager input streaming, since otherwise the API holds its
- * whole `answer` field back until it is written. Without `onText`, one
- * request, as before.
+ * out as the model writes it, from the `answer` call's input (plan #1902).
+ * The answer tool is sent with eager input streaming, since otherwise the API
+ * holds its whole `answer` field back until it is written. Without `onText`,
+ * one request, as before. `beta` names the beta headers the request needs.
  */
 async function callModel(
   client: Anthropic,
@@ -680,8 +740,10 @@ async function callModel(
   onText: ((piece: string) => void) | undefined,
   finishName: string,
   signal: AbortSignal | undefined,
+  beta: readonly string[] = [],
 ): Promise<Anthropic.Message> {
-  const options = signal ? { signal } : undefined;
+  const headers = beta.length > 0 ? { headers: { 'anthropic-beta': beta.join(',') } } : {};
+  const options = signal || beta.length > 0 ? { ...(signal ? { signal } : {}), ...headers } : undefined;
   if (!onText) return client.messages.create(params, options);
   const tools = params.tools?.map((tool) =>
     'name' in tool && tool.name === finishName && !('type' in tool && tool.type)
@@ -706,8 +768,6 @@ async function callModel(
         const json = answering.get(event.index)! + event.delta.partial_json;
         answering.set(event.index, json);
         tell(answerSoFar(json));
-      } else if (event.delta.type === 'text_delta' && params.tool_choice?.type === 'none') {
-        tell(told + event.delta.text);
       }
     }
   });
@@ -727,6 +787,12 @@ export type DashRun = {
   files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
+  /**
+   * System text that changes from one answer to the next, sent after the
+   * date and outside the cache: a mentor's memory and the person's day
+   * (plan #2748.4), while the voice's system holds what stays the same.
+   */
+  contextBlocks?: readonly string[];
   execute: DashExecutor;
   /** Absent: every proposal is refused. */
   propose?: DashProposer;
@@ -749,6 +815,8 @@ export type DashRun = {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** Hears each model call as it came back (plan #2937.2). Whatever it throws is ignored. */
+  onCall?: (call: DashCall) => void;
   /** For tests: the clock the time budget reads. */
   now?: () => number;
   /** Hears each call start and finish. Whatever it throws is ignored. */
@@ -780,6 +848,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const tools = voiceTools(voice);
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
+  const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
+  // Effort, and on a model that writes longer text as a progress note the
+  // display that returns its summary (plan #2937.1), from the model's rules
+  // (lib/core/model-rules.ts, plan #2937.3).
+  const { effort, thinking, beta } = requestShape(model, voice.effort);
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
   // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
@@ -834,6 +907,13 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
+  };
+  const heardCall = (call: DashCall) => {
+    try {
+      input.onCall?.(call);
+    } catch (error) {
+      console.error('ask call listener failed', error);
+    }
   };
   const noteLookup = (result: AskToolResult) => {
     lastError = result.ok ? null : result.error.replace(/\s+/g, ' ').trim().slice(0, 200);
@@ -903,6 +983,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
   if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
+  for (const text of input.contextBlocks ?? []) if (text.trim()) system.push({ type: 'text', text });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
@@ -949,21 +1030,29 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   let asked = false;
   // Set once a refusal made before any lookup has been sent back (LOOK_FIRST).
   let pushedBack = false;
+  // Set once an empty turn has been asked again (hiddenText).
+  let reasked = false;
+  // Set once lookups made where an answer was due have been refused.
+  let refused = false;
+  // The longest set of progress notes an empty turn came back with.
+  let notes = '';
   const canLook = voice.tools.some((tool) => tool.kind === 'lookup');
+  const lastRound = MAX_LOOKUPS + 1;
 
   // Each round either answers or makes at least one lookup, and the lookups
-  // are capped, so this ends; the bound is a second guard.
-  for (let round = 0; round <= MAX_LOOKUPS + 1; round++) {
+  // are capped, so this ends; the bound is a second guard, with room for the
+  // one re-ask and the one refusal.
+  for (let round = 0; round <= lastRound + 2; round++) {
     if (signal?.aborted) return stoppedAnswer();
     const limit: DashStop | null =
       lookups >= MAX_LOOKUPS
         ? 'lookups'
         : inputTokens >= INPUT_BUDGET
           ? 'budget'
-          : now() - started >= TIME_BUDGET_MS
+          : now() - started >= timeBudget
             ? 'time'
             : null;
-    const mustAnswer = limit !== null || asked || round === MAX_LOOKUPS + 1;
+    const mustAnswer = limit !== null || asked || round >= lastRound;
 
     let response: Anthropic.Message;
     try {
@@ -972,6 +1061,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         {
           model,
           max_tokens: maxTokens,
+          ...effort,
+          ...thinking,
           system,
           tools,
           tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
@@ -980,14 +1071,25 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         onText,
         finishName,
         signal,
+        beta,
       );
     } catch (error) {
       if (signal?.aborted) return stoppedAnswer();
-      return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
+      const message = error instanceof Error ? error.message : 'The answer failed.';
+      heardCall({ stop: null, blocks: [], outputTokens: 0, inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 0, error: message.slice(0, 500) });
+      return fail(message, 'the model could not be reached.');
     }
 
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
+    heardCall({
+      stop: response.stop_reason ?? null,
+      blocks: response.content.map((block) => block.type),
+      outputTokens: usage.outputTokens,
+      inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+    });
     inputTokens += budgetTokens(usage, previousPrompt);
     previousPrompt = usage.inputTokens + usage.cacheWriteTokens + usage.cachedInputTokens;
     if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
@@ -1096,6 +1198,34 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       messages.push({ role: 'assistant', content: response.content });
       continue;
     }
+    const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
+
+    // It ended its turn with nothing to show: no answer call and no text.
+    // Opus 5.5 and Sonnet 5.5 write text longer than a sentence or two as a
+    // progress note in a thinking block, which the person never sees, and
+    // they cannot be made to call the answer tool. That is how thread replies
+    // failed from mid-October and the thought-through answer of 4 November
+    // ("reported nothing (stopped: end_turn)"). The same request is sent
+    // again, without the empty turn and with a system message saying where
+    // the answer goes, so the cached history is read again and tool choice
+    // stays as it was.
+    if (uses.length === 0 && !text && stopped !== 'max_tokens' && stopped !== 'refusal') {
+      const said = progressNotes(response.content as { type: string; thinking?: unknown }[]);
+      if (said.length > notes.length) notes = said;
+      if (!reasked) {
+        reasked = true;
+        messages.push(systemMessage(model, hiddenText(finishName)));
+        continue;
+      }
+      // Twice out of sight: what the notes' summaries said is kept as an
+      // unfinished answer, rather than nothing.
+      if (notes && !voice.finish) {
+        const body = `${notes.slice(0, MAX_TURN - NOTES_ONLY.length - 2)}\n\n${NOTES_ONLY}`;
+        return { ok: true, body, toolCalls, citations: [], stop: 'unfinished', ...extras() };
+      }
+      return fail(whyNoReport(response), stoppedInWords(response));
+    }
+
     // A voice that chooses stopped without its answer: ask for it once, keeping
     // what it searched and wrote.
     if (chooses && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
@@ -1113,80 +1243,31 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     if (uses.length === 0 || mustAnswer) {
       // Told to call a tool and did not: a reply cut off, or prose instead.
-      const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
-      if (text && response.stop_reason !== 'max_tokens') {
-        return { ok: true, body: text.slice(0, MAX_TURN), toolCalls, citations: [], stop: limit ?? 'answered' };
+      if (uses.length === 0 && text && stopped !== 'max_tokens') {
+        const stop: DashStop = limit ?? 'answered';
+        const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
+        return { ok: true, body: `${text.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
       }
       // Told to answer and made more lookups instead, which is how a jobs
       // question failed after five rounds of lookups ("stopped: tool_use").
-      // Refuse those lookups and ask once more with no tool allowed, so what
-      // was already looked up still becomes an answer.
-      //
-      // Or it ended its turn with nothing to show: no answer call and no
-      // text. Sonnet 5.5 returns prose longer than a sentence or two as a
-      // progress note in a thinking block, which comes back empty, and it
-      // cannot be made to call the answer tool. That is how thread replies
-      // failed from mid-October ("reported nothing (stopped: end_turn)").
-      // With no tool allowed, what it writes comes back as text.
-      const empty = uses.length === 0 && !text && stopped !== 'max_tokens' && stopped !== 'refusal';
-      if (uses.length > 0 || empty) {
+      // The lookups are refused and it is asked once to answer from what it
+      // already found, with tool choice left as it was so the cache holds.
+      if (uses.length > 0 && !refused) {
+        refused = true;
         const at = lookups;
-        if (empty) {
-          if (response.content.length > 0) messages.push({ role: 'assistant', content: response.content });
-          messages.push({ role: 'user', content: WRITE_IT_OUT });
-        } else {
-          messages.push(
-            { role: 'assistant', content: response.content },
-            {
-              role: 'user',
-              content: (uses.map((use, i) => {
-                const result = keptResult({ ok: false, error: LIMIT_REACHED });
-                toolCalls.push({ name: use.name, input: use.input, result });
-                hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
-                return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
-              }) as Anthropic.ContentBlockParam[]).concat({ type: 'text', text: ANSWER_IN_WORDS }),
-            },
-          );
-        }
-        // Two tries: a call with no tool allowed has still come back empty,
-        // and asked again it writes the answer from what is already found.
-        let prose: Anthropic.Message | null = null;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          if (prose) {
-            if (prose.content.length > 0) messages.push({ role: 'assistant', content: prose.content });
-            messages.push({ role: 'user', content: WRITE_IT_OUT });
-          }
-          try {
-            prose = await callModel(
-              client,
-              {
-                model,
-                max_tokens: maxTokens,
-                system,
-                tools,
-                tool_choice: { type: 'none' },
-                messages: withRollingBreakpoint(messages),
-              },
-              onText,
-              finishName,
-              signal,
-            );
-          } catch (error) {
-            if (signal?.aborted) return stoppedAnswer();
-            return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
-          }
-          input.onSpend?.({ model, usage: usageFrom(prose.usage) });
-          const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
-          if (said && prose.stop_reason !== 'max_tokens') {
-            const stop: DashStop = limit ?? (empty ? 'answered' : 'lookups');
-            const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
-            return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
-          }
-          // Widened: the installed SDK's type may predate the reason.
-          const ended: string | null = prose.stop_reason;
-          if (ended === 'max_tokens' || ended === 'refusal') break;
-        }
-        return fail(whyNoReport(prose!), stoppedInWords(prose!));
+        messages.push(
+          { role: 'assistant', content: response.content },
+          {
+            role: 'user',
+            content: (uses.map((use, i) => {
+              const result = keptResult({ ok: false, error: LIMIT_REACHED });
+              toolCalls.push({ name: use.name, input: use.input, result });
+              hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
+              return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
+            }) as Anthropic.ContentBlockParam[]).concat({ type: 'text', text: answerNow(finishName) }),
+          },
+        );
+        continue;
       }
       return fail(whyNoReport(response), stoppedInWords(response));
     }

@@ -24,6 +24,7 @@ import { writeRoleNote } from '@/lib/dash/writes';
 import { publicEnv } from '@/lib/env';
 import { fileCapture, type FiledEntry } from '@/lib/goals/capture';
 import { askCaptureModel } from '@/lib/goals/capture-model';
+import { keepFailure } from '@/lib/dash/failures';
 import { keepCapture, loadCaptureContext, applyCaptureAction, saveFiled } from '@/lib/goals/capture-store';
 import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { ModuleId } from '@/lib/modules';
@@ -104,7 +105,17 @@ async function fileGoals(
       keep: (text) => keepCapture(client, userId, captureId, text),
       context: () => loadCaptureContext(reader, { userId, today }),
       ask: (message, file) =>
-        askCaptureModel({ apiKey: key, captureId, today, onSpend: (report) => spend.push(report) }, message, file),
+        askCaptureModel(
+          {
+            apiKey: key,
+            captureId,
+            today,
+            onSpend: (report) => spend.push(report),
+            recordFailure: (failure) => keepFailure(dash.core, userId, failure),
+          },
+          message,
+          file,
+        ),
       apply: (id, action) => applyCaptureAction(client, { userId, today, captureId: id, dash }, action),
       save: (id, filed) => saveFiled(client, id, filed),
     });

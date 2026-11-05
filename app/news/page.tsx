@@ -27,6 +27,7 @@ import {
 } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/lib/news/topic-hrefs';
 import { NowDashToday } from '@/components/shell/dash-today-fold';
+import { NewsNowFolds } from './now-folds';
 import { QuickReadView } from './quick/quick-view';
 
 export const metadata = { title: 'Quick read' };
@@ -71,7 +72,7 @@ export const dynamic = 'force-dynamic';
 export default async function QuickReadPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pictures?: string; topic?: string }>;
+  searchParams: Promise<{ pictures?: string; topic?: string; day?: string }>;
 }) {
   const params = await searchParams;
   const topic = readTopic(params.topic) ?? null;
@@ -162,7 +163,13 @@ export default async function QuickReadPage({
       hiddenCount={hidden.length}
       progress={progress}
       gotThrough={summary}
-      dashToday={<NowDashToday workspace="news" />}
+      dashToday={
+        <>
+          {/* Inbox and the Daily review folded into Now (plan #1496.10). */}
+          <NewsNowFolds day={params.day} />
+          <NowDashToday workspace="news" />
+        </>
+      }
       saved={saved}
       sent={card ? sentOf(card) : null}
       reaction={card ? reactionOf(card) : null}

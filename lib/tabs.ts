@@ -19,6 +19,12 @@ export type Tab = {
   id: string;
   label: string;
   count?: number;
+  /**
+   * What the count counts, said after it ("left", "unread"). With it the
+   * count is drawn as a small quiet pill reading "5 left", as the goal page's
+   * approved mockup has it (plan #2778.11); without it, the bare number.
+   */
+  countWord?: string;
   icon?: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>;
 };
 

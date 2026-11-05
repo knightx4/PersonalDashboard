@@ -161,6 +161,10 @@ export const SPEND_OPERATIONS = {
     // chosen model and read tools only. About ten answers a night, each a few
     // calls that read Dash's rules from the cache; background.
     'check-dash-quality',
+    // The daily model reply check (plan #2937.7, migration 0297): four or
+    // five small probes per model the app calls, at effort low, held to
+    // lib/core/model-rules.ts. Capped at five cents a run; background.
+    'check-model-replies',
     // Embedding passages of what the person wrote or did across the modules,
     // so Dash can find them by meaning (plan #1247). Voyage; background, from
     // the five-minute memory sweep, which is also the backfill. A row is
@@ -277,10 +281,39 @@ export const SPEND_OPERATIONS = {
     // from its file summaries on a press (plan #2401.7). One Haiku call
     // reading the stored summaries and key points, not the files.
     'collect-course-overview',
+    // A mentor's reply to the person's text (plan #2748.4): the model chosen
+    // for Dash, with Dash's lookups, one call or a few when it looks things
+    // up, after the message is saved. The persona and tools are cached.
+    'mentor-reply',
+    // The mentor's one-line first text when the reply has not started after
+    // about three seconds (plan #2748.4). One Haiku call, background.
+    'mentor-ack',
+    // Who speaks next in a group chat, or wait for the person (plan
+    // #2879.1.2). One Haiku call when the person writes and one after each
+    // round of bots, at most three a burst.
+    'group-director',
+    // One bot's text in a group chat (plan #2879.1.2): the model chosen for
+    // Dash, no lookups, at most six a message from the person.
+    'group-speaker',
+    // A persona card drafted from the People form, or redrafted from a
+    // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
+    'draft-persona',
+    // The rule made from what you wrote a person on People should text you
+    // about, on a save of their form or when you say so in Ask or their
+    // thread (plan #2931.2). One Sonnet call with structured output.
+    'make-reach-out-rule',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.
     'write-insights',
+    // An advisor's reply when the person talks to one alone, on the Talk tab
+    // of their profile (plan #2581.6). Sonnet on Ask Dash's loop, with its
+    // lookups, so a reply takes a few rounds as an Ask answer does.
+    'talk-to-advisor',
+    // What the advisor should remember from that exchange (plan #2581.6).
+    // One Haiku call after each reply, reading the two messages and what
+    // the advisor already remembers.
+    'remember-advisor-talk',
   ],
   finances: [
     // The monthly money review of the month before (plan #2593.8.2). Sonnet,

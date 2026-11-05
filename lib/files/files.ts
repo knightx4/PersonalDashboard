@@ -26,7 +26,14 @@ export type FileListing = {
   updatedAt: string;
   /** When they last opened it; null while the current version is unread (plan #1861). */
   readAt: string | null;
+  /** A file the person added (plan #2778.7): where it is kept, and its type. */
+  stored?: StoredFile | null;
+  /** When it was pinned to the top of its goal's files (plan #2778.7). */
+  pinnedAt?: string | null;
 };
+
+/** Where a file the person added is kept, in the goals-documents bucket (migration 0290). */
+export type StoredFile = { path: string; contentType: string; sizeBytes: number };
 
 /** One file as its page shows it. */
 export type FileDoc = FileListing & {
@@ -56,10 +63,15 @@ export type LinkedFile = {
   version?: number;
   /** When they last opened it; null while unread (plan #1861). */
   readAt?: string | null;
+  /** A file the person added rather than a piece of writing (plan #2778.7). */
+  stored?: StoredFile | null;
+  pinnedAt?: string | null;
+  /** The kind of document the link says the file is (goals migration 0093). */
+  documentKindId?: string | null;
 };
 
 export const LISTING_COLUMNS =
-  'id, title, summary, made_by, version, origin, created_at, updated_at, read_at';
+  'id, title, summary, made_by, version, origin, created_at, updated_at, read_at, storage_path, content_type, size_bytes, pinned_at';
 export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note`;
 export const VERSION_COLUMNS = 'version, title, made_by, change_note, created_at';
 
@@ -73,6 +85,10 @@ export type ListingRow = {
   created_at: string;
   updated_at: string;
   read_at?: string | null;
+  storage_path?: string | null;
+  content_type?: string | null;
+  size_bytes?: number | null;
+  pinned_at?: string | null;
 };
 
 export type DocRow = ListingRow & { body: string; change_note: string | null };
@@ -100,6 +116,11 @@ export function toListing(row: ListingRow): FileListing {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     readAt: row.read_at ?? null,
+    stored:
+      row.storage_path && row.content_type
+        ? { path: row.storage_path, contentType: row.content_type, sizeBytes: row.size_bytes ?? 0 }
+        : null,
+    pinnedAt: row.pinned_at ?? null,
   };
 }
 

@@ -25,7 +25,7 @@ export function advisorBrief(input: { advisorId: string; userId: string }): stri
 export type BuildResult = { started: true } | { started: false; error: string };
 
 const NO_ROUTINE =
-  'Brains are built on the board routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.';
+  'Brains are built on the council routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.';
 
 /** Fire the build for a row already marked building; a fire that fails marks it failed with the answer. */
 async function fireBuild(input: {
@@ -73,7 +73,7 @@ export async function addAdvisor(input: {
   const { client, userId } = input;
   const roster = await listRoster(client, userId);
   if (roster.some((a) => a.name.toLowerCase() === clean.value.name.toLowerCase())) {
-    return { error: `${clean.value.name} is already on your board.` };
+    return { error: `${clean.value.name} is already on your council.` };
   }
   const { data, error } = await client
     .from('board_advisors')

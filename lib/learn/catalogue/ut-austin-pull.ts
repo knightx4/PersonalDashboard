@@ -2,12 +2,12 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import type postgres from 'postgres';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { StructureDocumentInput } from '@/lib/learn/catalogue/structure';
 import { storeStructure } from '@/lib/learn/catalogue/structure-store';
 import type { GoalToClassify } from '@/lib/learn/goal-kind';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { decideWithJev } from '@/lib/jev/decide';
 import {
   fetchUtForm,
@@ -131,28 +131,25 @@ export async function proposeUtSearches(input: {
       model: UT_PROPOSE_MODEL,
       max_tokens: 1024,
       system: proposeSystem(input.departments),
-      tools: [
-        {
-          name: PROPOSE_TOOL,
-          description: 'Report the syllabus archive searches for this goal, best first.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              searches: {
-                type: 'array',
-                maxItems: MAX_PROPOSED_SEARCHES,
-                items: {
-                  type: 'object',
-                  properties: { department: { type: 'string' }, title: { type: 'string' } },
-                  required: ['department', 'title'],
-                },
+      ...reportRequest({
+        name: PROPOSE_TOOL,
+        description: 'Report the syllabus archive searches for this goal, best first.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            searches: {
+              type: 'array',
+              maxItems: MAX_PROPOSED_SEARCHES,
+              items: {
+                type: 'object',
+                properties: { department: { type: 'string' }, title: { type: 'string' } },
+                required: ['department', 'title'],
               },
             },
-            required: ['searches'],
           },
+          required: ['searches'],
         },
-      ],
-      tool_choice: forceTool(PROPOSE_TOOL, UT_PROPOSE_MODEL),
+      }, UT_PROPOSE_MODEL),
       messages: [{ role: 'user', content: describeGoal(input.goal) }],
     });
   } catch (error) {
@@ -160,9 +157,9 @@ export async function proposeUtSearches(input: {
     return { ok: false, detail: error instanceof Error ? error.message : 'The proposing call failed.' };
   }
   input.onSpend?.({ model: UT_PROPOSE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === PROPOSE_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, searches: readProposedSearches(block.input, input.departments) };
+  const report = readReport(response, PROPOSE_TOOL, UT_PROPOSE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, searches: readProposedSearches(report.value, input.departments) };
 }
 
 // ---------------------------------------------------------------------------
@@ -205,24 +202,21 @@ async function screenWithHaiku(
     model: UT_SCREEN_MODEL,
     max_tokens: 256,
     system: `${SCREEN_QUESTION.question} Answer through ${SCREEN_TOOL}.`,
-    tools: [
-      {
-        name: SCREEN_TOOL,
-        description: 'Whether the document is a syllabus with a schedule of topics.',
-        input_schema: {
-          type: 'object',
-          properties: { syllabus_with_schedule: { type: 'boolean' } },
-          required: ['syllabus_with_schedule'],
-        },
+    ...reportRequest({
+      name: SCREEN_TOOL,
+      description: 'Whether the document is a syllabus with a schedule of topics.',
+      input_schema: {
+        type: 'object',
+        properties: { syllabus_with_schedule: { type: 'boolean' } },
+        required: ['syllabus_with_schedule'],
       },
-    ],
-    tool_choice: forceTool(SCREEN_TOOL, UT_SCREEN_MODEL),
+    }, UT_SCREEN_MODEL),
     messages: [{ role: 'user', content: JSON.stringify(screenState(document)) }],
   });
   onSpend?.({ model: UT_SCREEN_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === SCREEN_TOOL);
-  if (!block || block.type !== 'tool_use') throw new Error(whyNoReport(response));
-  return (block.input as { syllabus_with_schedule?: unknown }).syllabus_with_schedule === true;
+  const report = readReport(response, SCREEN_TOOL, UT_SCREEN_MODEL);
+  if (!report.ok) throw new Error(report.reason);
+  return (report.value as { syllabus_with_schedule?: unknown }).syllabus_with_schedule === true;
 }
 
 export type ScreenOptions = {

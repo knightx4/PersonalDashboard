@@ -1,9 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { CheckBatch } from './reply-check';
 
 /**
@@ -48,36 +48,33 @@ export async function checkAskReplies(batch: CheckBatch, options: ReplyCheckMode
     model: REPLY_CHECK_MODEL,
     max_tokens: 4000,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: 'List the Dash answers that went badly, each with its label, the kind and the person\'s words.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            flags: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  reply: { type: 'string' },
-                  kind: { type: 'string', enum: ['pushed_back', 'repeated', 'gave_up'] },
-                  quote: { type: 'string' },
-                },
-                required: ['reply', 'kind', 'quote'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: 'List the Dash answers that went badly, each with its label, the kind and the person\'s words.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          flags: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                reply: { type: 'string' },
+                kind: { type: 'string', enum: ['pushed_back', 'repeated', 'gave_up'] },
+                quote: { type: 'string' },
               },
+              required: ['reply', 'kind', 'quote'],
             },
           },
-          required: ['flags'],
         },
+        required: ['flags'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, REPLY_CHECK_MODEL),
+    }, REPLY_CHECK_MODEL),
     messages: [{ role: 'user', content: `${batch.text}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: REPLY_CHECK_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return [];
-  return (block.input as { flags?: unknown } | null)?.flags ?? [];
+  const report = readReport(response, TOOL_NAME, REPLY_CHECK_MODEL);
+  if (!report.ok) return [];
+  return (report.value as { flags?: unknown } | null)?.flags ?? [];
 }

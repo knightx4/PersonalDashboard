@@ -329,7 +329,7 @@ function RaiseCard({
           named instead. */}
       {row.source && (
         <p className="text-small text-ink-muted">
-          Raised by {isRunnerSource(row.source) ? 'the overnight runner' : row.source}
+          Raised by {isRunnerSource(row.source) ? 'the runner' : row.source}
         </p>
       )}
 

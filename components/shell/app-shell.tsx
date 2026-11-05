@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { PendingPage } from '@/components/shell/pending-page';
+import { keptHref } from '@/lib/shell/kept-view';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Menu,
@@ -35,7 +36,6 @@ import {
   WorkspaceSwitcher,
   type SwitcherCounts,
 } from '@/components/shell/workspace-switcher';
-import { isAskPath } from '@/lib/ask/page-name';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
 import { arrival, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
@@ -62,6 +62,11 @@ export type NavSection = {
   exact?: boolean;
   /** Also treat these prefixes as this section. */
   alsoMatches?: readonly string[];
+  /**
+   * Link to the view the page was last showing, not its bare address, for a
+   * list that keeps its view in the address (lib/shell/kept-view.ts).
+   */
+  keepsView?: true;
   /**
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
@@ -299,6 +304,18 @@ export function AppShell({
     });
   }
 
+  // Where a `keepsView` tab goes: the view its page last showed (note
+  // 978314f8). Read after each move, since storage is not there on the server.
+  const [kept, setKept] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const section of sections) {
+      if (section.keepsView) next[section.href] = keptHref(section.href);
+    }
+    setKept(next);
+  }, [pathname, sections]);
+  const sectionHref = (section: NavSection) => kept[section.href] ?? section.href;
+
   const isActive = (section: NavSection) =>
     section.exact
       ? pathname === section.href ||
@@ -322,7 +339,7 @@ export function AppShell({
       const target = sections[Number(match[1]) - 1];
       if (!target) return;
       event.preventDefault();
-      router.push(target.href);
+      router.push(target.keepsView ? keptHref(target.href) : target.href);
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -349,9 +366,7 @@ export function AppShell({
   // page sits inside it is the page's own path, drawn once above its heading
   // by PageHeader's `subject`; the bar used to add the section after a ›,
   // which repeated the first part of that path a few inches lower.
-  // Dash's page is outside every workspace and is not Home (plan #1899.2).
-  const onDash = module === null && isAskPath(pathname ?? '');
-  const title = moduleById(module)?.label ?? (onDash ? 'Dash' : 'Home');
+  const title = moduleById(module)?.label ?? 'Home';
 
   useEffect(() => {
     if (!drawer) return;
@@ -469,7 +484,7 @@ export function AppShell({
     <nav className="flex flex-col gap-0.5" aria-label="Sections">
       {sections.map((section, index) =>
         navRow({
-          href: section.href,
+          href: sectionHref(section),
           label: section.label,
           Icon: section.icon ? NAV_ICONS[section.icon] : null,
           on: isActive(section),
@@ -486,7 +501,6 @@ export function AppShell({
       <div className={cn('pt-3', narrow ? 'px-2' : 'px-3')}>
         <WorkspaceSwitcher
           current={module}
-          dash={onDash}
           enabled={workspaces}
           counts={counts}
           onShell
@@ -555,7 +569,7 @@ export function AppShell({
     return (
       <li key={section.href}>
         <Link
-          href={section.href}
+          href={sectionHref(section)}
           aria-current={on ? 'page' : undefined}
           data-capture-nav={section.href}
           className={cn(dockItem, 'relative', on ? 'text-shell-ink' : 'text-shell-muted')}
@@ -582,6 +596,9 @@ export function AppShell({
   });
 
   if (overflow) {
+    // The counts on sections folded behind More go on More as one number, so a
+    // waiting count is seen on a phone without opening anything (plan #2635.3).
+    const folded = sections.slice(tabs.length).reduce((sum, s) => sum + (s.badge ?? 0), 0);
     dockTabs.push(
       <li key="__more">
         <button
@@ -590,10 +607,17 @@ export function AppShell({
           // Where an item lands when its section is one the dock folded away
           // (landingTarget in components/motion/settle.ts).
           data-capture-more=""
-          className={cn(dockItem, 'text-shell-muted')}
+          className={cn(dockItem, 'relative text-shell-muted')}
         >
           <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />
           More
+          {folded > 0 && (
+            // ui-ok: hand-rolled-chip -- the count badge on a dock tab, placed over the icon, not a label or a choice
+            <span className="tabular absolute left-1/2 top-1.5 ml-1.5 rounded-full bg-caution-fill px-1.5 py-0.5 text-micro font-bold leading-none text-caution-fill-ink">
+              {folded}
+              <span className="sr-only"> waiting</span>
+            </span>
+          )}
         </button>
       </li>,
     );

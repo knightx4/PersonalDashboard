@@ -1,7 +1,4 @@
-import Link, { linkVariants } from '@/components/ui/link';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { DetailCard } from '@/components/patterns/tabbed-detail';
-import { cn } from '@/lib/cn';
 import { notFound } from 'next/navigation';
 import { tabFrom } from '@/lib/tabs';
 import { createClient, requireUser } from '@/lib/auth/server';
@@ -10,7 +7,13 @@ import { loadYourInitial } from '@/lib/core/account/your-initial';
 import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
 import { isOwner } from '@/lib/dev/owner';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { LISTED_KINDS, noLinks, weekInstants, type GoalLinks, type ListedKind } from '@/lib/goals/links';
+import {
+  LISTED_KINDS,
+  noLinks,
+  weekInstants,
+  type GoalLinks,
+  type ListedKind,
+} from '@/lib/goals/links';
 import { listForTab, tabsWithLists, type ListView } from '@/lib/goals/goal-lists';
 import { loadGoalListViews } from '@/lib/goals/goal-lists-store';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
@@ -29,7 +32,7 @@ import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
 import { goalSuggestions, type Suggestion } from '@/lib/goals/suggestions';
-import { loadGoalSuggestions } from '@/lib/goals/suggestions-store';
+import { loadGoalSuggestions, loadRunSuggestions } from '@/lib/goals/suggestions-store';
 import {
   approvalLine,
   countOpenQuestions,
@@ -43,7 +46,7 @@ import {
 } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
 import type { GoalStatus } from '@/lib/goals/tree';
-import { loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
+import { loadQuestionRuns, loadShaping, loadStepRuns } from '@/lib/goals/shaping-store';
 import { loadGoalMap, type GoalMap } from '@/lib/goals/steps-store';
 import { loadAreas } from '@/lib/goals/store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -56,21 +59,33 @@ import { loadPreparation } from '@/lib/learn/prepare/store';
 import { preparationLine, preparationView } from '@/lib/learn/prepare/view';
 import { progressLine } from '@/lib/learn/lessons/plan-view';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
-import { FileLinks } from '@/components/files/file-links';
-import type { LinkedFile } from '@/lib/files/files';
+import { fileHref, type LinkedFile } from '@/lib/files/files';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
 import { goalScopeRef, loadScopeDays, type ScopeDay } from '@/lib/goals/scope-days';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
-import { goalFileRows, stepTitlesIn, unreadWords } from '@/lib/goals/goal-files';
+import {
+  fileByline,
+  goalFileRows,
+  newestFiles,
+  stepTitlesIn,
+  unreadWords,
+  type GoalFileRow,
+} from '@/lib/goals/goal-files';
+import { formatDay } from '@/lib/goals/dates';
+import { dayIn } from '@/lib/todo/time';
+import { goalStrip } from '@/lib/goals/goal-strip';
+import { planOrder } from '@/lib/goals/plan-order';
+import { loadGoalDashboardViews } from '@/lib/goals/dashboard-store';
+import type { TileView } from '@/lib/goals/dashboard-tiles';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews, loadReviewChange } from '@/lib/goals/reviews-store';
-import { closedSteps, GOAL_TABS, goalStages } from '@/lib/goals/goal-page';
+import { closedSteps, GOAL_TAB_ADDRESS, GOAL_TABS, goalStages } from '@/lib/goals/goal-page';
 import { goalMatchText } from '@/lib/goals/related-notes';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
@@ -97,8 +112,27 @@ import { GoalMetrics, type MetricView } from './goal-metrics';
 import { GoalNumber } from './goal-number';
 import { GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
-import { DashWork } from './dash-work';
-import { dashWork } from '@/lib/goals/dash-work';
+import { GoalPlan } from './goal-plan';
+import { GoalFilesTab, type TabWork } from './goal-files-tab';
+import { DashboardTiles } from './dashboard-tiles';
+import {
+  DashOnCard,
+  GoalDashboard,
+  GoalStripRow,
+  NoLayoutLine,
+  RecentFiles,
+} from './goal-dashboard';
+import { AskDash } from '../ask-dash';
+import { dashWork, FINISHED_SHOWN_MS, questionWork } from '@/lib/goals/dash-work';
+import {
+  waitingRows,
+  workEntries,
+  type WaitingKind,
+  type WaitingRow,
+  type WorkRun,
+} from '@/lib/goals/goal-files-tab';
+import { loadGoalWork, loadWaitingKinds, type StepLike } from '@/lib/goals/goal-files-tab-store';
+import { QuestionResults } from './question-results';
 
 export const metadata = { title: 'Goal' };
 
@@ -216,6 +250,73 @@ function stepRunLines(runs: Record<string, GoalRun>) {
   return stepRunViews(runs, Date.now());
 }
 
+/**
+ * The questions handed to the goal from a chat (plan #2778.8): those going,
+ * those ended in the last day or named by the link, and what each suggested.
+ * Outside the component because it reads the clock. A failed read leaves them
+ * out rather than the page.
+ */
+async function loadQuestions(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  goalId: string,
+  named: string | null,
+) {
+  const now = Date.now();
+  try {
+    const runs = await loadQuestionRuns(client, goalId, new Date(now - FINISHED_SHOWN_MS).toISOString(), named);
+    const work = questionWork(runs, goalId, now, named);
+    const suggested = await loadRunSuggestions(
+      client,
+      work.results.map((result) => result.runId),
+    );
+    const byRun: Record<string, Suggestion[]> = {};
+    for (const s of suggested) if (s.runId) (byRun[s.runId] ??= []).push(s);
+    return { ...work, suggestions: byRun };
+  } catch {
+    return { running: [], finished: [], results: [], suggestions: {} };
+  }
+}
+
+/**
+ * What the Work & files tab reads beyond the page (plan #2778.7): the
+ * documents the goal's open steps still wait for, and every run on the goal
+ * and its steps. Outside the component because it reads the clock. A failed
+ * read leaves that part empty rather than the page.
+ */
+async function loadFilesTab(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  map: GoalMap,
+  filesOf: Record<string, LinkedFile[]>,
+  files: GoalFileRow[],
+  timeZone: string,
+): Promise<{ waiting: WaitingRow[]; work: TabWork[] }> {
+  const steps: StepLike[] = [];
+  const titles = new Map<string, string>();
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      steps.push({ id: node.id, title: node.title, status: node.status, collectionId: node.collectionId ?? null });
+      titles.set(node.id, node.title);
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  const filled = new Set(
+    Object.values(filesOf).flatMap((list) => list.flatMap((file) => (file.documentKindId ? [file.documentKindId] : []))),
+  );
+  const [kinds, runs] = await Promise.all([
+    loadWaitingKinds(client, steps).catch((): WaitingKind[] => []),
+    loadGoalWork(client, [map.goal.id, ...steps.map((step) => step.id)]).catch((): WorkRun[] => []),
+  ]);
+  const now = Date.now();
+  return {
+    waiting: waitingRows(kinds, filled),
+    work: workEntries(runs, map.goal.id, titles, files, now).map((entry) => ({
+      ...entry,
+      day: formatDay(dayIn(entry.at, timeZone)),
+    })),
+  };
+}
+
 /** Dash's work at the top of the page (note 03ce0cce). Outside the component because it reads the clock. */
 function dashWorkOn(map: GoalMap, runs: Record<string, GoalRun>) {
   const titles = new Map<string, string>();
@@ -285,7 +386,11 @@ async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, 
  * one line (plan #2302.2); null while the goal points at none.
  */
 async function loadGoalSubject(learn: LearnSupabaseClient, userId: string, aimId: string) {
-  const { data, error } = await learn.from('aims').select('subject_id').eq('id', aimId).maybeSingle();
+  const { data, error } = await learn
+    .from('aims')
+    .select('subject_id')
+    .eq('id', aimId)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   const subjectId = (data as { subject_id: string | null } | null)?.subject_id;
   if (!subjectId) return null;
@@ -312,15 +417,22 @@ function runRowsOf(history: { runs: RunListing[] }, timeZone: string) {
 /**
  * One goal (docs/GOALS-SPEC.md, "The goal page"; plans #925, #1078 and
  * #1671), in the tabbed detail pattern the feature page on /dev/plan uses:
- * the path, the title and done-when, then three tabs with the goal's
- * properties in a column beside them.
+ * the path and the title, then four tabs laid out the same on every goal
+ * (plan #2778.4) with the goal's properties in a column beside them.
  *
- *  - Overview: the status card with Dash's verdict and next move, the
- *    number, Waiting on you, and what feeds the goal (context from the other
- *    modules, Dash's suggestions with the weekly help, links, Learn, files,
- *    related notes, add lines);
- *  - Steps: the step tree, with Now, Other stages and the rhythms;
- *  - Activity: the steps closed, the runs and the goal's comments.
+ *  - Dashboard: the done-when, the Now / Next / Later strip, the status card,
+ *    the goal's tiles (or a line offering Dash lay them out), the number,
+ *    Waiting on you and the charts, with Dash's card and the three newest
+ *    files beside them; then what feeds the goal (context from the other
+ *    modules, Dash's suggestions with the weekly help, links, Learn, related
+ *    notes, add lines);
+ *  - Plan: what is on you now, what comes next and why the rest waits, or
+ *    By stage, the step tree with every stage open (plan #2778.5);
+ *  - Work & files: what Dash is on and every file on the goal;
+ *  - History: the steps closed, the runs and the goal's comments.
+ *
+ * The tabs before plan #2778.4 (?tab=overview, steps, activity) open the tab
+ * that holds them now (GOAL_TAB_ADDRESS).
  *
  * The properties are the area, status, Dash's verdict, the dates and the
  * progress split between you and Dash. Up to two of your vault notes on the
@@ -333,10 +445,19 @@ export default async function GoalMapPage({
   searchParams,
 }: {
   params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{
+    tab?: string | string[];
+    work?: string | string[];
+    view?: string | string[];
+  }>;
 }) {
   const { goalId } = await params;
-  const tabParam = (await searchParams).tab;
+  const { tab: tabParam, work: workParam, view: viewParam } = await searchParams;
+  // The question run a notification or reply line opened the page at (plan #2778.8).
+  const namedWork =
+    typeof workParam === 'string' && /^[0-9a-f-]{36}$/i.test(workParam) ? workParam : null;
+  // The Plan tab's switch (plan #2778.5): What's next unless By stage is asked for.
+  const planView = viewParam === 'stage' ? 'stage' : 'next';
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -399,7 +520,7 @@ export default async function GoalMapPage({
       .catch((): ListView[] => []),
   ]);
   if (!map) notFound();
-  const tab = tabFrom(tabParam, tabsWithLists(GOAL_TABS, goalLists));
+  const tab = tabFrom(tabParam, tabsWithLists(GOAL_TABS, goalLists), GOAL_TAB_ADDRESS);
   const listTab = listForTab(tab, goalLists);
   // The latest run on each step sent, prepared or asked about from its row
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
@@ -430,6 +551,16 @@ export default async function GoalMapPage({
       return namedLists(counted, lists);
     })
     .catch((): MetricView[] | null => null);
+  // The goal's dashboard tiles (plan #2778.4); null for a goal with no
+  // layout yet, and when they cannot be read, which shows the line offering
+  // Dash lay them out rather than a broken page.
+  const tilesRead = loadGoalDashboardViews(
+    client,
+    user.id,
+    { id: map.goal.id, createdAt: map.goal.createdAt ?? null },
+    account.timezone,
+    { core },
+  ).catch((): TileView[] | null => null);
   const related = relatedNotes(
     vault,
     user.id,
@@ -442,7 +573,19 @@ export default async function GoalMapPage({
     (): ProgressEntry[] => [],
   );
   const suggestionIds = [map.goal.id, ...ownSteps(map.steps).map((step) => step.id)];
-  const [stepRuns, filesOf, brief, review, reviewChange, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
+  const questionsRead = loadQuestions(client, map.goal.id, namedWork);
+  const [
+    stepRuns,
+    filesOf,
+    brief,
+    review,
+    reviewChange,
+    places,
+    progressEntries,
+    arrivals,
+    pace,
+    suggestions,
+  ] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -527,18 +670,28 @@ export default async function GoalMapPage({
   // a run is going, the goal has no steps yet, or every step is finished and
   // the goal needs its next ones; otherwise it is Ask Dash alone, in the
   // status card.
+  const asked = await questionsRead;
+  // A question handed from a chat shows as its own line of Dash's work, not
+  // as the panel's mapping run (plan #2778.8).
+  const askedRunning = asked.running.some((item) => item.runId === history.runs[0]?.id);
   const shapingUp = Boolean(
     shapingView &&
-      (shapingView.approval.approve ||
-        shapingView.running ||
-        (map.goal.status === 'open' && (map.steps.length === 0 || nothingOpen(map.steps)))),
+    (shapingView.approval.approve ||
+      (shapingView.running && !askedRunning) ||
+      (map.goal.status === 'open' && (map.steps.length === 0 || nothingOpen(map.steps)))),
   );
   const shapingPanel = shapingView && (
-    <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} quiet />
+    <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} quiet inCard />
   );
   const shownItems = shownContext(context);
   const thread = map.threads[map.goal.id] ?? [];
-  const work = dashWorkOn(map, stepRuns);
+  const stepWork = dashWorkOn(map, stepRuns);
+  const work = [
+    ...asked.running,
+    ...stepWork.filter((item) => item.state === 'running'),
+    ...asked.finished,
+    ...stepWork.filter((item) => item.state === 'finished'),
+  ];
   const stepProgress = summariseProgress(progressEntries);
   const line = statusLine(status, {
     running: work.filter((item) => item.state === 'running').length,
@@ -559,82 +712,148 @@ export default async function GoalMapPage({
   const burnUpDays = await scopeDays;
   const metrics = await metricsRead;
   const metricRows = await metricRowsRead;
+  const tileViews = await tilesRead;
   const lists = metricLists(sources);
   // Every goal has steps and files to count (plan #2397.3), so the metrics
   // show whether or not it holds a list.
-  const metricsPart =
-    metricRows
-      ? {
-          node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
-          count: Math.max(1, metricRows.length),
-        }
-      : null;
-  const overview = (
-    <div className="space-y-6">
-      <GoalDoneWhen goal={map.goal}>
-        <GoalListChips
-          goalId={map.goal.id}
-          goalTitle={map.goal.title}
-          lists={goalLists}
-          canAdd={map.goal.status === 'open'}
-        />
-      </GoalDoneWhen>
-      <div className="space-y-4">
-        <GoalStatusCard
-          line={line}
-          review={review}
-          current={review ? reviewCurrent(review) : false}
-          change={reviewChange}
-          brief={brief}
-          briefWhen={brief ? noteWhen(brief, account.timezone) : null}
-          work={<DashWork items={work} />}
-          ask={!shapingUp && shapingPanel}
-        />
-        {shapingUp && shapingPanel}
-        {map.goal.status === 'open' && (
-          <GoalLogDone goalId={map.goal.id} />
-        )}
-        {!numberEmpty && <GoalNumber {...number} />}
-        <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
-      </div>
-      <GoalMetrics metrics={metrics} />
-      <BurnUpChart days={burnUpDays} />
-      <GoalContext items={shownItems} />
-      {map.goal.status === 'open' && (
-        <GoalSuggestions
-          goalId={map.goal.id}
-          suggestions={suggestions}
-          helpKinds={errand ? [] : help.helpKinds}
-          proposedHelpKinds={errand ? [] : help.proposedHelpKinds}
-        />
-      )}
-      {map.goal.status !== 'open' && !errand && !helpEmpty && <GoalHelp {...help} />}
-      {!linksEmpty && <GoalLinksSection {...linked} />}
-      {learnGoal && <GoalLearn {...learnGoal} />}
-      {files.length > 0 && (
-        <section aria-labelledby="files-heading" className="space-y-2">
-          <SectionHeading
-            id="files-heading"
-            title="Files"
-            count={unreadWords(files) || undefined}
-            className="px-1"
-            action={
-              <Link href="/goals/files" className={cn('press-area text-small', linkVariants())}>
-                Files for every goal
-              </Link>
-            }
+  const metricsPart = metricRows
+    ? {
+        node: <MetricsProperty goalId={map.goal.id} metrics={metricRows} lists={lists} />,
+        count: Math.max(1, metricRows.length),
+      }
+    : null;
+  const unread = unreadWords(files);
+  // The Plan tab's order (plan #2778.5), which the strip names the first of
+  // each lane from. A question under Now is answered on the Plan tab, so
+  // Waiting on you leaves it out rather than list it twice.
+  const order = planOrder(map.steps, { today });
+  const strip = goalStrip(map.steps, status.yourMove, order);
+  const inNow = new Set(order.now.map((entry) => entry.id));
+  const waitingRows = status.yourMove.filter((row) => !inNow.has(row.id));
+  // Dash's newest file, said in its card when no run finished in the last day.
+  const latestByDash = work.some((item) => item.state === 'finished')
+    ? null
+    : (newestFiles(
+        files.filter((file) => file.byDash),
+        1,
+      )[0] ?? null);
+  const open = map.goal.status === 'open';
+  const thisGoal = [{ id: map.goal.id, title: map.goal.title }];
+  // Each file as one line of who, when and for which step (plan #2778.4).
+  const bylined = files.map((file) => ({
+    ...file,
+    meta: fileByline(file, formatDay(dayIn(file.updatedAt, account.timezone))),
+  }));
+  // The Work & files tab's own reads (plan #2778.7), only when it is open.
+  const filesTab =
+    tab === 'files' ? await loadFilesTab(client, map, filesOf, files, account.timezone) : null;
+  const dashboard = (
+    <GoalDashboard
+      strip={<GoalStripRow strip={strip} />}
+      top={
+        <GoalDoneWhen goal={map.goal}>
+          <GoalListChips
+            goalId={map.goal.id}
+            goalTitle={map.goal.title}
+            lists={goalLists}
+            canAdd={open}
           />
-          <FileLinks files={files} />
-        </section>
-      )}
-      <RelatedNotes notes={related} className="px-1" />
-      <GoalAddRow
-        number={numberEmpty ? number : null}
-        help={!errand && helpEmpty ? help : null}
-        links={linksEmpty && canLink ? linked : null}
-        list={goalLists.length === 0 && map.goal.status === 'open' ? { goalId: map.goal.id } : null}
-      />
-    </div>
+        </GoalDoneWhen>
+      }
+      lead={
+        <>
+          {/* What a question handed from a chat worked out (plan #2778.8), first. */}
+          <QuestionResults
+            goalId={map.goal.id}
+            results={asked.results}
+            suggestions={asked.suggestions}
+            named={namedWork}
+          />
+          {tileViews ? (
+            <DashboardTiles goalId={map.goal.id} views={tileViews} part="lead" />
+          ) : (
+            // No tiles yet: the offer to lay them out stands where the tiles
+            // would, straight after the strip on a phone (plan #2778.11).
+            <NoLayoutLine
+              ask={
+                open && (
+                  <AskDash
+                    goals={thisGoal}
+                    areas={[]}
+                    defaultAreaId={null}
+                    only
+                    label="Ask Dash to lay it out"
+                    defaultBody="Lay out this goal’s dashboard with the tiles that fit it."
+                  />
+                )
+              }
+            />
+          )}
+        </>
+      }
+      main={
+        <>
+          <GoalStatusCard
+            line={line}
+            review={review}
+            current={review ? reviewCurrent(review) : false}
+            change={reviewChange}
+            brief={brief}
+            briefWhen={brief ? noteWhen(brief, account.timezone) : null}
+            now={strip.now}
+          />
+          {tileViews && <DashboardTiles goalId={map.goal.id} views={tileViews} part="rest" />}
+          {open && <GoalLogDone goalId={map.goal.id} />}
+          {!numberEmpty && <GoalNumber {...number} />}
+          <WaitingOnYou rows={waitingRows} flags={flags} questions={questions} />
+          <GoalMetrics metrics={metrics} />
+          <BurnUpChart days={burnUpDays} />
+        </>
+      }
+      side={
+        <>
+          <DashOnCard
+            items={work}
+            latest={
+              latestByDash
+                ? { title: latestByDash.title, href: fileHref(latestByDash.fileId) }
+                : null
+            }
+            shaping={shapingUp && shapingPanel}
+            arrivals={arrivals}
+            ask={open && <AskDash goals={thisGoal} areas={[]} defaultAreaId={null} only />}
+          />
+          <RecentFiles
+            files={newestFiles(bylined).map((file) => ({ ...file, summary: null }))}
+            unread={unread}
+          />
+        </>
+      }
+      rest={
+        <>
+          <GoalContext items={shownItems} />
+          {open && (
+            <GoalSuggestions
+              goalId={map.goal.id}
+              // One a question's result shows is answered there (plan #2778.8).
+              suggestions={suggestions.filter((s) => !(s.runId && asked.suggestions[s.runId]))}
+              helpKinds={errand ? [] : help.helpKinds}
+              proposedHelpKinds={errand ? [] : help.proposedHelpKinds}
+            />
+          )}
+          {!open && !errand && !helpEmpty && <GoalHelp {...help} />}
+          {!linksEmpty && <GoalLinksSection {...linked} />}
+          {learnGoal && <GoalLearn {...learnGoal} />}
+          <RelatedNotes notes={related} className="px-1" />
+          <GoalAddRow
+            number={numberEmpty ? number : null}
+            help={!errand && helpEmpty ? help : null}
+            links={linksEmpty && canLink ? linked : null}
+            list={goalLists.length === 0 && open ? { goalId: map.goal.id } : null}
+          />
+        </>
+      }
+    />
   );
 
   return (
@@ -648,28 +867,56 @@ export default async function GoalMapPage({
       pace={pace}
       metrics={metricsPart}
       lists={goalLists}
+      unreadFiles={files.filter((file) => file.unread).length}
     >
       {listTab ? (
         <DetailCard>
           <ListBody goalId={map.goal.id} list={listTab} />
         </DetailCard>
-      ) : tab === 'steps' ? (
+      ) : tab === 'plan' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
-          {/* Your initial, for the Assignee column (plan #2069.2). */}
-          <YourInitialProvider initial={await loadYourInitial(user)}>
-            <StepTree
-              map={map}
-              stages={stages}
-              todoOn={moduleEnabled(account, 'todo')}
-              runs={stepRunLines(stepRuns)}
-              files={filesOf}
-              progress={stepProgress}
-              arrivals={arrivals}
-              canRun={owner}
-            />
-          </YourInitialProvider>
+          <GoalPlan
+            map={map}
+            view={planView}
+            // A goal whose Dashboard has a card per room calls its stages rooms.
+            stageWord={tileViews?.some((view) => view.type === 'rooms') ? 'room' : 'stage'}
+            files={filesOf}
+            arrivals={arrivals}
+            canRun={owner}
+            today={today}
+            timeZone={account.timezone}
+            byStage={
+              planView === 'stage' && (
+                // Your initial, for the Assignee column (plan #2069.2).
+                <YourInitialProvider initial={await loadYourInitial(user)}>
+                  <StepTree
+                    map={map}
+                    stages={stages}
+                    todoOn={moduleEnabled(account, 'todo')}
+                    runs={stepRunLines(stepRuns)}
+                    files={filesOf}
+                    progress={stepProgress}
+                    arrivals={arrivals}
+                    canRun={owner}
+                    byStage
+                  />
+                </YourInitialProvider>
+              )
+            }
+          />
         </GoalStepsFold>
-      ) : tab === 'activity' ? (
+      ) : tab === 'files' ? (
+        // Work & files (plan #2778.7): every file on the goal in four views,
+        // what it is still waiting for, a place to add yours, and every
+        // piece of work Dash took on for it.
+        <GoalFilesTab
+          goalId={map.goal.id}
+          files={bylined}
+          waiting={filesTab?.waiting ?? []}
+          work={filesTab?.work ?? []}
+          canAdd={owner && map.goal.status !== 'dropped'}
+        />
+      ) : tab === 'history' ? (
         <GoalActivity
           goalId={map.goal.id}
           closed={closedSteps(map.steps)}
@@ -679,7 +926,7 @@ export default async function GoalMapPage({
           timeZone={account.timezone}
         />
       ) : (
-        overview
+        dashboard
       )}
     </GoalDetail>
   );

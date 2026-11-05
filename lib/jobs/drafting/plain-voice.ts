@@ -17,8 +17,8 @@ export const PLAIN_VOICE = `Their voice: say less, and only what they would say 
   team works); or a plain reason they would give a friend across a table.
   Using the research is good when it makes the answer more specific. A
   sentence that is only there to sound good, set up the next one or round
-  off a paragraph is cut. With no limit, 120 words that say something beat
-  230 that perform.
+  off a paragraph is cut. A short answer that says something beats a long
+  one that performs.
 - No hooks or framing lines. Say a thing about the company as a plain fact
   ("Contoso's customers are banks and PE funds"), not dressed up as a feeling
   ("Contoso is building AI for the people I most want to work around").

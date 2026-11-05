@@ -451,7 +451,9 @@ describe('the call', () => {
       why: 'You write about machine learning architecture (Computing).',
     });
     expect(spent).toEqual(['claude-sonnet-5-5']);
-    expect(calls[0]).toMatchObject({ tool_choice: { type: 'auto' } });
+    // Sonnet takes no forced tool, so the report comes back as structured output (plan #2937.4).
+    expect(calls[0]).toMatchObject({ output_config: { format: { type: 'json_schema' } } });
+    expect(calls[0]).not.toHaveProperty('tool_choice');
   });
 
   it('drops the pick, and still records the spend, when there is no report', async () => {

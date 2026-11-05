@@ -1,9 +1,10 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { MonthFacts } from './facts';
 import { reviewPrompt, type RawWording } from './write';
 
@@ -61,33 +62,30 @@ export async function wordMoneyReview(facts: MonthFacts, options: MoneyReviewMod
     model: MONEY_REVIEW_MODEL,
     max_tokens: 2500 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: 'Give the month review: an opening, and one line per fact citing the fact by id.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            summary: { type: 'string' },
-            lines: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: { fact: { type: 'string' }, text: { type: 'string' } },
-                required: ['fact', 'text'],
-              },
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: 'Give the month review: an opening, and one line per fact citing the fact by id.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          lines: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { fact: { type: 'string' }, text: { type: 'string' } },
+              required: ['fact', 'text'],
             },
           },
-          required: ['summary', 'lines'],
         },
+        required: ['summary', 'lines'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, MONEY_REVIEW_MODEL),
+    }, MONEY_REVIEW_MODEL),
     messages: [{ role: 'user', content: `${reviewPrompt(facts)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: MONEY_REVIEW_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return null;
-  return (block.input ?? null) as RawWording | null;
+  const report = readReport(response, TOOL_NAME, MONEY_REVIEW_MODEL);
+  if (!report.ok) return null;
+  return (report.value ?? null) as RawWording | null;
 }

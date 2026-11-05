@@ -660,6 +660,13 @@ export default async function InventoryPage({
             />
           ))}
         </RailGroup>
+        {/* Returns folded into Inventory, and Sell and Share left the tab bar
+            with their rows kept (plan #1496.8): these are their ways in. */}
+        <RailGroup label="Pages">
+          <RailItem label="Returns" href="/shopping/inventory/returns" />
+          <RailItem label="For sale" href="/shopping/sell" />
+          <RailItem label="Shares" href="/shopping/share" />
+        </RailGroup>
       </LeftRail>
 
       <div className="min-w-0 flex-1">

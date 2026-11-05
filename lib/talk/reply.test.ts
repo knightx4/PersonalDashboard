@@ -11,7 +11,8 @@ import { replyAbout, TALK_MODEL } from './reply';
 type Sent = {
   model: string;
   system: string;
-  tool_choice: unknown;
+  tools?: unknown;
+  output_config?: { format?: { type?: string } };
   messages: { role: string; content: string }[];
 };
 
@@ -53,7 +54,9 @@ describe('replyAbout', () => {
     expect(sent[0].model).toBe(TALK_MODEL);
     expect(sent[0].system).toContain('Monte Carlo tree search');
     expect(sent[0].system).toContain('Title: AlphaGo');
-    expect(sent[0].tool_choice).toEqual({ type: 'auto' });
+    // Sonnet reports as structured output, with no tool offered (plan #2937.5).
+    expect(sent[0].tools).toBeUndefined();
+    expect(sent[0].output_config?.format?.type).toBe('json_schema');
     expect(sent[0].messages).toEqual([
       { role: 'user', content: 'Why does a tree search beat brute force here?' },
     ]);

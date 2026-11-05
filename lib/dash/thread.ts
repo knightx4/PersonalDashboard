@@ -3,7 +3,8 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
 import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation, TalkToolCall } from '@/lib/talk/talk';
-import { MAX_LOOKUPS, runDash, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { MAX_LOOKUPS, runDash, type DashCall, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { UNFINISHED_REASON, type DashFailure } from './failures';
 import type { PaidQueued } from './paid';
 import {
   threadDashTools,
@@ -64,10 +65,10 @@ move_roles, and in Learn change_reading, add_learn_track,
 add_track_reading, reword_concept, add_concept_note, change_video,
 add_to_brief and attach_vault_note, and in
 Todo edit_todo, add_todo_item, link_todo, add_event, change_event, change_agenda_row and add_todos, and in
-You add_place, change_place, save_job, save_about_me, set_detail and ask_board (a question for their board), and in News mark_issue_unread,
+You add_place, change_place, save_job, save_about_me, set_detail, ask_board (a question for their council) and set_reach_out (what a person on People texts them about), and in News mark_issue_unread,
 save_story, send_story_to_learn, make_todo_from_story and stop_watch, and in
 Goals change_goal_area, change_goal, change_goal_step, change_goal_number,
-change_goal_link, change_goal_form, change_goals_inbox and change_goal_list, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
+change_goal_link, change_goal_form, change_goals_inbox, change_goal_list, change_goal_dashboard and log_hours, and in Shopping change_item, item_lists, add_items, change_saved_item, add_order, order_item_tags, review_orders, change_recurring, return_window and change_person, and in the Vault write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme, rename_maya_question, save_transcript and
 change_course, and in Jobs change_role, change_application, add_application_questions, save_answer, set_default_answer, change_company, merge_roles, change_reminder, change_waiting, change_role_email, review_application, review_events, review_emails, change_contact, change_touch, mark_suggestion_sent,
 add_evidence, add_resume_version, attach_resume_pdf, change_career_thought,
@@ -163,6 +164,12 @@ export type ThreadDash = {
   queue?: (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
   /** Keeps a queued paid press as proposed, under the comment that asked for it. */
   saveProposal?: (change: NewDashChange, cause: ThreadCause) => Promise<DashChange>;
+  /**
+   * Keeps a reply that failed or came back unfinished, with its reason and
+   * each model call (plan #2937.2, lib/dash/failures.ts). Never throws.
+   * Absent: not kept.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
 };
 
 /** What a thread's hand-off did: started something, or why not. */
@@ -313,6 +320,23 @@ export async function replyInThread(input: {
       : undefined;
 
   const { handOff, acknowledge } = input;
+  // A reply that fails is kept with why and each call (plan #2937.2).
+  const calls: DashCall[] = [];
+  const failed = async (outcome: DashFailure['outcome'], reason: string) => {
+    try {
+      await dash.recordFailure?.({
+        surface: 'thread',
+        outcome,
+        reason,
+        model: input.voice.model,
+        effort: input.voice.effort ?? null,
+        subjectRef: input.subject.ref,
+        calls,
+      });
+    } catch (error) {
+      console.error('the failed reply was not recorded', error);
+    }
+  };
   const answer = await runDash({
     voice: input.voice,
     context: { surface: 'thread', subject: input.subject, page: null },
@@ -343,8 +367,11 @@ export async function replyInThread(input: {
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,
+    onCall: (call) => calls.push(call),
     now: input.now,
   });
+  if (!answer.ok) await failed(made.length > 0 || queued.length > 0 ? 'unfinished' : 'failed', answer.detail);
+  else if (answer.stop === 'unfinished') await failed('unfinished', UNFINISHED_REASON);
   if (!answer.ok) {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {

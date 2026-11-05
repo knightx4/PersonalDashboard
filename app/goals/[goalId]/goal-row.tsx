@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { AssigneeCell } from '@/components/plan-tree/assignee-cell';
@@ -856,10 +857,12 @@ export function GoalRow({
             <span className="inline-block whitespace-normal leading-snug text-ink-muted sm:pt-1">
               {progressLine(step.rhythmPeriod, current, step.countSource)}
             </span>
-          ) : step.waitsUntil ? (
-            <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
-          ) : step.dueOn ? (
-            <span className="text-ink-muted">Due {formatDate(step.dueOn)}</span>
+          ) : step.waitsUntil || step.dueOn ? (
+            // A date as a small blue chip, as the Plan tab's approved mockup
+            // draws one (plan #2778.12); blue is the app's base accent.
+            <Chip size="sm" className="bg-w-chat-tint font-semibold text-w-chat">
+              {step.waitsUntil ? `Starts ${formatDate(step.waitsUntil)}` : `Due ${formatDate(step.dueOn!)}`}
+            </Chip>
           ) : null
         }
         quickActions={

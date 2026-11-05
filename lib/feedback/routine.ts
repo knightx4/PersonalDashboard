@@ -177,44 +177,51 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
- * The one routine that builds every project's steps (plan #2553.3), so a new
- * project needs nothing set up on claude.ai. It checks out this repository,
- * adds the project's repository to the session, and builds there; its
- * standing prompt is .claude/skills/plan/reference/project-routine.md.
+ * The standing broker session's wake-up task (plan #2789.2): the routine a
+ * message in a Chat session thread fires to wake the broker.
  *
- * No fallback to the plan routine or the shared token: the plan routine
- * builds in this repository, and a project's step built there would land in
- * the wrong place. With either unset a project with no routine of its own is
- * refused and nothing starts.
+ * No fallback to the shared id or any other routine's token: a thread message
+ * sent to the plan routine would build a step instead. Not in ROUTINE_FIRES,
+ * because no button fires it; the wake-time measurement
+ * (lib/threads/broker-wake-test.ts) and the thread send do.
  */
-export function projectsRoutine(): RoutineTarget {
+export function brokerRoutine(): RoutineTarget {
   return {
-    id: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_ID),
-    token: firstSet(process.env.CLAUDE_PROJECTS_ROUTINE_TOKEN),
+    id: firstSet(process.env.CLAUDE_BROKER_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_BROKER_ROUTINE_TOKEN),
   };
 }
 
 /**
- * The routine of a project's own, when its row names one and the deployment
- * sets its id: the override the website keeps until the shared routine has
- * built one of its steps (#2553.4). Its token falls back to the shared one,
- * as it did before there was a shared routine.
+ * Where a project's steps go: the
+ * projects dispatcher (.claude/skills/plan/reference/project-dispatch.md).
+ *
+ * No routine can build in a project's repository unless that repository is
+ * saved on the routine by hand: a routine's runs reach only the repositories
+ * saved on it, they get no add_repo, the fire API carries text alone, and the
+ * git proxy refuses a push to any repository outside the session's own
+ * (runs of 30 October and 1 November). A session started with the project's
+ * repository as its source can push to it, and the dispatcher, a standing
+ * session of this repository woken every hour, starts one for each queued
+ * run. So a run sent here is not fired: `startRoutineRun` records it, brief
+ * and all, and the dispatcher picks it up.
  */
-export function ownProjectRoutine(project: DevProject): RoutineTarget | null {
-  const env = project.routineEnv;
-  const id = env ? firstSet(process.env[env.id]) : null;
-  if (!env || !id) return null;
-  return { id, token: firstSet(process.env[env.token], process.env.CLAUDE_API_KEY) };
+export const PROJECTS_DISPATCHER = 'projects-dispatcher';
+
+export function projectsRoutine(): RoutineTarget {
+  return { id: PROJECTS_DISPATCHER, token: PROJECTS_DISPATCHER };
 }
 
 /**
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan, a reply to a run's
- * question, and the overnight runner: the project's own when it has one, and
- * the shared projects routine otherwise.
+ * question, and the overnight runner: the projects dispatcher, for every
+ * project.
  */
-export function projectRoutine(project: DevProject): RoutineTarget {
-  return ownProjectRoutine(project) ?? projectsRoutine();
+// The project stays in the signature: callers and the routine table name one.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function projectRoutine(_project: DevProject): RoutineTarget {
+  return projectsRoutine();
 }
 
 /**

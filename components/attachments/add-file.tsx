@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useImperativeHandle, useRef, useState } from 'react';
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -56,6 +56,7 @@ export function AddFile({
   disabled = false,
   onUploadingChange,
   iconOnPhone = false,
+  plus = false,
 }: {
   ref?: React.Ref<AddFileHandle>;
   value: readonly UploadedAttachment[];
@@ -71,6 +72,8 @@ export function AddFile({
    * (plan #2458.5).
    */
   iconOnPhone?: boolean;
+  /** Draw the button as a + alone at every width, as Claude's box has it (plan #2863). */
+  plus?: boolean;
 }) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -135,7 +138,18 @@ export function AddFile({
           void choose(files);
         }}
       />
-      {iconOnPhone ? (
+      {plus ? (
+        <Tooltip label="Add a file">
+          <IconButton
+            label={uploading ? 'Adding…' : 'Add a file'}
+            disabled={disabled || uploading || room <= 0}
+            aria-describedby={errors.length > 0 ? errorId : undefined}
+            onClick={() => input.current?.click()}
+          >
+            <Plus strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Tooltip>
+      ) : iconOnPhone ? (
         <Tooltip label="Add a file">
           <Button
             type="button"

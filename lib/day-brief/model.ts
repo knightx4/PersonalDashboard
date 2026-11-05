@@ -2,8 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import { BODY_MAX, picksPrompt, TITLE_MAX } from './notification';
 import { PICKS_MAX, shortlistPrompt, type DayBriefPick, type Shortlisted } from './picks';
 import { MODELS } from '@/lib/core/models';
@@ -61,28 +61,25 @@ export async function writeBrief(
     model: BRIEF_MODEL,
     max_tokens: 400,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: `Give today's notification: a title of at most ${TITLE_MAX} characters naming the first pick, and a body of at most ${BODY_MAX}.`,
-        input_schema: {
-          type: 'object',
-          properties: {
-            title: { type: 'string', maxLength: TITLE_MAX },
-            body: { type: 'string', maxLength: BODY_MAX },
-          },
-          required: ['title', 'body'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: `Give today's notification: a title of at most ${TITLE_MAX} characters naming the first pick, and a body of at most ${BODY_MAX}.`,
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', maxLength: TITLE_MAX },
+          body: { type: 'string', maxLength: BODY_MAX },
         },
+        required: ['title', 'body'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, BRIEF_MODEL),
+    }, BRIEF_MODEL),
     messages: [{ role: 'user', content: picksPrompt(day, picks) }],
   });
   options.onSpend?.({ model: BRIEF_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return null;
-  const parsed = Reply.safeParse(block.input);
+  const report = readReport(response, TOOL_NAME, BRIEF_MODEL);
+  if (!report.ok) return null;
+  const parsed = Reply.safeParse(report.value);
   return parsed.success ? parsed.data : null;
 }
 
@@ -117,24 +114,21 @@ export async function choosePicks(
     model: BRIEF_MODEL,
     max_tokens: 300,
     system: PICK_SYSTEM,
-    tools: [
-      {
-        name: PICK_TOOL,
-        description: `Give the keys of the one to ${PICKS_MAX} things that matter most today, the most important first.`,
-        input_schema: {
-          type: 'object',
-          properties: { keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: PICKS_MAX } },
-          required: ['keys'],
-        },
+    ...reportRequest({
+      name: PICK_TOOL,
+      description: `Give the keys of the one to ${PICKS_MAX} things that matter most today, the most important first.`,
+      input_schema: {
+        type: 'object',
+        properties: { keys: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: PICKS_MAX } },
+        required: ['keys'],
       },
-    ],
-    tool_choice: forceTool(PICK_TOOL, BRIEF_MODEL),
+    }, BRIEF_MODEL),
     messages: [{ role: 'user', content: shortlistPrompt(day, list) }],
   });
   options.onSpend?.({ model: BRIEF_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === PICK_TOOL);
-  if (!block || block.type !== 'tool_use') return null;
-  const parsed = PickReply.safeParse(block.input);
+  const report = readReport(response, PICK_TOOL, BRIEF_MODEL);
+  if (!report.ok) return null;
+  const parsed = PickReply.safeParse(report.value);
   return parsed.success ? parsed.data.keys : null;
 }

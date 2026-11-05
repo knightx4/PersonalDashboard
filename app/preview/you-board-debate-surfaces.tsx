@@ -1,6 +1,6 @@
 'use client';
 
-import { MeetingView, type MeetingActions } from '@/app/you/board/[id]/meeting-view';
+import { MeetingView, type MeetingActions } from '@/app/you/council/[id]/meeting-view';
 import { parseMinutes, scorecardFrom, type BoardMeeting } from '@/lib/you/board';
 import { debateFrom } from '@/lib/you/board-debate';
 import type { DecisionReview, PickScore } from '@/lib/you/board-reviews';
@@ -11,7 +11,7 @@ import { boardReviews } from './you-board-surfaces';
  * the first argued by the five seats and a guest through all three rounds,
  * the second unanimous in round 1 so two advisors argue the option nobody
  * backed. Drawn finished, still being held with the second question not yet
- * reached, and with one advisor's thinking open. The fixtures are invented
+ * reached. The fixtures are invented
  * and run as long as a real meeting's turns do.
  */
 
@@ -41,7 +41,7 @@ const advisorRows = [
   {
     id: A.mentor,
     key: 'mentor',
-    name: 'Mentor',
+    name: 'Jerwyn the Elder',
     kind: 'seat',
     question: 'Does this build toward a career you would want in ten years?',
     focus: 'Five to ten years: what you are building, and what you are not.',
@@ -525,7 +525,6 @@ const actions: MeetingActions = {
 export function YouBoardDebatePreview({
   state = 'ready',
   assumed = false,
-  advisor,
   decision,
   make,
   reviewed = false,
@@ -535,8 +534,6 @@ export function YouBoardDebatePreview({
   reviewed?: boolean;
   /** The first verdict names its assumptions. */
   assumed?: boolean;
-  /** Draw this advisor's thinking open. */
-  advisor?: keyof typeof A;
   /** 'made': both decided. 'open': the form open on a decided question's change. 'error': the form with a failed save. */
   decision?: 'made' | 'open' | 'error';
   /** Make it happen under the decision (plan #2561.9): 'todos' as first offered, 'steps' with a goal picked, 'steps-error' with a goal picked and a failed write, 'made' after the action was written. */
@@ -592,10 +589,11 @@ export function YouBoardDebatePreview({
         ref: null,
         path: [
           { label: 'You', href: '/you' },
-          { label: 'Board', href: '/you/board' },
+          { label: 'Council', href: '/you/council' },
+          { label: 'Decisions', href: '/you/council/decisions' },
           {
-            label: running ? 'Board meeting' : 'Board meeting 1 Nov 2026',
-            href: `/you/board/${MEETING}`,
+            label: running ? 'Council meeting' : 'Council meeting 1 Nov 2026',
+            href: `/you/council/${MEETING}`,
           },
         ],
       }}
@@ -604,7 +602,6 @@ export function YouBoardDebatePreview({
       actions={actions}
       decide={decide}
       open={{
-        ...(advisor ? { advisor: A[advisor] } : {}),
         ...(decision === 'open' || decision === 'error' ? { decide: decision } : {}),
         ...(make === 'steps-error' ? { make: 'error' as const } : {}),
       }}

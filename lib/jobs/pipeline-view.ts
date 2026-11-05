@@ -318,6 +318,12 @@ export function pipelineHref(
   return addressHref(PIPELINE_ADDRESS, params, changes);
 }
 
+/**
+ * Where interviews are listed since the Interviews page folded into Pipeline
+ * (plan #1496.7.1): the roles in process, each opening on its rounds.
+ */
+export const INTERVIEWS_HREF = pipelineHref({}, { stage: 'in_process' });
+
 /** Where an old /jobs/roles link lands: the table, with what it asked for. */
 export function rolesRedirect(params: PipelineParams): string {
   return pipelineHref(params, { view: 'table' });

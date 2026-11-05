@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ITEM_COLUMNS, planItemFromRow, type PlanData } from '@/lib/plan/load';
 import type { OvernightRun } from '@/lib/plan/overnight';
-import { chooseOvernightFeature, readyFeatureCount } from '@/lib/plan/overnight-choice';
+import { chooseOvernightFeature, finishedFeatures, readyFeatureCount } from '@/lib/plan/overnight-choice';
 import { buildPlanTree, workOrder, type PlanSection } from '@/lib/plan/tree';
 import { asUser, closeDb, createUser, truncateAll } from '../helpers/db';
 
@@ -136,11 +136,12 @@ describe('the runner beside an overhaul', () => {
     choice = chooseOvernightFeature(tree, night, NOW);
     expect(choice.act === 'fire' && [choice.feature.id, choice.step.id]).toEqual([feature, second]);
 
-    // With its steps closed, the feature itself is what is left to close.
+    // With its steps closed, the feature is closed by the tick rather than
+    // sent: a session sent at it would have nothing left to build.
     await close(second);
     tree = await readTree();
-    choice = chooseOvernightFeature(tree, night, NOW);
-    expect(choice.act === 'fire' && [choice.feature.id, choice.step.id]).toEqual([feature, feature]);
+    expect(finishedFeatures(tree).map((f) => f.id)).toEqual([feature]);
+    expect(chooseOvernightFeature(tree, night, NOW).act).toBe('end');
 
     // Once it is closed the runner has nothing, though the overhaul's step is
     // still ready for the overhaul's own routine.

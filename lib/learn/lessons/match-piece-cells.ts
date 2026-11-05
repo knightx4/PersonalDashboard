@@ -1,9 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { PIECE_CELLS_MAX, pieceCellsPrompt, readPieceCells, type PieceToMatch, type TerritoryCell } from './piece-cells';
 
 /**
@@ -59,30 +59,27 @@ export async function matchPieceCells(input: {
       model: PIECE_CELLS_MODEL,
       max_tokens: 1200,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the levels each piece teaches.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              pieces: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    piece: { type: 'integer' },
-                    cells: { type: 'array', items: { type: 'string' } },
-                  },
-                  required: ['piece', 'cells'],
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the levels each piece teaches.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            pieces: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  piece: { type: 'integer' },
+                  cells: { type: 'array', items: { type: 'string' } },
                 },
+                required: ['piece', 'cells'],
               },
             },
-            required: ['pieces'],
           },
+          required: ['pieces'],
         },
-      ],
-      tool_choice: forceTool(TOOL, PIECE_CELLS_MODEL),
+      }, PIECE_CELLS_MODEL),
       messages: [{ role: 'user', content: pieceCellsPrompt({ ...input, tool: TOOL }) }],
     });
   } catch (error) {
@@ -90,9 +87,9 @@ export async function matchPieceCells(input: {
   }
   input.onSpend?.({ model: PIECE_CELLS_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const cells = readPieceCells(block.input, input.pieces.length, input.cells);
+  const report = readReport(response, TOOL, PIECE_CELLS_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const cells = readPieceCells(report.value, input.pieces.length, input.cells);
   if (!cells) return { ok: false, detail: 'The levels for the pieces came back malformed.' };
   return { ok: true, cells };
 }
