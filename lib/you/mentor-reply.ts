@@ -6,7 +6,14 @@ import { DASH_TOOLS } from '@/lib/dash/registry';
 import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
-import { PEOPLE_ACTION_RULES, PEOPLE_TOOLS, peopleActing, type PeopleDash } from '@/lib/you/people-actions';
+import {
+  PEOPLE_ACTION_RULES,
+  PEOPLE_TOOLS,
+  PEOPLE_WEB_RULES,
+  peopleActing,
+  peopleServerTools,
+  type PeopleDash,
+} from '@/lib/you/people-actions';
 import {
   ACK_AFTER_MS,
   ACK_MAX_TOKENS,
@@ -284,9 +291,10 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   const voice: DashVoice = {
     model: input.model,
     system: acting
-      ? `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_ACTION_RULES}`
-      : `${ctx.layers.persona.text}\n\n${REPLY_RULES}`,
+      ? `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}\n\n${PEOPLE_ACTION_RULES}`
+      : `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}`,
     tools: acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS,
+    serverTools: peopleServerTools(input.model),
     maxTokens: REPLY_MAX_TOKENS,
   };
   const rest = (['memory', 'episodes', 'recall', 'live'] as const).map((layer) => ctx.layers[layer].text).filter(Boolean);

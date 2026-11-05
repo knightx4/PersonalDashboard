@@ -4,7 +4,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { claimTyping, MENTOR_LOOKUPS, REPLY_RULES, replyToMentor, type MentorSpendOperation } from './mentor-reply';
 import { sendMentorText } from './mentor-send';
-import { PEOPLE_ACTION_RULES } from './people-actions';
+import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -223,6 +223,10 @@ describe('replyToMentor', () => {
     expect(tools).not.toContain('show_chart');
     const system = (acting.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
     expect(system).toContain(PEOPLE_ACTION_RULES);
+    // Web search is in the core set, acting or not (plan #2861).
+    expect(tools[0]).toBe('web_search');
+    expect(lookupsOnly[0]).toBe('web_search');
+    expect(system).toContain(PEOPLE_WEB_RULES);
   });
 
   it('saves the first bubble while the rest is still being written', async () => {
