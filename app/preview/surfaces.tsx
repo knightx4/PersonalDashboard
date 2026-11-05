@@ -706,6 +706,11 @@ import {
   ShoppingSharesSurface,
 } from './shopping-page-surfaces';
 import {
+  VaultMapIdeasEmptySurface,
+  VaultMapIdeasErrorSurface,
+  VaultMapIdeasLoadingSurface,
+  VaultMapIdeasSortSurface,
+  VaultMapIdeasSurface,
   VaultMapSurface,
   VaultMayaSurface,
   VaultMayaThreadSurface,
@@ -14359,6 +14364,42 @@ export const SURFACES: readonly Surface[] = [
     module: 'vault',
     width: 'page',
     render: () => <VaultMapSurface />,
+  },
+  /* The Ideas view and its hidden parts (plan #2947.5). */
+  {
+    id: 'vault-map-ideas',
+    label: 'Vault · Map, your ideas ranked by score',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapIdeasSurface />,
+  },
+  {
+    id: 'vault-map-ideas-sort',
+    label: 'Vault · Map ideas, the sort menu open',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapIdeasSortSurface />,
+  },
+  {
+    id: 'vault-map-ideas-empty',
+    label: 'Vault · Map ideas, nothing scored yet',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapIdeasEmptySurface />,
+  },
+  {
+    id: 'vault-map-ideas-loading',
+    label: 'Vault · Map ideas, reading the scores',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapIdeasLoadingSurface />,
+  },
+  {
+    id: 'vault-map-ideas-error',
+    label: 'Vault · Map ideas, the scores could not be read',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapIdeasErrorSurface />,
   },
   {
     id: 'vault-theme',

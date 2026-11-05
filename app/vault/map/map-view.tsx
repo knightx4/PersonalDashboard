@@ -12,23 +12,45 @@ import { SweepAction, SweepPanel } from './sweep-panel';
 import { PageColumn } from '@/components/shell/page-width';
 import { sectionSubject } from '@/lib/core/section-path';
 import { formatNumber } from '@/lib/money';
+import type { MapView } from '@/lib/vault/map/ideas';
+import { MapViewSwitch } from './ideas-view';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
- * gallery can draw it from fixtures (plan #1605).
+ * gallery can draw it from fixtures (plan #1605). With `view="ideas"` the
+ * themes give way to `ideas`, the ranked list of scored ideas (plan #2947.5),
+ * which the page reads inside a Suspense boundary of its own.
  */
 export function VaultMapView({
   themes,
   capped,
   sweep,
   mergeLog,
+  view = 'themes',
+  ideas,
 }: {
   themes: ThemeListRow[];
   capped: boolean;
   sweep: SweepView | null;
   mergeLog: MergeLogPage;
+  view?: MapView;
+  ideas?: React.ReactNode;
 }) {
   const mergeTotal = mergeLog.counts.theme + mergeLog.counts.position;
+
+  if (view === 'ideas') {
+    return (
+      <PageColumn>
+        <PageHeader
+          subject={sectionSubject('/vault/map', 'Map')}
+          title="Map"
+          actions={<SweepAction sweep={sweep} />}
+        />
+        <SweepPanel sweep={sweep} />
+        {ideas}
+      </PageColumn>
+    );
+  }
 
   if (themes.length === 0) {
     return (
@@ -64,6 +86,9 @@ export function VaultMapView({
       />
       <SweepPanel sweep={sweep} />
 
+      <div className="mb-3">
+        <MapViewSwitch view="themes" />
+      </div>
       <p className="mb-3 text-body text-ink-muted">
         {themes.length} {themes.length === 1 ? 'theme' : 'themes'}, most written about first
         {capped && ` (the first ${THEME_LIST_LIMIT} are shown)`}
