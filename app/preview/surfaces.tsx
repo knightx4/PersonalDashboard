@@ -513,6 +513,8 @@ import {
   ChatGroupSurface,
   ChatPeopleSurface,
   ChatThreadChangesSurface,
+  ChatThreadWorkingSurface,
+  ChatThreadBuildsSurface,
   ChatThreadSurface,
   ChatTypingMomentSurface,
 } from './chat-surfaces';
@@ -9019,6 +9021,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadChangesSurface />,
+  },
+  {
+    /* The live card (plan #2854.3): you asked for two things, both are made and the reply is still coming, so a small card at the foot says the newest, where the typing would be. */
+    id: 'chat-people-thread-working',
+    label: 'Chat · A thread, them working on what you asked',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadWorkingSurface />,
+  },
+  {
+    /* Builds followed from the thread (plan #2854.3): three confirmed builds, one built, one waiting on your answer and one going, each saying where it stands with its step's link. */
+    id: 'chat-people-thread-builds',
+    label: 'Chat · A thread, the builds you started there',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadBuildsSurface />,
   },
   {
     /* Them typing: the dots at the foot of the thread, typing… in their row of the list, and Delivered under your message. */
