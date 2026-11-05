@@ -11,10 +11,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/inngest/core/dash-quality', () => ({
   runDashQualityCheck: vi.fn(async () => ({ runId: 'r-1', cases: 3, passed: 3, alerts: 0, noteId: null })),
+  runModelReplyCheck: vi.fn(async () => ({ runId: 'r-2', probes: 14, passed: 14, costMicros: 21_000, noteId: null })),
 }));
 
 const { GET, POST } = await import('@/app/api/cron/dash-quality/route');
-const { runDashQualityCheck } = await import('@/inngest/core/dash-quality');
+const { runDashQualityCheck, runModelReplyCheck } = await import('@/inngest/core/dash-quality');
 const { NextRequest } = await import('next/server');
 
 function request(token: string | null, query = '') {
@@ -46,6 +47,14 @@ describe('the Dash quality route', () => {
     expect(runDashQualityCheck).toHaveBeenLastCalledWith('manual', '1d7c8aaf-3ef1-499e-bae0-24899ddfe6e2');
     await GET(request('secret-token', '?trigger=manual&case=not-an-id'));
     expect(runDashQualityCheck).toHaveBeenLastCalledWith('manual', null);
+  });
+
+  it('runs the model reply check for its own trigger, and nothing else', async () => {
+    vi.mocked(runModelReplyCheck).mockClear();
+    const response = await GET(request('secret-token', '?trigger=models'));
+    expect(await response.json()).toMatchObject({ ok: true, runId: 'r-2', probes: 14 });
+    expect(runModelReplyCheck).toHaveBeenCalledTimes(1);
+    expect(runDashQualityCheck).not.toHaveBeenCalled();
   });
 
   it('runs the free health read for a trigger it does not know, so a stray call spends nothing', async () => {
@@ -105,5 +114,22 @@ describe('the schedule since 0279', () => {
     expect(monthly).toMatch(/revoke all on function core\.run_dash_quality\(uuid\) from public, anon, authenticated/);
     expect(monthly).toMatch(/grant execute on function core\.run_dash_quality\(uuid\) to service_role/);
     expect(monthly).toContain("'&case=' || p_case::text");
+  });
+});
+
+describe('the model reply schedule (0297)', () => {
+  const models = statementsOf('0297_dash_quality_model_replies.sql');
+
+  it('runs every day, after the health run, through its own trigger', () => {
+    const unschedule = models.indexOf("jobname = 'dash-quality-models-daily'");
+    expect(unschedule).toBeGreaterThan(-1);
+    expect(unschedule).toBeLessThan(models.indexOf('cron.schedule('));
+    expect(models).toMatch(/'dash-quality-models-daily',\s*'27 7 \* \* \*'/);
+    expect(models).toContain("'/api/cron/dash-quality?trigger=models'");
+    expect(models).toContain("'models'))");
+  });
+
+  it('keeps to the schema: no rows are changed', () => {
+    expect(models).not.toMatch(/\b(insert into|update core|delete from)\b/i);
   });
 });

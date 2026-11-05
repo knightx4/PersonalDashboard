@@ -426,6 +426,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // About ten Ask Dash answers, each around four calls of a 75,000-token
   // prompt that is mostly read from the cache; a few hundred tokens out each.
   'check-dash-quality': background(run(SONNET, 400_000, 6_000)),
+  // About fourteen probes across the three models, a few hundred tokens each
+  // way; costed as Sonnet, the middle of the three.
+  'check-model-replies': background(run(SONNET, 6_000, 2_500)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.

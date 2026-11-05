@@ -48,6 +48,12 @@ fix, re-ask the one case it is about, never all of them.
 - **Monthly case run**, 07:17 UTC on the 1st (trigger `monthly`): also asks
   every active case of the deployed Dash with the person's chosen model,
   read-only and kept out of their chats, and grades each answer. About $1.
+- **Daily model reply run**, 07:27 UTC (trigger `models`, migration 0297,
+  `lib/dash/quality/model-replies.ts`): four small probes per model the app
+  calls, at effort low and under five cents, each reply held to its rules in
+  `lib/core/model-rules.ts`. A broken rule writes a Dev note starting "Model
+  reply check:" that names the model and the rule; the fix is the rule, or
+  `readReply` in `lib/core/model-call.ts` for a new shape.
 - **One case by hand**: `npx tsx scripts/sql.ts "select core.run_dash_quality('<case id>')"`
   re-asks one case against whatever is deployed, in under a minute, for a
   few cents. This is how a fix is proven. `core.run_dash_quality()` with no
