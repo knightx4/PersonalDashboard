@@ -456,9 +456,14 @@ async function main() {
 
         await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
         await wait(100);
+        // A capture beyond the window resizes it while it draws, and a pane
+        // scrolled to a section inside the shell could come back at its end:
+        // chat-person-edit-reach-out-failed did on more than half its laptop
+        // takes (plan #2879.4.1). A page no taller than the window has nothing
+        // beyond it, so it is captured as it stands.
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
-          captureBeyondViewport: !windowOnly,
+          captureBeyondViewport: !windowOnly && pageHeight > size.height,
           ...(clipped
             ? { clip: { x: 0, y: 0, width: size.width, height: clipHeight, scale: 1 } }
             : {}),
