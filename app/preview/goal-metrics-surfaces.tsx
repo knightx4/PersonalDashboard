@@ -101,8 +101,26 @@ const DASH_FILES: MetricView = {
   counts: counted('month', '2026-10-01T09:00:00Z', []),
 };
 
+/** The applications kind: sent applications by the week, this week's count in full accent (plan #2908.2). */
+const SENT: MetricView = {
+  id: 'm-sent',
+  name: 'Job applications sent',
+  period: 'week',
+  target: 5,
+  source: 'applications',
+  list: null,
+  field: null,
+  counts: counted('week', '2026-09-14T09:00:00Z', [
+    '2026-09-15', '2026-09-16', '2026-09-22', '2026-09-23', '2026-09-24', '2026-10-06',
+    '2026-10-07', '2026-10-08', '2026-10-13', '2026-10-14',
+  ]),
+};
+
+/** The applications kind before any is sent: zero counts. */
+const SENT_NONE: MetricView = { ...SENT, id: 'm-sent-none', counts: counted('week', '2026-10-12T09:00:00Z', []) };
+
 export function GoalMetricsSurface() {
-  return <GoalMetrics metrics={[APPLICATIONS, INTERVIEWS, RUNS]} />;
+  return <GoalMetrics metrics={[SENT, APPLICATIONS, INTERVIEWS, RUNS]} />;
 }
 
 /** Hovering or focusing a bar: the tooltip held on the week of 21 Sep, the busiest. */
@@ -112,10 +130,15 @@ export function GoalMetricsTooltipSurface() {
 
 /** Nothing counted yet: a list with no records, and a steps and a files metric. */
 export function GoalMetricsEmptySurface() {
-  return <GoalMetrics metrics={[NOTHING, STEPS_CLOSED, DASH_FILES]} />;
+  return <GoalMetrics metrics={[NOTHING, STEPS_CLOSED, DASH_FILES, SENT_NONE]} />;
 }
 
 /** The read failed: the section's own message. */
 export function GoalMetricsErrorSurface() {
-  return <GoalMetrics metrics={null} />;
+  return (
+    <div className="space-y-4">
+      <GoalMetrics metrics={[{ ...SENT_NONE, id: 'm-sent-unread', unread: true }, RUNS]} />
+      <GoalMetrics metrics={null} />
+    </div>
+  );
 }

@@ -71,6 +71,17 @@ const METRICS: Metric[] = [
     target: null,
     position: 3,
   },
+  {
+    id: 'm-sent',
+    goalId: GOAL_ID,
+    name: 'Job applications sent',
+    source: 'applications',
+    collectionId: null,
+    dateField: null,
+    period: 'week',
+    target: null,
+    position: 4,
+  },
 ];
 
 function Column({ children }: { children: React.ReactNode }) {

@@ -252,6 +252,19 @@ describe('loadMetricCounts for applications', () => {
     expect(calls.some((c) => c.table === 'items' || c.table === 'progress_entries')).toBe(false);
   });
 
+  it('marks the metric unread when the applications cannot be read, and keeps the others', async () => {
+    const sent = { ...row, user_id: 'u1', id: 'm4', source: 'applications', collection_id: null, date_field: null };
+    const { client } = fakeClient({
+      metrics: { data: [sent], error: null },
+      applications: { data: null, error: { message: 'down' } },
+    });
+    const [metric] = await loadMetricCounts(client, { id: 'g1', createdAt: null }, 'UTC', {
+      core: fakeClient({}).client as never,
+    });
+    expect(metric.unread).toBe(true);
+    expect(metric.counts).toEqual([]);
+  });
+
   it('reads no applications for a goal without an applications metric', async () => {
     const { client, calls } = fakeClient({ metrics: { data: [row], error: null }, records: { data: [], error: null } });
     await loadMetricCounts(client, { id: 'g1', createdAt: null }, 'UTC', { core: fakeClient({}).client as never });
