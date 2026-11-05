@@ -177,6 +177,22 @@ export function overhaulRoutine(): RoutineTarget {
 }
 
 /**
+ * The standing broker session's wake-up task (plan #2789.2): the routine a
+ * message in a Chat session thread fires to wake the broker.
+ *
+ * No fallback to the shared id or any other routine's token: a thread message
+ * sent to the plan routine would build a step instead. Not in ROUTINE_FIRES,
+ * because no button fires it; the wake-time measurement
+ * (lib/threads/broker-wake-test.ts) and the thread send do.
+ */
+export function brokerRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_BROKER_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_BROKER_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * Where a project's steps go: the
  * projects dispatcher (.claude/skills/plan/reference/project-dispatch.md).
  *
