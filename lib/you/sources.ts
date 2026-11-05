@@ -245,7 +245,9 @@ export const youSources: ModuleSources = {
       href: () => '/you/council',
       section: BOARD,
       page: null,
-      note: 'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029).',
+      note:
+        'advisor_id points at you.board_advisors, the advisor they talked to. What was said is in you.advisor_messages (you 0029). ' +
+        'kind is direct or group; a group has a null advisor_id and its bots in you.advisor_chat_members, and title is the name they gave it or null (you 0042).',
     },
     {
       table: 'you.advisor_messages',
@@ -261,7 +263,8 @@ export const youSources: ModuleSources = {
       parent: parentBy('chat_id', 'you.advisor_chats'),
       note:
         'role is person (what they said) or advisor (written by Dash in the advisor\'s voice), so cite only role person as theirs. ' +
-        'chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038).',
+        'chat_id points at you.advisor_chats (you 0029). kind is reply, ack or text_first (a mentor writing unasked) (you 0038). ' +
+        'speaker_id is the bot that wrote an advisor message in a group chat (you 0042).',
     },
     {
       table: 'you.advisor_episodes',
@@ -282,6 +285,14 @@ export const youSources: ModuleSources = {
     },
   ],
   notSources: [
+    {
+      table: 'you.advisor_chat_members',
+      reason: 'Join rows naming which bots are in a group chat and whether each is typing; what was said is in you.advisor_messages.',
+    },
+    {
+      table: 'you.advisor_message_reactions',
+      reason: "A bot's tap back on a message in a group, written by Dash in the bot's voice; nothing the person wrote or did.",
+    },
     {
       table: 'you.course_overviews',
       reason:
@@ -306,6 +317,7 @@ export const youSources: ModuleSources = {
     { table: 'you.council_notes', reason: 'Advice the Council\'s mentors wrote unasked, by Dash in each mentor\'s voice, with the person\'s reaction; Goals reading it would cite Dash to itself.' },
     { table: 'you.council_runs', reason: 'Bookkeeping for the board-routine sessions that write Council notes and mentors\' replies.' },
     { table: 'you.advisor_persona_versions', reason: 'The persona cards a mentor had before their current one, kept so an earlier card can be brought back; a setting of the mentor, not something they wrote, wanted or did.' },
+    { table: 'you.first_text_events', reason: 'Bookkeeping for texts someone on People sends unasked: what happened on the plan and whether it was texted yet; the plan rows themselves are what happened.' },
     { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.personality_profiles', reason: 'Dash\'s analysis across their personality tests; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },

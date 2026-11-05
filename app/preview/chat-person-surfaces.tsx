@@ -5,15 +5,18 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { tabsFor } from '@/lib/shell/tabs';
 import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import { newPersonCard, type PersonCard } from '@/lib/you/people-cards-model';
-import { PeopleView } from '@/app/chat/people-view';
+import { BotsView } from '@/app/chat/bots-view';
 import { PersonForm } from '@/app/chat/people/person-form';
-import { CHAT_PEOPLE } from './chat-surfaces';
+import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
+import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
 /**
- * Adding and editing a person in Chat (plan #2748.11), in the gallery: the
- * form for someone new, empty, while Dash drafts their card, and when the
- * draft failed; and the form for a mentor already there, with their card,
- * the earlier cards, what they remember and the confirm before a line goes.
+ * Chat's Bots tab (plan #2879.3) in the gallery: every bot A to Z, with none,
+ * and not read; the form for a new bot (plan #2748.11), empty, while Dash
+ * drafts their card, and when the draft failed; and the form for a bot
+ * already there, with their card, the earlier cards, what they remember and
+ * the confirm before a line goes, the confirm before the bot is deleted, and
+ * a seat, which cannot be.
  */
 
 const NOW = Date.parse('2026-11-03T09:00:00Z');
@@ -48,6 +51,7 @@ export const FRANKLIN_PERSON: PersonCard = {
   },
   persona: FRANKLIN_CARD,
   joinsMeetings: true,
+  texts: null,
   versions: [
     {
       id: 'v2',
@@ -119,12 +123,21 @@ function Shell({ path, children }: { path: string; children: React.ReactNode }) 
   );
 }
 
+/** The Bots tab with nothing open: every bot A to Z, none at all, or not read. */
+export function ChatBotsSurface({ state = 'list' }: { state?: 'list' | 'empty' | 'failed' }) {
+  return (
+    <Shell path="/chat/bots">
+      <BotsView rows={state === 'list' ? EVERYONE : []} failed={state === 'failed'} />
+    </Shell>
+  );
+}
+
 /** The form for someone new: empty, filled in while Dash drafts, or after a draft failed. */
 export function ChatPersonAddSurface({ state = 'empty' }: { state?: 'empty' | 'drafting' | 'failed' }) {
   const card = state === 'empty' ? newPersonCard(CHAT_PEOPLE.map((p) => p.colour)) : NEW_FILLED;
   return (
-    <Shell path="/chat">
-      <PeopleView rows={CHAT_PEOPLE} timezone={ZONE} now={NOW} live={false} adding>
+    <Shell path="/chat/bots">
+      <BotsView rows={EVERYONE} adding>
         <PersonForm
           card={card}
           timezone={ZONE}
@@ -133,26 +146,112 @@ export function ChatPersonAddSurface({ state = 'empty' }: { state?: 'empty' | 'd
           draftError={state === 'failed' ? 'Dash is busy and could not draft the card.' : null}
           scrollTo={state === 'empty' ? null : 'card'}
         />
-      </PeopleView>
+      </BotsView>
     </Shell>
   );
 }
 
-/** The form for a mentor already there: the top, the card with earlier cards, redrafting, or the memory with a remove confirming. */
-export function ChatPersonEditSurface({ state = 'form' }: { state?: 'form' | 'card' | 'redrafting' | 'memory' }) {
+/** The Skeptic, one of the board's seats: its form says it cannot be deleted. */
+const SKEPTIC_SEAT: PersonCard = {
+  ...FRANKLIN_PERSON,
+  id: '00000000-0000-4000-8000-000000000004',
+  key: 'skeptic',
+  name: 'The Skeptic',
+  colour: MENTOR_PALETTE[5],
+  kind: 'seat',
+  brief: {
+    who: 'Pushes back',
+    length: 'short',
+    bubbles: 'one',
+    tone: 'Blunt, fair, never cruel',
+    cares: 'What could go wrong, and what you would do if it did.',
+    never: 'Cheerleading, or agreeing to keep the peace.',
+  },
+  persona: `Who you are
+You are the Skeptic, the seat on the board whose job is to find the hole in the plan before the world does.
+
+How you talk
+One short text a reply. Ask the question nobody wants asked, then stop.
+
+What you care about
+The downside nobody has priced, the evidence behind a claim, and what would change the person's mind.
+
+What you never do
+Cheerlead, pile on, or agree just to keep the peace.`,
+  versions: [],
+  memory: [],
+};
+
+/**
+ * The form for a bot already there: the top, the card with earlier cards,
+ * redrafting, the memory with a remove confirming, the confirm before it is
+ * deleted, or a seat's foot, which says why it stays.
+ */
+export function ChatPersonEditSurface({
+  state = 'form',
+}: {
+  state?: 'form' | 'card' | 'redrafting' | 'memory' | 'delete' | 'seat';
+}) {
+  const card = state === 'seat' ? SKEPTIC_SEAT : FRANKLIN_PERSON;
   return (
-    <Shell path={`/chat/people/${FRANKLIN_PERSON.key}`}>
-      <PeopleView rows={CHAT_PEOPLE} current={FRANKLIN_PERSON.key} timezone={ZONE} now={NOW} live={false}>
+    <Shell path={`/chat/bots/${card.key}`}>
+      <BotsView rows={EVERYONE} current={card.key}>
         <PersonForm
-          card={FRANKLIN_PERSON}
+          key={state}
+          card={card}
           timezone={ZONE}
           now={NOW}
           drafting={state === 'redrafting'}
           removing={state === 'memory' ? 'mem2' : null}
           editing={state === 'memory' ? 'mem1' : null}
-          scrollTo={state === 'card' ? 'versions' : state === 'redrafting' ? 'card' : state === 'memory' ? 'memory' : null}
+          deleting={state === 'delete'}
+          scrollTo={
+            state === 'card'
+              ? 'versions'
+              : state === 'redrafting'
+                ? 'card'
+                : state === 'memory'
+                  ? 'memory'
+                  : state === 'delete' || state === 'seat'
+                    ? 'delete'
+                    : null
+          }
         />
-      </PeopleView>
+      </BotsView>
+    </Shell>
+  );
+}
+
+/** The builder's form (plan #2854.1): what it texts first about, with failed or stalled builds switched off. */
+const BUILDER_PERSON: PersonCard = {
+  id: '00000000-0000-4000-8000-000000000007',
+  key: BUILDER_ROW.key,
+  name: BUILDER_ROW.name,
+  colour: BUILDER_ROW.colour,
+  kind: 'guest',
+  madeByYou: true,
+  brief: {
+    who: 'Dev',
+    length: 'short',
+    bubbles: 'few',
+    tone: 'Brief and plain',
+    cares: 'What shipped, what is building and what needs me.',
+    never: 'Detail I did not ask for.',
+  },
+  persona: 'You are the builder. You keep the person up to date on Dev in a few plain lines, and give detail only when asked.',
+  joinsMeetings: false,
+  versions: [],
+  memory: [],
+  texts: textSwitches(BUILDER_TEXTS, ['needs_you', 'question', 'shipped']),
+};
+
+/** The builder's form scrolled to the switches for when it texts first. */
+export function ChatPersonTextsSurface() {
+  return (
+    <Shell path={`/chat/bots/${BUILDER_ROW.key}`}>
+      <BotsView rows={[BUILDER_ROW, ...EVERYONE]} current={BUILDER_ROW.key}>
+        <PersonForm card={BUILDER_PERSON} timezone={ZONE} now={NOW} scrollTo="texts" />
+      </BotsView>
     </Shell>
   );
 }

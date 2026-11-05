@@ -117,10 +117,10 @@ it has no summary or grew after it got one.
 
 ```sql
 select e.id, e.chat_id, e.started_at, e.ended_at, e.message_count, e.summary,
-       c.advisor_id, a.key, a.name
+       c.kind, c.title, c.advisor_id, a.key, a.name
 from you.advisor_episodes e
 join you.advisor_chats c on c.id = e.chat_id and c.user_id = e.user_id
-join you.board_advisors a on a.id = c.advisor_id and a.user_id = c.user_id
+left join you.board_advisors a on a.id = c.advisor_id and a.user_id = c.user_id
 where e.user_id = :owner
   and e.ended_at < now() - interval '3 hours'
   and (e.summarised_at is null or e.summarised_at < e.ended_at)
@@ -131,13 +131,26 @@ limit 30;
 Newest first, at most thirty a night; the rest are due again tomorrow. When
 nothing is due, go to A1.
 
+A row of `kind = 'group'` is a group chat (you 0042, plan #2879.1): it has
+no `advisor_id`, and its bots are the members who were in it during the
+conversation.
+
+```sql
+select m.advisor_id, a.key, a.name
+from you.advisor_chat_members m
+join you.board_advisors a on a.id = m.advisor_id and a.user_id = m.user_id
+where m.user_id = :owner and m.chat_id = '<chat id>'
+  and m.joined_at <= '<ended_at>'
+  and (m.left_at is null or m.left_at >= '<started_at>');
+```
+
 ### M2. Summarise each conversation
 
 Read its messages. They carry no episode id: take the chat's messages
 between the episode's first and last.
 
 ```sql
-select m.id, m.role, m.kind, m.text, m.note_id, m.created_at
+select m.id, m.role, m.kind, m.speaker_id, m.text, m.note_id, m.created_at
 from you.advisor_messages m
 where m.user_id = :owner and m.chat_id = '<chat id>'
   and m.created_at between '<started_at>' and '<ended_at>'
@@ -145,6 +158,8 @@ order by m.created_at, m.id;
 ```
 
 A message with a `note_id` was about that Council note; read the note too.
+In a group, `speaker_id` names the bot who wrote each advisor message; null
+is a bot since deleted.
 An episode that already has a summary grew after it: write the summary again
 over the whole conversation, not only the new part.
 
@@ -153,7 +168,9 @@ Write one paragraph, at most 800 characters, addressed to the person as
 you agreed to do and by when, and what was left open. Name the specific
 thing (the company, the goal, the sum) rather than its kind. Only what the
 messages say: no advice the mentor did not give, and no quotes longer than a
-few words.
+few words. For a group, say who said what by first name, and open with the
+group: "In your group with Ada and Ben (Book club), ...", using the title
+when it has one.
 
 ```sql
 update you.advisor_episodes
@@ -164,7 +181,9 @@ returning id;
 
 ### M3. Bring each mentor's memory up to date
 
-For every mentor with a conversation summarised in M2, read their memory:
+For every mentor with a conversation summarised in M2, read their memory.
+A group conversation counts for each of its members from M1, so a bot
+remembers what was said in the group when the person talks to it alone:
 
 ```sql
 select id, kind, text, due_on, done_at, followed_up_at, source_message_id, created_at
@@ -183,7 +202,10 @@ already holds.
   did not know, a `preference` about how they should talk to you. Each is
   one sentence, with the message it came from in `source_message_id`. At
   most five new rows per mentor a night; keep the ones a mentor would most
-  regret forgetting.
+  regret forgetting. A row from a group conversation says so in its own
+  words, such as "In the group with Ada and Ben, you said you would send
+  the draft by Friday.", and names the person's commitment, not one made
+  to another bot.
 - **Close** what the conversations settled: a commitment you said is done
   gets `done_at = now()`; an open thread that was answered, a commitment
   you dropped, and a fact or preference that stopped being true get
@@ -328,11 +350,14 @@ app, as `.claude/skills/goals/reference/sources.md` gives it for each table
 brain source. `label` names the row in a few words. A link that is not an
 app path or https is dropped by the page.
 
-Find the mentor's thread, the newest one, and start one when they have none:
+Find the mentor's thread, the newest one, and start one when they have none.
+A text goes only to their direct chat, never to a group they are in: groups
+hear from a bot only when the person writes there, and the database refuses
+a text first written into one (you 0043).
 
 ```sql
 select id from you.advisor_chats
-where user_id = :owner and advisor_id = '<advisor id>'
+where user_id = :owner and advisor_id = '<advisor id>' and kind = 'direct'
 order by last_message_at desc nulls last, created_at desc
 limit 1;
 ```

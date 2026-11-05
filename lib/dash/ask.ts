@@ -181,7 +181,7 @@ reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
 links or an information step's form, call change_goal_number, change_goal_link
-or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list; to add a tile to a goal's dashboard when they ask for one in their own words ('add a chart of my balance'), move one, take one off or lay the whole dashboard out, call change_goal_dashboard. In Shopping, to
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list; to add a tile to a goal's dashboard when they ask for one in their own words ('add a chart of my balance'), move one, take one off or lay the whole dashboard out, call change_goal_dashboard. To log hours they spent on a goal or step on a day ('log 2 hours on the thesis for yesterday'), look the goal or step up and call log_hours. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
@@ -269,6 +269,17 @@ which page of the app they asked from, and the row it shows. When the question
 points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
+
+/**
+ * Ask's rules for making changes, from "YOU MAKE THE CHANGES" through the
+ * delete proposal, word for word: what the people on People act by (plan
+ * #2854.2, lib/you/people-actions.ts), so a change has one set of rules
+ * wherever it is asked for. Read out of SYSTEM so the two cannot drift.
+ */
+export const ASK_ACTION_RULES = SYSTEM.slice(
+  SYSTEM.indexOf('YOU MAKE THE CHANGES THEY ASK FOR'),
+  SYSTEM.indexOf('ANYTHING ELSE THEY ASK YOU TO DO, HAND ON'),
+).trim();
 
 /** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
 export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
@@ -511,6 +522,11 @@ export async function askDash(
     onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
     /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
     signal?: AbortSignal;
+    /**
+     * Try again (plan #2854.4): answer the chat's last question, which has no
+     * answer, instead of adding `question` to it. Needs `conversationRef`.
+     */
+    retry?: boolean;
     /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
     mentions?: readonly TalkCitation[];
     /** The workspace the question is kept to (plan #1899.5). */
@@ -544,9 +560,17 @@ export async function askDash(
       if (earlier.length === 0) return { turns: [], error: 'That conversation is not there any more.' };
       subject = { kind: 'ask', ref: input.conversationRef, title: askTitle(earlier[0].body) || null };
     } else {
+      if (input.retry) return { turns: [], error: 'That conversation is not there any more.' };
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [
+    // Try again (plan #2854.4): the chat's last question is answered as it
+    // was kept, and nothing new is added for it.
+    if (input.retry) {
+      const last = earlier[earlier.length - 1];
+      if (last.role !== 'user') return { turns: [], error: 'That question already has its answer.' };
+      earlier = earlier.slice(0, -1);
+      asked = [last];
+    } else asked = await stores.append(subject, [
       {
         role: 'user',
         body: question,
@@ -696,7 +720,7 @@ export async function askDash(
   await stores.recordSpend(spent);
   // Filed whether or not the answer is kept: the gap is real either way.
   if (answer.ok && answer.couldNot && handed.length === 0) {
-    await stores.noteGap?.(gapNote(answer.couldNot, question), subject.ref);
+    await stores.noteGap?.(gapNote(answer.couldNot, asked[0]?.body ?? question), subject.ref);
   }
   if (!answer.ok) {
     await discard();

@@ -381,6 +381,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   dash_question_runs_status_ck: 'state of a Dash run',
   council_runs_status_ck: 'state of a Dash run',
   advisor_chats_reply_status_ck: 'whether a mentor is writing a reply',
+  conversations_reply_state_ck: 'whether Dash is writing a reply',
   board_meetings_status_ck: 'state of a Dash run',
   insights_status_ck: 'whether Dash still shows an insight it wrote',
   runs_status_ck: 'state of a Dash run',

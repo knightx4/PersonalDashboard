@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { ACK_MAX_CHARS, bubblePauseMs, cleanAck, MAX_BUBBLES, replyFailed, splitBubbles, wholeBubbles } from './mentor-reply-model';
+import { ACK_MAX_CHARS, bubblePauseMs, cleanAck, MAX_BUBBLES, plainBubble, replyFailed, splitBubbles, wholeBubbles } from './mentor-reply-model';
+
+describe('plainBubble', () => {
+  it('takes headings, bullets, numbers and bold off a bubble, keeping the words', () => {
+    expect(plainBubble('## Where things are\n- **Two** builds running\n* one waiting\n1. Ship it')).toBe(
+      'Where things are\nTwo builds running\none waiting\nShip it',
+    );
+  });
+
+  it('leaves an ordinary text alone', () => {
+    expect(plainBubble('Then take it. #2854.3 is the one to look at, and 5 - 3 is 2.')).toBe(
+      'Then take it. #2854.3 is the one to look at, and 5 - 3 is 2.',
+    );
+  });
+
+  it('is applied when a reply is split', () => {
+    expect(splitBubbles('# Yes\n\n- six weeks first')).toEqual(['Yes', 'six weeks first']);
+  });
+});
 
 describe('splitBubbles', () => {
   it('splits on blank lines and drops empty parts', () => {

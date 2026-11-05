@@ -609,6 +609,32 @@ export function AskChangesSurface() {
     input: { title: 'Call the dentist', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false },
   });
   const step = (turnId: string) => proposals(turnId)[1];
+  // Hours logged from Ask (plan #2906.2): a goal's day and a step's, as the
+  // log_hours write describes them, drawn by the generic written card.
+  const hours = (turnId: string, onStep: boolean): DashChange => ({
+    ...CHANGE_BASE,
+    id: `${turnId}-hours-${onStep ? 'step' : 'goal'}`,
+    turnId,
+    status: 'proposed',
+    kind: 'log_hours',
+    input: onStep
+      ? {
+          verb: 'Logged 1.5 hours on',
+          what: 'Draft the methods chapter',
+          rest: ' under Finish my thesis, on Mon 28 Sep',
+          href: '/goals/g1/steps/s1',
+          where: 'Open the step',
+          paths: [],
+        }
+      : {
+          verb: 'Logged 2 hours on',
+          what: 'Finish my thesis',
+          rest: ', on Sun 27 Sep',
+          href: '/goals/g1',
+          where: 'Open the goal',
+          paths: [],
+        },
+  } as DashChange);
   const turns: TalkTurn[] = [
     {
       id: 'pa',
@@ -623,6 +649,8 @@ export function AskChangesSurface() {
         'I can add the todo "Call the dentist" due on Friday, and a step "Book the hygienist" under your goal to get your teeth sorted. Confirm each one below and I will write it.',
       createdAt: at(9),
     },
+    { id: 'pc', role: 'user', body: 'Log 2 hours on my thesis for yesterday and 90 minutes on the methods step today', createdAt: at(8) },
+    { id: 'rc', role: 'assistant', body: 'Logged both. Undo takes either one off again.', createdAt: at(8) },
     { id: 'pb', role: 'user', body: 'Add the same again for Sam', createdAt: at(10) },
     {
       id: 'rb',
@@ -642,6 +670,8 @@ export function AskChangesSurface() {
             done(todo('ra'), 'done'),
             done(step('ra'), 'declined'),
             done(todo('rb'), 'undone'),
+            done(hours('rc', false), 'done'),
+            done(hours('rc', true), 'undone'),
             { ...step('rb'), createdAt: at(10) },
           ]}
           label="Ask a follow-up"
@@ -910,7 +940,14 @@ export function DashPageSurface({
   modelStart,
   sessions,
   session,
+  reply,
 }: {
+  /**
+   * The last question's reply as the server holds it when the chat is opened
+   * (plan #2854.4): still being written after the page that asked was left,
+   * or failed, with Try again.
+   */
+  reply?: 'answering' | 'failed';
   /** Threads with Claude Code sessions in the list (plan #2789.7). */
   sessions?: SessionThread[];
   /** A session thread open beside the list in place of a chat, with its id (plan #2789.7). */
@@ -943,7 +980,10 @@ export function DashPageSurface({
             createdAt: open.lastAt,
           },
         ]
-      : dashPageTurns(open.title ?? '');
+      : reply
+        ? // The second question's answer is not in yet, or did not come.
+          dashPageTurns(open.title ?? '').filter((turn) => turn.id !== 'a2')
+        : dashPageTurns(open.title ?? '');
   const none = list === 'empty' || list === 'failed' || list === 'loading';
   const opened = chat !== 'new' && !none && !session;
   return (
@@ -1022,7 +1062,14 @@ export function DashPageSurface({
                 id="dash-page-preview"
                 conversationRef={open.ref}
                 turns={turns}
-                changes={DASH_CHAT_CHANGES}
+                changes={reply ? [] : DASH_CHAT_CHANGES}
+                reply={
+                  reply === 'answering'
+                    ? { state: 'answering', startedAt: chatAt(CHAT_TODAY, 10) }
+                    : reply === 'failed'
+                      ? { state: 'failed', error: 'Dash stopped before the answer was written.' }
+                      : null
+                }
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 dock

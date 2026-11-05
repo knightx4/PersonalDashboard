@@ -3,6 +3,7 @@ import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
 import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   mentorColour,
+  replyFailedOf,
   SEARCH_MAX,
   seatAreaOf,
   sortPeople,
@@ -23,7 +24,7 @@ export * from '@/lib/you/chat-threads-model';
  * (lib/you/mentor-reply-request.ts), not through here.
  */
 
-type ChatRow = { id: string; advisorId: string; typingUntil: string | null; lastReadAt: string | null };
+type ChatRow = { id: string; advisorId: string; typingUntil: string | null; lastReadAt: string | null; replyFailed: string | null };
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 const strOrNull = (value: unknown): string | null => str(value) || null;
@@ -38,7 +39,7 @@ async function readChats(client: YouSupabaseClient, userId: string): Promise<{ c
   const [chats, colours] = await Promise.all([
     client
       .from('advisor_chats')
-      .select('id, advisor_id, typing_until, last_read_at, last_message_at')
+      .select('id, advisor_id, typing_until, last_read_at, last_message_at, reply_status, reply_error')
       .eq('user_id', userId)
       .order('last_message_at', { ascending: false, nullsFirst: false }),
     client.from('board_advisors').select('id, colour').eq('user_id', userId),
@@ -52,6 +53,7 @@ async function readChats(client: YouSupabaseClient, userId: string): Promise<{ c
       advisorId,
       typingUntil: strOrNull(row.typing_until),
       lastReadAt: strOrNull(row.last_read_at),
+      replyFailed: replyFailedOf(row),
     });
   }
   const colourOf = new Map<string, string | null>();
@@ -80,6 +82,7 @@ async function personRow(
     unread: false,
     typingUntil: chat?.typingUntil ?? null,
     lastReadAt: chat?.lastReadAt ?? null,
+    replyFailed: chat?.replyFailed ?? null,
   };
   if (!chat) return base;
   let unreadQuery = client
@@ -121,6 +124,36 @@ export async function loadPeople(client: YouSupabaseClient, userId: string): Pro
       .map((a) => personRow(client, userId, a, chats.get(a.id), colours.get(a.id) ?? null)),
   );
   return sortPeople(people);
+}
+
+/**
+ * New message (plan #2879.2): the chat with this person, started when there
+ * is none yet, so they join the Messages list before anything is said. An
+ * existing chat is reused rather than a second one made. Null when the key
+ * names nobody on the roster.
+ */
+export async function startChat(client: YouSupabaseClient, userId: string, key: string): Promise<{ chatId: string } | null> {
+  const advisor = (await listRoster(client, userId)).find((a) => a.key === key && a.active);
+  if (!advisor) return null;
+  const found = await client
+    .from('advisor_chats')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('advisor_id', advisor.id)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (found.error) throw new Error(`Reading your chat with ${advisor.name} failed: ${found.error.message}`);
+  if (typeof found.data?.id === 'string') return { chatId: found.data.id };
+  const made = await client
+    .from('advisor_chats')
+    .insert({ user_id: userId, advisor_id: advisor.id, title: `Talking with ${advisor.name}`.slice(0, 200) })
+    .select('id')
+    .single();
+  if (made.error || typeof made.data?.id !== 'string') {
+    throw new Error(`Starting your chat with ${advisor.name} failed: ${made.error?.message ?? 'no row came back'}`);
+  }
+  return { chatId: made.data.id };
 }
 
 /** The newest page of a thread, or the page before `before` (a message's created_at). */

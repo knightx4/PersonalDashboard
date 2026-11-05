@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  botLineOf,
+  botsOf,
+  filterRecipients,
   isTyping,
   MENTOR_PALETTE,
   mentorColour,
@@ -14,6 +17,8 @@ import {
   threadDetail,
   threadMessageOf,
   threadTime,
+  recipientsOf,
+  withChats,
   type PersonRow,
   type ThreadMessage,
 } from './chat-threads-model';
@@ -155,5 +160,51 @@ describe('the People tab model', () => {
     expect(receiptOf([msg('a', 'person', '2026-11-03T08:00:00Z', { deliveredAt: 'x' })])?.label).toBe('Delivered');
     expect(receiptOf([msg('a', 'person', '2026-11-03T08:00:00Z', { deliveredAt: 'x', readAt: 'y' })])?.label).toBe('Read');
     expect(receiptOf([msg('a', 'person', '2026-11-03T08:00:00Z'), msg('b', 'advisor', '2026-11-03T08:01:00Z')])).toBeNull();
+  });
+});
+
+describe('the Messages list and New message (plan #2879.2)', () => {
+  const rows = [
+    row({ id: '1', name: 'Zed', chatId: 'c1' }),
+    row({ id: '2', name: 'Ada', chatId: null }),
+    row({ id: '3', name: 'Bea', chatId: null, canTalk: false }),
+    row({ id: '4', name: 'Cal', chatId: 'c4' }),
+  ];
+
+  it('lists only the people with a chat, in the order given', () => {
+    expect(withChats(rows).map((r) => r.name)).toEqual(['Zed', 'Cal']);
+  });
+
+  it('keeps the open thread in the list even before it has a chat', () => {
+    const keyed = rows.map((r, i) => ({ ...r, key: `k${i}` }));
+    expect(withChats(keyed, 'k2').map((r) => r.name)).toEqual(['Zed', 'Bea', 'Cal']);
+  });
+
+  it('offers everyone A to Z, those not ready to talk last', () => {
+    expect(recipientsOf(rows).map((r) => r.name)).toEqual(['Ada', 'Cal', 'Zed', 'Bea']);
+  });
+
+  it('narrows to names holding what is typed, ignoring case and the spaces round it', () => {
+    expect(filterRecipients(rows, '  a ').map((r) => r.name)).toEqual(['Ada', 'Bea', 'Cal']);
+    expect(filterRecipients(rows, 'ZE').map((r) => r.name)).toEqual(['Zed']);
+    expect(filterRecipients(rows, '')).toHaveLength(4);
+  });
+});
+
+describe('the Bots tab (plan #2879.3)', () => {
+  const rows = [
+    row({ id: '1', name: 'zed', chatId: 'c1' }),
+    row({ id: '2', name: 'Ada', chatId: null, canTalk: false }),
+    row({ id: '3', name: 'Bea', chatId: null }),
+  ];
+
+  it('lists every bot A to Z, with a chat or not and ignoring case', () => {
+    expect(botsOf(rows).map((r) => r.name)).toEqual(['Ada', 'Bea', 'zed']);
+  });
+
+  it('says what a bot is for, and when it cannot talk yet', () => {
+    expect(botLineOf({ about: 'Money', canTalk: true })).toBe('Money');
+    expect(botLineOf({ about: 'Money', canTalk: false })).toBe('Money · not ready to talk yet');
+    expect(botLineOf({ about: '', canTalk: false })).toBe('Not ready to talk yet');
   });
 });

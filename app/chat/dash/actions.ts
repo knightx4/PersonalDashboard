@@ -14,6 +14,7 @@ import {
   listAskConversations,
   loadAskChanges,
   loadAskConversation,
+  loadAskReply,
   rateAskAnswer,
   saveAskAnswer,
   searchAskChatsInRequest,
@@ -28,6 +29,7 @@ import type { SaveAnswerOutcome, SaveAnswerTo } from '@/lib/talk/save-answer';
 import { parseRating, ratingNote, type RateAnswerOutcome } from '@/lib/talk/rate-answer';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
+import type { ReplyState } from '@/lib/talk/reply-state';
 
 /**
  * Asking Dash from the sheet in the shell and from /ask (plan #1090).
@@ -80,7 +82,17 @@ export type OpenedAsk = {
   changesError?: string;
   /** Requests handed to the backup routine with no reply yet (plan #1402). */
   openHandoffs?: number;
+  /** The reply to the last question, still being written or failed (plan #2854.4); null when none is waiting. */
+  reply?: ReplyState;
 };
+
+/** Where the reply stands; a failed read says nothing is waiting. */
+function replyOf(ref: string, turns: readonly TalkTurn[]): Promise<ReplyState> {
+  return loadAskReply(ref, turns).catch((error: unknown) => {
+    console.error('where the reply stands was not read', error);
+    return null;
+  });
+}
 
 /** One earlier question's turns and changes, to reopen it in the sheet. */
 // latency: pending
@@ -99,10 +111,13 @@ export async function openAskQuestion(ref: string): Promise<OpenedAsk> {
       ),
     ]);
     if (turns.length === 0) return { turns, changes: [], error: 'That conversation is not there any more.' };
-    const openHandoffs = await countOpenAskHandoffs(parsed.data).catch(() => 0);
+    const [openHandoffs, reply] = await Promise.all([
+      countOpenAskHandoffs(parsed.data).catch(() => 0),
+      replyOf(parsed.data, turns),
+    ]);
     return 'failed' in changes
-      ? { turns, changes: [], changesError: CHANGES_UNREAD, openHandoffs }
-      : { turns, changes: changes.found, openHandoffs };
+      ? { turns, changes: [], changesError: CHANGES_UNREAD, openHandoffs, reply }
+      : { turns, changes: changes.found, openHandoffs, reply };
   } catch {
     return { turns: [], changes: [], error: 'That conversation could not be read. Try again.' };
   }
@@ -115,12 +130,12 @@ export async function openAskQuestion(ref: string): Promise<OpenedAsk> {
  * the checking until the thread is reopened.
  */
 // latency: pending
-export async function pollAskQuestion(ref: string): Promise<{ turns: TalkTurn[]; open: number }> {
+export async function pollAskQuestion(ref: string): Promise<{ turns: TalkTurn[]; open: number; reply?: ReplyState }> {
   const parsed = Ref.safeParse(ref);
   if (!parsed.success) return { turns: [], open: 0 };
   try {
     const [turns, open] = await Promise.all([loadAskConversation(parsed.data), countOpenAskHandoffs(parsed.data)]);
-    return { turns, open };
+    return { turns, open, reply: await replyOf(parsed.data, turns) };
   } catch {
     return { turns: [], open: 0 };
   }

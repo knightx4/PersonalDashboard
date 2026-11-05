@@ -14,13 +14,16 @@ import { SectionLabel } from '@/components/ui/section-heading';
 import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { whenDate } from '@/lib/core/when';
-import { MENTOR_PALETTE, personInitials, threadHref } from '@/lib/you/chat-threads-model';
+import { MENTOR_PALETTE, personInitials } from '@/lib/you/chat-threads-model';
 import type { CouncilMemory } from '@/lib/you/council-model';
+import { ruleFor } from '@/lib/you/first-texts';
 import {
   ASK_MAX,
+  BOTS_HREF,
   BUBBLE_LABELS,
   BUBBLES,
   CARES_MAX,
+  editHref,
   LENGTH_LABELS,
   LENGTHS,
   MEMORY_LINE_MAX,
@@ -35,8 +38,8 @@ import {
 } from '@/lib/you/people-cards-model';
 
 /**
- * Adding someone to People, or editing anyone already there (plan #2748.11):
- * one form for both, in the thread's place beside the list.
+ * Adding a bot, or editing one already there (plan #2748.11), on Chat's Bots
+ * tab (plan #2879.3): one form for both, beside the list of bots.
  *
  * Name, colour and who they are; how they talk (length, how many texts,
  * tone); what they care about and never say. Then the persona card every
@@ -44,7 +47,8 @@ import {
  * there already it can be edited directly or redrafted from a sentence.
  * Earlier cards can be brought back into the box, and saving keeps the one
  * it replaces. What they remember is corrected or removed line by line,
- * each at once, with a confirm before a line goes.
+ * each at once, with a confirm before a line goes. A guest is deleted at
+ * the foot of the form, after a confirm; a seat on the board cannot be.
  */
 
 export type PersonFormActions = {
@@ -55,11 +59,14 @@ export type PersonFormActions = {
     brief: PersonBrief;
     persona: string;
     joinsMeetings: boolean;
+    textWhen?: string[];
     author: { by: 'you' | 'dash'; ask: string | null };
   }) => Promise<{ key: string } | { error: string }>;
   draft: (input: { name: string; brief: PersonBrief; current?: string | null; ask?: string | null }) => Promise<{ card: string } | { error: string }>;
   correct: (id: string, text: string) => Promise<{ error: string | null }>;
   remove: (id: string) => Promise<{ error: string | null }>;
+  /** Delete the bot, its chats and what it remembers. */
+  delete: (advisorId: string) => Promise<{ error: string | null }>;
 };
 
 /** The gallery's presses: nothing is saved. */
@@ -68,6 +75,7 @@ const NO_ACTIONS: PersonFormActions = {
   draft: async () => ({ error: 'The gallery drafts nothing.' }),
   correct: async () => ({ error: null }),
   remove: async () => ({ error: null }),
+  delete: async () => ({ error: 'The gallery deletes nothing.' }),
 };
 
 type Drafted = { card: string; ask: string | null };
@@ -82,6 +90,7 @@ export function PersonForm({
   removing = null,
   editing = null,
   scrollTo = null,
+  deleting: initialDeleting = false,
 }: {
   card: PersonCard;
   timezone: string;
@@ -96,7 +105,9 @@ export function PersonForm({
   /** For the gallery: the memory line being corrected. */
   editing?: string | null;
   /** For the gallery: open scrolled to a part further down. */
-  scrollTo?: 'card' | 'versions' | 'memory' | null;
+  scrollTo?: 'card' | 'versions' | 'memory' | 'texts' | 'delete' | null;
+  /** For the gallery: the confirm before the bot is deleted. */
+  deleting?: boolean;
 }) {
   const router = useRouter();
   const adding = !card.id;
@@ -105,13 +116,13 @@ export function PersonForm({
   const [brief, setBrief] = useState<PersonBrief>(card.brief);
   const [persona, setPersona] = useState(card.persona);
   const [joins, setJoins] = useState(card.joinsMeetings);
+  const [textWhen, setTextWhen] = useState<string[]>(() => (card.texts ?? []).filter((t) => t.on).map((t) => t.kind));
   const [ask, setAsk] = useState('');
   const [drafted, setDrafted] = useState<Drafted | null>(null);
   const [drafting, setDrafting] = useState(initialDrafting);
   const [draftError, setDraftError] = useState<string | null>(initialDraftError);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
-  const back = adding ? '/chat' : threadHref(card.key);
   const set = <K extends keyof PersonBrief>(key: K, value: PersonBrief[K]) => setBrief((b) => ({ ...b, [key]: value }));
 
   const draft = async (redraft: boolean) => {
@@ -133,12 +144,21 @@ export function PersonForm({
     setSaveError(null);
     startSave(async () => {
       const author = drafted && drafted.card === persona.trim() ? { by: 'dash' as const, ask: drafted.ask } : { by: 'you' as const, ask: null };
-      const result = await actions.save({ advisorId: card.id, name, colour, brief, persona, joinsMeetings: joins, author });
+      const result = await actions.save({
+        advisorId: card.id,
+        name,
+        colour,
+        brief,
+        persona,
+        joinsMeetings: joins,
+        ...(card.texts ? { textWhen } : {}),
+        author,
+      });
       if ('error' in result) {
         setSaveError(result.error);
         return;
       }
-      router.push(threadHref(result.key));
+      router.push(editHref(result.key));
       router.refresh();
     });
   };
@@ -149,14 +169,14 @@ export function PersonForm({
 
   return (
     <MessagingPanel
-      title={adding ? 'Add someone' : `Edit ${card.name}`}
+      title={adding ? 'Add a bot' : `Edit ${card.name}`}
       avatar={<PersonMark initials={personInitials(name)} colour={colour} size="sm" />}
-      back={{ href: back, label: adding ? 'People' : card.name }}
-      crumbs={[{ label: 'People', href: '/chat' }, ...(adding ? [] : [{ label: card.name, href: back }])]}
+      back={{ href: BOTS_HREF, label: 'Bots' }}
+      crumbs={[{ label: 'Bots', href: BOTS_HREF }]}
       foot={
         <div className="flex flex-wrap items-center justify-end gap-2">
           {saveError && <p className="mr-auto text-small text-danger">{saveError}</p>}
-          <Link href={back} className={buttonVariants({ variant: 'ghost' })}>
+          <Link href={BOTS_HREF} className={buttonVariants({ variant: 'ghost' })}>
             Cancel
           </Link>
           <Button type="button" onClick={save} pending={saving} disabled={saving || drafting || !persona.trim()}>
@@ -312,7 +332,35 @@ export function PersonForm({
           <Memory key={card.id} lines={card.memory} name={card.name} actions={actions} removing={removing} editing={editing} />
         )}
 
-        <section>
+        {card.texts && card.texts.length > 0 && (
+          <section id="person-texts" className="flex scroll-mt-4 flex-col gap-3">
+            <div>
+              <SectionLabel as="h2">When {card.name} texts first</SectionLabel>
+              <p className="mt-1 text-small text-ink-muted">
+                One text for everything since the last, at most {ruleFor(card.key)?.dailyLimit ?? 4} a day, and never from 10 PM to 8 AM.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-3">
+              {card.texts.map((t) => (
+                <li key={t.kind}>
+                  <label className="flex cursor-pointer items-start justify-between gap-4">
+                    <span className="min-w-0">
+                      <span className="block text-ui text-ink">{t.label}</span>
+                      <span className="mt-0.5 block text-small text-ink-muted">{t.hint}</span>
+                    </span>
+                    <Switch
+                      checked={textWhen.includes(t.kind)}
+                      onChange={(e) => setTextWhen((on) => (e.target.checked ? [...on.filter((k) => k !== t.kind), t.kind] : on.filter((k) => k !== t.kind)))}
+                      aria-label={t.label}
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className={cn(card.texts && card.texts.length > 0 && 'border-t border-border pt-6')}>
           <label className="flex cursor-pointer items-start justify-between gap-4">
             <span className="min-w-0">
               <span className="block text-ui text-ink">Join board meetings</span>
@@ -323,6 +371,8 @@ export function PersonForm({
             <Switch checked={joins} onChange={(e) => setJoins(e.target.checked)} aria-label="Join board meetings" />
           </label>
         </section>
+
+        {!adding && <DeleteBot card={card} action={actions.delete} confirming={initialDeleting} />}
       </div>
     </MessagingPanel>
   );
@@ -483,6 +533,73 @@ function Memory({
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The foot of an edit: Delete, then a confirm saying what goes with them.
+ * A seat says instead why it stays, so the press is never there to refuse.
+ */
+function DeleteBot({
+  card,
+  action,
+  confirming: initialConfirming,
+}: {
+  card: PersonCard;
+  action: PersonFormActions['delete'];
+  confirming: boolean;
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(initialConfirming);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startDelete] = useTransition();
+
+  if (card.kind === 'seat') {
+    return (
+      <section id="person-delete" className="scroll-mt-4 border-t border-border pt-4">
+        <p className="text-small text-ink-muted">{card.name} holds one of the board&rsquo;s five seats, so they cannot be deleted.</p>
+      </section>
+    );
+  }
+
+  const remove = () => {
+    setError(null);
+    startDelete(async () => {
+      const result = await action(card.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push(BOTS_HREF);
+      router.refresh();
+    });
+  };
+
+  return (
+    <section id="person-delete" className="flex scroll-mt-4 flex-col gap-2 border-t border-border pt-4">
+      {confirming ? (
+        <>
+          <p className="text-ui text-ink">Delete {card.name}?</p>
+          <p className="text-small text-ink-muted">Your chat with them and everything they remember go too. This cannot be undone.</p>
+          <FieldError>{error}</FieldError>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="danger" size="sm" pending={pending} disabled={pending} onClick={remove}>
+              Delete {card.name}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div>
+          <Button type="button" variant="ghost" size="sm" className="-ml-2 text-danger hover:text-danger" onClick={() => setConfirming(true)}>
+            <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
+            Delete {card.name}
+          </Button>
+        </div>
       )}
     </section>
   );

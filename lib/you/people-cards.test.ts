@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { addPerson, savePerson, type CleanPerson } from '@/lib/you/people-cards';
+import { addPerson, deletePerson, savePerson, type CleanPerson } from '@/lib/you/people-cards';
 import { EMPTY_BRIEF } from '@/lib/you/people-cards-model';
 
 type Call = { table: string; op: string; values?: Record<string, unknown>; filters: [string, unknown][] };
@@ -79,5 +79,103 @@ describe('addPerson', () => {
     const key = await addPerson(client, USER, { ...person('Card'), joinsMeetings: false }, { by: 'dash', ask: null });
     expect(key).toBe('benjamin_franklin_2');
     expect(calls[0].values).toMatchObject({ made_by_you: true, joins_meetings: false, kind: 'guest', persona: 'Card', user_id: USER });
+  });
+});
+
+/** A client for deletePerson: the advisor its read finds, what the delete answers, and the panels holding the key. */
+function deleteClient(advisor: { key: string; kind: string } | null, deleteError: { code: string; message: string } | null, panels: unknown[] = []) {
+  const calls: Call[] = [];
+  const client = {
+    from(table: string) {
+      const call: Call = { table, op: 'select', filters: [] };
+      const answer = () => {
+        if (call.op === 'delete' && table === 'board_advisors') return { error: deleteError };
+        if (call.op === 'select' && table === 'board_panels') return { data: panels, error: null };
+        return { data: null, error: null };
+      };
+      const chain = {
+        select: () => chain,
+        delete: () => {
+          call.op = 'delete';
+          calls.push(call);
+          return chain;
+        },
+        update: (values: Record<string, unknown>) => {
+          call.op = 'update';
+          call.values = values;
+          calls.push(call);
+          return chain;
+        },
+        eq: (col: string, value: unknown) => {
+          call.filters.push([col, value]);
+          return chain;
+        },
+        contains: (col: string, value: unknown) => {
+          call.filters.push([col, value]);
+          return chain;
+        },
+        is: (col: string, value: unknown) => {
+          call.filters.push([col, value]);
+          return chain;
+        },
+        maybeSingle: () => Promise.resolve({ data: advisor, error: null }),
+        then: (resolve: (v: unknown) => void) => resolve(answer()),
+      };
+      return chain;
+    },
+  };
+  return { client: client as unknown as YouSupabaseClient, calls };
+}
+
+describe('deletePerson (plan #2879.3)', () => {
+  it('deletes a guest and takes its key off the panels that hold it', async () => {
+    const { client, calls } = deleteClient({ key: 'franklin', kind: 'guest' }, null, [{ id: 'p1', advisors: ['cfo', 'franklin'] }]);
+    expect(await deletePerson(client, USER, 'a1')).toBe(true);
+    const removed = calls.find((c) => c.table === 'board_advisors' && c.op === 'delete');
+    expect(removed?.filters).toEqual([
+      ['user_id', USER],
+      ['id', 'a1'],
+    ]);
+    expect(calls.some((c) => c.table === 'advisor_chats')).toBe(false);
+    const panel = calls.find((c) => c.table === 'board_panels' && c.op === 'update');
+    expect(panel?.values).toEqual({ advisors: ['cfo'] });
+    expect(panel?.filters).toEqual([
+      ['user_id', USER],
+      ['id', 'p1'],
+    ]);
+  });
+
+  it('retires a guest the board minutes hold, deleting its direct chats and leaving its groups (plan #2879.1.1)', async () => {
+    const { client, calls } = deleteClient({ key: 'franklin', kind: 'guest' }, { code: '23503', message: 'board_turns' });
+    expect(await deletePerson(client, USER, 'a1')).toBe(true);
+    const chats = calls.find((c) => c.table === 'advisor_chats' && c.op === 'delete');
+    expect(chats?.filters).toEqual([
+      ['user_id', USER],
+      ['advisor_id', 'a1'],
+      ['kind', 'direct'],
+    ]);
+    const left = calls.find((c) => c.table === 'advisor_chat_members' && c.op === 'update');
+    expect(left?.values).toMatchObject({ typing_until: null });
+    expect(typeof left?.values?.left_at).toBe('string');
+    expect(left?.filters).toEqual([
+      ['user_id', USER],
+      ['advisor_id', 'a1'],
+      ['left_at', null],
+    ]);
+    const retired = calls.find((c) => c.table === 'board_advisors' && c.op === 'update');
+    expect(retired?.values).toEqual({ active: false, joins_meetings: false });
+  });
+
+  it('never deletes a seat, nor someone not found', async () => {
+    for (const advisor of [{ key: 'skeptic', kind: 'seat' }, null]) {
+      const { client, calls } = deleteClient(advisor, null);
+      expect(await deletePerson(client, USER, 'a1')).toBe(false);
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it('throws on any other failure', async () => {
+    const { client } = deleteClient({ key: 'franklin', kind: 'guest' }, { code: '42501', message: 'denied' });
+    await expect(deletePerson(client, USER, 'a1')).rejects.toThrow('Deleting them failed: denied');
   });
 });

@@ -6,6 +6,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
 import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
+import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
 import {
   ASK_MAX,
   briefOf,
@@ -37,7 +38,7 @@ export * from '@/lib/you/people-cards-model';
 const MODEL = MODELS.personaDraft;
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings';
+const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when';
 
 /** One person's form, their earlier cards and what they remember, or null when they are not on the council. */
 export async function loadPersonCard(client: YouSupabaseClient, userId: string, key: string): Promise<PersonCard | null> {
@@ -76,7 +77,15 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
     joinsMeetings: row.joins_meetings !== false,
     versions: (versions.data ?? []).flatMap((v) => versionOf(v as Record<string, unknown>) ?? []),
     memory: (memory.data ?? []).flatMap((m) => memoryOf(m as Record<string, unknown>) ?? []) as CouncilMemory[],
+    texts: textsOf(str(row.key), row.text_when),
   };
+}
+
+/** The switches for what someone texts first about; null when no rule is theirs (plan #2854.1). */
+function textsOf(key: string, stored: unknown): TextSwitch[] | null {
+  const rule = ruleFor(key);
+  if (!rule) return null;
+  return textSwitches(rule, Array.isArray(stored) ? stored.filter((k): k is string => typeof k === 'string') : null);
 }
 
 /** Who wrote the card being saved: Dash when it is Dash's draft as drafted, with the sentence asked. */
@@ -156,11 +165,19 @@ export async function savePerson(
       persona: person.persona,
       persona_brief: storedBrief(person.brief, keepAuthor),
       joins_meetings: person.joinsMeetings,
+      ...textWhenPatch(str(row.key), person.textWhen),
     })
     .eq('user_id', userId)
     .eq('id', advisorId);
   if (error) throw new Error(`Saving ${person.name} failed: ${error.message}`);
   return str(row.key);
+}
+
+/** text_when as a save writes it: only for someone with a rule, and only when the form sent the list. */
+function textWhenPatch(key: string, on: readonly string[] | undefined): { text_when?: string[] | null } {
+  const rule = ruleFor(key);
+  if (!rule || !on) return {};
+  return { text_when: storedTextWhen(rule, on) };
 }
 
 function authorOf(brief: unknown): CardAuthor {
@@ -169,6 +186,53 @@ function authorOf(brief: unknown): CardAuthor {
 }
 
 /** Correct a line of what they remember. */
+/**
+ * Delete a bot from the Bots tab (plan #2879.3). Its direct chats, their
+ * messages, what it remembers and its earlier cards go with the row (each
+ * references board_advisors on delete cascade), and its key comes off the
+ * person's board panels. A group it was in stays: its member row goes with
+ * it and its messages there lose their speaker (you 0042). A seat is never
+ * deleted: the board's method needs all five.
+ *
+ * A bot that has spoken in a board meeting is held by you.board_turns,
+ * whose reference has no cascade, so the minutes keep who said what. That
+ * bot is retired instead: its direct chats are deleted, it is marked left
+ * in its groups, and the row is marked inactive, which every list reads
+ * past, so it is gone from Chat and the board all the same. Returns false when the id names no guest of theirs.
+ */
+export async function deletePerson(client: YouSupabaseClient, userId: string, advisorId: string): Promise<boolean> {
+  const found = await client.from('board_advisors').select('key, kind').eq('user_id', userId).eq('id', advisorId).eq('active', true).maybeSingle();
+  if (found.error) throw new Error(`Reading them failed: ${found.error.message}`);
+  const row = found.data as { key?: unknown; kind?: unknown } | null;
+  if (!row || row.kind !== 'guest') return false;
+  const key = str(row.key);
+  const removed = await client.from('board_advisors').delete().eq('user_id', userId).eq('id', advisorId);
+  if (removed.error?.code === '23503') {
+    // Only their own chats go; a group they were in stays, with them marked left.
+    const chats = await client.from('advisor_chats').delete().eq('user_id', userId).eq('advisor_id', advisorId).eq('kind', 'direct');
+    if (chats.error) throw new Error(`Deleting their chats failed: ${chats.error.message}`);
+    const left = await client
+      .from('advisor_chat_members')
+      .update({ left_at: new Date().toISOString(), typing_until: null })
+      .eq('user_id', userId)
+      .eq('advisor_id', advisorId)
+      .is('left_at', null);
+    if (left.error) throw new Error(`Taking them out of your groups failed: ${left.error.message}`);
+    const retired = await client.from('board_advisors').update({ active: false, joins_meetings: false }).eq('user_id', userId).eq('id', advisorId);
+    if (retired.error) throw new Error(`Deleting them failed: ${retired.error.message}`);
+  } else if (removed.error) {
+    throw new Error(`Deleting them failed: ${removed.error.message}`);
+  }
+  const panels = await client.from('board_panels').select('id, advisors').eq('user_id', userId).contains('advisors', [key]);
+  if (panels.error) throw new Error(`Reading your panels failed: ${panels.error.message}`);
+  for (const panel of (panels.data ?? []) as { id: string; advisors: string[] }[]) {
+    const left = panel.advisors.filter((k) => k !== key);
+    const { error } = await client.from('board_panels').update({ advisors: left }).eq('user_id', userId).eq('id', panel.id);
+    if (error) throw new Error(`Taking them off a panel failed: ${error.message}`);
+  }
+  return true;
+}
+
 export async function correctMemory(client: YouSupabaseClient, userId: string, id: string, text: string): Promise<void> {
   const { error } = await client.from('advisor_memory').update({ text }).eq('user_id', userId).eq('id', id).is('retired_at', null);
   if (error) throw new Error(`Correcting that failed: ${error.message}`);

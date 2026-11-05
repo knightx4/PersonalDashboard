@@ -1,8 +1,12 @@
 import { revalidatePath } from 'next/cache';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth/server';
 import { parseAskInput } from '@/lib/talk/ask-input';
 import { askDashInRequest } from '@/lib/talk/ask-request';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { AskDashResult } from '@/lib/dash/ask';
+import { askReplyPayload } from '@/lib/talk/reply-state';
+import { notifyPerson } from '@/lib/talk/reply-state-store';
 import { changePaths } from '@/lib/ask/changes';
 import { encodeStreamLine, lookupWire, type AskStreamLine } from '@/lib/talk/lookups';
 
@@ -22,11 +26,14 @@ export const dynamic = 'force-dynamic';
  * whose saved turn is the answer as kept.
  * lib/talk/lookups.ts writes and reads both.
  *
- * Stop (plan #1899.5) is the browser ending the request: the request's
- * signal, or the stream being cancelled, aborts the answer, which ends the
- * model call in flight and keeps what Dash had written as the answer. The
- * browser then reads the kept answer back by the conversation the `asked`
- * line named. Leaving the page mid-answer ends it the same way.
+ * The answer runs on the server whatever the browser does (plan #2854.4).
+ * Leaving the page closes the stream and nothing else: the answer is still
+ * written and kept, the chat says where it stands (core.conversations
+ * reply_state), and a notification opens the chat when the page that asked
+ * has gone. Stop (plan #1899.5) is its own press, app/api/ask/stop, which
+ * marks the chat; the run reads the mark, ends the model call in flight and
+ * keeps what Dash had written as the answer, and the stream ends with it.
+ * `retry` answers the chat's last question again, for Try again.
  *
  * The person comes from the session and nowhere else; the body names only the
  * question, the conversation it continues, the page it was asked on, the filter
@@ -68,68 +75,76 @@ export async function POST(request: Request) {
     body.think,
   );
 
-  const stopping = new AbortController();
-  const stop = () => stopping.abort();
-  if (request.signal.aborted) stop();
-  else request.signal.addEventListener('abort', stop, { once: true });
-
+  // The answer runs whether or not the browser stays (plan #2854.4): leaving
+  // the page closes the stream and nothing else. `after` holds the function
+  // open until the answer is kept, and Stop is a press of its own
+  // (app/api/ask/stop/route.ts) that the run reads from the chat.
+  let open = true;
+  let controller: ReadableStreamDefaultController<Uint8Array> | null = null;
   const encoder = new TextEncoder();
+  const send = (line: AskStreamLine) => {
+    if (!open || !controller) return;
+    try {
+      controller.enqueue(encoder.encode(encodeStreamLine(line)));
+    } catch {
+      open = false;
+    }
+  };
+  const end = () => {
+    if (!open) return;
+    open = false;
+    try {
+      controller?.close();
+    } catch {
+      // Already closed by the browser leaving.
+    }
+  };
+  // Whether the page that asked is still reading: when it is not, the reply is announced.
+  const watching = () => open && !request.signal.aborted;
+
   const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      // A browser that went away leaves the stream closed; the answer is still
-      // kept, and the question reopened from the list shows it.
-      let open = true;
-      const send = (line: AskStreamLine) => {
-        if (!open) return;
-        try {
-          controller.enqueue(encoder.encode(encodeStreamLine(line)));
-        } catch {
-          open = false;
-        }
-      };
-      const end = () => {
-        if (!open) return;
-        open = false;
-        try {
-          controller.close();
-        } catch {
-          // Already closed by the browser leaving.
-        }
-      };
-      if (!checked.ok) {
-        send({ result: { turns: [], error: checked.error } });
-        end();
-        return;
-      }
-      try {
-        const result = await askDashInRequest({
-          ...checked.input,
-          signal: stopping.signal,
-          onAsked: (asked) => send({ asked }),
-          onLookup: (event) => {
-            const lookup = lookupWire(event);
-            if (lookup) send({ lookup });
-          },
-          onText: (text) => send({ text }),
-        });
-        // The list of past questions reads the table, so a new question or a new
-        // answer has to show there the next time it is opened.
-        if (result.conversation) revalidatePath('/chat/dash');
-        // A change Dash made in the answer shows on the pages that hold its row (plan #1440).
-        for (const change of result.changes ?? []) {
-          if (change.status === 'done') for (const path of changePaths(change)) revalidatePath(path);
-        }
-        send({ result });
-      } catch {
-        send({ result: { turns: [], error: 'Dash could not be asked. Check your connection and try again.' } });
-      }
-      end();
+    start(c) {
+      controller = c;
     },
     cancel() {
-      // The browser stopped reading: Stop was pressed, or the page went.
-      stop();
+      // The browser stopped reading: the page went. The answer carries on.
+      open = false;
     },
   });
+
+  const answering = (async () => {
+    if (!checked.ok) {
+      send({ result: { turns: [], error: checked.error } });
+      end();
+      return;
+    }
+    try {
+      const result = await askDashInRequest({
+        ...checked.input,
+        retry: body.retry === true,
+        onAsked: (asked) => send({ asked }),
+        onLookup: (event) => {
+          const lookup = lookupWire(event);
+          if (lookup) send({ lookup });
+        },
+        onText: (text) => send({ text }),
+      });
+      // The list of past questions reads the table, so a new question or a new
+      // answer has to show there the next time it is opened.
+      if (result.conversation) revalidatePath('/chat/dash');
+      // A change Dash made in the answer shows on the pages that hold its row (plan #1440).
+      for (const change of result.changes ?? []) {
+        if (change.status === 'done') for (const path of changePaths(change)) revalidatePath(path);
+      }
+      if (result.conversation && !watching()) await announceReply(user.id, result);
+      send({ result });
+    } catch (error) {
+      console.error('ask failed', error);
+      send({ result: { turns: [], error: 'Dash could not be asked. Check your connection and try again.' } });
+    }
+    end();
+  })();
+  after(() => answering);
 
   return new Response(stream, {
     headers: {
@@ -139,4 +154,20 @@ export async function POST(request: Request) {
       'x-accel-buffering': 'no',
     },
   });
+}
+
+/**
+ * The reply landed, or failed, after the page that asked had gone (plan
+ * #2854.4): a notification that opens the chat. Never throws.
+ */
+async function announceReply(userId: string, result: AskDashResult): Promise<void> {
+  const ref = result.conversation?.ref;
+  if (!ref) return;
+  const answer = result.turns.findLast((turn) => turn.role === 'assistant');
+  const outcome = answer && !result.error ? { answer: answer.body } : { error: result.error ?? 'Open the chat to see why.' };
+  try {
+    await notifyPerson(await createCoreClient(), userId, askReplyPayload(ref, outcome));
+  } catch (error) {
+    console.error('the reply notification was not sent', error);
+  }
 }

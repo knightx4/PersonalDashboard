@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_messages', 'advisor_persona_versions', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -909,6 +909,69 @@ describe('advisor chats, memory and forecasts', () => {
     expect(await admin`select text from you.advisor_memory where user_id = ${userA}`).toEqual([
       { text: 'Deciding on the offer.' },
     ]);
+  });
+
+  it('keeps a group, its bots and their reactions to their owner, and holds a group to eight bots (you 0042)', async () => {
+    const bots = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      select ${userA}, 'group_bot_' || n, 'Bot ' || n, 'seat', 'Why?', ${admin.json({ style: 'notionists', seed: 'g' })}
+        from generate_series(1, 9) n
+      returning id`;
+    const [group] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_chats (user_id, kind, advisor_id) values (${userA}, 'group', null) returning id`,
+    );
+    for (const bot of bots.slice(0, 8)) {
+      await asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bot.id})`);
+    }
+    await expect(
+      asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bots[8].id})`),
+    ).rejects.toThrow();
+    await asUser(userA, (tx) => tx`update advisor_chat_members set left_at = now() where advisor_id = ${bots[0].id}`);
+    await asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bots[8].id})`);
+    const [said] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_messages (user_id, chat_id, role, text, speaker_id)
+                 values (${userA}, ${group.id}, 'advisor', 'Hello all', ${bots[1].id}) returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_message_reactions (user_id, message_id, advisor_id, reaction)
+                 values (${userA}, ${said.id}, ${bots[2].id}, 'thumbs_up')`,
+    );
+    expect(await asUser(userB, (tx) => tx`select chat_id from advisor_chat_members`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_message_reactions`)).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userB}, ${group.id}, ${bots[3].id})`),
+    ).rejects.toThrow();
+
+    // A group never gets a text first or an ack (you 0043): its bots only answer the person.
+    await expect(
+      admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, speaker_id)
+            values (${userA}, ${group.id}, 'advisor', 'ack', 'One sec', ${bots[1].id})`,
+    ).rejects.toThrow(/replies only/);
+
+    // Deleting a bot leaves the group, takes its member row, and keeps its words without a speaker.
+    await admin`delete from you.board_advisors where id = ${bots[1].id}`;
+    const [kept] = await admin`select speaker_id from you.advisor_messages where id = ${said.id}`;
+    expect(kept.speaker_id).toBeNull();
+    const [count] = await admin`select count(*)::int as n from you.advisor_chat_members where chat_id = ${group.id}`;
+    expect(count.n).toBe(8);
+  });
+
+  it('refuses a group with a bot of its own, a direct chat with members, a person speaking as a bot, or a made-up reaction', async () => {
+    const [direct] = await admin<{ id: string }[]>`select id from you.advisor_chats where id = ${chatA}`;
+    const bad = [
+      () => admin`insert into you.advisor_chats (user_id, kind, advisor_id) values (${userA}, 'group', ${advisorA})`,
+      () => admin`insert into you.advisor_chats (user_id, kind, advisor_id) values (${userA}, 'direct', null)`,
+      () => admin`insert into you.advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${direct.id}, ${advisorA})`,
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, text, speaker_id) values (${userA}, ${chatA}, 'person', 'x', ${advisorA})`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+    const [message] = await admin<{ id: string }[]>`select id from you.advisor_messages where chat_id = ${chatA} limit 1`;
+    await expect(
+      admin`insert into you.advisor_message_reactions (user_id, message_id, advisor_id, reaction) values (${userA}, ${message.id}, ${advisorA}, 'shrug')`,
+    ).rejects.toThrow();
   });
 
   it('refuses a message, a memory or an avatar of the wrong shape', async () => {
