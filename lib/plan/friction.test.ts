@@ -46,6 +46,21 @@ describe('knownLesson', () => {
     );
   });
 
+  it('knows the stop lines the first review found unfiled', () => {
+    expect(knownLesson('Closing the feature row is refused by ui-guard: the critic has no recorded round on 80 You surfaces')?.key).toBe(
+      'feature-row-close-checks-every-surface',
+    );
+    expect(knownLesson('close is refused: GITHUB_READ_TOKEN gets 404 reading the repo')?.key).toBe(
+      'github-read-token-cannot-read-repo',
+    );
+    expect(knownLesson('add_repo tool unavailable in the routine session; interactive-islm not attached')?.key).toBe(
+      'add-repo-searched-instead-of-called',
+    );
+    expect(knownLesson('All three steps were already built and closed by an earlier worker; nothing left to build.')?.key).toBe(
+      'run-sent-with-nothing-to-build',
+    );
+  });
+
   it('leaves an unknown line for the review', () => {
     expect(knownLesson('The weather was bad')).toBeNull();
   });

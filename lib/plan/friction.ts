@@ -69,6 +69,31 @@ const KNOWN: { key: string; title: string; test: RegExp }[] = [
     test: /names #[0-9.]+(, #[0-9.]+)* and not #|names another step/,
   },
   {
+    key: 'feature-row-close-checks-every-surface',
+    title: "Closing a feature row ran the design check over every surface its merge reached, without its steps' rounds",
+    test: /clos(e|ing) (the feature( row| itself)?|#\d+)[^.]*(is |was )?refused|feature (row|itself) (is|was) refused|HEAD is the feature merge/i,
+  },
+  {
+    key: 'github-read-token-cannot-read-repo',
+    title: 'done and land could not ask GitHub whether a commit is on main',
+    test: /GITHUB_READ_TOKEN|cannot read (the )?(repo|repository|commits)/i,
+  },
+  {
+    key: 'add-repo-searched-instead-of-called',
+    title: 'A session looked for add_repo with ToolSearch, did not find it, and gave up on another repository',
+    test: /add_repo[^.]*(unavailable|not (available|among|in)|were not)|not checked out and add_repo/i,
+  },
+  {
+    key: 'run-sent-with-nothing-to-build',
+    title: 'A run was sent at a feature whose steps were already built or closed',
+    test: /nothing (left )?to build|already (built and )?closed by|were already (done|built)|nothing was buildable|no step was buildable/i,
+  },
+  {
+    key: 'two-sessions-on-one-feature',
+    title: 'Two sessions built the same feature at once',
+    test: /another session was already (building|working)|duplicate builds?/i,
+  },
+  {
     key: 'close-refused-by-critic-gate',
     title: 'A step whose code is on main cannot close until the design critic passes its surfaces',
     test: /design critic (has not passed|has (recorded )?no round|has no recorded)|critic has no round|critic passes|no critic rounds?|ui-guard.*(refus|cannot close)|cannot close.*critic/i,

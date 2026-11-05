@@ -260,6 +260,20 @@ async function main() {
         console.log(`  ~${l.minutes} min · ${l.count}× ${grow} · ${l.key} [${l.status}]: ${l.title}`);
         if (l.lesson) console.log(`      Do: ${clip(l.lesson, 200)}`);
       }
+      // Rows the word list now knows are filed without the review's help.
+      const loose = await sql`
+        select id, what from build_friction
+        where user_id = ${userId} and lesson_id is null and created_at > now() - make_interval(days => ${days})`;
+      let refiled = 0;
+      for (const row of loose) {
+        const known = knownLesson(row.what as string);
+        if (!known) continue;
+        const lesson = await ensureLesson(sql, userId, known.key, known.title);
+        await sql`update build_friction set lesson_id = ${lesson.id} where id = ${row.id} and user_id = ${userId}`;
+        refiled += 1;
+      }
+      if (refiled > 0) console.log(`Filed ${refiled} earlier row(s) the word list now knows.\n`);
+
       const unfiled = await sql`
         select f.id, f.kind, f.what, f.created_at from build_friction f
         where f.user_id = ${userId} and f.lesson_id is null and f.created_at > now() - make_interval(days => ${days})
