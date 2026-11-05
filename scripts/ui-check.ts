@@ -1,7 +1,7 @@
 /**
  * Record one design critic round (plan #1533).
  *
- *   npm run ui-check -- <step or note id> <surface> <round> [--commit <sha>]
+ *   npm run ui-check -- <step or note id> <surface> <round> [--commit <sha>] [--states <id>,<id>]
  *
  * Reads the critic's verdict, saved unchanged at
  * `.preview-shots/checks/<step or note id>--<surface>--r<round>.json`, keeps a
@@ -20,6 +20,13 @@
  *     through the Supabase connector, with no shots uploaded. The shots stay
  *     in `.preview-shots/checks/`, and running this again from a session
  *     with the keys uploads them and fills the row in.
+ *
+ * With `--states`, for a feature's land review (plan #2966.3), the verdict on
+ * a page's main state is recorded for each of the page's other states too:
+ * the critic judged them together, from the main state's four shots and the
+ * strip `npm run ui-guard -- <feature> --feature --sheets` drew of the rest.
+ * Give the feature's number and `--commit <branch head>`: land counts only a
+ * round taken at a commit that holds every built step's.
  *
  * Exits non-zero when the verdict file is missing or is not the critic's
  * shape, so a round cannot be recorded from a summary.
@@ -45,6 +52,7 @@ import {
   type CheckOwner,
   type KeptShot,
 } from '../lib/preview/ui-checks';
+import { referenceFor } from '../lib/preview/references';
 import { supabaseProjectUrl } from '../lib/db/project';
 
 function fail(message: string): never {
@@ -96,7 +104,7 @@ function serviceClient() {
 async function main() {
   const [ownerArg, surfaceArg, roundArg] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
   if (!ownerArg || !surfaceArg || !roundArg) {
-    fail('Usage: npm run ui-check -- <step or note id> <surface> <round> [--commit <sha>]');
+    fail('Usage: npm run ui-check -- <step or note id> <surface> <round> [--commit <sha>] [--states <id>,<id>]');
   }
   let owner: CheckOwner, surface: string, round: number;
   try {
@@ -111,11 +119,40 @@ async function main() {
   if (!existsSync(file)) fail(`No verdict at ${file}. Save the critic's json block there first.`);
   let verdict;
   try {
-    verdict = parseVerdict(readFileSync(file, 'utf8'), surface, round);
+    verdict = parseVerdict(readFileSync(file, 'utf8'), surface, round, referenceFor(surface) !== null);
   } catch (error) {
     fail(`${file}: ${(error as Error).message}`);
   }
 
+  // A land review judges a page's states with its main state in one round
+  // (plan #2966.3): the one verdict is recorded for each, with each state's
+  // own shots kept beside it.
+  const states = (arg('--states') ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (const state of states) {
+    try {
+      parseSurface(state);
+    } catch (error) {
+      fail((error as Error).message);
+    }
+    if (referenceFor(state) !== null && !verdict.layout) {
+      fail(`${state} has a reference, so the verdict has to answer the layout question for the page.`);
+    }
+  }
+  for (const each of [surface, ...states.filter((s) => s !== surface)]) {
+    await record(owner, ownerArg, { ...verdict, surface: each }, each, round);
+  }
+}
+
+async function record(
+  owner: CheckOwner,
+  ownerArg: string,
+  verdict: ReturnType<typeof parseVerdict>,
+  surface: string,
+  round: number,
+): Promise<void> {
   const kept = keepShots(owner, surface, round);
   const after = kept.filter((shot) => !shot.startsWith('before-')).length;
   if (after < SHOT_NAMES.length) {

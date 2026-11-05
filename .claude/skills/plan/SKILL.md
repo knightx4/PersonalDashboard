@@ -266,7 +266,8 @@ thousand tokens, and gets to the end.
      critic. The step's own commit is the one whose subject ends
      `(plan #<outline>)`, not the branch's head: on #2879 three steps were
      checked against a later step's commit and six runs went into critic
-     rounds for screens they never touched.
+     rounds for screens they never touched. These are the builder's working
+     checks; the rounds that close the step come from the land review below.
    - `built <n> --note "…"`, with the note the subagent wrote. The step stays
      in progress and records its commit and the branch; `done` would refuse
      it, because the commit is not on main yet. Without `--commit`, `built`
@@ -303,12 +304,26 @@ thousand tokens, and gets to the end.
      broke it: fix it with a commit against that step's outline. That includes
      a failure another session merged, because main is what you are about to
      push.
+   - **Review the screens once, at the head** (plan #2966.3), when any built
+     step changed a screen. `npm run ui-guard -- <feature> --feature
+     --compare` settles what looks the same as main; `--sheets` groups the
+     rest by page, and the critic judges each page in one round, its main
+     state at four shots and its other states as a strip, recorded under the
+     feature with `npm run ui-check -- <feature> <surface> <round> --commit
+     <head> --states …`. `screen.md`, **The land review**, has the loop. Do
+     it before the merge to main: afterwards main already has the feature
+     and every screen compares the same. A fix the critic asks for is a commit
+     against the step that drew the screen, and the gate runs again if it
+     changed code.
    - Merge the feature branch into `main` with `--no-ff`, subject `Merge plan
      feature #<outline>: <title>`, list the steps it carries in the body, and
      push.
    - `land <feature>`. It closes every step marked built under the feature,
-     each against its own commit and with the same checks `done` makes, and
-     names any it could not close and why.
+     each against its own commit, and names any it could not close and why.
+     The screens are checked once for the whole feature: a screen step closes
+     when every surface it reaches has passed in the feature's rounds, taken
+     at a commit that holds every built step's commit. Rounds recorded on the
+     steps themselves do not close them.
 
    A step sent on its own ("do #1073.4") is not a batch: it merges to main by
    itself, after the gate, with subject `Merge plan step #<outline>: <title>`,

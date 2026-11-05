@@ -11,12 +11,20 @@
  * settle's own rule (`lib/plan/ui-settle-diff.ts`). Those that look the same
  * are settled; only those that changed are listed for the critic.
  *
- * Which surfaces a step meant to change: those the critic has judged on it
- * (any round but an `accepted` one, which is a settle rather than a look),
- * and those its title, detail or done-when links as `/preview?s=<id>`. A page
- * address in its words does not count: #2748.13's mention of /dev/ui named 29
- * surfaces. Every other surface its files serve was reached through a shared
- * file. A surface whose latest round already passes is in neither list.
+ * Plan #2966.2: the surfaces a step meant to change are compared too. A
+ * screen the step lists as its own may have no visible change (a hidden part
+ * drawn the same, a state the edit did not reach), and the critic used to be
+ * sent it anyway. Now every surface that has not passed is shot on both
+ * checkouts, and only those whose shots differ from main's, or that main does
+ * not have, go to the critic.
+ *
+ * `splitSurfaces` still says which surfaces a step meant to change: those the
+ * critic has judged on it (any round but an `accepted` one, which is a settle
+ * rather than a look), and those its title, detail or done-when links as
+ * `/preview?s=<id>`. A page address in its words does not count: #2748.13's
+ * mention of /dev/ui named 29 surfaces. The compare run uses it for the line
+ * it prints, not to hold a surface back. A surface whose latest round already
+ * passes is in neither list.
  *
  * Nothing here has side effects; the servers and the shooting are in
  * `scripts/ui-guard-compare.ts`.
@@ -78,9 +86,9 @@ export function mainPreviewPort(previewPort: number): number {
   return previewPort + 1000;
 }
 
-/** Why a reached surface that looks the same is settled, as its round's notes say. */
+/** Why a surface that looks the same as main is settled, as its round's notes say. */
 export const SAME_AS_MAIN_REASON =
-  'reached only through a shared file, and ui-guard --compare found its four shots the same as main\'s';
+  'ui-guard --compare found its four shots the same as main\'s, so it has no visible change for the critic to judge';
 
 /** How long each part took, in milliseconds. */
 export type CompareTimings = { build: number; shoot: number; compare: number };
@@ -92,32 +100,32 @@ function seconds(ms: number): string {
 }
 
 /**
- * What a compare run prints: the surfaces left for the critic (the named ones
- * and those that changed), and those it settled, with the time each part took.
+ * What a compare run prints: how many surfaces it settled and how many go to
+ * the critic, then the ones that go (those whose shots differ from main's or
+ * that main does not have), with the time each part took. Every surface the
+ * step's files serve was compared, those the step names included.
  */
 export function compareReport(input: {
   name: string;
   step: number;
-  named: readonly string[];
   comparisons: readonly ShotComparison[];
   /** Surfaces main's gallery does not have: new on this branch. */
   newOnBranch: readonly string[];
   timings: CompareTimings;
 }): { forCritic: string[]; settled: string[]; text: string } {
-  const { name, step, named, comparisons, newOnBranch, timings } = input;
+  const { name, step, comparisons, newOnBranch, timings } = input;
   const changed = comparisons.filter((c) => c.outcome !== 'same');
   const settled = comparisons.filter((c) => c.outcome === 'same').map((c) => c.surface);
-  const forCritic = [...named, ...changed.map((c) => c.surface)];
+  const forCritic = changed.map((c) => c.surface);
   const lines = [
-    `${name}: ${comparisons.length} surface${comparisons.length === 1 ? '' : 's'} reached through a shared file, compared with main. ` +
-      `${settled.length} look the same, ${changed.length} do not.`,
+    `${name}: compared ${comparisons.length} surface${comparisons.length === 1 ? '' : 's'} with main. ` +
+      `Settled ${settled.length} that look the same; ${forCritic.length} go${forCritic.length === 1 ? 'es' : ''} to the critic.`,
     `Time: building ${seconds(timings.build)}, shooting ${seconds(timings.shoot)}, comparing ${seconds(timings.compare)}.`,
   ];
   if (forCritic.length === 0) {
     lines.push('Nothing for the critic: every surface the files reach looks the same as on main.');
   } else {
     lines.push(`For the critic (${forCritic.length}):`);
-    for (const s of named) lines.push(`  ${s}: judged by the critic or linked by the step, not passed yet`);
     for (const c of changed) {
       const why = newOnBranch.includes(c.surface) ? 'new on this branch' : c.reasons.join('; ');
       lines.push(`  ${c.surface}: ${why}`);

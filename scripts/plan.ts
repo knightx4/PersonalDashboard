@@ -146,8 +146,14 @@ import { landNowLine } from '../lib/plan/land';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
-import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
-import { stepScreenInputs } from '../lib/plan/ui-check-local';
+import { isScreenFile, uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
+import { localGit, stepScreenInputs } from '../lib/plan/ui-check-local';
+import {
+  featureLandCheck,
+  roundsAtHead,
+  type BuiltScreenStep,
+  type FeatureRound,
+} from '../lib/plan/ui-feature-review';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain, isAppRepo, type Repo } from '../lib/plan/github';
 import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
@@ -494,6 +500,11 @@ async function doneRefusal(
   commit: string,
   /** The repository `--repo` named, for a step built outside its root's. */
   named?: Repo,
+  /**
+   * False for `land`, which checks the screens once for the whole feature
+   * from the feature's own rounds (plan #2966.3) rather than step by step.
+   */
+  screens = true,
 ): Promise<string | null> {
   // Asked of the repository the step was built in: its root feature's
   // project's, or this one (plan #2553.2), unless `--repo` names a project
@@ -507,7 +518,7 @@ async function doneRefusal(
   if (refusal) return refusal;
   // The screens and the design critic are this app's; a project's
   // repository has its own checks.
-  if (!app) return null;
+  if (!app || !screens) return null;
 
   let inputs: { files: string[]; surfaces: string[] };
   try {
@@ -525,11 +536,51 @@ async function doneRefusal(
           union all
           select p.id, p.number from plan_items p join below b on p.parent_id = b.id
         )
-        select surface, round, verdict from ui_checks
+        select surface, round, verdict, (layout->>'ok')::boolean as layout_ok, fixes, notes from ui_checks
         where user_id = ${userId} and step in (select number from below)
         order by round, created_at`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
+}
+
+/**
+ * The built steps under a feature that its land review still holds, each with
+ * the sentence saying why (plan #2966.3). The rounds are the feature's own,
+ * recorded under its number at a commit holding every screen step's commit,
+ * read once for the union of the surfaces the steps reach
+ * (lib/plan/ui-feature-review.ts). A feature in another project's repository
+ * has none of this app's screens to check.
+ */
+async function featureScreensHeld(
+  sql: Sql,
+  userId: string,
+  feature: number,
+  steps: readonly { number: number; commit: string }[],
+): Promise<Map<number, string>> {
+  const held = new Map<number, string>();
+  if (steps.length === 0) return held;
+  if (!isAppRepo(repoForScope(await rootScope(sql, userId, feature), projects))) return held;
+  const inputs: BuiltScreenStep[] = [];
+  for (const step of steps) {
+    try {
+      inputs.push({ ...step, ...stepScreenInputs(step.number, step.commit, outlines.get(step.number)) });
+    } catch (error) {
+      held.set(
+        step.number,
+        `could not read what it changed at ${step.commit} to check its screens ` +
+          `(${error instanceof Error ? error.message : String(error)}). Run git fetch origin and try again.`,
+      );
+    }
+  }
+  const screenSteps = inputs.filter((s) => s.files.some(isScreenFile) && s.surfaces.length > 0);
+  if (screenSteps.length === 0) return held;
+  const all = await sql<FeatureRound[]>`
+    select surface, round, verdict, (layout->>'ok')::boolean as layout_ok, commit_sha, fixes, notes from ui_checks
+    where user_id = ${userId} and step = ${feature}`;
+  const counting = roundsAtHead(all, { contains: screenSteps.map((s) => s.commit) }, localGit);
+  const check = featureLandCheck({ feature, outline: outlines.get(feature), steps: inputs, all, counting });
+  for (const [number, why] of check.held) held.set(number, why);
+  return held;
 }
 
 /**
@@ -2091,9 +2142,12 @@ async function main(): Promise<void> {
 
     /**
      * Close every step marked built under a feature, once the feature's
-     * branch is on main. Each close runs the same checks as `done`, against
-     * the commit `built` recorded, so a step whose commit did not land, or
-     * whose screen has no passing design check, stays open and is named.
+     * branch is on main. Each close runs the commit checks `done` makes,
+     * against the commit `built` recorded, so a step whose commit did not
+     * land stays open and is named. The screens are checked once for the
+     * feature (plan #2966.3, featureScreensHeld): a screen step whose
+     * surfaces have not passed in the feature's rounds at its head stays
+     * open too.
      */
     if (command === 'land') {
       const rows = await sql<Record<string, unknown>[]>`
@@ -2114,20 +2168,31 @@ async function main(): Promise<void> {
       const stamp = new Date().toISOString().slice(0, 10);
       const closed: number[] = [];
       const refused: string[] = [];
+      // Each step's commit has to be on main, as for done; the screens are
+      // then checked once for the feature (plan #2966.3).
+      const onMain: { id: string; number: number; commit: string }[] = [];
       for (const row of built) {
         const number = row.number as number;
         const commit = row.commit_sha as string;
-        const refusal = await doneRefusal(sql, userId, number, commit);
+        const refusal = await doneRefusal(sql, userId, number, commit, undefined, false);
         if (refusal) {
           const said = await refusedFriction(sql, userId, row.id as string, refusal);
           refused.push(`${ref(number)}: ${refusal}${said ? `\n${said}` : ''}`);
+        } else onMain.push({ id: row.id as string, number, commit });
+      }
+      const held = await featureScreensHeld(sql, userId, item.number, onMain);
+      for (const { id, number } of onMain) {
+        const why = held.get(number);
+        if (why) {
+          const said = await refusedFriction(sql, userId, id, why);
+          refused.push(`${ref(number)}: ${why}${said ? `\n${said}` : ''}`);
           continue;
         }
         const line = `Done ${stamp}: on main with ${ref(item.number)}.`;
         await sql`
           update plan_items
           set status = 'done', comment = coalesce(comment || E'\n\n', '') || ${line}
-          where id = ${row.id as string} and user_id = ${userId}`;
+          where id = ${id} and user_id = ${userId}`;
         closed.push(number);
       }
       if (closed.length > 0) console.log(`Closed ${closed.map((n) => ref(n)).join(', ')}.`);

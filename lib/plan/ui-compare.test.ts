@@ -62,11 +62,10 @@ describe('ports', () => {
 describe('compareReport', () => {
   const timings = { build: 200_000, shoot: 61_000, compare: 900 };
 
-  it('lists the named and the changed for the critic and settles the same', () => {
+  it('settles the same and lists only the changed for the critic', () => {
     const report = compareReport({
       name: '#2748.12',
       step: 2770,
-      named: ['ask-page'],
       comparisons: [
         { surface: 'dev-comment-thread', outcome: 'same', reasons: [] },
         { surface: 'learn-now', outcome: 'changed', reasons: ['phone-light differs in 812 pixels (0.06%)'] },
@@ -75,9 +74,9 @@ describe('compareReport', () => {
       newOnBranch: ['chat-people'],
       timings,
     });
-    expect(report.forCritic).toEqual(['ask-page', 'learn-now', 'chat-people']);
+    expect(report.forCritic).toEqual(['learn-now', 'chat-people']);
     expect(report.settled).toEqual(['dev-comment-thread']);
-    expect(report.text).toContain('3 surfaces reached through a shared file');
+    expect(report.text).toContain('compared 3 surfaces with main. Settled 1 that look the same; 2 go to the critic.');
     expect(report.text).toContain('learn-now: phone-light differs in 812 pixels');
     expect(report.text).toContain('chat-people: new on this branch');
     expect(report.text).toContain('building 3 min 20 s, shooting 61.0 s, comparing 900 ms');
@@ -88,7 +87,6 @@ describe('compareReport', () => {
     const report = compareReport({
       name: '#1',
       step: 1,
-      named: [],
       comparisons: [{ surface: 'ui-kit', outcome: 'same', reasons: [] }],
       newOnBranch: [],
       timings,

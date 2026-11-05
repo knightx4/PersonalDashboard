@@ -200,7 +200,12 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
    each of its surfaces. After a third failed round you settle it yourself (see
-   `screen.md`).
+   `screen.md`). A builder sent as part of a batch still runs the critic on
+   its own surfaces, but those rounds are its working checks: the rounds that
+   close its step are the feature's land review, taken once on the feature
+   branch head by the session that lands it (`screen.md`, **The land
+   review**). Report your rounds all the same, so that review starts from
+   them.
 
    **Do not run the full suite and do not run `next build`.** The session that
    sent you runs both before the feature goes to main, and CI runs them again
