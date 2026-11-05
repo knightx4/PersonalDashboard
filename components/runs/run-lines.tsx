@@ -124,7 +124,12 @@ export function RunLinesView({
   const list = feature ? (
     <StepLines lines={lines} feature={feature} now={now} arrived={arrived} open={asking} />
   ) : (
-    <LineList lines={lines} now={now} arrived={arrived} open={asking} />
+    // One list of lines scrolls in a box of fixed height, opened at the newest
+    // line (note d89c72b0): a long run on Home's runner card otherwise ran the
+    // page on for screens.
+    <ScrollingLines lastId={lines[lines.length - 1]?.id ?? null} className="max-h-80">
+      <LineList lines={lines} now={now} arrived={arrived} open={asking} />
+    </ScrollingLines>
   );
 
   if (state === 'ended') {
@@ -207,7 +212,7 @@ const STEP_STATE: Record<FeatureStep['status'], string> = {
  * what Dash is doing reads first, then one fold for each step. The fold
  * holding the newest line, a question waiting on you or a step being built
  * opens by itself, and the rest fold to their state and how many lines they
- * hold. An open step's lines scroll in their own box (StepBody).
+ * hold. An open step's lines scroll in their own box (ScrollingLines).
  */
 function StepLines({
   lines,
@@ -377,7 +382,7 @@ function StepFold({
         </span>
       </button>
       {isOpen && (
-        <StepBody id={body} lastId={bucket.groups[bucket.groups.length - 1]?.lastId ?? null}>
+        <ScrollingLines id={body} lastId={bucket.groups[bucket.groups.length - 1]?.lastId ?? null}>
           {bucket.groups.length === 0 ? (
             <p className="pl-5.5 text-small text-ink-muted">Nothing written about this step yet.</p>
           ) : (
@@ -399,18 +404,29 @@ function StepFold({
               )}
             </ol>
           )}
-        </StepBody>
+        </ScrollingLines>
       )}
     </div>
   );
 }
 
 /**
- * A step's lines in a box of fixed height that scrolls on its own, opened at
- * its newest line and kept there as lines arrive. Scrolling up to read older
+ * Lines in a box of fixed height that scrolls on its own (a step's, or a
+ * run's one list), opened at its newest line and kept there as lines arrive. Scrolling up to read older
  * lines stops it following until it is scrolled back to the foot.
  */
-function StepBody({ id, lastId, children }: { id: string; lastId: string | null; children: React.ReactNode }) {
+function ScrollingLines({
+  id,
+  lastId,
+  className = 'mx-2.5 mb-2 max-h-64',
+  children,
+}: {
+  id?: string;
+  lastId: string | null;
+  /** The box's height and spacing; a step's fold sets its own. */
+  className?: string;
+  children: React.ReactNode;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
 
@@ -427,7 +443,7 @@ function StepBody({ id, lastId, children }: { id: string; lastId: string | null;
         const el = event.currentTarget;
         follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
-      className="mx-2.5 mb-2 max-h-64 overflow-y-auto overscroll-contain"
+      className={cn('overflow-y-auto overscroll-contain', className)}
     >
       {children}
     </div>
