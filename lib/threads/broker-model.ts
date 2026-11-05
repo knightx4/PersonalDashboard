@@ -40,6 +40,11 @@ export type BrokerThread = {
   projectId: string | null;
   sessionId: string | null;
   state: string;
+  /**
+   * 'think': a question from Ask Dash's Think it through (plan #2789.11),
+   * answered with no change made. Absent or 'work': a thread on the code.
+   */
+  mode?: 'work' | 'think';
 };
 
 export type BrokerMessage = {
@@ -188,6 +193,7 @@ export function threadSessionPrompt(input: {
     '- Their next messages reach you as turns from the broker session that started you. Each one is what they wrote in the app. If you wonder whether you missed something, read_thread (thread_id as above) returns everything written since a point.',
     '- Files they attach come as links that last a week. Open them with a plain fetch.',
     '',
+    ...(thread.mode === 'think' ? thinkSection(id) : []),
     'How you work',
     '',
     "- Follow this repository's own CLAUDE.md. Its rules on migrations, the gate, commits and merging hold here as in any session.",
@@ -207,6 +213,26 @@ export function threadSessionPrompt(input: {
   ]
     .filter((line, index, all) => !(line === '' && all[index - 1] === ''))
     .join('\n');
+}
+
+/**
+ * What a think-it-through thread's session is told on top (plan #2789.11):
+ * the question came from Ask Dash with Think it through on, so it answers
+ * in words and changes nothing.
+ */
+function thinkSection(id: string): string[] {
+  return [
+    'This thread is a question to think through',
+    '',
+    "- The person asked it in Ask Dash with Think it through on. It needs thought, not a change to the code: a design idea for the app, a choice in their career or life, or what an article or a product means for what they are building. The chat so far is the thread's first message, and the last question in it is the one to answer.",
+    '- Change nothing. Do not edit files, commit, push, open a pull request, apply a migration or write a row: no plan rows (propose_feature, add_plan_step, write_decision) and no Dash writes. Read the code, the specs and the docs freely, and search the web.',
+    '- Weigh the options against each other and name what each costs. Ground what you say about the app in what you read, naming the files. Cite each source you rely on with its link.',
+    '- End with what you would do and why, and say plainly where you are unsure.',
+    `- Before a stretch of reading, write one status line (reply_in_thread, kind "status") on what you are looking at, so they can see where you are. Then give the whole answer in one reply_in_thread of kind "text" with thread_id ${id}: plain prose, a list where it helps, each part opened with its name in bold. It can be longer than a usual reply, but every paragraph earns its place.`,
+    '- If they ask in the thread for a change afterwards, say that this thread only thinks, and that they can start a session thread from Chat to make it.',
+    '- Then report_progress with state "done".',
+    '',
+  ];
 }
 
 /** The source_url create_session takes for a repository. */

@@ -1,5 +1,6 @@
 import { BODY_MAX, clip, TITLE_MAX } from '@/lib/day-brief/notification';
 import type { PushPayload } from '@/lib/push/send';
+import { sessionThreadPath } from '@/lib/core/session-threads-model';
 
 /**
  * Where the reply to an Ask Dash chat's last question stands (plan #2854.4),
@@ -77,6 +78,25 @@ export function askReplyPayload(
     body: clip(body || 'Open the chat to read it.', BODY_MAX),
     url: askChatUrl(ref),
     tag: `ask-${ref}`,
+  };
+}
+
+/**
+ * The notification for a session's answer in a think-it-through thread
+ * (plan #2789.11): the question went from Ask Dash to a session, so the
+ * person has left the page by the time it answers. Opens the thread. A
+ * question the session asks back says so, since it waits on them.
+ */
+export function sessionReplyPayload(
+  thread: { id: string; title: string },
+  reply: { kind: 'text' | 'question'; body: string },
+): PushPayload {
+  const asked = reply.kind === 'question';
+  return {
+    title: clip(asked ? `A question on "${thread.title}"` : `Thought through: ${thread.title}`, TITLE_MAX),
+    body: clip(plainLine(reply.body) || 'Open the thread to read it.', BODY_MAX),
+    url: sessionThreadPath(thread.id),
+    tag: `session-${thread.id}`,
   };
 }
 

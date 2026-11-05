@@ -7,7 +7,8 @@ import { parseAskInput } from '@/lib/talk/ask-input';
 import { isShownLookup, lookupLabel } from '@/lib/talk/lookups';
 import { MAX_MOCKUP_HTML, mockupDocument, parseMockup, turnMockups } from '@/lib/talk/mockup';
 import type { NewTalkTurn, TalkSubject } from '@/lib/talk/talk';
-import { turnThought } from '@/lib/talk/thought';
+import { SESSION_SENT_BODY, THINK_FALLBACK, sessionSentState, turnSessionSent, turnThought } from '@/lib/talk/thought';
+import { chatAsMessage } from '@/lib/talk/chat-to-session';
 import { answerQuestion, askDash, ASK_VOICE, thinkVoice, type AskStores } from './ask';
 import { MAX_WEB_SEARCHES } from './web-search';
 import { THINK_EFFORT, THINK_MODEL, THINK_RULES, THINK_TIME_BUDGET_MS, thoughtCost, type ThinkDeps } from './think';
@@ -252,7 +253,7 @@ describe('askDash with Think it through', () => {
     );
     const answer = result.turns.find((turn) => turn.role === 'assistant');
     const thought = turnThought(answer?.toolCalls);
-    expect(thought).toEqual({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spend) });
+    expect(thought).toEqual({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spend), fallback: null });
     // 1000 input at $4 and 500 output at $20 a million: $0.014.
     expect(thought?.costMicros).toBe(14_000);
   });
@@ -267,6 +268,100 @@ describe('askDash with Think it through', () => {
       stores,
     );
     expect(turnThought(result.turns.find((turn) => turn.role === 'assistant')?.toolCalls)).toBeNull();
+  });
+});
+
+describe('askDash with Think it through, in a session thread (plan #2789.11)', () => {
+  const THREAD = '11111111-2222-4333-8444-555555555555';
+  const QUESTION = 'Should the vault sync through a repository?';
+
+  it('sends the chat to a session instead of asking the model, and says so at once with the thread', async () => {
+    const { client, sent } = stubClient([]);
+    const { stores, written } = memoryStores();
+    const handed: string[] = [];
+    const result = await askDash(
+      { question: QUESTION, today: '2026-11-05', execute: noLookups, anthropicApiKey: 'test', client, think: deps({}) },
+      {
+        ...stores,
+        toSession: async (conversation) => {
+          handed.push(chatAsMessage(conversation, { think: true }));
+          return { ok: true, threadId: THREAD };
+        },
+      },
+    );
+    expect(sent).toHaveLength(0);
+    expect(handed[0]).toContain('Please think my last question through');
+    expect(handed[0]).toContain(`Me: ${QUESTION}`);
+    const reply = result.turns.find((turn) => turn.role === 'assistant');
+    expect(reply?.body).toBe(SESSION_SENT_BODY);
+    expect(turnSessionSent(reply?.toolCalls)).toEqual({ threadId: THREAD });
+    expect(turnThought(reply?.toolCalls)).toBeNull();
+    expect(written.map((t) => t.role)).toEqual(['user', 'assistant']);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('answers here when the thread could not be started, and the mark says why', async () => {
+    const { client } = stubClient([
+      { content: [use('u1', 'answer', { answer: 'Keep the plugin.', cited: [] })], stop_reason: 'tool_use', usage: USAGE },
+    ]);
+    const { stores } = memoryStores();
+    const result = await askDash(
+      { question: QUESTION, today: '2026-11-05', execute: noLookups, anthropicApiKey: 'test', client, think: deps({}) },
+      { ...stores, toSession: async () => ({ ok: false, error: 'insert failed' }) },
+    );
+    const answer = result.turns.find((turn) => turn.role === 'assistant');
+    expect(answer?.body).toContain('Keep the plugin.');
+    expect(turnThought(answer?.toolCalls)?.fallback).toBe(THINK_FALLBACK.notStarted);
+    expect(turnSessionSent(answer?.toolCalls)).toBeNull();
+  });
+
+  it('with no broker, answers here and keeps the reason it was given', async () => {
+    const { client } = stubClient([
+      { content: [use('u1', 'answer', { answer: 'Keep the plugin.', cited: [] })], stop_reason: 'tool_use', usage: USAGE },
+    ]);
+    const { stores } = memoryStores();
+    const result = await askDash(
+      {
+        question: QUESTION,
+        today: '2026-11-05',
+        execute: noLookups,
+        anthropicApiKey: 'test',
+        client,
+        think: deps({}),
+        thinkFallback: THINK_FALLBACK.noBroker,
+      },
+      stores,
+    );
+    expect(turnThought(result.turns.find((turn) => turn.role === 'assistant')?.toolCalls)?.fallback).toBe(THINK_FALLBACK.noBroker);
+  });
+
+  it('never sends an ordinary question to a session', async () => {
+    const { client } = stubClient([
+      { content: [use('u1', 'answer', { answer: 'Yes.', cited: [] })], stop_reason: 'tool_use', usage: USAGE },
+    ]);
+    const { stores } = memoryStores();
+    let called = false;
+    await askDash(
+      { question: 'Any todos?', today: '2026-11-05', execute: noLookups, anthropicApiKey: 'test', client },
+      {
+        ...stores,
+        toSession: async () => {
+          called = true;
+          return { ok: true, threadId: THREAD };
+        },
+      },
+    );
+    expect(called).toBe(false);
+  });
+
+  it('reads where the session has got to: waiting, its newest line, a question back, then its answer', () => {
+    const status = { author: 'session' as const, kind: 'status' as const, answer: null };
+    expect(sessionSentState([], null)).toEqual({ state: 'waiting' });
+    expect(sessionSentState([status], 'Reading the vault spec')).toEqual({ state: 'working', line: 'Reading the vault spec' });
+    expect(sessionSentState([status, { author: 'session', kind: 'question', answer: null }], 'x')).toEqual({ state: 'asked' });
+    expect(sessionSentState([{ author: 'session', kind: 'text', answer: null }], 'x')).toEqual({ state: 'answered' });
+    // The person's own first message is not the session answering.
+    expect(sessionSentState([{ author: 'person', kind: 'text', answer: null }], null)).toEqual({ state: 'waiting' });
   });
 });
 

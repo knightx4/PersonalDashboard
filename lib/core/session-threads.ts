@@ -21,6 +21,7 @@ import {
   threadTitleFrom,
   type SessionMessage,
   type SessionThread,
+  type SessionThreadMode,
 } from './session-threads-model';
 import { PROGRESS_COLUMNS, progressReportOf, type SessionProgressReport } from './session-thread-live';
 
@@ -209,21 +210,31 @@ async function insertMessage(
 /**
  * Start a thread on a project (or this app, with null) with its first
  * message. The thread waits as queued until the broker starts a session on it.
+ * `mode` 'think' marks a question from Ask Dash to think through with no
+ * change made (plan #2789.11); `title`, when given, names the thread instead
+ * of the message's first line.
  */
 export async function startSessionThread(
   core: CoreSupabaseClient,
   userId: string,
-  input: { projectId: string | null; text: string; file: UploadedAttachment | null },
+  input: {
+    projectId: string | null;
+    text: string;
+    file: UploadedAttachment | null;
+    mode?: SessionThreadMode;
+    title?: string;
+  },
   projects: readonly DevProject[],
 ): Promise<{ id: string }> {
   const body = checkText(input.text, input.file);
   if (input.projectId && !projects.some((p) => p.id === input.projectId && !p.archivedAt)) {
     throw new SessionThreadError('That project is not one of yours.');
   }
-  const title = body ? threadTitleFrom(body) : `About ${input.file?.name ?? 'a file'}`.slice(0, 200);
+  const named = input.title?.trim() ? threadTitleFrom(input.title) : null;
+  const title = named ?? (body ? threadTitleFrom(body) : `About ${input.file?.name ?? 'a file'}`.slice(0, 200));
   const { data, error } = await core
     .from('session_threads')
-    .insert({ user_id: userId, title, project_id: input.projectId, state: 'queued' })
+    .insert({ user_id: userId, title, project_id: input.projectId, state: 'queued', mode: input.mode ?? 'work' })
     .select('id')
     .single();
   if (error || !data) throw new Error(`Starting the thread failed: ${error?.message ?? 'no row'}`);

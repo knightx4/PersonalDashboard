@@ -136,6 +136,25 @@ describe('jobFor', () => {
     expect(job.prompt).toContain("repository's own CLAUDE.md");
     expect(job.prompt).toContain('Broker session: session_broker');
     expect(job.prompt).not.toContain('An earlier session on this thread has ended');
+    expect(job.prompt).not.toContain('question to think through');
+  });
+
+  it('tells a think-it-through thread to weigh, cite, recommend and change nothing (plan #2789.11)', () => {
+    const first = message({ body: 'Should the vault sync over Git?' });
+    const job = jobFor({
+      thread: thread({ mode: 'think' }),
+      messages: [first],
+      repo: APP,
+      links: none,
+      brokerSessionId: null,
+    })!;
+    expect(job.prompt).toContain('This thread is a question to think through');
+    expect(job.prompt).toContain('Change nothing.');
+    expect(job.prompt).toContain('Cite each source');
+    expect(job.prompt).toContain('End with what you would do');
+    expect(job.prompt).toContain(`one reply_in_thread of kind "text" with thread_id ${THREAD}`);
+    // The think section comes before the general rules, which still hold.
+    expect(job.prompt.indexOf('question to think through')).toBeLessThan(job.prompt.indexOf('How you work'));
   });
 
   it('sends to the session a thread already has, and its prompt is a replacement given the transcript', () => {

@@ -28,6 +28,8 @@ import type { ModuleId } from '@/lib/modules';
 import type { AskBoxStart } from '@/components/talk/ask-box';
 import { stoppedBody } from '@/lib/talk/talk';
 import { SESSION_OFFER } from '@/lib/talk/chat-to-session';
+import { SESSION_SENT_BODY, THINK_FALLBACK, type SessionSentState } from '@/lib/talk/thought';
+import { SessionSentFixture } from '@/components/talk/think-switch';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 
@@ -578,6 +580,71 @@ export function AskThinkSurface({ part }: { part: 'on' | 'mockup' | 'cost' }) {
           />
         </Card>
       </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+const SESSION_THREAD = '00000000-0000-4000-8000-000000002789';
+
+const SESSION_QUESTION =
+  'Should the vault sync over Git, or keep the Obsidian plugin? I keep losing edits made on my phone.';
+
+/**
+ * "Think it through" sent to a session thread (plan #2789.11): Ask Dash's
+ * reply at once, with the line under it following the session. `working`
+ * shows the session's newest line and `answered` its answer landed; with the
+ * session runner not set up, `fallback` is the answer written here, its cost
+ * line saying why.
+ */
+export function AskThinkSessionSurface({ part }: { part: 'working' | 'answered' | 'fallback' }) {
+  const at = '2026-11-05T09:00:00Z';
+  const answer: TalkTurn =
+    part === 'fallback'
+      ? {
+          id: 's-a',
+          role: 'assistant',
+          body: THINK_ANSWER,
+          createdAt: at,
+          toolCalls: [
+            { name: 'read_code', input: { path: 'components/talk/model-chip.tsx' }, result: { ok: true, rows: [] } },
+            {
+              name: 'think_it_through',
+              input: { model: OPUS, effort: 'high', fallback: THINK_FALLBACK.noBroker },
+              result: { ok: true, costMicros: 236_000 },
+            },
+          ],
+        }
+      : {
+          id: 's-a',
+          role: 'assistant',
+          body: SESSION_SENT_BODY,
+          createdAt: at,
+          toolCalls: [{ name: 'think_in_session', input: { thread_id: SESSION_THREAD }, result: { ok: true } }],
+        };
+  const turns: TalkTurn[] = [
+    { id: 's-q', role: 'user', body: part === 'fallback' ? THINK_QUESTION : SESSION_QUESTION, createdAt: at },
+    answer,
+  ];
+  const state: SessionSentState =
+    part === 'answered'
+      ? { state: 'answered' }
+      : { state: 'working', line: 'Reading lib/vault/sync.ts and the vault spec, then the Obsidian Git plugin notes' };
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <SessionSentFixture.Provider value={state}>
+        <PageColumn className="py-4">
+          <Card padding="standard" className="mx-auto w-full max-w-prose">
+            <AskThread
+              id={`ask-think-session-${part}`}
+              conversationRef="00000000-0000-4000-8000-000000000033"
+              turns={turns}
+              label="Ask a follow-up"
+              placeholder="Ask Dash. @ adds a row, / a command"
+              boxStart={{ think: true }}
+            />
+          </Card>
+        </PageColumn>
+      </SessionSentFixture.Provider>
     </AskDashProvider>
   );
 }

@@ -44,6 +44,7 @@ import {
   thoughtCost,
   type ThinkDeps,
 } from './think';
+import { SESSION_SENT_BODY, THINK_FALLBACK, sessionSentCall } from '@/lib/talk/thought';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -454,7 +455,15 @@ export type AskStores = {
    * Absent: not kept.
    */
   recordFailure?: (failure: DashFailure) => Promise<void>;
+  /**
+   * Think it through in a session thread (plan #2789.11): starts a thread on
+   * this app whose first message is the conversation so far, ending with the
+   * question, and wakes the broker. Present only when the broker is set up;
+   * absent, a thought-through question is answered here.
+   */
+  toSession?: (conversation: readonly TalkTurn[]) => Promise<{ ok: true; threadId: string } | { ok: false; error: string }>;
 };
+
 
 /**
  * The note filed when an answer could not do what was asked: the model's
@@ -577,6 +586,12 @@ export async function askDash(
      * what it cost. Absent: an ordinary answer.
      */
     think?: ThinkDeps | null;
+    /**
+     * Why a thought-through question is answered here rather than in a
+     * session thread (plan #2789.11), kept on the answer's mark for the line
+     * under it. Absent: nothing is said.
+     */
+    thinkFallback?: string | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -644,6 +659,32 @@ export async function askDash(
       console.error('the failed answer was not recorded', error);
     }
   };
+
+  // Think it through goes to a session thread when one can be started (plan
+  // #2789.11): Dash says so at once, and the session answers in the thread.
+  // A thread that could not be started falls back to the answer here.
+  let thinkFallback = input.think ? (input.thinkFallback ?? null) : null;
+  if (input.think && stores.toSession) {
+    let sent: Awaited<ReturnType<NonNullable<AskStores['toSession']>>>;
+    try {
+      sent = await stores.toSession([...earlier, ...asked]);
+    } catch (error) {
+      sent = { ok: false, error: error instanceof Error ? error.message : 'no reason given' };
+    }
+    if (sent.ok) {
+      try {
+        const answered = await stores.append(subject, [
+          { role: 'assistant', body: SESSION_SENT_BODY, toolCalls: [sessionSentCall({ threadId: sent.threadId })] },
+        ]);
+        return { conversation, turns: [...asked, ...answered] };
+      } catch (error) {
+        await failed('failed', `The question went to a session but the reply saying so was not kept: ${error instanceof Error ? error.message : 'no reason given'}`);
+        return { conversation, turns: asked, error: `Sent to a session, but this chat could not say so. Its answer will be in Chat, under Sessions.` };
+      }
+    }
+    console.error('the thought-through question did not reach a session', sent.error);
+    thinkFallback = THINK_FALLBACK.notStarted;
+  }
 
   if (!input.anthropicApiKey) {
     const error = 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.';
@@ -793,7 +834,10 @@ export async function askDash(
   try {
     // A thought-through answer keeps its mark and its cost, read by the line under it.
     const toolCalls = input.think
-      ? [...answer.toolCalls, thoughtCall({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spent) })]
+      ? [
+          ...answer.toolCalls,
+          thoughtCall({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spent), fallback: thinkFallback }),
+        ]
       : answer.toolCalls;
     answered = await stores.append(subject, [
       { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
