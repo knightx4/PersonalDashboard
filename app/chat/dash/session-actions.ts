@@ -19,6 +19,9 @@ import { isThreadId, type SessionMessage } from '@/lib/core/session-threads-mode
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { brokerRoutine } from '@/lib/feedback/routine';
 import { wakeBroker } from '@/lib/threads/broker-wake';
+import { loadAskConversation } from '@/lib/talk/ask-request';
+import { AskRef } from '@/lib/talk/ask-input';
+import { chatAsMessage, suggestProject, type SessionProjectChoice } from '@/lib/talk/chat-to-session';
 
 /**
  * The presses on a session thread in Chat (plan #2789.7): start one, send a
@@ -156,5 +159,67 @@ export async function commentOnSessionMockupAction(input: {
     return { ok: true };
   } catch (error) {
     return failed(error, 'Your note could not be sent. Try again.');
+  }
+}
+
+/** What the Ask Dash chat's button offers: the projects to pick from, and the one the chat is about. */
+export type ChatSessionOptions =
+  | { ok: true; projects: SessionProjectChoice[]; suggested: string | null }
+  | { ok: false; error: string };
+
+/**
+ * The projects a chat can be taken to, with the one the chat names picked
+ * (plan #2789.8). Null stands for this app, which the form draws as its own
+ * first choice.
+ */
+// latency: pending
+export async function chatSessionOptionsAction(ref: string): Promise<ChatSessionOptions> {
+  const user = await requireUser();
+  const parsed = AskRef.safeParse(ref);
+  if (!parsed.success) return { ok: false, error: 'That chat is not there any more.' };
+  try {
+    const [turns, projects] = await Promise.all([
+      loadAskConversation(parsed.data),
+      loadProjectsForRequest(user.id),
+    ]);
+    if (turns.length === 0) return { ok: false, error: 'That chat is not there any more.' };
+    const choices = activeProjects(projects).map((p) => ({ id: p.id, label: p.label }));
+    return { ok: true, projects: choices, suggested: suggestProject(turns, choices) };
+  } catch (error) {
+    return failed(error, 'The projects could not be read. Try again.');
+  }
+}
+
+/**
+ * Start a session thread whose first message is the chat so far, on the
+ * project the person confirmed (plan #2789.8). The chat is read here, not
+ * taken from the page, so the thread holds what was kept.
+ */
+// latency: pending
+export async function startSessionFromChatAction(input: {
+  ref: string;
+  projectId: string | null;
+}): Promise<SessionOutcome<{ id: string }>> {
+  const user = await requireUser();
+  const parsed = AskRef.safeParse(input.ref);
+  if (!parsed.success) return { ok: false, error: 'That chat is not there any more.' };
+  const projectId = input.projectId && PROJECT.test(input.projectId) ? input.projectId : null;
+  if (input.projectId && !projectId) return { ok: false, error: 'That project is not one of yours.' };
+  try {
+    const turns = await loadAskConversation(parsed.data);
+    const text = chatAsMessage(turns);
+    if (!text) return { ok: false, error: 'That chat is not there any more.' };
+    const projects = activeProjects(await loadProjectsForRequest(user.id));
+    const { id } = await startSessionThread(
+      await createCoreClient(),
+      user.id,
+      { projectId, text, file: null },
+      projects,
+    );
+    wake(user.id, id);
+    revalidatePath('/chat/dash', 'layout');
+    return { ok: true, id };
+  } catch (error) {
+    return failed(error, 'The thread could not be started. Try again.');
   }
 }

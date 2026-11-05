@@ -63,6 +63,8 @@ import {
   saveDashAnswer,
   undoDashChange,
 } from '@/app/chat/dash/actions';
+import { chatSessionOptionsAction, startSessionFromChatAction } from '@/app/chat/dash/session-actions';
+import { offersSession } from '@/lib/talk/chat-to-session';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
 import { ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
@@ -139,6 +141,15 @@ export type AskSource = ChangePresses & {
    * leave it out, and a pick there is kept on the page alone.
    */
   setModel?: (model: DashChoiceId) => Promise<SetDashModelResult>;
+  /**
+   * Take the chat to a session thread (plan #2789.8): the projects to pick
+   * from, and the start. The gallery's fixtures leave it out for the ones that
+   * do not draw the button.
+   */
+  toSession?: {
+    options: typeof chatSessionOptionsAction;
+    start: typeof startSessionFromChatAction;
+  };
   /** Read the saved model again, after Dash changed it in an answer (plan #2458.4). */
   getModel?: () => Promise<DashChoiceId>;
 };
@@ -271,6 +282,7 @@ const ACTIONS: AskSource = {
   label: askDashPageLabel,
   save: saveDashAnswer,
   rate: rateDashAnswer,
+  toSession: { options: chatSessionOptionsAction, start: startSessionFromChatAction },
   setModel: setDashModel,
   getModel: getDashModel,
   confirm: confirmDashChange,
@@ -656,6 +668,12 @@ export function AskThread({
     [refreshModel],
   );
   const [today] = useState(localToday);
+  // The chat's ref is stable once kept, so the source is too (plan #2789.8).
+  const sessionSource = useMemo(() => {
+    const to = source.toSession;
+    if (!to || !ref) return undefined;
+    return { options: () => to.options(ref), start: (projectId: string | null) => to.start({ ref, projectId }) };
+  }, [source.toSession, ref]);
 
   const byTurn = useMemo(() => {
     const map = new Map<string, DashChange[]>();
@@ -763,6 +781,9 @@ export function AskThread({
               // Thumbs up and down (plan #2285.2), once the chat is kept and has a ref.
               rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
               rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
+              // To a session thread on a project (plan #2789.8), once the chat is kept.
+              toSession={sessionSource}
+              offerSession={offersSession(turn.body)}
             />
             </div>
           </>

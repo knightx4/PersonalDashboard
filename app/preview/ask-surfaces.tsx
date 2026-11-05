@@ -27,6 +27,7 @@ import type { SearchHit } from '@/lib/search/sources';
 import type { ModuleId } from '@/lib/modules';
 import type { AskBoxStart } from '@/components/talk/ask-box';
 import { stoppedBody } from '@/lib/talk/talk';
+import { SESSION_OFFER } from '@/lib/talk/chat-to-session';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 
@@ -1150,6 +1151,63 @@ export function AskAnswerActionsSurface({ thumbs }: { thumbs?: AnswerThumbsMomen
   );
 }
 
+/**
+ * Taking a chat to a session thread (plan #2789.8): an answer in which Dash
+ * offers it. `offer` draws the answer with the written button, `form` has it
+ * pressed so the project list shows with the one the chat names picked, and
+ * `started` has the thread started so the link to it shows.
+ */
+export type ToSessionPart = 'offer' | 'form' | 'started';
+
+const SESSION_ASKED = 'The Budget app should show my spending by week as well as by month. Can you add that?';
+const SESSION_ANSWER = `That is a change to the Budget app's code, not something I can switch on from here: the month view groups by calendar month, and a weekly one needs a new grouping and a toggle on the page. ${SESSION_OFFER}`;
+
+const SESSION_SOURCE: AskSource = {
+  ...FIXTURES,
+  toSession: {
+    options: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return {
+        ok: true,
+        projects: [
+          { id: 'website', label: 'Personal website' },
+          { id: 'budget', label: 'Budget app' },
+        ],
+        suggested: 'budget',
+      };
+    },
+    start: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { ok: true, id: '00000000-0000-4000-8000-0000000000a1' };
+    },
+  },
+};
+
+export function AskToSessionSurface({ part }: { part: ToSessionPart }) {
+  const at = '2026-10-14T09:00:00Z';
+  const turns: TalkTurn[] = [
+    { id: 'ts-q', role: 'user', body: SESSION_ASKED, createdAt: at },
+    { id: 'ts-a', role: 'assistant', body: SESSION_ANSWER, createdAt: at },
+  ];
+  return (
+    <AskDashProvider source={SESSION_SOURCE}>
+      {part !== 'offer' && <ActOnArrival label="Take this to a session" />}
+      {part === 'started' && <ActOnArrival label="Start the thread" after={600} />}
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id={`ask-to-session-${part}`}
+            conversationRef="00000000-0000-4000-8000-000000000041"
+            turns={turns}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
 /** Which moment of the paid card a surface draws (plan #2228.2). */
 export type AskPaidMoment = 'pending' | 'running' | 'done' | 'failed' | 'declined';
 
@@ -1430,16 +1488,19 @@ function PressOnArrival({ label }: { label: string }) {
  * Presses, or with `focus` rests the mouse on, the last button named
  * `label` once the surface has drawn: the thumbs under the newest answer.
  */
-function ActOnArrival({ label, focus = false }: { label: string; focus?: boolean }) {
+function ActOnArrival({ label, focus = false, after = 0 }: { label: string; focus?: boolean; after?: number }) {
   useEffect(() => {
     const timer = setTimeout(() => {
-      const named = Array.from(document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`));
+      // A button with a written name is found by its words, an icon's by its label.
+      const named = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter(
+        (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
+      );
       const button = named[named.length - 1];
       // A mouse resting on it, which is what opens a tooltip.
       if (focus) button?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
       else button?.click();
-    }, 0);
+    }, after);
     return () => clearTimeout(timer);
-  }, [label, focus]);
+  }, [label, focus, after]);
   return null;
 }
