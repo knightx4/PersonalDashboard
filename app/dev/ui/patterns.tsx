@@ -234,24 +234,29 @@ function DeckSurface() {
   );
 }
 
+/**
+ * Fixed instants, read against a clock the gallery pins to 12:00 on the same
+ * day (FROZEN_CLOCKS in scripts/shoot.ts), so the thread shows 50m, 48m and 5m
+ * ago on every take rather than whatever the minute hand says.
+ */
 const TURNS: DevComment[] = [
   {
     id: 'turn-1',
     author: 'me',
     body: '@dash the count on Home says three and the list shows four. Which one is wrong?',
-    createdAt: new Date(Date.now() - 50 * 60 * 1000).toISOString(),
+    createdAt: '2026-03-02T11:10:00.000Z',
   },
   {
     id: 'turn-2',
     author: 'claude',
     body: 'The list is right. The count leaves out steps that are waiting on you, and the fourth one is: it needs a key set in Vercel before it can start. I have reworded the count to say "ready" so the two read as different things.',
-    createdAt: new Date(Date.now() - 48 * 60 * 1000).toISOString(),
+    createdAt: '2026-03-02T11:12:00.000Z',
   },
   {
     id: 'turn-3',
     author: 'me',
     body: 'Good. Leave the key step where it is, I will set it tonight.',
-    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    createdAt: '2026-03-02T11:55:00.000Z',
   },
 ];
 
