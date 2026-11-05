@@ -479,6 +479,13 @@ async function main() {
           console.log(`  (${surfaceId} is cut to its top ${clipHeight}px)`);
         }
 
+        // Chrome's pointer starts in the middle of the window, so on a laptop
+        // it rested on whatever was drawn there: on pattern-conversation that
+        // is the first Dash answer, whose action row fades in on hover and
+        // was caught partway through on some takes (plan #2879.5). Park it in
+        // the top left corner, on the page's own margin, before the freeze.
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
+        await wait(300);
         await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
         await wait(100);
         // A capture beyond the window resizes it while it draws, and a pane
