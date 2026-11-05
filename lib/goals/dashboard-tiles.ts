@@ -294,6 +294,7 @@ function metricReads(metric: Metric, data: DashboardData, shows: string): string
   if (metric.source === 'steps') return `No steps closed yet. ${each}`;
   if (metric.source === 'files') return `No files from Dash yet. ${each}`;
   if (metric.source === 'hours') return `No hours logged yet. Write "applied 2h" in the capture box. ${each}`;
+  if (metric.source === 'applications') return `No applications sent yet. ${each}`;
   const list = data.lists.find((l) => l.id === metric.collectionId);
   return `Nothing in ${list?.name ?? 'its list'} yet. ${each}`;
 }
