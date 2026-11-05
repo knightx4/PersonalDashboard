@@ -4,6 +4,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
+import { removeBotPhotos, signBotPhotos } from '@/lib/you/bot-photos';
 import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
@@ -38,7 +39,7 @@ export * from '@/lib/you/people-cards-model';
 const MODEL = MODELS.personaDraft;
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when';
+const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when, photo_path';
 
 /** One person's form, their earlier cards and what they remember, or null when they are not on the council. */
 export async function loadPersonCard(client: YouSupabaseClient, userId: string, key: string): Promise<PersonCard | null> {
@@ -46,7 +47,8 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
   if (found.error) throw new Error(`Reading them failed: ${found.error.message}`);
   const row = found.data as Record<string, unknown> | null;
   if (!row || typeof row.id !== 'string') return null;
-  const [versions, memory] = await Promise.all([
+  const photoPath = str(row.photo_path);
+  const [versions, memory, photos] = await Promise.all([
     client
       .from('advisor_persona_versions')
       .select('id, persona, made_by, ask, created_at')
@@ -62,6 +64,7 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
       .is('retired_at', null)
       .order('created_at', { ascending: false })
       .limit(60),
+    signBotPhotos(client, [photoPath]),
   ]);
   if (versions.error) throw new Error(`Reading their earlier cards failed: ${versions.error.message}`);
   if (memory.error) throw new Error(`Reading what they remember failed: ${memory.error.message}`);
@@ -78,6 +81,7 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
     versions: (versions.data ?? []).flatMap((v) => versionOf(v as Record<string, unknown>) ?? []),
     memory: (memory.data ?? []).flatMap((m) => memoryOf(m as Record<string, unknown>) ?? []) as CouncilMemory[],
     texts: textsOf(str(row.key), row.text_when),
+    photo: photos.get(photoPath) ?? null,
   };
 }
 
@@ -201,9 +205,9 @@ function authorOf(brief: unknown): CardAuthor {
  * past, so it is gone from Chat and the board all the same. Returns false when the id names no guest of theirs.
  */
 export async function deletePerson(client: YouSupabaseClient, userId: string, advisorId: string): Promise<boolean> {
-  const found = await client.from('board_advisors').select('key, kind').eq('user_id', userId).eq('id', advisorId).eq('active', true).maybeSingle();
+  const found = await client.from('board_advisors').select('key, kind, photo_path').eq('user_id', userId).eq('id', advisorId).eq('active', true).maybeSingle();
   if (found.error) throw new Error(`Reading them failed: ${found.error.message}`);
-  const row = found.data as { key?: unknown; kind?: unknown } | null;
+  const row = found.data as { key?: unknown; kind?: unknown; photo_path?: unknown } | null;
   if (!row || row.kind !== 'guest') return false;
   const key = str(row.key);
   const removed = await client.from('board_advisors').delete().eq('user_id', userId).eq('id', advisorId);
@@ -218,11 +222,17 @@ export async function deletePerson(client: YouSupabaseClient, userId: string, ad
       .eq('advisor_id', advisorId)
       .is('left_at', null);
     if (left.error) throw new Error(`Taking them out of your groups failed: ${left.error.message}`);
-    const retired = await client.from('board_advisors').update({ active: false, joins_meetings: false }).eq('user_id', userId).eq('id', advisorId);
+    const retired = await client
+      .from('board_advisors')
+      .update({ active: false, joins_meetings: false, photo_path: null })
+      .eq('user_id', userId)
+      .eq('id', advisorId);
     if (retired.error) throw new Error(`Deleting them failed: ${retired.error.message}`);
   } else if (removed.error) {
     throw new Error(`Deleting them failed: ${removed.error.message}`);
   }
+  // Their picture goes with them (plan #2955).
+  if (typeof row.photo_path === 'string' && row.photo_path) await removeBotPhotos(client, [row.photo_path]);
   const panels = await client.from('board_panels').select('id, advisors').eq('user_id', userId).contains('advisors', [key]);
   if (panels.error) throw new Error(`Reading your panels failed: ${panels.error.message}`);
   for (const panel of (panels.data ?? []) as { id: string; advisors: string[] }[]) {
