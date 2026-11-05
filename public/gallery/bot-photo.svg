@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- A painted portrait for the gallery's bot pictures (plan #2955). -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d6b078"/>
+      <stop offset="1" stop-color="#9a7e50"/>
+    </linearGradient>
+    <radialGradient id="l" cx="0.78" cy="0.25" r="0.35">
+      <stop offset="0" stop-color="#f3dca0"/>
+      <stop offset="1" stop-color="#f3dca0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#g)"/>
+  <rect width="256" height="256" fill="url(#l)"/>
+  <ellipse cx="128" cy="240" rx="100" ry="66" fill="#343a48"/>
+  <rect x="112" y="158" width="32" height="40" fill="#dcb496"/>
+  <path d="M116 190 L128 216 L140 190 Z" fill="#f0efe9"/>
+  <ellipse cx="128" cy="122" rx="50" ry="60" fill="#e4bc9e"/>
+  <path d="M74 120 C70 60 100 46 128 46 C156 46 186 60 182 120 C176 96 164 80 128 78 C92 80 80 96 74 120 Z" fill="#cfcdc6"/>
+  <ellipse cx="78" cy="118" rx="12" ry="34" fill="#cfcdc6"/>
+  <ellipse cx="178" cy="118" rx="12" ry="34" fill="#cfcdc6"/>
+  <ellipse cx="110" cy="118" rx="6" ry="5" fill="#3c322d"/>
+  <ellipse cx="146" cy="118" rx="6" ry="5" fill="#3c322d"/>
+  <path d="M112 146 Q128 158 144 146" fill="none" stroke="#965a50" stroke-width="3" stroke-linecap="round"/>
+</svg>

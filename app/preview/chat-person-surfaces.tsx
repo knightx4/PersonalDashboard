@@ -22,6 +22,12 @@ import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
  */
 
 const NOW = Date.parse('2026-11-03T09:00:00Z');
+
+/** A picture the person uploaded for Benjamin Franklin (plan #2955). */
+export const BOT_PHOTO = '/gallery/bot-photo.svg';
+
+/** Everyone, with Franklin wearing his picture. */
+const WITH_PHOTO = EVERYONE.map((row) => (row.key === 'benjamin-franklin' ? { ...row, photo: BOT_PHOTO } : row));
 const ZONE = 'Europe/London';
 
 const FRANKLIN_CARD = `Who you are
@@ -132,7 +138,7 @@ function Shell({ path, children }: { path: string; children: React.ReactNode }) 
 export function ChatBotsSurface({ state = 'list' }: { state?: 'list' | 'empty' | 'failed' }) {
   return (
     <Shell path="/chat/bots">
-      <BotsView rows={state === 'list' ? EVERYONE : []} failed={state === 'failed'} />
+      <BotsView rows={state === 'list' ? WITH_PHOTO : []} failed={state === 'failed'} />
     </Shell>
   );
 }
@@ -210,31 +216,51 @@ Cheerlead, pile on, or agree just to keep the peace.`,
 /**
  * The form for a bot already there: the top, the card with earlier cards,
  * redrafting, the memory with a remove confirming, the confirm before it is
- * deleted, or a seat's foot, which says why it stays.
+ * deleted, or a seat's foot, which says why it stays. The top also comes
+ * with the picture the person uploaded (plan #2955), with one uploading,
+ * and with an upload that failed. Reaching out (plan #2931.3) shows set up,
+ * empty, with Dash setting it up, and with a set-up that failed.
  */
 export function ChatPersonEditSurface({
   state = 'form',
 }: {
-  state?: 'form' | 'card' | 'redrafting' | 'memory' | 'delete' | 'seat' | 'reach-out' | 'reach-out-empty' | 'reach-out-setting' | 'reach-out-failed';
+  state?:
+    | 'form'
+    | 'photo'
+    | 'photo-uploading'
+    | 'photo-failed'
+    | 'card'
+    | 'redrafting'
+    | 'memory'
+    | 'delete'
+    | 'seat'
+    | 'reach-out'
+    | 'reach-out-empty'
+    | 'reach-out-setting'
+    | 'reach-out-failed';
 }) {
   const card =
     state === 'seat'
       ? SKEPTIC_SEAT
-      : state === 'reach-out'
-        ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT }
-        : state === 'reach-out-setting'
-          ? { ...FRANKLIN_PERSON, reachOut: { ...FRANKLIN_REACH_OUT, summary: null, cannotWatch: [], next: null } }
-          : state === 'reach-out-failed'
-            ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_FAILED }
-            : FRANKLIN_PERSON;
+      : state === 'photo'
+        ? { ...FRANKLIN_PERSON, photo: BOT_PHOTO }
+        : state === 'reach-out'
+          ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT }
+          : state === 'reach-out-setting'
+            ? { ...FRANKLIN_PERSON, reachOut: { ...FRANKLIN_REACH_OUT, summary: null, cannotWatch: [], next: null } }
+            : state === 'reach-out-failed'
+              ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_FAILED }
+              : FRANKLIN_PERSON;
   return (
     <Shell path={`/chat/bots/${card.key}`}>
-      <BotsView rows={EVERYONE} current={card.key}>
+      <BotsView rows={state === 'photo' ? WITH_PHOTO : EVERYONE} current={card.key}>
         <PersonForm
           key={state}
           card={card}
           timezone={ZONE}
           now={NOW}
+          photoBusy={state === 'photo-uploading'}
+          photoError={state === 'photo-failed' ? 'Choose an image under 5 MB.' : null}
           drafting={state === 'redrafting'}
           removing={state === 'memory' ? 'mem2' : null}
           editing={state === 'memory' ? 'mem1' : null}
