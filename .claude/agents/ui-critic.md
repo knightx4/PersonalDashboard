@@ -28,6 +28,13 @@ The session that sends you names, for one surface:
   those, and name a fault found in one by its phone shot.
 - **before shots**: the same four taken from main, in a separate folder. A new
   surface has none, and then you judge the after shots alone.
+- **states strip**: on a feature's land round (plan #2966.3), the page's
+  other states drawn side by side at phone width in the light theme,
+  `.preview-shots/sheets/<main>--states.png`, beside the main state's four
+  shots, with the id of each state in order. Judge the page and its states in
+  the one round. A fix on a state names it at the start of `where`, as "the
+  goals-inbox-empty state: the heading", and takes `phone-light` as its
+  `shot`. Without a strip the prompt says "none".
 - **round**: 1, 2 or 3.
 - **done-when**: the acceptance line of the step, or the note being fixed.
 - **pattern**: the page pattern the step uses (Part 4 of the spec), by name
@@ -472,6 +479,17 @@ block, so it must parse, and nothing after it.
   `"craft:moment"` or `"craft:wording"`.
   One per fix; if two apply, cite the narrower one, which is usually the
   preference.
+
+  Three of these decide where an unfinished screen goes after round 3
+  (plan #2966.4). A fix citing `reference`, `done-when` or `regression` is
+  never settled by the builder: on 5 November 2026 the person agreed that a
+  screen still differing from its mockup, failing its done-when or worse
+  than it was after three rounds comes to them, with the shot beside the
+  mockup. Every other kind left open after round 3 is settled by the builder
+  and never put to them, by their rule of 12 October 2026. So cite those
+  three only for what they mean: the narrower-citation rule above still
+  applies, and a preference broken is `taste:<id>` even where the reference
+  does it better.
 - `change` says what the picture should show instead. It names no file and no
   class: the builder finds those.
 - `earlier`, on round 2 or 3, has one entry per earlier fix:

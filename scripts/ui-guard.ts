@@ -1,7 +1,7 @@
 /**
  * Check whether a step that changed a screen may close (plan #1534).
  *
- *   npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]]
+ *   npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>] | --ask]
  *
  * <step> is the outline the plan reads (`1073.4`) or the stored number. An
  * outline is looked up in plan_item_outlines, so it needs DATABASE_URL;
@@ -29,7 +29,16 @@
  * With `--settle "<why>"`, the builder settles the surfaces still waiting
  * itself (`uiSettleSql`): one still failing after the critic's third round,
  * or one reached only through a shared file. Design checks are not put to the
- * person (their answer of 12 October 2026).
+ * person (their answer of 12 October 2026), with one exception (plan
+ * #2966.4): a surface whose latest round cites the mockup, the done-when or a
+ * regression is never settled, by `--settle` or by `--compare`.
+ *
+ * With `--ask`, for each such surface past round 3, it writes the question
+ * the person gets in its place: `.preview-shots/asks/<step>--<surface>.html`,
+ * the shot as built beside the reference picture (or main's shot, for a
+ * regression), and prints the `plan.ts add … --kind decision --mockup` and
+ * `block` to run (lib/plan/ui-person-ask.ts). Once the decision is answered,
+ * `--accept` reads its answer.
  *
  * The second kind is settled only when it looks the same as on main (plan
  * #2215.4): every surface the critic has not judged through three rounds has
@@ -58,11 +67,16 @@
  * every round it writes, and `--sheets`, which groups what is left by page
  * and draws each page's other states as one strip beside its main state, for
  * one critic round a page. Alone it says whether the feature may land.
+ * `--compare` refuses once the head is on `--base`: after the merge every
+ * surface looks the same as main and would be settled unseen. `--ask` and
+ * `--accept` work as for a step, with the feature's rounds.
  */
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
 import {
   isScreenFile,
+  personHeld,
+  SETTLE_NOTE_PREFIX,
   uiAcceptSql,
   uiCheckRefusal,
   layoutBlocked,
@@ -86,6 +100,14 @@ import sharp from 'sharp';
 import { shotFile, SHOT_NAMES } from '../lib/preview/ui-checks';
 import { branchScreenInputs } from '../lib/plan/ui-check-local';
 import { featureUnpassed, pageGroups, roundsAtHead, type FeatureRound } from '../lib/plan/ui-feature-review';
+import { personAskHtml, personAskQuestion, shellQuote } from '../lib/plan/ui-person-ask';
+import { readStopFixes } from '../lib/plan/ui-check-stop';
+import { referenceFor } from '../lib/preview/references';
+import { SURFACE_ROUTES } from '../lib/preview/routes';
+import { beforeShotFile } from '../lib/preview/ui-checks';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 function arg(flag: string): string | null {
   const i = process.argv.indexOf(flag);
@@ -161,13 +183,14 @@ async function main(): Promise<void> {
     );
   const accept = process.argv.includes('--accept');
   const compare = process.argv.includes('--compare');
+  const ask = process.argv.includes('--ask');
   const settle = process.argv.includes('--settle') ? (arg('--settle') ?? '') : null;
   const written = (stepArg ?? '').trim().replace(/^#/, '');
   if (!/^\d+(?:\.\d+)*$/.test(written) || Number(written) === 0) {
-    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]] [--feature [--base <ref>] [--sheets]]');
+    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>] | --ask] [--feature [--base <ref>] [--sheets]]');
   }
-  if ([accept, compare, process.argv.includes('--settle')].filter(Boolean).length > 1) {
-    fail('Give one of --accept, --settle and --compare.');
+  if ([accept, compare, ask, process.argv.includes('--settle')].filter(Boolean).length > 1) {
+    fail('Give one of --accept, --settle, --compare and --ask.');
   }
   if (settle !== null && !settle.trim()) fail('--settle needs the reason: --settle "<why>".');
   const { step, outline } = await placeStep(written);
@@ -175,8 +198,7 @@ async function main(): Promise<void> {
   const commit = arg('--commit') ?? localGit(['rev-parse', 'HEAD']).trim();
 
   if (process.argv.includes('--feature')) {
-    if (accept) fail('--accept is for a step; a feature review settles or goes to the critic.');
-    await featureRun({ name, feature: step, head: commit, compare, settle });
+    await featureRun({ name, feature: step, head: commit, compare, settle, accept, ask });
     return;
   }
 
@@ -196,6 +218,11 @@ async function main(): Promise<void> {
     await compareRun({ name, step, files, surfaces, databaseUrl });
     return;
   }
+  if (ask) {
+    if (!databaseUrl) fail(`--ask reads ${name}'s rounds, which needs DATABASE_URL or SUPABASE_SERVICE_ROLE_KEY.`);
+    writePersonAsks({ name, step, outline, rounds: await stepRounds(databaseUrl, step), surfaces });
+    return;
+  }
   if (settle !== null) {
     // A surface the critic has not judged through three rounds is settled only
     // when its shots match main's (plan #2215.4).
@@ -211,13 +238,15 @@ async function main(): Promise<void> {
     }
     // A layout that differs from its reference is not the builder's to settle (plan #2966.5).
     const wrongLayout = layoutBlocked(checks);
-    const settleable = surfaces.filter((s) => !wrongLayout.has(s));
+    const held = personHeld(checks);
+    const settleable = surfaces.filter((s) => !wrongLayout.has(s) && !held.has(s));
     if (wrongLayout.size > 0) {
       console.log(
         `Not settled: ${[...wrongLayout].join(', ')} ${wrongLayout.size === 1 ? 'differs' : 'differ'} from the ` +
           `reference in layout. Fix the layout and run a round that answers yes, or leave it for the person's answer.`,
       );
     }
+    reportHeld(held, `${outline ?? step}`);
     const statement = uiSettleSql(step, settleable, settle);
     if (!statement) return;
     if (!databaseUrl) {
@@ -313,8 +342,13 @@ async function compareRun(input: {
   });
   const report = compareReport({ name, step, comparisons, newOnBranch, timings });
   console.log(report.text);
-  if (report.settled.length === 0) return;
-  const statement = uiSettleSql(step, report.settled, SAME_AS_MAIN_REASON, input.head);
+  // Looking the same as main does not answer a fix that cites the mockup, the
+  // done-when or a regression (plan #2966.4).
+  const held = personHeld(checks);
+  reportHeld(held, input.head ? `${step} --feature` : String(step));
+  const settled = report.settled.filter((s) => !held.has(s));
+  if (settled.length === 0) return;
+  const statement = uiSettleSql(step, settled, SAME_AS_MAIN_REASON, input.head);
   if (!databaseUrl) {
     console.log('\nRun this through the Supabase connector. It settles the surfaces that look the same.\n');
     console.log(statement);
@@ -342,6 +376,8 @@ async function featureRun(input: {
   head: string;
   compare: boolean;
   settle: string | null;
+  accept: boolean;
+  ask: boolean;
 }): Promise<void> {
   const { name, feature, compare, settle } = input;
   const databaseUrl = reachableDatabase();
@@ -350,6 +386,14 @@ async function featureRun(input: {
   }
   const head = localGit(['rev-parse', input.head]).trim();
   const base = arg('--base') ?? 'origin/main';
+  // After the merge the head is on main: every surface compares as the same
+  // and would be settled without anybody looking at it.
+  if (compare && isAncestorOf(head, base)) {
+    fail(
+      `${name}'s head ${head.slice(0, 9)} is already on ${base}, so every surface would look the same as main ` +
+        `and be settled. Run --compare on the feature branch head before the merge.`,
+    );
+  }
   const { files, surfaces } = branchScreenInputs(base, head);
   if (!files.some(isScreenFile)) {
     console.log(`${name} changed no screen file since ${base}: nothing to review.`);
@@ -371,6 +415,29 @@ async function featureRun(input: {
     await compareRun({ name, step: feature, files, surfaces, databaseUrl, rounds: counting, head });
     return;
   }
+  if (input.ask) {
+    writePersonAsks({ name, step: feature, outline: name.replace(/^#/, ''), rounds: counting, surfaces, feature: true });
+    return;
+  }
+  if (input.accept) {
+    const statement = uiAcceptSql(feature, waiting.map((w) => w.surface), { rounds: feature, commit: head });
+    if (!statement) {
+      console.log(`Every surface has passed at the head: nothing to accept on ${name}.`);
+      return;
+    }
+    const sql = connect(databaseUrl);
+    try {
+      const rows = await sql.unsafe(statement);
+      console.log(
+        rows.length === 0
+          ? `Nothing written: no question under ${name} with the screens' pictures was answered after their last round.`
+          : `Accepted ${rows.length} surface${rows.length === 1 ? '' : 's'} on ${name} at ${head.slice(0, 9)}.`,
+      );
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
+    return;
+  }
   if (settle !== null) {
     // Only what has been through three rounds at the head, or looks the same
     // as on main, is the builder's to settle (plan #2215.4, #2966.5).
@@ -386,7 +453,9 @@ async function featureRun(input: {
         `Not settled: ${[...wrongLayout].join(', ')} differ${wrongLayout.size === 1 ? 's' : ''} from the reference in layout.`,
       );
     }
-    const settleable = waiting.map((w) => w.surface).filter((s) => !wrongLayout.has(s));
+    const held = personHeld(counting);
+    reportHeld(held, `${feature} --feature`);
+    const settleable = waiting.map((w) => w.surface).filter((s) => !wrongLayout.has(s) && !held.has(s));
     const statement = uiSettleSql(feature, settleable, settle, head);
     if (!statement) return;
     const sql = connect(databaseUrl);
@@ -463,12 +532,106 @@ async function stateStrip(main: string, states: readonly string[]): Promise<{ fi
   return { file, missing };
 }
 
+/** Whether `ancestor` is on the history of `ref`; false when git cannot say. */
+function isAncestorOf(ancestor: string, ref: string): boolean {
+  try {
+    localGit(['merge-base', '--is-ancestor', ancestor, ref]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Says which surfaces no settle lets through, and what to run for them. */
+function reportHeld(held: Map<string, string[]>, step: string): void {
+  if (held.size === 0) return;
+  console.log(
+    `Not settled: ${[...held.keys()].join(', ')} still ${held.size === 1 ? 'cites' : 'cite'} the mockup, the done-when ` +
+      `or a regression, which goes to the person (plan #2966.4). Fix and run another round; after round 3, ` +
+      `npm run ui-guard -- ${step} --ask writes the question.`,
+  );
+}
+
+/**
+ * `--ask` (plan #2966.4): for each surface held for the person past round 3,
+ * the mockup file with the shot as built beside the reference picture (or
+ * main's shot, for a regression), and the decision and block to write.
+ */
+function writePersonAsks(input: {
+  name: string;
+  step: number;
+  outline: string | null;
+  rounds: readonly CheckRound[];
+  surfaces: readonly string[];
+  feature?: boolean;
+}): void {
+  const held = personHeld(input.rounds);
+  const mine = input.surfaces.filter((s) => held.has(s));
+  if (mine.length === 0) {
+    console.log(`Nothing of ${input.name} cites the mockup, the done-when or a regression: nothing to ask.`);
+    return;
+  }
+  const outline = input.outline ?? String(input.step);
+  // A step's decision goes under its feature; a feature's under itself.
+  const parent = input.feature ? outline : outline.includes('.') ? outline.replace(/\.\d+$/, '') : '<the feature>';
+  const file = (path: string) => pathToFileURL(resolve(path)).href;
+  mkdirSync('.preview-shots/asks', { recursive: true });
+  for (const surface of mine) {
+    const latest = input.rounds
+      .filter((r) => r.surface === surface && !(r.verdict === 'accepted' && (r.notes ?? '').startsWith(SETTLE_NOTE_PREFIX)))
+      .reduce<CheckRound | null>((a, r) => (!a || r.round > a.round ? r : a), null)!;
+    const kinds = held.get(surface)!;
+    if (latest.round < 3) {
+      console.log(
+        `${surface}: round ${latest.round} cites ${kinds.join(', ')}. Fix it and run round ${latest.round + 1}; ` +
+          `it is put to the person after round 3.`,
+      );
+      continue;
+    }
+    const shot = shotFile(surface, 'laptop-light');
+    if (!existsSync(shot)) fail(`${surface} has no shot at ${shot}: npm run shoot -- ${surface}, then --ask again.`);
+    const pictures = referenceFor(surface)?.pictures ?? [];
+    const reference = pictures.find((p) => /laptop/.test(p)) ?? pictures[0] ?? null;
+    const before = beforeShotFile(surface, 'laptop-light');
+    const ask = {
+      surface,
+      route: SURFACE_ROUTES[surface]?.[0] ?? null,
+      round: latest.round,
+      kinds,
+      fixes: readStopFixes(latest.fixes),
+      shot: file(shot),
+      reference: reference && existsSync(reference) ? file(reference) : null,
+      before: existsSync(before) ? file(before) : null,
+    };
+    const html = `.preview-shots/asks/${input.step}--${surface}.html`;
+    writeFileSync(html, personAskHtml(ask));
+    const { title, detail } = personAskQuestion(ask);
+    console.log(`\n${surface}, round ${latest.round}: ${html}`);
+    console.log(
+      `  npx tsx scripts/plan.ts add ${shellQuote(title)} --parent ${parent} --kind decision ` +
+        `--detail ${shellQuote(detail)} --mockup ${html}`,
+    );
+    const page = ask.route ?? surface;
+    const blocked = input.feature ? '<each step land holds for it>' : outline;
+    console.log(
+      `  npx tsx scripts/plan.ts block ${blocked} --on <the decision> --ask ` +
+        shellQuote(
+          `Which of the options on #<the decision>: keep ${page} (/preview?s=${surface}) as built, or change it as the review asks?`,
+        ),
+    );
+  }
+  console.log(
+    `\nOnce the decision is answered: to keep it as built, npm run ui-guard -- ` +
+      `${input.feature ? `${input.step} --feature` : input.step} --accept; to change it, make the change and run the critic again.`,
+  );
+}
+
 /** The feature's own rounds in ui_checks, with the commit each was taken at. */
 async function featureRounds(databaseUrl: string, feature: number): Promise<FeatureRound[]> {
   const sql = connect(databaseUrl);
   try {
     return await sql<FeatureRound[]>`
-      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok, c.commit_sha
+      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok, c.commit_sha, c.fixes, c.notes
       from ui_checks c
       where c.step = ${feature}
         and c.user_id = (select p.user_id from plan_items p where p.number = ${feature} limit 1)`;
@@ -495,7 +658,7 @@ async function stepRounds(databaseUrl: string, step: number): Promise<CheckRound
   const sql = connect(databaseUrl);
   try {
     return await sql<CheckRound[]>`
-      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok from ui_checks c
+      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok, c.fixes, c.notes from ui_checks c
       where c.step = ${step}
         and c.user_id = (select p.user_id from plan_items p where p.number = ${step} limit 1)`;
   } finally {

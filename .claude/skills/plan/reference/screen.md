@@ -187,7 +187,9 @@ pictures yourself in its place.
 **Three rounds, then settle it yourself.** If round 3 comes back `fix`, stop
 the loop: no fourth round. Design checks are not questions for the person.
 They said so on 12 October 2026, after a week of "accept it as it is"
-blocks, and that answer replaces decision #1535's A. So:
+blocks, and that answer replaces decision #1535's A. The one exception, a
+fix that cites the mockup, the done-when or a regression, is the next
+paragraph. For every other fix:
 
 1. Record round 3 like any other (below).
 2. Make any of the open fixes you can make cheaply, without another round.
@@ -199,6 +201,49 @@ blocks, and that answer replaces decision #1535's A. So:
 4. Merge and close the step as usual. The close note names each surface
    settled and the fixes still open, in a line, so the person can overrule
    it from the step's row.
+
+**A screen that misses its mockup goes to the person (plan #2966.4).** Three
+kinds of fix are never settled: one whose `breaks` is `reference` (it reads
+worse than its mockup), `done-when` (it does not do what the step says) or
+`regression` (it is worse than it was). On 5 November 2026 the person agreed
+that a screen still failing one of these after three rounds comes to them,
+with the shot beside the mockup. Their rule of 12 October 2026 still holds
+for every other kind of fix: a law, a preference, the pattern, a craft check
+or a spec rule left open after round 3 is settled as above, and never put to
+them.
+
+`--settle` and `--compare` leave such a surface out, whatever round it is on,
+and print why. The close guard and `land` hold it until a later round passes
+or the person answers; a settle written past it does not clear it. Before
+round 3, fix it and run the next round. After round 3:
+
+1. Shoot the surface again, so `.preview-shots/<surface>--laptop-light.png`
+   is the screen as it stands.
+2. Run `npm run ui-guard -- <step> --ask` (`<feature> --feature --ask` in the
+   land review). For each held surface it writes
+   `.preview-shots/asks/<step>--<surface>.html`: option A is the shot as
+   built, and option B is the reference picture from `docs/references/<surface>/`
+   (main's shot from `.preview-shots/before/` for a regression with no
+   reference; the critic's findings alone for a done-when with neither),
+   with the held fixes listed under it. It prints the two commands below
+   with the question, the options and the page's `/preview?s=<id>` link
+   filled in.
+3. Write the decision under the feature:
+   `npx tsx scripts/plan.ts add "<question>" --parent <feature> --kind decision --detail "<options>" --mockup .preview-shots/asks/<step>--<surface>.html`.
+   `--mockup` takes one HTML file and photographs each `data-option`
+   element at 390 and 1280, so the shot and the mockup show side by side
+   beside the options on the Inbox and on the plan page. Merge the gallery
+   drawing to main first, so the `/preview` link in the detail opens it.
+4. Block on it: `npx tsx scripts/plan.ts block <step> --on <the decision> --ask "<the ask it printed>"`.
+   In the land review, block each step `land` names as held by that
+   surface. The ask names the page and its options, never the critic or a
+   design check, which `block` refuses (`lib/plan/block-ask.ts`).
+5. When the person answers A, keep it as built: `npm run ui-guard -- <step>
+   --accept` (or `<feature> --feature --accept`). It takes the answer to a
+   question with pictures that the step waits on, or that sits under the
+   feature, answered after the surface's last round, and writes an
+   `accepted` round quoting it. When they answer B, make the change and run
+   the critic again; the next round has to pass.
 
 **Compare with main first (plan #2966.2).** Before any round goes to the
 critic, run `npm run ui-guard -- <step> --compare`. It is the first stage: a
@@ -333,7 +378,14 @@ has the feature and every surface would compare the same:
    counts, so `--feature` alone tells you what is still to judge.
 6. Three rounds, then settle as above: `npm run ui-guard -- <feature> --feature
    --settle "<why>"`. A layout the critic said differs from its reference is
-   never settled (plan #2966.5).
+   never settled (plan #2966.5), and nor is a surface whose last round cites
+   the mockup, the done-when or a regression: that one goes to the person as
+   **A screen that misses its mockup goes to the person** says, with
+   `--feature --ask`.
+
+`--feature --compare` refuses once the head is already on origin/main (or
+`--base`): after the merge every surface looks the same as main and would be
+settled without being looked at. Run it on the branch head before the merge.
 
 `npm run ui-guard -- <feature> --feature` with no other flag says whether the
 feature may land, and exits 1 naming each surface not yet passed at the head.

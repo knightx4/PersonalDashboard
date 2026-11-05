@@ -112,6 +112,22 @@ describe('featureLandCheck', () => {
     expect(check.held.get(13)).toContain('npm run ui-guard -- 10 --feature --compare');
   });
 
+  it('holds a step whose surface still cites the mockup at the head, past a settle (plan #2966.4)', () => {
+    const fixes = [{ shot: 'phone-light', where: 'top', problem: 'p', breaks: 'reference', change: 'c' }];
+    const all: FeatureRound[] = [
+      round('goals-hours', 1, 'pass', 'a000004'),
+      round('goals-hours-day-empty', 1, 'pass', 'a000004'),
+      round('goals-inbox', 1, 'pass', 'a000004'),
+      { ...round('goals-inbox-empty', 3, 'fix', 'a000004'), fixes },
+      { ...round('goals-inbox-empty', 4, 'accepted', 'a000004'), notes: 'Settled by Dash: stopped at round 3' },
+    ];
+    const counting = roundsAtHead(all, { contains: steps.map((s) => s.commit) }, git);
+    const check = featureLandCheck({ feature: 10, outline: '10', steps, all, counting });
+    expect([...check.held.keys()]).toEqual([13]);
+    expect(check.held.get(13)).toContain('goals-inbox-empty (round 4 cites the mockup: it goes to the person)');
+    expect(check.held.get(13)).toContain('npm run ui-guard -- 10 --feature --ask');
+  });
+
   it('keeps a layout that differs from its reference unpassed, even from a round that no longer counts', () => {
     const all = [round('goals-hours', 1, 'fix', 'a000002', false), round('goals-hours', 2, 'pass', 'a000004')];
     const counting = roundsAtHead(all, { contains: ['a000004'] }, git);

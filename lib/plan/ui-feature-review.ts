@@ -19,7 +19,9 @@
  * a head is given, when no screen file the feature changed has changed between
  * that commit and the head. The layout rule of plan #2966.5 is read over every
  * round of the feature, counted or not: a "no" on the layout stays until a
- * later round answers yes.
+ * later round answers yes. A counted round that cites the mockup, the
+ * done-when or a regression holds its surface for the person (plan #2966.4,
+ * `personHeld`): no settle lets it through, only a later pass or their answer.
  *
  * Surfaces that share a page are judged together (`pageGroups`): the page's
  * main state at its four shots and its other states as one strip, in one
@@ -29,8 +31,10 @@
  */
 import { SURFACE_ROUTES } from '../preview/routes';
 import {
+  heldKindsText,
   isScreenFile,
   layoutBlocked,
+  personHeldSentence,
   unpassedSurfaces,
   type CheckRound,
   type GitRunner,
@@ -126,6 +130,9 @@ export function featureUnpassed(
 }
 
 function describe(missing: UnpassedSurface): string {
+  if (missing.askPerson) {
+    return `${missing.surface} (round ${missing.round} cites ${heldKindsText(missing.askPerson)}: it goes to the person)`;
+  }
   if (missing.layoutNo) return `${missing.surface} (its layout does not match the reference)`;
   if (missing.round === null) return `${missing.surface} (no round at the branch head)`;
   return `${missing.surface} (round ${missing.round} asked for fixes)`;
@@ -161,7 +168,8 @@ export function featureLandCheck(input: {
         `On the feature branch head, before the merge to main: npm run ui-guard -- ${input.feature} --feature --compare, ` +
         `then the critic on what it leaves, one round per page (npm run ui-guard -- ${input.feature} --feature --sheets), ` +
         `recorded with npm run ui-check -- ${input.feature} <surface> <round> --commit <head> [--states …]. ` +
-        `A round counts only when its commit holds every built step's.`,
+        `A round counts only when its commit holds every built step's. ` +
+        personHeldSentence(own.map((s) => waiting.get(s)!), `${input.feature} --feature`),
     );
   }
   return { closes, held };

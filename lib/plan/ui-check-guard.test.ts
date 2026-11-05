@@ -7,6 +7,9 @@ import {
   uiSettleSql,
   unpassedSurfaces,
   layoutBlocked,
+  heldBreaks,
+  personHeld,
+  uiAcceptSql,
   type GitRunner,
 } from './ui-check-guard';
 
@@ -242,5 +245,80 @@ describe('uiSettleSql', () => {
 
   it('writes nothing for no surfaces', () => {
     expect(uiSettleSql(42, [], 'why')).toBe('');
+  });
+});
+
+describe('fixes only the person settles (plan #2966.4)', () => {
+  const fix = (breaks: string) => ({ shot: 'phone-light', where: 'top', problem: 'p', breaks, change: 'c' });
+
+  it('reads the mockup, the done-when and a regression from the fixes, once each', () => {
+    expect(heldBreaks([fix('law 9'), fix(' Reference '), fix('done-when'), fix('reference'), fix('regression')])).toEqual([
+      'reference',
+      'done-when',
+      'regression',
+    ]);
+    expect(heldBreaks([fix('law 9'), fix('taste:no-bare-text'), fix('pattern')])).toEqual([]);
+    expect(heldBreaks(null)).toEqual([]);
+    expect(heldBreaks(['reference', 3])).toEqual([]);
+  });
+
+  it('holds a surface whose latest round cites one, and a settle past it does not clear it', () => {
+    const checks = [
+      { surface: 'news-home', round: 3, verdict: 'fix', fixes: [fix('reference')] },
+      { surface: 'news-home', round: 4, verdict: 'accepted', fixes: [], notes: 'Settled by Dash: stopped' },
+      { surface: 'news-saved', round: 3, verdict: 'fix', fixes: [fix('law 4')] },
+    ];
+    expect([...personHeld(checks)]).toEqual([['news-home', ['reference']]]);
+    expect(unpassedSurfaces(['news-home', 'news-saved'], checks)).toEqual([
+      { surface: 'news-home', round: 4, verdict: 'accepted', askPerson: ['reference'] },
+      { surface: 'news-saved', round: 3, verdict: 'fix' },
+    ]);
+  });
+
+  it("clears on a later pass or the person's accept", () => {
+    const held = { surface: 'news-home', round: 3, verdict: 'fix', fixes: [fix('done-when')] };
+    expect(personHeld([held, { surface: 'news-home', round: 4, verdict: 'pass' }]).size).toBe(0);
+    expect(
+      personHeld([held, { surface: 'news-home', round: 4, verdict: 'accepted', notes: 'Accepted by you: Answered on #9: A' }]).size,
+    ).toBe(0);
+  });
+
+  it('refuses the close naming the surface and the question to write', () => {
+    const refusal = uiCheckRefusal({
+      step: 42,
+      outline: '40.2',
+      files: screen,
+      surfaces: ['news-saved'],
+      checks: [{ surface: 'news-saved', round: 3, verdict: 'fix', fixes: [fix('regression')] }],
+    });
+    expect(refusal).toContain('news-saved (round 3 cites a regression: it goes to the person)');
+    expect(refusal).toContain('which no settle lets through');
+    expect(refusal).toContain('npm run ui-guard -- 42 --ask');
+  });
+
+  it('keeps such a surface out of every settle and in the guard, past a settle', () => {
+    for (const sql of [uiSettleSql(42, ['news-saved'], 'stopped'), uiSettleSql(42, ['news-saved'], 'same', 'abc1234')]) {
+      expect(sql).toContain("lower(btrim(f->>'breaks')) in ('reference', 'done-when', 'regression')");
+      expect(sql).toContain("coalesce(c.notes, '') like 'Settled by Dash%'");
+      expect(sql).toContain('and not coalesce(judged.held, false)');
+    }
+    expect(uiGuardSql(42, ['news-saved'])).toContain('or judged.held;');
+  });
+});
+
+describe('uiAcceptSql', () => {
+  it("reads the step's own answer or an answered question with pictures it waits on", () => {
+    const sql = uiAcceptSql(42, ['news-saved']);
+    expect(sql).toContain("'Answered on #' || d.number || ': ' || d.resolution");
+    expect(sql).toContain('from plan_item_mockups m');
+    expect(sql).toContain('dep.item_id = item.id and dep.depends_on_id = d.id');
+    expect(sql).toContain('c.step = 42');
+    expect(sql).toContain("'{}'::text[],");
+  });
+
+  it("keeps a feature's accept under the feature at its head", () => {
+    const sql = uiAcceptSql(40, ['news-saved'], { rounds: 40, commit: 'abc1234' });
+    expect(sql).toContain("'abc1234'");
+    expect(() => uiAcceptSql(40, ['news-saved'], { commit: "x'; drop" })).toThrow();
   });
 });
