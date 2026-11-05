@@ -50,6 +50,11 @@ feature and every feature is theirs to approve.
    decision's own answer, so it cannot be paraphrased into something nobody
    said. A waiting step the answers have not settled stays exactly as it is:
    one rewritten into something vaguer is worse than one left alone.
+   Each step you write follows the rule in `shaping.md`, "Every step's detail
+   stands alone": complete enough to build from without the feature's comments
+   or the answers, carrying every constraint, file, example, edge case and
+   decision that applies, with only what is still open written out in full.
+
 3. **Say what an answer invalidated.** A step an answer made pointless is
    `drop <n> --note "…"`, naming the answer that did it and why: "#95.2's answer
    settles this on the server, so the client half is not needed." A re-shape
