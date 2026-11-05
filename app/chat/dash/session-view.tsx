@@ -16,10 +16,16 @@ import { ComposeBody, ComposeBox, FieldError, Select } from '@/components/ui/fie
 import { IconButton } from '@/components/ui/icon-button';
 import Link from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DashMark } from '@/components/ui/dash-mark';
+import { runPose } from '@/lib/core/run-pose';
+import { exactTime, shortWhen } from '@/lib/comments/when';
+import type { RunActivity } from '@/lib/core/run-activities';
+import { useSessionThreadLive } from '@/components/thread/use-session-thread-live';
 import { ATTACHMENT_ACCEPT, ATTACHMENT_HINT, attachmentSize, type UploadedAttachment } from '@/lib/attachments/rules';
 import { cn } from '@/lib/cn';
 import { keepCurrent } from '@/lib/share/keep-current';
 import { useClockNow } from '@/lib/use-clock-now';
+import { sessionLines, threadWithHeard, type SessionProgressReport } from '@/lib/core/session-thread-live';
 import {
   MOCKUP_COMMENT_MAX,
   SESSION_MESSAGE_MAX,
@@ -54,8 +60,13 @@ import { CHATS_BACK } from './view';
  *   #2789.9). Pick tells the session and, on a thread about a plan step, puts
  *   the link on that step; the card then shows Picked. Comment opens a box
  *   whose note goes to the session as a reply on that mockup.
- * - The page re-reads itself while it is open, as a shared page does: every
- *   fifteen seconds while a reply is to come, every minute otherwise.
+ * - It stays current over Realtime while it is open (plan #2789.12,
+ *   useSessionThreadLive): a reply, a question or a mockup appears as the
+ *   session writes it, the state above the turns changes in place, and each
+ *   progress report and status line since your last message is a run line
+ *   under the turns. Only when the channel cannot open does the page fall
+ *   back to re-reading itself, as a shared page does: every fifteen seconds
+ *   while a reply is to come, every minute otherwise.
  */
 
 export type SessionActions = {
@@ -96,9 +107,10 @@ function projectHref(projectId: string | null): string {
 }
 
 export function SessionThreadView({
-  thread,
-  messages,
+  thread: readThread,
+  messages: readMessages,
   reported = null,
+  report = null,
   projects = [],
   projectId: initialProject = null,
   actions = NO_ACTIONS,
@@ -115,6 +127,8 @@ export function SessionThreadView({
   messages: readonly SessionMessage[];
   /** What the session last reported on its progress row, for the working line. */
   reported?: string | null;
+  /** The newest report on that row, the first of the session's lines. */
+  report?: SessionProgressReport | null;
   /** On a new thread, the projects it can be on. */
   projects?: readonly ProjectChoice[];
   /** On a new thread, the project it starts on. */
@@ -136,7 +150,7 @@ export function SessionThreadView({
   const clock = useClockNow();
   // The gallery keeps the time it was drawn at, so its turns read as recent.
   const now = live ? clock || start : start;
-  const [projectId, setProjectId] = useState<string | null>(thread?.projectId ?? initialProject);
+  const [projectId, setProjectId] = useState<string | null>(readThread?.projectId ?? initialProject);
   const [pending, setPending] = useState<PendingSend[]>(initialPending);
   const [boxOpen, setBoxOpen] = useState(initialBoxOpen || initialAttachOpen);
   const [attachOpen, setAttachOpen] = useState(initialAttachOpen);
@@ -171,6 +185,17 @@ export function SessionThreadView({
     void discardUpload(gone.path);
   };
   const footRef = useRef<HTMLDivElement>(null);
+  const sent = useRef(0);
+
+  const liveThread = useSessionThreadLive({
+    threadId: readThread?.id ?? null,
+    messages: readMessages,
+    report,
+    enabled: live,
+  });
+  const messages = liveThread.messages;
+  const thread = threadWithHeard(readThread, liveThread.heard);
+  const lost = liveThread.connection === 'lost';
 
   // Sent messages the server has drawn since are dropped from the pending list.
   const shownIds = new Set(messages.map((m) => m.id));
@@ -178,12 +203,15 @@ export function SessionThreadView({
   const state = thread?.state ?? 'queued';
   const replyDue = pending.some((p) => !p.failed) || awaitingReply(messages);
   const working = thread ? workingLine(state, messages, reported) : null;
+  const lines = thread && working ? sessionLines(thread.id, messages, liveThread.reports) : [];
   const ended = state === 'ended';
   const label = thread?.projectLabel ?? projects.find((p) => p.id === projectId)?.label ?? THIS_APP_LABEL;
   const openInClaude = claudeSessionUrl(thread?.sessionId ?? null);
 
+  // The fallback when the channel cannot open: re-read the page on a timer.
+  const hasThread = thread !== null;
   useEffect(() => {
-    if (!live || !thread) return;
+    if (!live || !hasThread || !lost) return;
     return keepCurrent(
       {
         addEventListener: (t, f) => window.addEventListener(t, f),
@@ -195,11 +223,11 @@ export function SessionThreadView({
       () => router.refresh(),
       replyDue ? REPLY_DUE_MS : QUIET_MS,
     );
-  }, [live, thread, replyDue, router]);
+  }, [live, hasThread, lost, replyDue, router]);
 
   useEffect(() => {
     footRef.current?.scrollIntoView?.({ block: 'end' });
-  }, [messages.length, pending.length]);
+  }, [messages.length, pending.length, lines.length]);
 
   const deliver = (item: PendingSend) => {
     startTransition(async () => {
@@ -227,7 +255,8 @@ export function SessionThreadView({
     event.preventDefault();
     const text = draft.trim();
     if ((!text && !file) || uploading || ended) return;
-    const item: PendingSend = { id: `pending-${Date.now()}`, text, file, failed: null };
+    sent.current += 1;
+    const item: PendingSend = { id: `pending-${sent.current}`, text, file, failed: null };
     setPending((list) => [...list, item]);
     setDraft('');
     setFile(null);
@@ -402,7 +431,13 @@ export function SessionThreadView({
           </ol>
         )}
 
-        {working && showPending.every((p) => p.failed) && (
+        {working && showPending.every((p) => p.failed) && lines.length > 0 && (
+          <ol aria-label="What the session is doing">
+            <SessionLines lines={lines} arrived={liveThread.arrived} now={now} />
+          </ol>
+        )}
+
+        {working && showPending.every((p) => p.failed) && lines.length === 0 && (
           <p className="flex items-center gap-2 text-small text-ink-muted" aria-live="polite">
             <LoaderCircle className="size-3.5 shrink-0 motion-safe:animate-spin" strokeWidth={1.75} aria-hidden />
             <span className="min-w-0 break-words">{working}</span>
@@ -514,6 +549,60 @@ export function SessionThreadView({
         </div>
       </div>
     </ConversationChat>
+  );
+}
+
+/**
+ * What the session has reported since your last message, while a reply is
+ * to come (plan #2789.12): one turn in the session's voice, its mark working
+ * in the shape of the newest line as a runner's Dash does, and the lines
+ * under it oldest first, the newest in full ink and the earlier ones quiet.
+ * Each line rises in as it arrives over Realtime.
+ */
+function SessionLines({
+  lines,
+  arrived,
+  now,
+}: {
+  lines: readonly RunActivity[];
+  arrived: ReadonlySet<string>;
+  now: number;
+}) {
+  const newest = lines[lines.length - 1];
+  const pose = runPose(newest);
+  return (
+    <ThreadTurn
+      voice="dash"
+      name="Session"
+      at={newest.created_at}
+      now={now}
+      muted
+      aria-live="polite"
+      mark={<DashMark size="2xs" decorative state={pose.state} activity={pose.activity} />}
+    >
+      <ol className="space-y-0.5">
+        {lines.map((line) => {
+          const latest = line === newest;
+          return (
+            <li
+              key={line.id}
+              className={cn('flex min-w-0 items-baseline gap-3', arrived.has(line.id) && 'run-line-in')}
+            >
+              <span className={cn('min-w-0 flex-1 break-words', latest ? 'text-body text-ink' : 'text-ui text-ink-muted')}>
+                {line.body}
+              </span>
+              <time
+                dateTime={line.created_at}
+                title={exactTime(line.created_at)}
+                className="tabular shrink-0 text-small text-ink-ghost"
+              >
+                {shortWhen(line.created_at, now)}
+              </time>
+            </li>
+          );
+        })}
+      </ol>
+    </ThreadTurn>
   );
 }
 

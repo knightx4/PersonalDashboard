@@ -500,6 +500,7 @@ import {
   AskMadeChangesSurface,
   DashPageSurface,
   AskAnswerActionsSurface,
+  AskToSessionSurface,
   AskBoxSurface,
   AskThinkSurface,
   FAILING_QUESTION,
@@ -8899,7 +8900,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SessionThreadSurface part="open" />,
   },
   {
-    /* The working line (plan #2789.7): your message sent, and under it what the session last reported while the reply is to come. */
+    /* The working line (plan #2789.7): your message sent, and under it the session's status lines and progress reports since, as run lines that fill in over Realtime (plan #2789.12). In the list, the thread that moved while it was open carries a dot until it is opened. */
     id: 'chat-session-working',
     label: 'Dash · A session thread, a reply on its way',
     module: 'chat',
@@ -9508,6 +9509,32 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskAnswerActionsSurface />,
+  },
+  {
+    /* Taking a chat to a session (plan #2789.8): the answer in which Dash
+     * offers a session, with the written button under it. */
+    id: 'ask-to-session',
+    label: 'Dash · An answer that offers a session',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskToSessionSurface part="offer" />,
+  },
+  {
+    /* The button pressed: the project the chat names picked, the list to
+     * change it, Start the thread and Cancel. */
+    id: 'ask-to-session-form',
+    label: 'Dash · Choosing the project for a session',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskToSessionSurface part="form" />,
+  },
+  {
+    /* The thread started: the link to open it. */
+    id: 'ask-to-session-started',
+    label: 'Dash · A session thread started from a chat',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskToSessionSurface part="started" />,
   },
   {
     /* Thumbs on an answer already rated (plan #2285.2): the first up, the
