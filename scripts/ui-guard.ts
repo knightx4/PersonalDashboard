@@ -48,6 +48,16 @@
  * shooting and comparing took. It shoots the checkout it runs in, so
  * run it with the commit to compare checked out; `--commit <sha>` names the
  * commit the step's changed files are read at.
+ *
+ * With `--feature` (plan #2966.3), <step> is a feature and the check is its
+ * land review, run on the feature branch head before the merge to main. The
+ * surfaces are every one the branch's changes since `--base` (origin/main by
+ * default) serve, and the rounds are the feature's own, counted only when
+ * taken at a commit no screen file has changed since (lib/plan/ui-feature-review.ts).
+ * It takes `--compare` and `--settle` as a step does, keeping the head on
+ * every round it writes, and `--sheets`, which groups what is left by page
+ * and draws each page's other states as one strip beside its main state, for
+ * one critic round a page. Alone it says whether the feature may land.
  */
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
@@ -71,6 +81,11 @@ import {
 import { requireSupabaseProjectUrl } from '../lib/db/project';
 import { compareReport, SAME_AS_MAIN_REASON, splitSurfaces } from '../lib/plan/ui-compare';
 import { compareWithMain } from './ui-guard-compare';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import sharp from 'sharp';
+import { shotFile, SHOT_NAMES } from '../lib/preview/ui-checks';
+import { branchScreenInputs } from '../lib/plan/ui-check-local';
+import { featureUnpassed, pageGroups, roundsAtHead, type FeatureRound } from '../lib/plan/ui-feature-review';
 
 function arg(flag: string): string | null {
   const i = process.argv.indexOf(flag);
@@ -142,14 +157,14 @@ async function main(): Promise<void> {
     .slice(2)
     .find(
       (a, i, all) =>
-        !a.startsWith('--') && !['--commit', '--settle', '--workers'].includes(all[i - 1] ?? ''),
+        !a.startsWith('--') && !['--commit', '--settle', '--workers', '--base'].includes(all[i - 1] ?? ''),
     );
   const accept = process.argv.includes('--accept');
   const compare = process.argv.includes('--compare');
   const settle = process.argv.includes('--settle') ? (arg('--settle') ?? '') : null;
   const written = (stepArg ?? '').trim().replace(/^#/, '');
   if (!/^\d+(?:\.\d+)*$/.test(written) || Number(written) === 0) {
-    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]]');
+    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>" | --compare [--workers <n>]] [--feature [--base <ref>] [--sheets]]');
   }
   if ([accept, compare, process.argv.includes('--settle')].filter(Boolean).length > 1) {
     fail('Give one of --accept, --settle and --compare.');
@@ -158,6 +173,12 @@ async function main(): Promise<void> {
   const { step, outline } = await placeStep(written);
   const name = `#${outline ?? step}`;
   const commit = arg('--commit') ?? localGit(['rev-parse', 'HEAD']).trim();
+
+  if (process.argv.includes('--feature')) {
+    if (accept) fail('--accept is for a step; a feature review settles or goes to the critic.');
+    await featureRun({ name, feature: step, head: commit, compare, settle });
+    return;
+  }
 
   const { files, surfaces } = stepScreenInputs(step, commit, outline);
   if (!files.some(isScreenFile)) {
@@ -261,9 +282,14 @@ async function compareRun(input: {
   files: string[];
   surfaces: string[];
   databaseUrl: string | null;
+  /** A feature's rounds at its head, read by the caller (plan #2966.3). */
+  rounds?: CheckRound[];
+  /** The head a feature review settles at, kept on each settled round. */
+  head?: string;
 }): Promise<void> {
   const { name, step, files, surfaces, databaseUrl } = input;
-  const checks = databaseUrl ? await stepRounds(databaseUrl, step) : localCheckRounds(step, process.cwd());
+  const checks =
+    input.rounds ?? (databaseUrl ? await stepRounds(databaseUrl, step) : localCheckRounds(step, process.cwd()));
   const text = databaseUrl ? await stepText(databaseUrl, step) : '';
   const { named, reached } = splitSurfaces(surfaces, text, checks);
   if (!databaseUrl) {
@@ -288,7 +314,7 @@ async function compareRun(input: {
   const report = compareReport({ name, step, comparisons, newOnBranch, timings });
   console.log(report.text);
   if (report.settled.length === 0) return;
-  const statement = uiSettleSql(step, report.settled, SAME_AS_MAIN_REASON);
+  const statement = uiSettleSql(step, report.settled, SAME_AS_MAIN_REASON, input.head);
   if (!databaseUrl) {
     console.log('\nRun this through the Supabase connector. It settles the surfaces that look the same.\n');
     console.log(statement);
@@ -298,6 +324,154 @@ async function compareRun(input: {
   try {
     const rows = await sql.unsafe(statement);
     console.log(`Settled ${rows.length} surface${rows.length === 1 ? '' : 's'} that look the same as on main.`);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+/**
+ * `--feature` (plan #2966.3): the land review of a whole feature branch, run
+ * on its head before the merge to main. Its surfaces come from everything the
+ * branch changed since it left `--base` (origin/main by default), its rounds
+ * are the ones recorded under the feature's number at a commit no screen file
+ * has changed since, and what it settles carries the head.
+ */
+async function featureRun(input: {
+  name: string;
+  feature: number;
+  head: string;
+  compare: boolean;
+  settle: string | null;
+}): Promise<void> {
+  const { name, feature, compare, settle } = input;
+  const databaseUrl = reachableDatabase();
+  if (!databaseUrl) {
+    fail(`${name}'s land review reads the feature's rounds, which needs DATABASE_URL or SUPABASE_SERVICE_ROLE_KEY.`);
+  }
+  const head = localGit(['rev-parse', input.head]).trim();
+  const base = arg('--base') ?? 'origin/main';
+  const { files, surfaces } = branchScreenInputs(base, head);
+  if (!files.some(isScreenFile)) {
+    console.log(`${name} changed no screen file since ${base}: nothing to review.`);
+    return;
+  }
+  if (surfaces.length === 0) {
+    console.log(`${name} changed screen files that no gallery surface stands for: nothing to review.`);
+    return;
+  }
+  const all = await featureRounds(databaseUrl, feature);
+  const counting = roundsAtHead(all, { contains: [], head, screenFiles: files }, localGit);
+  const waiting = featureUnpassed(surfaces, all, counting);
+  console.log(
+    `${name} reaches ${surfaces.length} surface${surfaces.length === 1 ? '' : 's'} at ${head.slice(0, 9)}; ` +
+      `${waiting.length} not yet passed there.`,
+  );
+
+  if (compare) {
+    await compareRun({ name, step: feature, files, surfaces, databaseUrl, rounds: counting, head });
+    return;
+  }
+  if (settle !== null) {
+    // Only what has been through three rounds at the head, or looks the same
+    // as on main, is the builder's to settle (plan #2215.4, #2966.5).
+    const compared = surfacesToCompare(surfaces, counting);
+    const read = fileShotReader(process.cwd());
+    const comparisons = [];
+    for (const surface of compared) comparisons.push(await compareSurfaceShots(surface, read));
+    const refusal = settleRefusal(name, feature, comparisons);
+    if (refusal) fail(refusal);
+    const wrongLayout = new Set(waiting.filter((w) => w.layoutNo).map((w) => w.surface));
+    if (wrongLayout.size > 0) {
+      console.log(
+        `Not settled: ${[...wrongLayout].join(', ')} differ${wrongLayout.size === 1 ? 's' : ''} from the reference in layout.`,
+      );
+    }
+    const settleable = waiting.map((w) => w.surface).filter((s) => !wrongLayout.has(s));
+    const statement = uiSettleSql(feature, settleable, settle, head);
+    if (!statement) return;
+    const sql = connect(databaseUrl);
+    try {
+      const rows = await sql.unsafe(statement);
+      console.log(`Settled ${rows.length} surface${rows.length === 1 ? '' : 's'} on ${name} at ${head.slice(0, 9)}.`);
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
+    return;
+  }
+
+  if (process.argv.includes('--sheets')) {
+    const groups = pageGroups(waiting.map((w) => w.surface));
+    console.log(`\n${groups.length} page${groups.length === 1 ? '' : 's'} for the critic, one round each:`);
+    for (const group of groups) {
+      const round = Math.max(0, ...all.filter((r) => r.surface === group.main).map((r) => r.round)) + 1;
+      console.log(`\n${group.route}: ${group.main}, round ${round}`);
+      console.log(`  main state: ${SHOT_NAMES.map((shot) => shotFile(group.main, shot)).join(', ')}`);
+      if (group.states.length === 0) {
+        console.log('  states: none');
+      } else {
+        const strip = await stateStrip(group.main, group.states);
+        console.log(`  states (${group.states.join(', ')}): ${strip.file}`);
+        if (strip.missing.length > 0) console.log(`  not shot yet: ${strip.missing.join(', ')} (npm run shoot -- <id>)`);
+      }
+      const states = group.states.length ? ` --states ${group.states.join(',')}` : '';
+      console.log(`  record: npm run ui-check -- ${feature} ${group.main} ${round} --commit ${head.slice(0, 12)}${states}`);
+    }
+    return;
+  }
+
+  if (waiting.length === 0) {
+    console.log(`Every surface has passed at the head: ${name} lands with its steps closed.`);
+    return;
+  }
+  fail(
+    `Not passed at ${head.slice(0, 9)}: ${waiting.map((w) => w.surface).join(', ')}. ` +
+      `Run npm run ui-guard -- ${feature} --feature --compare, then --sheets for what goes to the critic.`,
+  );
+}
+
+/**
+ * One picture of a page's other states, side by side at phone width in the
+ * light theme, so the critic judges them in the same round as the main state.
+ * Each is cut at 1600 pixels tall; a state not shot yet is left out and named.
+ */
+async function stateStrip(main: string, states: readonly string[]): Promise<{ file: string; missing: string[] }> {
+  const width = 390;
+  const tallest = 1600;
+  const gap = 24;
+  const missing: string[] = [];
+  const tiles: { input: Buffer; height: number }[] = [];
+  for (const state of states) {
+    const path = shotFile(state, 'phone-light');
+    if (!existsSync(path)) {
+      missing.push(state);
+      continue;
+    }
+    const resized = await sharp(readFileSync(path)).resize({ width }).png().toBuffer({ resolveWithObject: true });
+    const height = Math.min(resized.info.height, tallest);
+    const input = await sharp(resized.data).extract({ left: 0, top: 0, width, height }).png().toBuffer();
+    tiles.push({ input, height });
+  }
+  if (tiles.length === 0) return { file: 'none drawn yet', missing };
+  mkdirSync('.preview-shots/sheets', { recursive: true });
+  const file = `.preview-shots/sheets/${main}--states.png`;
+  const canvasWidth = Math.max(1, tiles.length * width + Math.max(0, tiles.length - 1) * gap);
+  const canvasHeight = Math.max(1, ...tiles.map((t) => t.height));
+  await sharp({ create: { width: canvasWidth, height: canvasHeight, channels: 3, background: '#9ca3af' } })
+    .composite(tiles.map((tile, i) => ({ input: tile.input, left: i * (width + gap), top: 0 })))
+    .png()
+    .toFile(file);
+  return { file, missing };
+}
+
+/** The feature's own rounds in ui_checks, with the commit each was taken at. */
+async function featureRounds(databaseUrl: string, feature: number): Promise<FeatureRound[]> {
+  const sql = connect(databaseUrl);
+  try {
+    return await sql<FeatureRound[]>`
+      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok, c.commit_sha
+      from ui_checks c
+      where c.step = ${feature}
+        and c.user_id = (select p.user_id from plan_items p where p.number = ${feature} limit 1)`;
   } finally {
     await sql.end({ timeout: 5 });
   }

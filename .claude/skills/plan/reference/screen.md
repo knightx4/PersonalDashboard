@@ -286,4 +286,54 @@ any surface those files serve is not a `pass`, and names each such surface
 (plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <outline>` runs
 the same check from your branch, and prints the SQL for the connector where
 there is no `DATABASE_URL`. Run it before you report a screen step: a
-surface it names is a round still to run or record.
+surface it names is a round still to run or record. A step built in a batch
+is closed by `land` instead, from the feature's land review below.
+
+## The land review: each screen once, at the feature's head
+
+A feature in a batch is reviewed once, when it lands (plan #2966.3). The
+rounds a builder records on its own step are its working checks: they show it
+the screen is right before it reports, and they no longer close anything.
+What closes the feature's screen steps is one set of rounds recorded under the
+feature's number, taken on the feature branch head once every step is built,
+for every surface the branch reaches. A page two steps both changed is judged
+once, in the state that goes to main.
+
+`land` reads those rounds (`lib/plan/ui-feature-review.ts`). A round counts
+only when it was taken at a commit that holds every built step's commit, so a
+round from before the last step merged does not. A step that changed no screen
+closes on its commit alone; a screen step closes once every surface it
+reaches has passed in the feature's rounds; one that has not stays open, and
+`land` names the surfaces holding it.
+
+The session landing the feature runs the review on the branch head after the
+gate and before the merge to main, since after the merge origin/main already
+has the feature and every surface would compare the same:
+
+1. `npm run ui-guard -- <feature> --feature --compare`. It shoots every
+   surface the branch serves that has not passed at the head, on the head and
+   on origin/main, and settles those that look the same, recording the head
+   on each settled round.
+2. `npm run ui-guard -- <feature> --feature --sheets`. It groups what is left
+   by page (the first route in `SURFACE_ROUTES`) and prints, for each page,
+   the main state's four shots, a strip of the page's other states, the round
+   to run and the command that records it. Shoot any state it lists as not
+   shot yet, then run it again.
+3. **One critic round a page.** The critic gets the main state's four shots
+   and the strip (`.preview-shots/sheets/<main>--states.png`, each other state
+   at phone width in the light theme) and judges the page as a whole: a fix
+   on a state names it in `where`. Everything else in the prompt is as in the
+   loop above, with the feature's done-when in place of a step's.
+4. **Record it for the whole page:** `npm run ui-check -- <feature> <main>
+   <round> --commit <head> --states <id>,<id>`. The one verdict is written for
+   the main state and for each state, each with its own shots kept beside it.
+5. On `fix`, make the changes on the branch, commit them against the step that
+   drew the screen, and run the next round at the new head. A round taken
+   before a commit that changed a screen file the branch changed no longer
+   counts, so `--feature` alone tells you what is still to judge.
+6. Three rounds, then settle as above: `npm run ui-guard -- <feature> --feature
+   --settle "<why>"`. A layout the critic said differs from its reference is
+   never settled (plan #2966.5).
+
+`npm run ui-guard -- <feature> --feature` with no other flag says whether the
+feature may land, and exits 1 naming each surface not yet passed at the head.

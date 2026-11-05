@@ -312,31 +312,50 @@ export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
  * notes opening "Settled by Dash", so the record still says who let the
  * screen through.
  */
-export function uiSettleSql(step: number, surfaces: readonly string[], reason: string): string {
+export function uiSettleSql(
+  step: number,
+  surfaces: readonly string[],
+  reason: string,
+  /**
+   * The commit the settle looked at, kept as the round's commit_sha. A
+   * feature's land review counts only rounds taken at its branch head
+   * (plan #2966.3, lib/plan/ui-feature-review.ts), so its settles carry one.
+   */
+  commit?: string | null,
+): string {
   const check = uiGuardSql(step, surfaces);
   if (!check) return '';
   const why = reason.trim();
   if (!why) throw new Error('Say why the surfaces are settled.');
   if (why.includes('$r$')) throw new Error('The reason cannot contain $r$.');
+  if (commit && !/^[0-9a-f]{7,40}$/i.test(commit)) throw new Error(`"${commit}" is not a commit sha.`);
+  const sha = commit ? `'${commit}'` : 'null';
   const list = surfaces.map((s) => `'${s}'`).join(', ');
   const passing = PASSING_VERDICTS.map((v) => `'${v}'`).join(', ');
   return [
     'with step as (',
     `  select p.user_id from plan_items p where p.number = ${step} limit 1`,
     '), waiting as (',
-    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    '  select s.surface, coalesce(top.round, 0) + 1 as round',
     `  from unnest(array[${list}]::text[]) as s(surface)`,
     '  cross join step',
     '  left join lateral (',
+    '    select max(c.round) as round from ui_checks c',
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    '  ) top on true',
+    // With a commit, only a pass at that commit counts as passed: a land
+    // review settles what is waiting at the branch head (plan #2966.3).
+    '  left join lateral (',
     '    select c.round, c.verdict from ui_checks c',
     `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    ...(commit ? [`      and c.commit_sha = ${sha}`] : []),
     '    order by c.round desc limit 1',
     '  ) last on true',
     `  where last.verdict is null or last.verdict not in (${passing})`,
     ')',
-    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots, commit_sha)',
     `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
-    `  $r$Settled by Dash: ${why}$r$, '{}'::text[]`,
+    `  $r$Settled by Dash: ${why}$r$, '{}'::text[], ${sha}`,
     'from waiting cross join step',
     'returning surface, round;',
   ].join('\n');

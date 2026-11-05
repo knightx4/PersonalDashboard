@@ -219,9 +219,19 @@ describe('uiSettleSql', () => {
     expect(sql).toContain("'accepted'");
     expect(sql).toContain('$r$Settled by Dash: the critic stopped at round 3 with 1 fix open$r$');
     expect(sql).toContain("not in ('pass', 'accepted')");
-    expect(sql).toContain('coalesce(last.round, 0) + 1');
+    expect(sql).toContain('coalesce(top.round, 0) + 1');
     // No answer from the person is needed.
     expect(sql).not.toContain('Answered');
+    expect(sql).toContain("'{}'::text[], null");
+  });
+
+  it('with a commit, counts only a pass at that commit and records it on the round', () => {
+    const sql = uiSettleSql(42, ['news-saved'], 'same as main', 'abc1234');
+    expect(sql).toContain("and c.commit_sha = 'abc1234'");
+    expect(sql).toContain("'{}'::text[], 'abc1234'");
+    // The round number still follows every round, whatever commit it was at.
+    expect(sql).toContain('select max(c.round) as round from ui_checks c');
+    expect(() => uiSettleSql(42, ['news-saved'], 'why', "x'; drop")).toThrow();
   });
 
   it('needs a reason, and nothing that closes its quotes', () => {
