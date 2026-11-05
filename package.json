@@ -31,6 +31,7 @@
     "learn:prepare": "tsx --conditions=react-server scripts/learn-prepare-subject.ts",
     "learn:drafts": "tsx --conditions=react-server scripts/learn-drafts.ts",
     "broker": "tsx --conditions=react-server scripts/session-broker.ts",
+    "session-sync": "tsx --conditions=react-server scripts/session-sync.ts",
     "goals:dashboard": "tsx --conditions=react-server scripts/goal-dashboard.ts",
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
