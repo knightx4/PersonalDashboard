@@ -5,6 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
+import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { UNFINISHED_REASON, type DashFailure } from './failures';
@@ -102,8 +103,8 @@ WHEN THEY ASK YOU TO PICK, SUGGEST OR RECOMMEND, CHOOSE FROM WHAT THEY HAVE.
 should I chase first" are answered by looking up the rows they already have
 and choosing one, or a few, saying why from what the rows say: a verdict, a
 summary, a date, what they wrote. Prefer what they have not finished or
-watched yet. You cannot browse the web, and you do not need to: what they
-saved is what they are asking about.
+watched yet. Never search the web for these: what they saved is what they
+are asking about.
 
 WHEN THE DATA CANNOT ANSWER IT, SAY SO, BUT ONLY AFTER LOOKING. Never say you
 cannot see or do something before you have made a lookup for it. If the
@@ -112,6 +113,8 @@ answer "I cannot see that" and say in a sentence what you could see instead.
 Do not fill the gap with a likely answer. Whenever an answer does not do what
 they asked, say what was missing in the answer tool's could_not, so the
 ability gets built.
+
+${WEB_RULES}
 
 ANSWER THROUGH THE answer TOOL. Match the length to what they said. A remark
 that needs nothing back ("thanks", "looks good") gets one short sentence, such
@@ -283,20 +286,33 @@ export const ASK_ACTION_RULES = SYSTEM.slice(
   SYSTEM.indexOf('ANYTHING ELSE THEY ASK YOU TO DO, HAND ON'),
 ).trim();
 
-/** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
-export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
+/**
+ * How Dash speaks on Ask by default: Sonnet, the rules above, every
+ * registered tool but a thread's own, and web search (plan #2861).
+ */
+export const ASK_VOICE: DashVoice = {
+  model: ASK_MODEL,
+  system: SYSTEM,
+  tools: ASK_DASH_TOOLS,
+  serverTools: [dashWebSearch(ASK_MODEL)],
+};
 
 /**
  * Ask's voice for a question kept to one workspace (plan #1899.5): every
  * tool but the lookups outside it (lookupInScope). Writes stay, since a
- * change the person asks for is not a lookup. `model` is the one the person
- * chose to be answered with (plan #2458.2, lib/dash/model-choice.ts);
- * absent, Sonnet.
+ * change the person asks for is not a lookup, and not the web, since the
+ * question is kept to their own rows. `model` is the one the person chose to
+ * be answered with (plan #2458.2, lib/dash/model-choice.ts); absent, Sonnet.
+ * The web search is the one that model takes (dashWebSearch).
  */
 export function scopedVoice(scope: ModuleId | null | undefined, model: string = ASK_MODEL): DashVoice {
-  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model };
+  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model, serverTools: [dashWebSearch(model)] };
   if (!scope) return voice;
-  return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+  return {
+    ...voice,
+    tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)),
+    serverTools: [],
+  };
 }
 
 /**

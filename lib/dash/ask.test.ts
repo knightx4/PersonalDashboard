@@ -403,7 +403,8 @@ describe('askDash', () => {
     );
 
     expect(sent[0].messages.map((m) => m.role)).toEqual(['user']);
-    expect(sent[0].messages[0].content).toBe('What did I buy on eBay?');
+    // Cached as one block, since Ask's voice can search the web (plan #2861).
+    expect(JSON.stringify(sent[0].messages[0].content)).toContain('What did I buy on eBay?');
     // Only the answer is written: the question was kept the first time.
     expect(written).toHaveLength(1);
     expect(written[0].turns.map((t) => t.role)).toEqual(['assistant']);
