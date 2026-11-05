@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { GraderCell, RawVerdict } from '@/lib/learn/levels/grade';
@@ -200,36 +200,33 @@ export async function gradeCellAnswer(input: {
       model,
       max_tokens: 400 + 200 * input.cells.length,
       system: input.hint ? withCellHintRule(base) : base,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report met, not_met or not_touched for every cell, with the quote behind each met.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              grades: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    cell: { type: 'string', description: 'The cell key, such as C1.' },
-                    verdict: { type: 'string', enum: ['met', 'not_met', 'not_touched'] },
-                    quote: {
-                      type: 'string',
-                      description: 'On a met only: the words of the answer that meet it, copied exactly.',
-                    },
-                    reason: { type: 'string', description: 'One short sentence on why this verdict.' },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report met, not_met or not_touched for every cell, with the quote behind each met.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            grades: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  cell: { type: 'string', description: 'The cell key, such as C1.' },
+                  verdict: { type: 'string', enum: ['met', 'not_met', 'not_touched'] },
+                  quote: {
+                    type: 'string',
+                    description: 'On a met only: the words of the answer that meet it, copied exactly.',
                   },
-                  required: ['cell', 'verdict'],
+                  reason: { type: 'string', description: 'One short sentence on why this verdict.' },
                 },
+                required: ['cell', 'verdict'],
               },
-              ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
             },
-            required: ['grades'],
+            ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
           },
+          required: ['grades'],
         },
-      ],
-      tool_choice: forceTool(TOOL, model),
+      }, model),
       messages: [{ role: 'user', content: gradePrompt(input) }],
     });
   } catch (error) {
@@ -238,15 +235,15 @@ export async function gradeCellAnswer(input: {
 
   input.onSpend?.({ model, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL, model);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  const parsed = gradeSchema.safeParse(block.input);
+  const parsed = gradeSchema.safeParse(report.value);
   if (!parsed.success) return { ok: false, detail: 'The grade came back malformed.' };
 
   const verdicts = parsed.data.grades.map((g) => ({ cell: g.cell, verdict: g.verdict, quote: g.quote ?? null, reason: g.reason ?? null }));
   if (!input.hint) return { ok: true, verdicts };
-  const raw = block.input as { hint?: unknown; miss_kind?: unknown };
+  const raw = report.value as { hint?: unknown; miss_kind?: unknown };
   return {
     ok: true,
     verdicts,
