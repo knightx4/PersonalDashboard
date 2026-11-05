@@ -10,9 +10,15 @@ notices: every day, from evidence, before they notice. The person should
 never see "I could not finish this answer", a lookup that "did not work", or
 an answer that states things it did not look up.
 
-**The person's own judgement comes first.** A thumbs down, or a reply that
+**An answer the person never got comes first.** Every Dash answer that
+failed, or came back unfinished, is kept in `core.dash_failures` with its
+reason and what each model call returned (plan #2937.2). The person asked
+and got "Dash could not answer", or notes in place of an answer: work those
+before anything else.
+
+**The person's own judgement comes next.** A thumbs down, or a reply that
 says an answer was wrong ("no", "that's wrong", "you missed…"), is the best
-evidence there is of what a good answer is. Work those before anything else,
+evidence there is of what a good answer is. Work those after the failures,
 every time.
 
 A day's work is: read what the pipeline found, fix the causes, prove the
@@ -33,7 +39,8 @@ fix, re-ask the one case it is about, never all of them.
   calls no model. It reads the last 24 hours of real Dash answers, in Ask
   and in comment threads (an `@dash` comment on a role, an answer, a step),
   and from connected apps, and grades them (`lib/dash/quality/health.ts`): fallbacks to "I could not
-  finish", limits, failed or refused lookups, thumbs down with their notes,
+  finish", every row of `core.dash_failures` (one alert each), limits,
+  failed or refused lookups, thumbs down with their notes,
   replies that pushed back, and prompt size. The run is a row in
   `core.dash_eval_runs` (`health` holds it all, with turn ids). Any alert
   writes a Dev note (`feedback_items`, kind bug, page `/ask`, body starting
@@ -79,7 +86,16 @@ that runs past 300 seconds is cut off: fewer cases, or faster answers.
 done.** Go to the backlog (step 4), or, if its next step needs a paid run to
 measure, stop and report in two lines.
 
-For each thumbs down, pushback and other alert, find the turn it names, with
+Read the day's failed answers first. `calls` holds, per model call, the
+stop reason, the content block types and the tokens: an `end_turn` whose
+blocks are only `thinking` is an answer written out of sight (plan #2937.1),
+`max_tokens` is a reply cut off, and an `error` is a call that threw.
+
+```sh
+npx tsx scripts/sql.ts "select id, created_at, surface, outcome, model, effort, think, conversation_id, turn_id, subject_ref, reason, jsonb_pretty(calls) calls from core.dash_failures where user_id = :owner and created_at > now() - interval '26 hours' order by created_at"
+```
+
+Then, for each thumbs down, pushback and other alert, find the turn it names, with
 the question before it and the reply after it:
 
 ```sh
@@ -107,7 +123,11 @@ is not one. Work it down:
 - **A wrong or unfounded answer.** Compare the body with what its lookups
   returned (`tool_calls`). If it states something no lookup returned, the
   prompt or the tools let it guess: fix that, not the one answer.
-- **A thumbs down or pushback.** Start here. The `rating_note`, the
+- **A failed or unfinished answer.** Start here. The row's `calls` say how
+  each model call ended. Re-run the question's shape in a unit test with
+  those stop reasons and blocks (`lib/dash/loop.test.ts` has stubs for each),
+  and fix the loop or the voice so it answers.
+- **A thumbs down or pushback.** Then these. The `rating_note`, the
   question and what they wrote next say what they wanted. Check the data to
   learn what the right answer was, then find why Dash did not give it: a
   lookup it never made, a tool that could not reach the rows, a page of rows

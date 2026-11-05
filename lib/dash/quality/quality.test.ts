@@ -167,6 +167,7 @@ describe('a run', () => {
       turns: async () => [],
       spend: async () => [],
       connectorCalls: async () => [],
+      failures: async () => [],
       start: async () => 'run-1',
       finish: async (_id, row) => {
         finished.push(row);

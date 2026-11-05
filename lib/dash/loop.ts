@@ -405,6 +405,22 @@ export type DashLookupEvent =
 
 export type { DashSeen } from './sets';
 
+/**
+ * One model call as it came back (plan #2937.2), for the record a failed
+ * answer keeps in core.dash_failures: why it stopped, which kinds of block
+ * it held, and its tokens. `error` is set, and the rest empty, when the call
+ * threw.
+ */
+export type DashCall = {
+  stop: string | null;
+  blocks: string[];
+  outputTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  cacheWriteTokens: number;
+  error?: string;
+};
+
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type DashExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
 
@@ -798,6 +814,8 @@ export type DashRun = {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** Hears each model call as it came back (plan #2937.2). Whatever it throws is ignored. */
+  onCall?: (call: DashCall) => void;
   /** For tests: the clock the time budget reads. */
   now?: () => number;
   /** Hears each call start and finish. Whatever it throws is ignored. */
@@ -892,6 +910,13 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     const built = answerFromLookups(cause, lastRows);
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
+  };
+  const heardCall = (call: DashCall) => {
+    try {
+      input.onCall?.(call);
+    } catch (error) {
+      console.error('ask call listener failed', error);
+    }
   };
   const noteLookup = (result: AskToolResult) => {
     lastError = result.ok ? null : result.error.replace(/\s+/g, ' ').trim().slice(0, 200);
@@ -1053,11 +1078,21 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       );
     } catch (error) {
       if (signal?.aborted) return stoppedAnswer();
-      return fail(error instanceof Error ? error.message : 'The answer failed.', 'the model could not be reached.');
+      const message = error instanceof Error ? error.message : 'The answer failed.';
+      heardCall({ stop: null, blocks: [], outputTokens: 0, inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 0, error: message.slice(0, 500) });
+      return fail(message, 'the model could not be reached.');
     }
 
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
+    heardCall({
+      stop: response.stop_reason ?? null,
+      blocks: response.content.map((block) => block.type),
+      outputTokens: usage.outputTokens,
+      inputTokens: usage.inputTokens,
+      cachedInputTokens: usage.cachedInputTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
+    });
     inputTokens += budgetTokens(usage, previousPrompt);
     previousPrompt = usage.inputTokens + usage.cacheWriteTokens + usage.cachedInputTokens;
     if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
