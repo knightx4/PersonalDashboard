@@ -111,6 +111,22 @@ const ALL_WIDTHS = [
   { name: 'landscape', width: 1440, height: 810 },
 ] as const;
 
+/**
+ * Surfaces whose fixtures are written as fixed instants and read against a
+ * pinned clock, so "5m ago" is the same five minutes on every take. The
+ * clock stands still at that instant for the whole page, Date.now() and a bare
+ * new Date() both.
+ */
+const FROZEN_CLOCKS: Readonly<Record<string, string>> = {
+  'pattern-thread': '2026-03-02T12:00:00.000Z',
+};
+
+function freezeClockScript(iso: string): string {
+  return `(()=>{var T=${new Date(iso).getTime()},D=Date;
+function F(...a){if(!(this instanceof F))return new D(T).toString();return a.length?new D(...a):new D(T)}
+F.prototype=D.prototype;F.now=()=>T;F.parse=D.parse;F.UTC=D.UTC;window.Date=F;})()`;
+}
+
 /** Sizes shot as the window shows them, never grown to the page's length. */
 const WINDOW_ONLY: ReadonlySet<string> = new Set(['landscape']);
 
@@ -141,7 +157,10 @@ const WIDTHS = (() => {
  * should not carry it.
  */
 const HIDE_DEV_BADGE =
-  "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
+  "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});" +
+  // The status line's wall clock reads a different minute on every take, so two
+  // shoots of one commit differed in its ten pixels (plan #2879.5).
+  "(function(){var s=document.createElement('style');s.textContent='[data-wall-clock]{visibility:hidden}';document.head.appendChild(s);})();";
 
 /**
  * Puts every CSS animation and transition at rest before a capture (plan
@@ -374,6 +393,12 @@ async function main() {
           deviceScaleFactor: 2,
           mobile: size.name === 'phone',
         });
+        const frozen = FROZEN_CLOCKS[surfaceId];
+        const frozenScript = frozen
+          ? ((await send('Page.addScriptToEvaluateOnNewDocument', {
+              source: freezeClockScript(frozen),
+            })) as unknown as { identifier?: string })
+          : null;
         await send('Page.navigate', {
           url:
             `http://localhost:${PORT}/preview?s=${surfaceId}` +
@@ -502,6 +527,11 @@ async function main() {
             console.log(`  ${endName}`);
             shot += 1;
           }
+        }
+        if (frozenScript?.identifier) {
+          await send('Page.removeScriptToEvaluateOnNewDocument', {
+            identifier: frozenScript.identifier,
+          });
         }
       }
     }
