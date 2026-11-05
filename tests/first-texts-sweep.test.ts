@@ -67,7 +67,8 @@ describe('one pass of the first texts', () => {
     await runFirstTextsWith(p, NOW);
     expect(p.close).toHaveBeenCalledWith('u1', ['1'], null, NOW);
     expect(p.send.mock.calls[0][0].bubbles).toEqual(['The build of #2854.2 stalled.']);
-    expect(p.send.mock.calls[0][0].push).toBe(false);
+    // Every text first reaches the phone, a stalled build too (note 6a69a1c3).
+    expect(p.send.mock.calls[0][0].push).toBe(true);
   });
 
   it('does nothing for someone with no rule, and closes stale events everywhere', async () => {
