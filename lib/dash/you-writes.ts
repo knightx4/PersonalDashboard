@@ -672,9 +672,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   },
   {
     name: 'set_reach_out',
-    runs: noButton(
-      'The People form sets the same rule from its own save, where the person writes the brief in a field; no button sets one from a sentence said in a chat.',
-    ),
+    runs: sameAs(['app/chat/actions.ts#setReachOut', 'lib/you/reach-out-make.ts#saveReachOut']),
     description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends"). Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
     input_schema: {
       type: 'object',

@@ -132,6 +132,11 @@ export const youActions: ModuleActions = {
       'spends',
       'Has Dash draft or redraft a persona card on the People form, one Sonnet call paid for on each press, which the person decides to make by pressing Draft (plan #2748.11).',
     ),
+    setReachOut: tool('set_reach_out'),
+    turnOffPersonReachOut: none(
+      'theirs',
+      "Turning a person's reach-out off is the person's own choice on the form; Dash clears a rule by setting an empty brief.",
+    ),
     correctPersonMemory: none('theirs', 'Correcting what a mentor remembers is the person correcting what Dash noted about them.'),
     removePersonMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them; the line is kept, retired.'),
     startChatWith: none('theirs', 'Who the person starts a chat with is their own call on their chats.'),
