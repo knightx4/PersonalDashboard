@@ -40,3 +40,72 @@ export function builtBeneathExpiries(comment: string | null | undefined): boolea
   }
   return BUILT_LINE.test(paragraphs[paragraphs.length - 1] ?? '');
 }
+
+/** The `(plan #…)` references at the end of a commit subject, without the `#`. */
+export function subjectSteps(subject: string): string[] {
+  const out: string[] = [];
+  for (const match of subject.matchAll(/\(plan #([0-9]+(?:\.[0-9]+)*)\)/g)) out.push(match[1]);
+  return out;
+}
+
+/** Whether a commit subject names this step, by number or outline, or a step beneath it. */
+export function subjectNamesStep(subject: string, number: number, outline: string): boolean {
+  return subjectSteps(subject).some(
+    (ref) => ref === String(number) || ref === outline || ref.startsWith(`${outline}.`),
+  );
+}
+
+/** One commit on the branch, newest first, as `git log --format=%h%x09%s` gives it. */
+export type BranchCommit = { sha: string; subject: string };
+
+/**
+ * The commit `built` records for a step, or a refusal.
+ *
+ * Until 5 November 2026 `built` recorded HEAD. A session that built
+ * #2879.1.1, .1.2 and .1.4 and then .1.3 marked all four built at the end, so
+ * each carried .1.3's commit, which drew 19 screen files. `land` then asked
+ * the critic for 21 chat surfaces under steps that changed none, and six runs
+ * went into re-recording rounds before anyone looked at the commit.
+ *
+ * So without `--commit`, the newest commit on the branch whose subject names
+ * the step (or a step beneath it) is recorded, and HEAD only when no subject
+ * names it. With `--commit`, a commit whose subject names other steps and not
+ * this one is refused; a commit with no `(plan #…)` at all, such as a merge,
+ * is taken as given.
+ */
+export function chooseBuiltCommit(input: {
+  number: number;
+  outline: string;
+  given: string | null;
+  givenSubject: string | null;
+  head: string | null;
+  branch: readonly BranchCommit[];
+}): { commit: string; why: string } | { refusal: string } {
+  const { number, outline, given, givenSubject, head, branch } = input;
+  if (given) {
+    const named = subjectSteps(givenSubject ?? '');
+    if (named.length > 0 && !subjectNamesStep(givenSubject ?? '', number, outline)) {
+      const own = branch.find((c) => subjectNamesStep(c.subject, number, outline));
+      return {
+        refusal:
+          `${given} is "${givenSubject}", which names ${named.map((n) => `#${n}`).join(', ')} and not #${outline}. ` +
+          (own
+            ? `This step's own commit looks like ${own.sha} ("${own.subject}"): pass --commit ${own.sha}.`
+            : `Pass the commit that built #${outline}, or a merge that holds it.`),
+      };
+    }
+    return { commit: given, why: 'as given' };
+  }
+  const own = branch.find((c) => subjectNamesStep(c.subject, number, outline));
+  if (own) return { commit: own.sha, why: `the newest commit naming #${outline}` };
+  if (!head) return { refusal: 'No commit to record: pass --commit <sha>.' };
+  const headSubject = branch[0]?.sha === head ? branch[0].subject : '';
+  if (subjectSteps(headSubject).length > 0) {
+    return {
+      refusal:
+        `No commit on this branch names #${outline}, and HEAD (${head}, "${headSubject}") names another step. ` +
+        `Commit this step's work with "(plan #${outline})" at the end of its subject, or pass --commit <sha>.`,
+    };
+  }
+  return { commit: head, why: 'HEAD: no commit subject names this step' };
+}
