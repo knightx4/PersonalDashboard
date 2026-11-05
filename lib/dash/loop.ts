@@ -3,7 +3,8 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
-import { forceTool, PROGRESS_NOTES_BETA, whyNoReport, writesProgressNotes } from '@/lib/learn/graph/tool-call';
+import { whyNoReport } from '@/lib/learn/graph/tool-call';
+import { forceTool, requestShape, systemMessage } from '@/lib/core/model-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { LOOKUP_NOT_RUN, MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
@@ -830,14 +831,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
   const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
-  // Widened: the installed SDK's types predate output_config.
-  const effort = (voice.effort ? { output_config: { effort: voice.effort } } : {}) as Record<string, never>;
-  // On a model that writes longer text as a progress note, its summary comes
-  // back as the note's text (plan #2937.1) rather than an empty block.
-  // Widened as above: the installed SDK's types predate adaptive thinking.
-  const notesShown = writesProgressNotes(model);
-  const thinking = (notesShown ? { thinking: { type: 'adaptive', display: 'updates' } } : {}) as Record<string, never>;
-  const beta = notesShown ? [PROGRESS_NOTES_BETA] : [];
+  // Effort, and on a model that writes longer text as a progress note the
+  // display that returns its summary (plan #2937.1), from the model's rules
+  // (lib/core/model-rules.ts, plan #2937.3).
+  const { effort, thinking, beta } = requestShape(model, voice.effort);
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
   // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
@@ -1182,7 +1179,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       if (said.length > notes.length) notes = said;
       if (!reasked) {
         reasked = true;
-        messages.push({ role: 'system', content: hiddenText(finishName) } as unknown as Anthropic.MessageParam);
+        messages.push(systemMessage(model, hiddenText(finishName)));
         continue;
       }
       // Twice out of sight: what the notes' summaries said is kept as an
