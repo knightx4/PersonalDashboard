@@ -9201,6 +9201,46 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="seat" />,
   },
   {
+    /* Reaching out on a bot's form (plan #2931.3), scrolled to it: the Set up card saying back what Franklin will text about and how often, what Dash cannot watch, when the next text is due and the caps that can hold one back, with Change and Turn off. */
+    id: 'chat-person-edit-reach-out',
+    label: 'Chat · Editing a bot, what they text you about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out" />,
+  },
+  {
+    /* Reaching out with nothing written: an empty box, and a line saying they text when the daily round picks them. */
+    id: 'chat-person-edit-reach-out-empty',
+    label: 'Chat · Editing a bot, nothing on what they text about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-empty" />,
+  },
+  {
+    /* Reaching out while Dash makes the rule: the words held in the box and Dash is setting it up under it. */
+    id: 'chat-person-edit-reach-out-setting',
+    label: 'Chat · Editing a bot, Dash setting up what they text about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-setting" />,
+  },
+  {
+    /* Reaching out when no rule could be made: the words kept in the box, what Dash could not watch, and Try again. */
+    id: 'chat-person-edit-reach-out-failed',
+    label: 'Chat · Editing a bot, what they text about could not be set up',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-failed" />,
+  },
+  {
+    /* A thread whose person has a reach-out rule (plan #2931.3): under the name, when the next text is due, if there is something new. */
+    id: 'chat-people-thread-next-text',
+    label: 'Chat · A thread, when their next text is due',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="next-text" />,
+  },
+  {
     /* The list hidden to its strip (New chat and the button to show it),
      * with the chat centred at its reading width. The column of what Dash
      * used is folded too, to its button in the chat's header (#1899.4). */
