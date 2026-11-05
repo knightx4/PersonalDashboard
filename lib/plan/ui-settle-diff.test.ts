@@ -131,8 +131,13 @@ describe('localCheckRounds', () => {
       writeFileSync(join(dir, '42--news-home--r3--phone-light.png'), '');
       writeFileSync(join(dir, '420--news-home--r1.json'), JSON.stringify({ verdict: 'pass' }));
       writeFileSync(join(dir, '42--jobs-role--r1.json'), 'not json');
+      writeFileSync(
+        join(dir, '42--people--r1.json'),
+        JSON.stringify({ verdict: 'fix', layout: { answer: 'x', ok: false } }),
+      );
       expect(localCheckRounds(42, root)).toEqual([
-        { surface: 'news-home', round: 3, verdict: 'fix' },
+        { surface: 'news-home', round: 3, verdict: 'fix', layout_ok: null },
+        { surface: 'people', round: 1, verdict: 'fix', layout_ok: false },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

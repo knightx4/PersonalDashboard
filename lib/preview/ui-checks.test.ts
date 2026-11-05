@@ -176,7 +176,7 @@ describe('connectorSql', () => {
 
   it('writes the three answers into the questions column, and replaces them on a second record', () => {
     const sql = connectorSql(checkRow(parseOwner('1533'), verdict, [], null));
-    expect(sql).toMatch(/notes, questions, shots/);
+    expect(sql).toMatch(/notes, questions, layout, shots/);
     expect(sql).toContain('questions = excluded.questions');
     const decoded = [...sql.matchAll(/decode\('([^']+)'/g)].map((m) =>
       Buffer.from(m[1], 'base64').toString('utf8'),

@@ -156,10 +156,17 @@ export function localCheckRounds(step: number, root: string): CheckRound[] {
     const match = pattern.exec(file);
     if (!match) continue;
     try {
-      const verdict = (JSON.parse(readFileSync(join(dir, file), 'utf8')) as { verdict?: unknown })
-        .verdict;
-      if (typeof verdict === 'string')
-        rounds.push({ surface: match[1]!, round: Number(match[2]), verdict });
+      const json = JSON.parse(readFileSync(join(dir, file), 'utf8')) as {
+        verdict?: unknown;
+        layout?: { ok?: unknown } | null;
+      };
+      if (typeof json.verdict === 'string')
+        rounds.push({
+          surface: match[1]!,
+          round: Number(match[2]),
+          verdict: json.verdict,
+          layout_ok: typeof json.layout?.ok === 'boolean' ? json.layout.ok : null,
+        });
     } catch {
       // Not the critic's json: no round.
     }

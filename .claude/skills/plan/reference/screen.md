@@ -62,7 +62,19 @@ registered; working offline, read the line and `REFERENCES` yourself.
   reference whose surface is not in the gallery or whose pictures are missing.
 - **Send a registered reference to the critic on every round** on its
   surface, in this step and every later one, as the prompt's `reference`
-  (4 below). A surface with none is sent "none".
+  (4 below). A surface with none is sent "none", and its verdict has no `layout`.
+- **Check the layout before wiring (plan #2966.5).** Round 1 on a surface
+  with a reference asks the critic one more question than the laws: does the
+  layout match the reference, meaning the panes, where the list and the
+  content sit, and what each row holds. The answer comes back as `layout`
+  (`{ "answer": "...", "ok": true|false }`) in the verdict, and the recorder
+  refuses a verdict without it on a surface that has a reference. A no fails
+  the round whatever the laws say, and the screen is not wired to real data
+  until a round answers yes: moving panes is cheap on fixtures and costly
+  after wiring. `ui-guard` keeps refusing the step until a later round on the
+  surface answers yes. Settling does not clear it; only a round that answers
+  yes or the person's answer does. (On 4 November 2026 the People tab passed
+  review as a full-width list while its mockup was a two-pane messenger.)
 - **Never scope the critic away from the reference.** Do not ask it to leave
   a difference unraised because a shared component draws it or a later step
   will. A shared component that makes the screen differ from its reference is

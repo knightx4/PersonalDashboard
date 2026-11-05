@@ -45,6 +45,7 @@ import {
   type CheckOwner,
   type KeptShot,
 } from '../lib/preview/ui-checks';
+import { referenceFor } from '../lib/preview/references';
 import { supabaseProjectUrl } from '../lib/db/project';
 
 function fail(message: string): never {
@@ -111,7 +112,7 @@ async function main() {
   if (!existsSync(file)) fail(`No verdict at ${file}. Save the critic's json block there first.`);
   let verdict;
   try {
-    verdict = parseVerdict(readFileSync(file, 'utf8'), surface, round);
+    verdict = parseVerdict(readFileSync(file, 'utf8'), surface, round, referenceFor(surface) !== null);
   } catch (error) {
     fail(`${file}: ${(error as Error).message}`);
   }
