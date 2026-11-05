@@ -31,14 +31,17 @@ function use(id: string, name: string, input: unknown) {
 
 function stubClient(replies: unknown[]) {
   const sent: Sent[] = [];
+  const create = async (params: Sent) => {
+    sent.push(structuredClone(params));
+    const next = replies[sent.length - 1];
+    if (!next) throw new Error('no reply scripted');
+    return next;
+  };
+  // Think's max_tokens is large, so the loop streams it (no one is shown the text here).
   const client = {
     messages: {
-      create: async (params: Sent) => {
-        sent.push(structuredClone(params));
-        const next = replies[sent.length - 1];
-        if (!next) throw new Error('no reply scripted');
-        return next;
-      },
+      create,
+      stream: (params: Sent) => ({ on: () => undefined, finalMessage: () => create(params) }),
     },
   } as unknown as Anthropic;
   return { client, sent };

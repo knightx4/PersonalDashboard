@@ -765,7 +765,7 @@ async function callModel(
     if (text.length <= told.length || !text.startsWith(told)) return;
     const piece = text.slice(told.length);
     told = text;
-    onText(piece);
+    onText?.(piece);
   };
   stream.on('streamEvent', (event) => {
     if (event.type === 'content_block_start' && event.content_block.type === 'tool_use') {
