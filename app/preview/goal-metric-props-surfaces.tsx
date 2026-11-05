@@ -71,6 +71,17 @@ const METRICS: Metric[] = [
     target: null,
     position: 3,
   },
+  {
+    id: 'm-sent',
+    goalId: GOAL_ID,
+    name: 'Job applications sent',
+    source: 'applications',
+    collectionId: null,
+    dateField: null,
+    period: 'week',
+    target: null,
+    position: 4,
+  },
 ];
 
 function Column({ children }: { children: React.ReactNode }) {
@@ -135,6 +146,14 @@ export function GoalMetricPropsEmptySurface() {
  */
 export function GoalMetricPropsFormStepsSurface() {
   return <Metrics metrics={[]} lists={[LISTS[1]]} shown={{ open: 'add' }} />;
+}
+
+/**
+ * Changing the applications metric: Job applications sent is chosen under
+ * What to count, and no list or date is asked for (plan #2908.2).
+ */
+export function GoalMetricPropsFormApplicationsSurface() {
+  return <Metrics shown={{ open: 'm-sent' }} />;
 }
 
 /** A new metric being saved: the button holds its pending state. */

@@ -8,6 +8,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
+import { setBotPhoto } from '@/lib/you/bot-photos';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
 import {
@@ -38,13 +39,18 @@ import {
   type CardAuthor,
   type PersonBrief,
 } from '@/lib/you/people-cards';
+import { loadReachOutView, turnOffReachOut } from '@/lib/you/reach-out-card';
+import type { ReachOutView } from '@/lib/you/reach-out-card-model';
+import { makeReachOutRule, saveReachOut, type MadeReachOut } from '@/lib/you/reach-out-make';
+import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
 
 /**
  * The People tab's presses that are not a send (plan #2748.6): reading the
  * page of a thread before the oldest one shown, and reading a thread, which
  * having it open does. A send goes through POST /api/chat/messages. Then
- * adding and editing a person and what they remember (plan #2748.11), and
- * deleting one from the Bots tab (plan #2879.3).
+ * adding and editing a person and what they remember (plan #2748.11),
+ * deleting one from the Bots tab (plan #2879.3), and what each texts you
+ * about (plan #2931.3).
  */
 
 const KEY = /^[a-z0-9_-]{1,80}$/;
@@ -292,6 +298,27 @@ export async function draftPersonCard(input: {
   return drafted.ok ? { card: drafted.card } : { error: drafted.error };
 }
 
+/**
+ * A bot's picture (plan #2955): point them at the image the form has just
+ * uploaded to their folder of the you-bot-photos bucket, or at none with
+ * null, which draws their initials again. The picture replaced is removed.
+ */
+// latency: pending
+export async function saveBotPhoto(advisorId: string, path: string | null): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  if (path !== null && typeof path !== 'string') return { error: 'That picture was not saved. Try again.' };
+  try {
+    const found = await setBotPhoto(await createYouClient(), user.id, advisorId, path);
+    if (!found) return { error: 'They are not on your list.' };
+    revalidatePath('/chat', 'layout');
+    return { error: null };
+  } catch (error) {
+    console.error('bot picture not saved', error);
+    return { error: path ? 'That picture was not saved. Try again.' : 'The picture was not taken off. Try again.' };
+  }
+}
+
 /** Delete from the Bots tab (plan #2879.3): the bot, its chats and what it remembers. */
 // latency: pending
 export async function deletePersonCard(advisorId: string): Promise<{ error: string | null }> {
@@ -336,5 +363,56 @@ export async function removePersonMemory(id: string): Promise<{ error: string | 
   } catch (error) {
     console.error('memory not removed', error);
     return { error: 'That was not removed. Try again.' };
+  }
+}
+
+/**
+ * Set it up on a person's form (plan #2931.3): Dash makes the rule from what
+ * you wrote (lib/you/reach-out-make.ts), the brief is kept with the rule or
+ * with why none could be made, and the form gets back what to show. An
+ * empty brief clears it all.
+ */
+// latency: pending -- a model call; the box says Dash is setting it up
+export async function setReachOut(advisorId: string, brief: string): Promise<{ view: ReachOutView } | { error: string }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  const words = typeof brief === 'string' ? brief.trim() : '';
+  if (words.length > REACH_OUT_LIMITS.brief) return { error: `Keep it under ${REACH_OUT_LIMITS.brief} characters.` };
+  const client = await createYouClient();
+  const found = await client.from('board_advisors').select('name').eq('user_id', user.id).eq('id', advisorId).eq('active', true).maybeSingle();
+  if (found.error || typeof found.data?.name !== 'string') return { error: 'They are not on your list.' };
+  let made: MadeReachOut | null = null;
+  if (words) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot set this up.' };
+    const reports: SpendReport[] = [];
+    made = await makeReachOutRule({ name: found.data.name, brief: words }, { apiKey, onSpend: (report) => reports.push(report) });
+    await recordSpendReports(await createCoreClient(), user.id, { module: 'you', operation: 'make-reach-out-rule' }, reports);
+  }
+  try {
+    await saveReachOut(client, user.id, advisorId, words, made);
+    const view = await loadReachOutView(client, user.id, advisorId, Date.now());
+    revalidatePath('/chat', 'layout');
+    return { view };
+  } catch (error) {
+    console.error('reach-out not saved', error);
+    return { error: 'What you wrote was not saved. Try again.' };
+  }
+}
+
+/** Turn off on a person's form (plan #2931.3): the rule goes, your words stay. */
+// latency: pending -- one write
+export async function turnOffPersonReachOut(advisorId: string): Promise<{ view: ReachOutView } | { error: string }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  const client = await createYouClient();
+  try {
+    await turnOffReachOut(client, user.id, advisorId);
+    const view = await loadReachOutView(client, user.id, advisorId, Date.now());
+    revalidatePath('/chat', 'layout');
+    return { view };
+  } catch (error) {
+    console.error('reach-out not turned off', error);
+    return { error: 'It was not turned off. Try again.' };
   }
 }

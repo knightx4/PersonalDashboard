@@ -6,6 +6,7 @@ import {
   dashFileDays,
   dateFields,
   metricInputError,
+  sentApplicationDays,
   type CountedRecord,
 } from '@/lib/goals/metrics';
 
@@ -202,6 +203,62 @@ describe('dashFileDays', () => {
       'UTC',
     );
     expect(days).toEqual(['2026-10-13', '2026-09-30']);
+  });
+});
+
+describe('sentApplicationDays', () => {
+  const sent = (submittedAt: string | null, status = 'submitted', outcome: string | null = null) => ({
+    submittedAt,
+    status,
+    outcome,
+  });
+
+  it('counts each sent application on its day, and leaves out the unsent and the withdrawn', () => {
+    const days = sentApplicationDays(
+      [
+        sent('2026-10-13T09:00:00Z'),
+        sent('2026-10-14T09:00:00Z', 'rejected', 'rejected'),
+        sent(null, 'lead'),
+        sent('2026-10-14T10:00:00Z', 'withdrawn', 'withdrawn'),
+        sent('2026-10-15T10:00:00Z', 'in_process', 'withdrawn'),
+      ],
+      'UTC',
+    );
+    expect(days).toEqual(['2026-10-13', '2026-10-14']);
+  });
+
+  it('puts an application sent late on a Sunday in the week it was sent where you live', () => {
+    // 23:30 on Sunday 18 October in New York is already Monday in UTC.
+    const days = sentApplicationDays([sent('2026-10-19T03:30:00Z')], 'America/New_York');
+    expect(days).toEqual(['2026-10-18']);
+    const counts = countDaysByPeriod({
+      days,
+      period: 'week',
+      goalStartedAt: '2026-10-12T12:00:00Z',
+      now: new Date('2026-10-20T12:00:00Z'),
+      timeZone: 'America/New_York',
+    });
+    expect(counts.map((p) => [p.startsOn, p.count])).toEqual([
+      ['2026-10-12', 1],
+      ['2026-10-19', 0],
+    ]);
+  });
+
+  it('counts by month', () => {
+    const counts = countDaysByPeriod({
+      days: sentApplicationDays(
+        [sent('2026-09-30T20:00:00Z'), sent('2026-10-01T08:00:00Z'), sent('2026-10-20T08:00:00Z')],
+        'UTC',
+      ),
+      period: 'month',
+      goalStartedAt: null,
+      now: new Date('2026-10-25T12:00:00Z'),
+      timeZone: 'UTC',
+    });
+    expect(counts.map((p) => [p.startsOn, p.count])).toEqual([
+      ['2026-09-01', 1],
+      ['2026-10-01', 2],
+    ]);
   });
 });
 

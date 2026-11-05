@@ -148,6 +148,7 @@ export function ThreadView({
   presses = NO_PRESSES,
   builds: initialBuilds = NO_BUILDS,
   today,
+  nextText = null,
 }: {
   person: PersonRow;
   chatId: string | null;
@@ -171,6 +172,8 @@ export function ThreadView({
   builds?: Record<string, BuildRun>;
   /** YYYY-MM-DD in the person's zone, so a due date this year leaves the year off. */
   today?: string;
+  /** "Next text Monday, if there is something new", for someone with a reach-out rule (plan #2931.3). */
+  nextText?: string | null;
 }) {
   const [startedChatId, setChatId] = useState<string | null>(null);
   const chatId = initialChatId ?? startedChatId;
@@ -443,8 +446,8 @@ export function ThreadView({
   return (
     <MessagingThread
       name={person.name}
-      detail={threadDetail(person)}
-      avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
+      detail={nextText && person.canTalk ? nextText : threadDetail(person)}
+      avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} photo={person.photo} size="sm" />}
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
       actions={
@@ -574,7 +577,7 @@ export function ThreadView({
 function EmptyThread({ person }: { person: PersonRow }) {
   return (
     <div className="my-auto flex flex-col items-center gap-2 px-4 py-8 text-center">
-      <PersonMark initials={personInitials(person.name)} colour={person.colour} size="lg" />
+      <PersonMark initials={personInitials(person.name)} colour={person.colour} photo={person.photo} size="lg" />
       <p className="mt-1 text-body font-semibold text-ink">{person.name}</p>
       <p className="max-w-xs text-ui text-ink-muted">
         {person.canTalk

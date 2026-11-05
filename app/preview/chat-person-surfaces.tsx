@@ -8,6 +8,7 @@ import { newPersonCard, type PersonCard } from '@/lib/you/people-cards-model';
 import { BotsView } from '@/app/chat/bots-view';
 import { PersonForm } from '@/app/chat/people/person-form';
 import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
+import type { ReachOutView } from '@/lib/you/reach-out-card-model';
 import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
 /**
@@ -16,10 +17,17 @@ import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
  * drafts their card, and when the draft failed; and the form for a bot
  * already there, with their card, the earlier cards, what they remember and
  * the confirm before a line goes, the confirm before the bot is deleted, and
- * a seat, which cannot be.
+ * a seat, which cannot be; and Reaching out (plan #2931.3), set up, while
+ * Dash sets it up, and when it could not.
  */
 
 const NOW = Date.parse('2026-11-03T09:00:00Z');
+
+/** A picture the person uploaded for Benjamin Franklin (plan #2955). */
+export const BOT_PHOTO = '/gallery/bot-photo.svg';
+
+/** Everyone, with Franklin wearing his picture. */
+const WITH_PHOTO = EVERYONE.map((row) => (row.key === 'benjamin-franklin' ? { ...row, photo: BOT_PHOTO } : row));
 const ZONE = 'Europe/London';
 
 const FRANKLIN_CARD = `Who you are
@@ -102,9 +110,12 @@ const DRAFT_COST: CostEstimate = {
   models: [MODELS.personaDraft],
 };
 
+/** About what making a reach-out rule costs, as the hint beside Set it up says it. */
+const RULE_COST: CostEstimate = { ...DRAFT_COST, lowMicros: 10_000, medianMicros: 14_000, highMicros: 22_000, models: [MODELS.reachOutRule] };
+
 function Shell({ path, children }: { path: string; children: React.ReactNode }) {
   return (
-    <PaidCostsProvider costs={{ 'app/chat/actions.ts#draftPersonCard': DRAFT_COST }}>
+    <PaidCostsProvider costs={{ 'app/chat/actions.ts#draftPersonCard': DRAFT_COST, 'app/chat/actions.ts#setReachOut': RULE_COST }}>
     <AppShell
       account="preview"
       module="chat"
@@ -127,7 +138,7 @@ function Shell({ path, children }: { path: string; children: React.ReactNode }) 
 export function ChatBotsSurface({ state = 'list' }: { state?: 'list' | 'empty' | 'failed' }) {
   return (
     <Shell path="/chat/bots">
-      <BotsView rows={state === 'list' ? EVERYONE : []} failed={state === 'failed'} />
+      <BotsView rows={state === 'list' ? WITH_PHOTO : []} failed={state === 'failed'} />
     </Shell>
   );
 }
@@ -150,6 +161,26 @@ export function ChatPersonAddSurface({ state = 'empty' }: { state?: 'empty' | 'd
     </Shell>
   );
 }
+
+/** Franklin set up to text about money habits weekly (plan #2931.3), with two asks Dash cannot watch. */
+const FRANKLIN_REACH_OUT: ReachOutView = {
+  brief:
+    'Once a week, pick one habit from my insights or notes that is worth keeping, and tell me why. Also warn me when my savings drop under £2,000 and what I spent on takeaway.',
+  summary:
+    'Benjamin Franklin will text you once a week with one habit worth keeping, drawn from your insights and notes, and will not name the same one again within a month.',
+  cannotWatch: ['your savings balance', 'what you spend on takeaway'],
+  error: null,
+  next: { at: '2026-11-09T09:00:00Z' },
+};
+
+/** The same words when no rule could be made from them. */
+const FRANKLIN_REACH_OUT_FAILED: ReachOutView = {
+  brief: 'Text me when my savings drop under £2,000, and tell me what I spent on takeaway each week.',
+  summary: null,
+  cannotWatch: [],
+  error: 'Dash cannot watch anything you asked for: your savings balance and what you spend on takeaway.',
+  next: null,
+};
 
 /** The Skeptic, one of the board's seats: its form says it cannot be deleted. */
 const SKEPTIC_SEAT: PersonCard = {
@@ -185,26 +216,56 @@ Cheerlead, pile on, or agree just to keep the peace.`,
 /**
  * The form for a bot already there: the top, the card with earlier cards,
  * redrafting, the memory with a remove confirming, the confirm before it is
- * deleted, or a seat's foot, which says why it stays.
+ * deleted, or a seat's foot, which says why it stays. The top also comes
+ * with the picture the person uploaded (plan #2955), with one uploading,
+ * and with an upload that failed. Reaching out (plan #2931.3) shows set up,
+ * empty, with Dash setting it up, and with a set-up that failed.
  */
 export function ChatPersonEditSurface({
   state = 'form',
 }: {
-  state?: 'form' | 'card' | 'redrafting' | 'memory' | 'delete' | 'seat';
+  state?:
+    | 'form'
+    | 'photo'
+    | 'photo-uploading'
+    | 'photo-failed'
+    | 'card'
+    | 'redrafting'
+    | 'memory'
+    | 'delete'
+    | 'seat'
+    | 'reach-out'
+    | 'reach-out-empty'
+    | 'reach-out-setting'
+    | 'reach-out-failed';
 }) {
-  const card = state === 'seat' ? SKEPTIC_SEAT : FRANKLIN_PERSON;
+  const card =
+    state === 'seat'
+      ? SKEPTIC_SEAT
+      : state === 'photo'
+        ? { ...FRANKLIN_PERSON, photo: BOT_PHOTO }
+        : state === 'reach-out'
+          ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT }
+          : state === 'reach-out-setting'
+            ? { ...FRANKLIN_PERSON, reachOut: { ...FRANKLIN_REACH_OUT, summary: null, cannotWatch: [], next: null } }
+            : state === 'reach-out-failed'
+              ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_FAILED }
+              : FRANKLIN_PERSON;
   return (
     <Shell path={`/chat/bots/${card.key}`}>
-      <BotsView rows={EVERYONE} current={card.key}>
+      <BotsView rows={state === 'photo' ? WITH_PHOTO : EVERYONE} current={card.key}>
         <PersonForm
           key={state}
           card={card}
           timezone={ZONE}
           now={NOW}
+          photoBusy={state === 'photo-uploading'}
+          photoError={state === 'photo-failed' ? 'Choose an image under 5 MB.' : null}
           drafting={state === 'redrafting'}
           removing={state === 'memory' ? 'mem2' : null}
           editing={state === 'memory' ? 'mem1' : null}
           deleting={state === 'delete'}
+          settingReachOut={state === 'reach-out-setting'}
           scrollTo={
             state === 'card'
               ? 'versions'
@@ -214,7 +275,9 @@ export function ChatPersonEditSurface({
                   ? 'memory'
                   : state === 'delete' || state === 'seat'
                     ? 'delete'
-                    : null
+                    : state.startsWith('reach-out')
+                      ? 'reach-out'
+                      : null
           }
         />
       </BotsView>

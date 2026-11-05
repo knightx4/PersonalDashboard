@@ -28,6 +28,10 @@ import {
 } from '@/lib/you/places';
 import { putQuestionToBoard } from '@/lib/you/board-ask';
 import { CONTEXT_MAX, LEAN_MAX, OPTION_MAX, OPTIONS_MAX, QUESTION_MAX } from '@/lib/you/board-questions';
+import { makeReachOutRule, saveReachOut } from '@/lib/you/reach-out-make';
+import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
+import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 
 /**
@@ -47,6 +51,11 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 the person's lean (plan #2561.10): queued for the Sunday
  *                 meeting, or a meeting convened about it now when they said
  *                 so. Through the Ask the board button's own function.
+ *   set_reach_out what a person on People should text them about and how
+ *                 often, in their words (plan #2931.4): the rule is made by
+ *                 makeReachOutRule and saved by saveReachOut, as the People
+ *                 form does, and the summary is said back. Undo puts the
+ *                 earlier brief and rule back.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -64,7 +73,16 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * the page refuse the same things in the same words.
  */
 
-export type YouWriteEnv = { userId: string; you: SchemaClient };
+export type YouWriteEnv = {
+  userId: string;
+  you: SchemaClient;
+  /**
+   * What set_reach_out needs to make a rule (plan #2931.4): the key, or a
+   * client in tests, and the core client the spend is recorded on. Absent,
+   * the tool says it cannot make a rule here.
+   */
+  rules?: { apiKey?: string; client?: Parameters<typeof makeReachOutRule>[1]['client']; core?: SpendClient };
+};
 
 export type YouMade = {
   kind: YouChangeKind;
@@ -411,6 +429,112 @@ async function askBoard(env: YouWriteEnv, args: Args): Promise<YouMade> {
   };
 }
 
+const REACH_OUT_PATHS = ['/chat', '/home'];
+
+/** The columns that hold a person's reach-out, which Undo puts back together. */
+const PERSON_COLUMNS = 'id, key, name, active';
+
+/**
+ * Set what a person on People texts them about, from a sentence. The person
+ * is named as People names them (or by key); the rule is made with one paid
+ * call, whose spend is recorded as the form's is. An empty brief clears it.
+ */
+async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
+  const who = (textArg(args, 'person') ?? '').trim();
+  const brief = (textArg(args, 'brief') ?? '').trim();
+  if (!who) throw new YouRefused('person is missing: give the name of the person on People.');
+  if (textArg(args, 'brief') === undefined) {
+    throw new YouRefused('brief is missing: give what they should text about and how often, or an empty brief to clear it.');
+  }
+  if (brief.length > REACH_OUT_LIMITS.brief) throw new YouRefused(`Keep brief under ${REACH_OUT_LIMITS.brief} characters.`);
+
+  const client = env.you as unknown as YouSupabaseClient;
+  const { data: people, error: listError } = await client
+    .from('board_advisors')
+    .select(PERSON_COLUMNS)
+    .eq('user_id', env.userId);
+  if (listError) throw new Error(`Reading People failed: ${listError.message}`);
+  const all = (people ?? []) as { id: string; key: string; name: string }[];
+  // "the hiring manager" is the person whose key is hiring_manager, whatever name they carry.
+  const plain = (text: string) => text.toLowerCase().replace(/_/g, ' ').replace(/^the\s+/, '').trim();
+  const lower = plain(who);
+  let found = all.filter((p) => p.id === who || plain(p.key) === lower || plain(p.name) === lower);
+  if (found.length === 0) found = all.filter((p) => plain(p.name).includes(lower) || plain(p.key).includes(lower));
+  if (found.length === 0) {
+    throw new YouRefused(`There is no one called "${who}" on People. They are: ${all.map((p) => p.name).join(', ') || 'nobody yet'}.`);
+  }
+  if (found.length > 1) {
+    throw new YouRefused(`More than one person matches "${who}": ${found.map((p) => p.name).join(', ')}. Ask which.`);
+  }
+  const person = found[0];
+
+  const { data: beforeRow, error: readError } = await client
+    .from('board_advisors')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('id', person.id)
+    .maybeSingle();
+  if (readError) throw new Error(`Reading ${person.name} failed: ${readError.message}`);
+  if (!beforeRow) throw new YouRefused(`${person.name} is not there any more. Nothing was changed.`);
+  const before = beforeRow as Row;
+
+  let made = null;
+  if (brief) {
+    const rules = env.rules;
+    if (!rules?.client && !rules?.apiKey) {
+      throw new YouRefused('Dash cannot make a rule here (no key is set), so nothing was changed. Tell them to set it on the People form.');
+    }
+    const reports: SpendReport[] = [];
+    made = await makeReachOutRule(
+      { name: person.name, brief },
+      { apiKey: rules.apiKey, client: rules.client, onSpend: (report) => reports.push(report) },
+    );
+    // Recorded whether or not a rule came back: the call was paid for.
+    if (rules.core) {
+      await recordSpendReports(rules.core, env.userId, { module: 'you', operation: 'make-reach-out-rule' }, reports).catch(
+        (error) => console.error('[spend] you/make-reach-out-rule', error instanceof Error ? error.message : error),
+      );
+    }
+    if (!made.ok) throw new YouRefused(`${made.error} Their words are not saved. Tell them in plain words.`);
+  }
+  await saveReachOut(client, env.userId, person.id, brief, made);
+
+  const { data: afterRow, error: afterError } = await client
+    .from('board_advisors')
+    .select('*')
+    .eq('user_id', env.userId)
+    .eq('id', person.id)
+    .maybeSingle();
+  if (afterError || !afterRow) throw new Error(afterError?.message ?? 'no row');
+  const after = afterRow as Row;
+
+  const href = `/chat/people/${person.key}`;
+  const said = made?.ok ? made.summary : '';
+  return {
+    kind: 'set_reach_out',
+    input: {
+      verb: brief ? 'Set what to text you about' : 'Cleared what to text you about',
+      what: person.name,
+      rest: said ? `: ${said}` : '',
+      href,
+      where: `Open ${person.name}`,
+      paths: [...REACH_OUT_PATHS, href],
+    },
+    subjectRef: toRef('you.board_advisors', person.id),
+    op: 'update',
+    before,
+    after,
+    summary: brief ? `Dash set up ${person.name} to text you. ${said}` : `Dash cleared what ${person.name} texts you about.`,
+    row: {
+      table: 'you.board_advisors',
+      ref: person.id,
+      title: person.name,
+      href,
+      detail: { brief: brief || null, summary: said || null },
+    },
+  };
+}
+
 const DATE_HINT = "A year (2019) or a month and year (2019-03, or 'March 2019').";
 
 const FIELDS = {
@@ -546,6 +670,24 @@ export const YOU_WRITES: readonly YouWrite[] = [
     },
     run: askBoard,
   },
+  {
+    name: 'set_reach_out',
+    runs: sameAs(['app/chat/actions.ts#setReachOut', 'lib/you/reach-out-make.ts#saveReachOut']),
+    description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends"). Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        person: { type: 'string', description: 'The person on People, by name as the tab shows it.' },
+        brief: {
+          type: 'string',
+          description: `What they should text about and how often, in the person's words. At most ${REACH_OUT_LIMITS.brief} characters. Empty to stop the texts.`,
+        },
+      },
+      required: ['person', 'brief'],
+      additionalProperties: false,
+    },
+    run: setReachOut,
+  },
 ];
 
 /** Runs one You write. Never throws: a refusal or a failure is the sentence the model reads. */
@@ -567,6 +709,11 @@ export async function runYouWrite(
 const ASK_NOTE =
   'It is done: it shows under your answer with an Undo. Say in your answer what you did, and cite the row this returned.';
 
+/** What set_reach_out is given where the key and the core client are the app's own. */
+export async function reachOutRules(db: DashWriteContext['db']): Promise<NonNullable<YouWriteEnv['rules']>> {
+  return { apiKey: process.env.ANTHROPIC_API_KEY, core: (await db('core')) as unknown as SpendClient };
+}
+
 /** The You writes as Ask's write tools, run on the person's own you client. */
 export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WRITES.map((write) => ({
   name: write.name,
@@ -577,7 +724,11 @@ export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WR
     if (!ctx.enabledModules.includes('you')) {
       return { ok: false, error: 'The You workspace is switched off, so nothing can be changed there.' };
     }
-    const env = { userId: ctx.userId, you: await ctx.db('you') };
+    const env: YouWriteEnv = {
+      userId: ctx.userId,
+      you: await ctx.db('you'),
+      rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db) : undefined,
+    };
     const result = await runYouWrite(write, env, input);
     if ('ok' in result) return result;
     return {

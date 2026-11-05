@@ -18,7 +18,8 @@ going over months, as well as this week's choices. They also asked that texts
 never pile up while they are away, so the caps below are theirs.
 
 **What you write:** the run row, at most three `you.advisor_messages` texts
-of kind `text_first` (the round, with the thread for a mentor who has none)
+of kind `text_first` (the round, with the thread for a mentor who has none,
+and one `you.advisor_reach_outs` row per row a text names)
 or one `you.advisor_messages` row (a reply), the mentors'
 `you.advisor_memory` rows, the summaries on `you.advisor_episodes` (the
 overnight memory), and the chat's reply state. Nothing else: no code,
@@ -35,6 +36,15 @@ talks to the person as "you".
 Follow .claude/skills/board/council.md
 Council advice <run id>
 user_id <uuid>
+```
+
+followed, when anyone is due by their own rule (A3), by a list of them:
+
+```
+Due by their own rule (plan #2931.5); see A3:
+- <name> (<key>, advisor <advisor id>)
+  - watch <watch key> [<mode>[, <form>], every <n> days, <never repeat | repeat after n days>]: <what it watches>
+    - <schema.table> <ref id> | <the row's title>
 ```
 
 or
@@ -301,6 +311,15 @@ claim unless new evidence answers it. Mentors whose texts go unanswered, or
 whose notes the person marked `not_useful`, speak less; mentors the person
 answers, makes a todo from, or marks `useful`, more.
 
+Then read each person's reach-out rule (plan #2931). A person with one
+has told the person what they text about and how often, in their own words:
+
+```sql
+select id, key, name, reach_out_brief, reach_out_summary
+from you.board_advisors
+where user_id = :owner and active and reach_out_rule is not null;
+```
+
 Read the open commitments too, with their mentor:
 
 ```sql
@@ -313,7 +332,33 @@ order by m.due_on nulls last, m.created_at;
 
 ### A3. Choose who speaks
 
-Choose by what changed, never by rotation:
+**People with a rule first.** A person with a `reach_out_rule` speaks only
+when the brief lists them as due, and only about the rows listed under
+their due watches. The app worked that out before firing the round
+(`lib/you/reach-out-due.ts`): their watch's cadence has passed since the
+last row it named, and the rows listed are new since then (any row, for a
+`pick` watch) and not named by them inside the watch's no-repeat window.
+Never name a row of a watch's tables that the brief does not list, and
+never speak for a person with a rule who is not listed, even about a
+commitment of theirs: it waits for their next due round. A person with a
+rule who is listed takes a place before anyone chosen below.
+
+What a due person sends, by the watch's `mode`:
+
+- **`roundup`**: one text covering the listed rows that matter, as one to
+  three short bubbles (a blank line between them) when the form is
+  `bubbles` or unset, or as a short list in one bubble when it is `list`.
+- **`each`**: one text this round naming the new rows, one bubble each, at
+  most three.
+- **`pick`**: one row from the list, the one their question makes them
+  notice, and why now.
+
+A person with two due watches sends one text that covers both. When nothing
+listed is worth a text, write nothing for them and say so in the summary;
+the same rows stay listed at the next due round.
+
+**Everyone else as before.** A person with no rule is chosen by what
+changed, never by rotation:
 
 - **A commitment fell due**, or was made over a week ago and never asked
   about (`followed_up_at` null or older than seven days): the mentor who
@@ -331,8 +376,10 @@ Choose by what changed, never by rotation:
 - **Nobody spoken lately.** Between two good fits, the mentor whose last text
   is older.
 
-Pick at most the number A1 allows, never two about the same row, and never
-the same mentor two rounds running unless a commitment of theirs is due.
+Pick at most the number A1 allows, due people with a rule first, never two
+about the same row, and never the same mentor without a rule two rounds
+running unless a commitment of theirs is due. A due person the caps leave
+out is still due at the next round, since nothing was written for them.
 When nothing changed that anyone would remark on, write nothing: a round
 with no texts is better than texts that say nothing. Say why in the summary.
 
@@ -382,6 +429,33 @@ The person's phone is told by the app within five minutes: a notification
 naming the mentor with the text's first line, opening Chat. Do not send one
 yourself, and write no `you.council_notes` row; the Council tab no longer
 shows new notes.
+
+For a person with a rule, write one row per row the text names, under the
+watch it came from, with `ref_table` and `ref_id` exactly as the brief
+listed them. This is what stops the next round naming it again, and what
+starts the watch's next cadence; a text that names a row with no row here
+breaks the no-repeat promise. Check each first, since the brief may be a
+day old:
+
+```sql
+select exists (
+  select 1 from you.advisor_reach_outs
+  where user_id = :owner and advisor_id = '<advisor id>'
+    and ref_table = '<schema.table>' and ref_id = '<ref id>'
+    and sent_at > now() - make_interval(days => <repeat_after_days, or 36500 for never>)
+) as named;
+```
+
+Drop a row that comes back `true`. Then, after the text is saved:
+
+```sql
+insert into you.advisor_reach_outs (user_id, advisor_id, message_id, watch_key, ref_table, ref_id)
+values (:owner, '<advisor id>', '<message id>', '<watch key>', '<schema.table>', '<ref id>')
+returning id;
+```
+
+Leave `text_rule` unset on these texts: they are the Council's, and the
+caps above hold them like any other.
 
 When a text asks about a commitment, set its `followed_up_at`:
 

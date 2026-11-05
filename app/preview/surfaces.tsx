@@ -543,6 +543,7 @@ import {
   GoalMetricPropsEmptySurface,
   GoalMetricPropsErrorSurface,
   GoalMetricPropsFormStepsSurface,
+  GoalMetricPropsFormApplicationsSurface,
   GoalMetricPropsFormSurface,
   GoalMetricPropsMenuSurface,
   GoalMetricPropsPendingSurface,
@@ -9219,6 +9220,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface />,
   },
   {
+    /* The same form once the person has uploaded a picture for the bot (plan #2955): the picture in the header, the Picture row with Change picture and Remove, and the bot's row in the list wearing it. */
+    id: 'chat-person-edit-photo',
+    label: 'Chat · Editing a bot, with their picture',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo" />,
+  },
+  {
+    /* A chosen picture on its way (plan #2955): the initials dimmed and the button saying Uploading, so the press shows it was taken. */
+    id: 'chat-person-edit-photo-uploading',
+    label: 'Chat · Editing a bot, a picture uploading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo-uploading" />,
+  },
+  {
+    /* A picture that could not be kept: the initials stay, and the Picture row says why under its buttons. */
+    id: 'chat-person-edit-photo-failed',
+    label: 'Chat · Editing a bot, a picture that was not kept',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo-failed" />,
+  },
+  {
     /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
     id: 'chat-person-edit-versions',
     label: 'Chat · Editing a bot, their card and earlier cards',
@@ -9273,6 +9298,46 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="seat" />,
+  },
+  {
+    /* Reaching out on a bot's form (plan #2931.3), scrolled to it: the Set up card saying back what Franklin will text about and how often, what Dash cannot watch, when the next text is due and the caps that can hold one back, with Change and Turn off. */
+    id: 'chat-person-edit-reach-out',
+    label: 'Chat · Editing a bot, what they text you about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out" />,
+  },
+  {
+    /* Reaching out with nothing written: an empty box, and a line saying they text when the daily round picks them. */
+    id: 'chat-person-edit-reach-out-empty',
+    label: 'Chat · Editing a bot, nothing on what they text about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-empty" />,
+  },
+  {
+    /* Reaching out while Dash makes the rule: the words held in the box and Dash is setting it up under it. */
+    id: 'chat-person-edit-reach-out-setting',
+    label: 'Chat · Editing a bot, Dash setting up what they text about',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-setting" />,
+  },
+  {
+    /* Reaching out when no rule could be made: the words kept in the box, what Dash could not watch, and Try again. */
+    id: 'chat-person-edit-reach-out-failed',
+    label: 'Chat · Editing a bot, what they text about could not be set up',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-failed" />,
+  },
+  {
+    /* A thread whose person has a reach-out rule (plan #2931.3): under the name, when the next text is due, if there is something new. */
+    id: 'chat-people-thread-next-text',
+    label: 'Chat · A thread, when their next text is due',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="next-text" />,
   },
   {
     /* The list hidden to its strip (New chat and the button to show it),
@@ -10101,6 +10166,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'narrow',
     render: () => <GoalMetricPropsFormStepsSurface />,
+  },
+  {
+    /* The applications metric's form: Job applications sent chosen, no list or date asked (plan #2908.2). */
+    id: 'goals-metrics-props-form-applications',
+    label: 'Goal · Metrics, the applications kind',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormApplicationsSurface />,
   },
   {
     /* A metric's row pointed at, its Change and Remove menu showing. */

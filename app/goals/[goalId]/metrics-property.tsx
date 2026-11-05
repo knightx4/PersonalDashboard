@@ -179,12 +179,13 @@ function MetricRow({
  * the goal's closed steps and Dash's files. It posts `source` and
  * `collectionId` through hidden inputs, which parseMetricForm reads.
  */
-type Counted = 'steps' | 'files' | 'hours' | `list:${string}`;
+type Counted = 'steps' | 'files' | 'hours' | 'applications' | `list:${string}`;
 
 const SOURCE_LABELS: Record<Exclude<MetricSource, 'list'>, string> = {
   steps: 'Steps closed',
   files: 'Dash files',
   hours: 'Hours logged',
+  applications: 'Job applications sent',
 };
 
 const PLACEHOLDERS: Record<MetricSource, string> = {
@@ -192,6 +193,7 @@ const PLACEHOLDERS: Record<MetricSource, string> = {
   steps: 'Steps done each week',
   files: 'Drafts from Dash',
   hours: 'Hours applying',
+  applications: 'Applications sent',
 };
 
 function countedOf(metric: Metric | undefined, lists: MetricList[]): Counted {
@@ -293,6 +295,7 @@ function MetricForm({
           <option value="steps">{SOURCE_LABELS.steps}</option>
           <option value="files">{SOURCE_LABELS.files}</option>
           <option value="hours">{SOURCE_LABELS.hours}</option>
+          <option value="applications">{SOURCE_LABELS.applications}</option>
         </Select>
       </Field>
       {source === 'list' && (
@@ -326,7 +329,7 @@ function MetricForm({
         <FieldError>{errorOn('period')}</FieldError>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field id={`${id}-target`} label={`Aim per ${period}, if any`} error={errorOn('target')}>
+        <Field id={`${id}-target`} label={`Aim per ${period}`} error={errorOn('target')}>
           <Input
             id={`${id}-target`}
             name="target"

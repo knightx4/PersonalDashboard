@@ -27,7 +27,11 @@ import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from './rules';
  * The trial scored novelty from the map's one-sentence statement alone and
  * found it bunched at the bottom, since a summary flattens an idea into a
  * textbook point. So Jev also reads up to three passages the idea was taken
- * from, and the novelty question tells it to judge from those.
+ * from, and the novelty question tells it to judge from those. The first
+ * check (#2947.4) found one quoted sentence did not spread novelty either, so
+ * from v3 each passage also carries the paragraph around the quote in the
+ * note as it stands now, up to PARAGRAPH_CHARS (#2947.8, the person's answer
+ * A on #2947.6). All three questions read it.
  *
  * Nothing here writes to the database. The job that scores the map
  * (#2947.3) reads the position and its sources, calls scoreIdea and stores
@@ -44,7 +48,7 @@ import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from './rules';
  * asks and the novelty anchors (0-1 a textbook point, 4-5 a fresh
  * combination of known parts, 8-9 no clear precedent).
  */
-export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v2';
+export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v3';
 
 export const IDEA_TYPES = [
   'own_idea',
@@ -61,8 +65,15 @@ export const SCORED_IDEA_TYPES: ReadonlySet<IdeaType> = new Set<IdeaType>(['own_
 /** At most this many passages go to Jev with the idea. */
 export const IDEA_SCORE_MAX_PASSAGES = 3;
 
-/** A passage longer than this is cut, so one long quote cannot crowd the state. */
+/** A quote longer than this is cut, so one long quote cannot crowd the state. */
 const PASSAGE_CHARS = 1_500;
+
+/**
+ * The paragraph around a quote is at most this long. A paragraph shorter than
+ * this takes in its neighbours in the same section until the next would pass
+ * it; a longer one is cut to a window around the quote.
+ */
+export const PARAGRAPH_CHARS = 1_500;
 
 const IDEA_TYPE_OPTIONS: Readonly<Record<IdeaType, string>> = {
   own_idea:
@@ -131,10 +142,15 @@ export const IDEA_SCORE_QUESTIONS = {
   novelty: NOVELTY_QUESTION,
 } as const;
 
-/** One sentence an idea was taken from, with the note it is in. */
+/**
+ * One sentence an idea was taken from, with the note it is in. `body` is the
+ * note's text as it stands, from which the paragraph around the quote is
+ * taken; without it, or when the quote is no longer in it, only the quote is
+ * sent.
+ */
 export type IdeaSource = {
   quote: string;
-  note: { title: string; path: string; voice: NoteVoice | null };
+  note: { title: string; path: string; voice: NoteVoice | null; body?: string | null };
 };
 
 export type IdeaToScore = {
@@ -149,8 +165,14 @@ export type IdeaToScore = {
 export type IdeaScoreState = {
   idea: string;
   basis: string;
-  passages: { note: string; text: string }[];
+  /**
+   * `quote` is the sentence the idea came from; `paragraph`, when the note
+   * gives more than the quote, is the text around it (paragraphAround).
+   */
+  passages: IdeaScorePassage[];
 };
+
+export type IdeaScorePassage = { note: string; quote: string; paragraph?: string };
 
 /**
  * Whether a source's passage may go to Jev. Never one from a secret note, one
@@ -159,9 +181,13 @@ export type IdeaScoreState = {
  * the person left out of the map. A passage that looks like it holds a key is
  * held back too, whatever its note.
  */
-export function passageMaySend(source: IdeaSource, rules: VaultRules = DEFAULT_VAULT_RULES): boolean {
+export function passageMaySend(
+  source: IdeaSource,
+  rules: VaultRules = DEFAULT_VAULT_RULES,
+  paragraph: string = source.quote,
+): boolean {
   if (source.note.voice === 'secret' || source.note.voice === 'audience') return false;
-  return whyNotRead({ path: source.note.path, body: source.quote }, rules) === null;
+  return whyNotRead({ path: source.note.path, body: `${source.quote}\n\n${paragraph}` }, rules) === null;
 }
 
 /**
@@ -176,15 +202,24 @@ export function ideaScoreState(
 ): { state: IdeaScoreState; inputHash: string } {
   const seen = new Set<string>();
   const passages = idea.sources
-    .filter((source) => passageMaySend(source, rules))
-    .map((source) => ({ note: source.note.title.trim(), text: cut(source.quote.trim()) }))
+    .map((source) => {
+      const quote = source.quote.trim();
+      const paragraph = source.note.body ? paragraphAround(source.note.body, quote) : null;
+      return { source, quote, paragraph };
+    })
+    .filter(({ source, paragraph }) => passageMaySend(source, rules, paragraph ?? source.quote))
+    .map(({ source, quote, paragraph }): IdeaScorePassage => {
+      const passage: IdeaScorePassage = { note: source.note.title.trim(), quote: cut(quote) };
+      if (paragraph && paragraph !== quote) passage.paragraph = paragraph;
+      return passage;
+    })
     .filter((passage) => {
-      const key = `${passage.note}\u0000${passage.text}`;
-      if (passage.text === '' || seen.has(key)) return false;
+      const key = `${passage.note}\u0000${passage.quote}`;
+      if (passage.quote === '' || seen.has(key)) return false;
       seen.add(key);
       return true;
     })
-    .sort((a, b) => compare(a.note, b.note) || compare(a.text, b.text))
+    .sort((a, b) => compare(a.note, b.note) || compare(a.quote, b.quote))
     .slice(0, IDEA_SCORE_MAX_PASSAGES);
   const state: IdeaScoreState = { idea: idea.statement.trim(), basis: idea.basis.trim(), passages };
   return { state, inputHash: ideaInputHash(state) };
@@ -352,6 +387,71 @@ export function withheldIdeaScore(inputHash: string): IdeaScoreResult {
       inputHash,
     },
   };
+}
+
+const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+const HEADING_LINE = /^ {0,3}#{1,6}[ \t]/;
+
+/**
+ * The paragraph of `body` that holds `quote`, widened to its neighbours while
+ * the whole stays within `max` characters, or null when the quote is not in
+ * the body (the note changed since the quote was taken). Paragraphs are split
+ * at blank lines, outside the frontmatter. Widening alternates after and
+ * before, never runs past a heading below the quote, and stops at the first
+ * heading above it, which it keeps, so the text stays in the quote's own
+ * section. A paragraph longer than `max` is cut to a window around the quote,
+ * marked with an ellipsis at each cut end. Pure.
+ */
+export function paragraphAround(body: string, quote: string, max: number = PARAGRAPH_CHARS): string | null {
+  const front = FRONTMATTER.exec(body);
+  const text = front ? body.slice(front[0].length) : body;
+  const at = quote === '' ? -1 : text.indexOf(quote);
+  if (at < 0) return null;
+
+  const paragraphs: { start: number; end: number }[] = [];
+  const gap = /\r?\n[ \t]*\r?\n\s*/g;
+  let start = 0;
+  for (let match = gap.exec(text); match; match = gap.exec(text)) {
+    paragraphs.push({ start, end: match.index });
+    start = match.index + match[0].length;
+  }
+  paragraphs.push({ start, end: text.length });
+  const blocks = paragraphs.filter((p) => text.slice(p.start, p.end).trim() !== '');
+
+  let first = blocks.findIndex((p) => at < p.end);
+  if (first < 0) first = blocks.length - 1;
+  let last = first;
+  // A quote that runs across a blank line spans more than one paragraph.
+  while (last + 1 < blocks.length && blocks[last].end < at + quote.length) last++;
+
+  const span = () => blocks[last].end - blocks[first].start;
+  if (span() > max) {
+    if (quote.length >= max) return quote;
+    const low = blocks[first].start;
+    const high = blocks[last].end;
+    const from = Math.min(Math.max(low, at - Math.floor((max - quote.length) / 2)), high - max);
+    const to = from + max;
+    return `${from > low ? '…' : ''}${text.slice(from, to).trim()}${to < high ? '…' : ''}`;
+  }
+
+  const isHeading = (index: number) => HEADING_LINE.test(text.slice(blocks[index].start, blocks[index].end));
+  let canBefore = !isHeading(first);
+  let canAfter = true;
+  while (canBefore || canAfter) {
+    if (canAfter) {
+      const next = last + 1;
+      if (next < blocks.length && !isHeading(next) && blocks[next].end - blocks[first].start <= max) last = next;
+      else canAfter = false;
+    }
+    if (canBefore) {
+      const previous = first - 1;
+      if (previous >= 0 && blocks[last].end - blocks[previous].start <= max) {
+        first = previous;
+        if (isHeading(previous)) canBefore = false;
+      } else canBefore = false;
+    }
+  }
+  return text.slice(blocks[first].start, blocks[last].end).trim();
 }
 
 function cut(text: string): string {

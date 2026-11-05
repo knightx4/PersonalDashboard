@@ -294,6 +294,10 @@ export const SPEND_OPERATIONS = {
     // A persona card drafted from the People form, or redrafted from a
     // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
     'draft-persona',
+    // The rule made from what you wrote a person on People should text you
+    // about, on a save of their form or when you say so in Ask or their
+    // thread (plan #2931.2). One Sonnet call with structured output.
+    'make-reach-out-rule',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.
