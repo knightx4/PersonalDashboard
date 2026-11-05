@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { WRITE_LESSON_MODEL } from './write-lesson';
 import { markAgainstPoints, type MarkedPoints } from './mark-points';
 import type { HandIn } from './point-marks';
@@ -84,34 +85,31 @@ export async function writeProject(input: {
       model: WRITE_PROJECT_MODEL,
       max_tokens: 4000 + THINKING_ROOM,
       system: WRITE_SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the final project, what it is marked on and a worked answer.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              task: { type: 'string' },
-              columns: { type: 'array', items: { type: 'string' } },
-              rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
-              figures: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { label: { type: 'string' }, unit: { type: 'string' } },
-                  required: ['label'],
-                },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the final project, what it is marked on and a worked answer.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            task: { type: 'string' },
+            columns: { type: 'array', items: { type: 'string' } },
+            rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+            figures: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { label: { type: 'string' }, unit: { type: 'string' } },
+                required: ['label'],
               },
-              points: { type: 'array', items: { type: 'string' } },
-              worked: { type: 'string' },
-              spreadsheet_note: { type: 'string' },
             },
-            required: ['title', 'task', 'points', 'worked'],
+            points: { type: 'array', items: { type: 'string' } },
+            worked: { type: 'string' },
+            spreadsheet_note: { type: 'string' },
           },
+          required: ['title', 'task', 'points', 'worked'],
         },
-      ],
-      tool_choice: forceTool(TOOL, WRITE_PROJECT_MODEL),
+      }, WRITE_PROJECT_MODEL),
       messages: [{ role: 'user', content: projectPrompt(input.plan, TOOL) }],
     });
   } catch (error) {
@@ -120,10 +118,10 @@ export async function writeProject(input: {
 
   input.onSpend?.({ model: WRITE_PROJECT_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL, WRITE_PROJECT_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
 
-  const safe = projectPayloadSchema.safeParse(block.input);
+  const safe = projectPayloadSchema.safeParse(report.value);
   if (!safe.success) return { outcome: 'failed', detail: 'The project came back malformed.' };
 
   const checked = toWrittenProject(safe.data);

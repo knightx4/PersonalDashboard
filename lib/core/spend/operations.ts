@@ -161,6 +161,10 @@ export const SPEND_OPERATIONS = {
     // chosen model and read tools only. About ten answers a night, each a few
     // calls that read Dash's rules from the cache; background.
     'check-dash-quality',
+    // The daily model reply check (plan #2937.7, migration 0297): four or
+    // five small probes per model the app calls, at effort low, held to
+    // lib/core/model-rules.ts. Capped at five cents a run; background.
+    'check-model-replies',
     // Embedding passages of what the person wrote or did across the modules,
     // so Dash can find them by meaning (plan #1247). Voyage; background, from
     // the five-minute memory sweep, which is also the backfill. A row is

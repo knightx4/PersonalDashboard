@@ -1,9 +1,10 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { CURRICULUM_MODEL } from '@/lib/learn/graph/curriculum';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { PIECES_MAX, piecesPrompt, readPieces, type PieceIdea, type PiecesResult } from './pieces-payload';
 
 /**
@@ -81,8 +82,7 @@ export async function writePieces(input: {
         model: PIECES_MODEL,
         max_tokens: 1500 + THINKING_ROOM,
         system: SYSTEM,
-        tools: [TOOL],
-        tool_choice: forceTool(TOOL_NAME, PIECES_MODEL),
+        ...reportRequest(TOOL, PIECES_MODEL),
         messages,
       });
     } catch (error) {
@@ -92,23 +92,23 @@ export async function writePieces(input: {
     // Before the reply is read: a malformed report still cost what it cost.
     input.onSpend?.({ model: PIECES_MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-    const result = readPieces(block.input, input.ideas.length);
+    const report = readReport(response, TOOL_NAME, PIECES_MODEL);
+    if (!report.ok) return { ok: false, detail: report.reason };
+    const result = readPieces(report.value, input.ideas.length);
     if (result.ok || attempt >= 2 || !SCHEMA_FAULT.test(result.detail)) return result;
 
+    // Sent back as a tool error where the report came through the tool, and
+    // as a plain turn where it came as structured output.
+    const again = `${result.detail} Report again with pieces as a list of objects, each with a title and ideas as a list of idea numbers.`;
+    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
     messages.push(
       { role: 'assistant', content: response.content },
       {
         role: 'user',
-        content: [
-          {
-            type: 'tool_result',
-            tool_use_id: block.id,
-            is_error: true,
-            content: `${result.detail} Call ${TOOL_NAME} again with pieces as a list of objects, each with a title and ideas as a list of idea numbers.`,
-          },
-        ],
+        content:
+          block && block.type === 'tool_use'
+            ? [{ type: 'tool_result', tool_use_id: block.id, is_error: true, content: again }]
+            : again,
       },
     );
   }

@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 
 /**
  * Naming the places on Idea Space (plan #1997.2).
@@ -131,27 +131,24 @@ export async function namePlaces(input: {
       model: PLACE_NAME_MODEL,
       max_tokens: 2048,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report a short name for each place, by its number.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              names: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { place: { type: 'integer' }, name: { type: 'string' } },
-                  required: ['place', 'name'],
-                },
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report a short name for each place, by its number.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            names: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { place: { type: 'integer' }, name: { type: 'string' } },
+                required: ['place', 'name'],
               },
             },
-            required: ['names'],
           },
+          required: ['names'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, PLACE_NAME_MODEL),
+      }, PLACE_NAME_MODEL),
       messages: [{ role: 'user', content: describePlaces(places, input.inUse) }],
     });
   } catch (error) {
@@ -162,7 +159,7 @@ export async function namePlaces(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: PLACE_NAME_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readNames(block.input, places, input.inUse);
+  const report = readReport(response, TOOL_NAME, PLACE_NAME_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return readNames(report.value, places, input.inUse);
 }

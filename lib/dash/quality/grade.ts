@@ -20,6 +20,8 @@ export type CaseExpect = {
   mentions_none?: string[];
   /** At least one cited row's title must contain one of these. */
   cites_any?: string[];
+  /** The answer must run to at least this many characters: a long answer that fails is caught. */
+  min_chars?: number;
   /** The most lookups the answer may take. */
   max_lookups?: number;
   /** The most seconds the answer may take. */
@@ -69,6 +71,7 @@ export function parseExpect(raw: unknown): CaseExpect {
     mentions_any: parsedList(r.mentions_any),
     mentions_none: parsedList(r.mentions_none),
     cites_any: parsedList(r.cites_any),
+    min_chars: parsedNumber(r.min_chars),
     max_lookups: parsedNumber(r.max_lookups),
     max_seconds: parsedNumber(r.max_seconds),
     allow_failed_lookups: r.allow_failed_lookups === true,
@@ -139,6 +142,9 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   }
   if (expect.cites_any && !expect.cites_any.some((t) => cited.some((title) => title.includes(t.toLowerCase())))) {
     failures.push(`No cited row matches ${expect.cites_any.map((t) => `"${t}"`).join(', ')}.`);
+  }
+  if (expect.min_chars !== undefined && body.length < expect.min_chars) {
+    failures.push(`The answer is ${body.length} characters, fewer than the ${expect.min_chars} it should run to.`);
   }
   const lookups = outcome.toolCalls.length;
   if (expect.max_lookups !== undefined && lookups > expect.max_lookups) {

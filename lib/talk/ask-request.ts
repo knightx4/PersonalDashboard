@@ -44,6 +44,7 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { codeDeps } from '@/lib/dash/think-code';
 import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
@@ -147,7 +148,13 @@ export async function askDashInRequest(input: {
   // A question kept to one workspace (plan #1899.5) looks only there: its
   // lookups run as though that were the only workspace switched on, and
   // one outside it is refused. Writes and the page keep the full context.
-  const scope = input.scope && settings.enabledModules.includes(input.scope) ? input.scope : null;
+  // Try again asks with the switches the failed answer was asked with
+  // (plan #2937.2): a reload leaves Think it through off and no workspace
+  // picked, and the question deserves the same answer it was asked for.
+  const before = input.retry && input.conversationRef ? await lastFailureSwitches(core, user.id, input.conversationRef) : null;
+  const think = Boolean(input.think || before?.think);
+  const asScope = input.scope ?? (before?.scope as ModuleId | null | undefined) ?? null;
+  const scope = asScope && settings.enabledModules.includes(asScope) ? asScope : null;
   const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
 
   // Where the reply stands is kept on the chat (plan #2854.4), so a thread
@@ -219,7 +226,7 @@ export async function askDashInRequest(input: {
       scope,
       model: await choosing,
       // The code is read as the owner, as Dev is (plan #2789.10).
-      think: input.think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
+      think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -229,6 +236,7 @@ export async function askDashInRequest(input: {
       readFiles: (turnId) => readTurnFiles(core, turnId),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
+      recordFailure: (failure) => keepFailure(core, user.id, failure),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
@@ -323,6 +331,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
     queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
     saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
+    recordFailure: (failure) => keepFailure(core, userId, failure),
   };
 }
 
