@@ -88,6 +88,8 @@ export function budgetTokens(
 export const TIME_BUDGET_MS = 40_000;
 /** Output tokens for one call. A list of every company in three months runs past 2000. */
 export const ANSWER_MAX_TOKENS = 4000;
+/** Above this many output tokens a call must stream, or the SDK throws before sending it. */
+const STREAM_ABOVE_TOKENS = 16_000;
 /** The most rows an answer built from the lookups lists by name. */
 export const FALLBACK_ROWS = 25;
 
@@ -747,8 +749,10 @@ async function callModel(
 ): Promise<Anthropic.Message> {
   const headers = beta.length > 0 ? { headers: { 'anthropic-beta': beta.join(',') } } : {};
   const options = signal || beta.length > 0 ? { ...(signal ? { signal } : {}), ...headers } : undefined;
-  if (!onText) return client.messages.create(params, options);
-  const tools = params.tools?.map((tool) =>
+  // The SDK refuses a plain call whose max_tokens could run past ten minutes, so a long
+  // think streams even when nobody is shown the text (eval case 62345130).
+  if (!onText && params.max_tokens <= STREAM_ABOVE_TOKENS) return client.messages.create(params, options);
+  const tools = !onText ? params.tools : params.tools?.map((tool) =>
     'name' in tool && tool.name === finishName && !('type' in tool && tool.type)
       ? ({ ...tool, eager_input_streaming: true } as Anthropic.Tool)
       : tool,

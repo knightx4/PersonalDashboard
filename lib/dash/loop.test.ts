@@ -521,3 +521,28 @@ describe('an answer written out of sight (plan #2937.1, 4 November 2026)', () =>
     ).toBe('First.\n\nSecond.');
   });
 });
+
+describe('a long answer with no one watching', () => {
+  it('streams a call whose max_tokens is large, because the SDK refuses a plain one', async () => {
+    const create = vi.fn(async () => {
+      throw new Error('Streaming is strongly recommended for operations that may take longer than 10 minutes.');
+    });
+    const stream = vi.fn(() => ({
+      on: () => undefined,
+      finalMessage: async () => call('a1', 'answer', { answer: 'Done.', cited: [] }),
+    }));
+    const stub = { messages: { create, stream } } as unknown as Anthropic;
+    const answer = await runDash({
+      voice: { ...voice, maxTokens: 32_000 },
+      context,
+      turns,
+      today: '2026-11-05',
+      execute: vi.fn(),
+      anthropicApiKey: 'k',
+      client: stub,
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(stream).toHaveBeenCalled();
+    expect(answer).toMatchObject({ ok: true, body: 'Done.' });
+  });
+});
