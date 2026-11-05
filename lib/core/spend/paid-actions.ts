@@ -193,6 +193,8 @@ export const PAID_ACTIONS = {
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
   // Draft or redraft a person's persona card on Chat's People form (plan #2748.11)
   'app/chat/actions.ts#draftPersonCard': ['draft-persona'],
+  // Set it up: what a person texts you about, made into a rule (plan #2931.3)
+  'app/chat/actions.ts#setReachOut': ['make-reach-out-rule'],
   // The one explain prompt on a graded course (plan #2172.4.2)
   'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   // Summarise on a file kept under a course (plan #2401.4)

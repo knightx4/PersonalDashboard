@@ -5,6 +5,7 @@ import { NewMessage } from '@/app/chat/new-message';
 import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
+import { nextTextLine } from '@/lib/you/reach-out-card-model';
 import type { DashChange } from '@/lib/talk/changes';
 import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
@@ -338,7 +339,10 @@ export function ChatPeopleSurface({
   );
 }
 
-type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'reply-failed' | 'new' | 'not-ready' | 'loading';
+type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'reply-failed' | 'new' | 'not-ready' | 'loading' | 'next-text';
+
+/** Franklin's rule texts next on Monday (plan #2931.3), as the thread's header says it. */
+const NEXT_TEXT = nextTextLine({ at: '2026-11-09T09:00:00Z' }, { timeZone: ZONE, now: NOW });
 
 /** Their reply that could not be written (plan #2854.4), as the thread says it. */
 const REPLY_FAILED_WHY = 'Benjamin Franklin could not reply: the answer was cut off. Nothing was lost.';
@@ -470,6 +474,7 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           now={NOW}
           live={false}
           loadingOlder={state === 'older'}
+          nextText={state === 'next-text' ? NEXT_TEXT : null}
           pending={
             state === 'failed'
               ? [
