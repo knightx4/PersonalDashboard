@@ -11,6 +11,7 @@ import {
   dashFileDays,
   loggedHourDays,
   metricInputError,
+  sentApplicationDays,
   sumDaysByPeriod,
   type CountedFile,
   type CountedStep,
@@ -20,6 +21,7 @@ import {
   type MetricPeriod,
   type MetricSource,
   type PeriodCount,
+  type SentApplication,
 } from '@/lib/goals/metrics';
 
 /**
@@ -35,6 +37,7 @@ import {
 
 type MetricRow = {
   id: string;
+  user_id: string;
   goal_id: string;
   name: string;
   source: MetricSource;
@@ -47,7 +50,7 @@ type MetricRow = {
 };
 
 const METRIC_COLUMNS =
-  'id, goal_id, name, source, collection_id, date_field, period, target, target_high, position';
+  'id, user_id, goal_id, name, source, collection_id, date_field, period, target, target_high, position';
 
 const toMetric = (row: MetricRow): Metric => ({
   id: row.id,
@@ -89,6 +92,10 @@ function refusal(error: { code?: string; message: string; details?: string | nul
 
 /** The live metrics on one goal, in order. */
 export async function loadMetrics(client: GoalsSupabaseClient, goalId: string): Promise<Metric[]> {
+  return (await loadMetricRows(client, goalId)).map(toMetric);
+}
+
+async function loadMetricRows(client: GoalsSupabaseClient, goalId: string): Promise<MetricRow[]> {
   const { data, error } = await client
     .from('metrics')
     .select(METRIC_COLUMNS)
@@ -97,7 +104,7 @@ export async function loadMetrics(client: GoalsSupabaseClient, goalId: string): 
     .order('position')
     .order('created_at');
   if (error) throw new Error(`Could not read the metrics: ${error.message}`);
-  return ((data ?? []) as MetricRow[]).map(toMetric);
+  return (data ?? []) as MetricRow[];
 }
 
 /** Add a metric to a goal, after the ones it has. */
@@ -161,7 +168,11 @@ export async function archiveMetric(client: GoalsSupabaseClient, metricId: strin
   return (data ?? []).length > 0;
 }
 
-export type MetricCounts = Metric & { counts: PeriodCount[] };
+export type MetricCounts = Metric & {
+  counts: PeriodCount[];
+  /** True when what it counts could not be read (applications, plan #2908.2); the counts are then empty. */
+  unread?: boolean;
+};
 
 type StepRow = {
   id: string;
@@ -236,6 +247,33 @@ export async function loadLoggedEntries(
   }));
 }
 
+type ApplicationRow = { submitted_at: string | null; status: string; outcome: string | null };
+
+/**
+ * Every application the owner has sent, as an applications metric reads it
+ * (plan #2908.1): the ones with a submitted_at, of every role. The read names
+ * the owner as well as relying on row level security, so a service-role
+ * client sees the same rows. sentApplicationDays leaves out the withdrawn.
+ */
+export async function loadSentApplications(
+  client: GoalsSupabaseClient,
+  userId: string,
+): Promise<SentApplication[]> {
+  const { data, error } = await client
+    .schema('job_search')
+    .from('applications')
+    .select('submitted_at, status, outcome')
+    .eq('user_id', userId)
+    .not('submitted_at', 'is', null)
+    .limit(10000);
+  if (error) throw new Error(`Could not read the applications: ${error.message}`);
+  return ((data ?? []) as ApplicationRow[]).map((row) => ({
+    submittedAt: row.submitted_at,
+    status: row.status,
+    outcome: row.outcome,
+  }));
+}
+
 type FileLinkRow = { target_id: string };
 
 /**
@@ -265,7 +303,9 @@ async function loadGoalFiles(
 /**
  * Each live metric on a goal with its counts: a list metric from the live
  * records of its list, a steps metric from the steps closed as done under the
- * goal, and a files metric from the files Dash wrote under it (plan #2397.2).
+ * goal, a files metric from the files Dash wrote under it (plan #2397.2),
+ * and an applications metric from every application the owner sent (plan
+ * #2908.1).
  * `goal.createdAt` is where the periods start unless something counted is
  * earlier; the zone is the account's (loadAccountSettings). The steps and
  * files are read only when a metric counts them.
@@ -276,7 +316,8 @@ export async function loadMetricCounts(
   timeZone: string,
   { core, now = new Date() }: { core: CoreSupabaseClient; now?: Date },
 ): Promise<MetricCounts[]> {
-  const metrics = await loadMetrics(client, goal.id);
+  const rows = await loadMetricRows(client, goal.id);
+  const metrics = rows.map(toMetric);
   const lists = new Map<string, Awaited<ReturnType<typeof loadRecords>>>();
   for (const metric of metrics) {
     if (metric.source !== 'list' || !metric.collectionId || lists.has(metric.collectionId)) continue;
@@ -284,15 +325,26 @@ export async function loadMetricCounts(
   }
   // A files metric reads the steps too, for the files linked to them, and an
   // hours metric for the time logged on them.
-  const wantsTree = metrics.some((m) => m.source !== 'list');
+  const wantsTree = metrics.some((m) => m.source !== 'list' && m.source !== 'applications');
   const steps = wantsTree ? await loadGoalSteps(client, goal.id) : [];
   const treeIds = [goal.id, ...steps.map((step) => step.id)];
   const files = metrics.some((m) => m.source === 'files') ? await loadGoalFiles(client, core, treeIds) : [];
   const entries = metrics.some((m) => m.source === 'hours') ? await loadLoggedEntries(client, treeIds) : [];
+  const owner = rows.find((row) => row.source === 'applications')?.user_id;
+  // A failed read of the applications marks that metric unread rather than
+  // failing the goal's other metrics.
+  let applicationsUnread = false;
+  const applications = owner
+    ? await loadSentApplications(client, owner).catch((): Awaited<ReturnType<typeof loadSentApplications>> => {
+        applicationsUnread = true;
+        return [];
+      })
+    : [];
 
   const daysOf = (metric: Metric): string[] | null => {
     if (metric.source === 'steps') return closedStepDays(steps, timeZone);
     if (metric.source === 'files') return dashFileDays(files, timeZone);
+    if (metric.source === 'applications') return sentApplicationDays(applications, timeZone);
     return null;
   };
   return metrics.map((metric) => {
@@ -301,6 +353,7 @@ export async function loadMetricCounts(
     if (metric.source === 'hours') {
       return { ...metric, counts: sumDaysByPeriod({ amounts: loggedHourDays(entries), ...common }) };
     }
+    if (metric.source === 'applications' && applicationsUnread) return { ...metric, counts: [], unread: true };
     if (days) return { ...metric, counts: countDaysByPeriod({ days, ...common }) };
     if (!metric.collectionId || !metric.dateField) return { ...metric, counts: [] };
     return {

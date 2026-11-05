@@ -541,6 +541,7 @@ import {
   GoalMetricPropsEmptySurface,
   GoalMetricPropsErrorSurface,
   GoalMetricPropsFormStepsSurface,
+  GoalMetricPropsFormApplicationsSurface,
   GoalMetricPropsFormSurface,
   GoalMetricPropsMenuSurface,
   GoalMetricPropsPendingSurface,
@@ -10147,6 +10148,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'narrow',
     render: () => <GoalMetricPropsFormStepsSurface />,
+  },
+  {
+    /* The applications metric's form: Job applications sent chosen, no list or date asked (plan #2908.2). */
+    id: 'goals-metrics-props-form-applications',
+    label: 'Goal · Metrics, the applications kind',
+    module: 'goals',
+    width: 'narrow',
+    render: () => <GoalMetricPropsFormApplicationsSurface />,
   },
   {
     /* A metric's row pointed at, its Change and Remove menu showing. */
