@@ -17,6 +17,8 @@ import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
 import { DELETE_NOUNS } from '@/lib/ask/deletable';
 import { DeleteDialog } from './delete-dialog';
 import { PaidCard, type PaidChange } from './paid-card';
+import { LiveStatus } from './live-card';
+import { buildLine, buildRunId, type BuildRun } from '@/lib/you/live-cards';
 
 /**
  * The changes Dash made or proposed in one answer, drawn under it (plan
@@ -52,6 +54,7 @@ export function DashChanges({
   today,
   by = 'Dash',
   inThread = false,
+  builds,
 }: {
   changes: readonly DashChange[];
   presses: ChangePresses;
@@ -66,6 +69,12 @@ export function DashChanges({
    * on their bubble's fill a link falls short of 4.5:1 in light.
    */
   inThread?: boolean;
+  /**
+   * Where each confirmed build stands, by run id (plan #2854.3): a People
+   * thread hands these in, so a build's row follows its run. Left out, a
+   * started build reads Done as before.
+   */
+  builds?: Readonly<Record<string, BuildRun>>;
 }) {
   // Kept by identity, so the card's own state is reset only by a newer list.
   const paid = useMemo(
@@ -92,6 +101,7 @@ export function DashChanges({
                 presses={presses}
                 onChanged={onChanged}
                 today={today}
+                builds={builds}
               />
             </li>
           ))}
@@ -115,6 +125,7 @@ export function DashChangeRow({
   onChanged,
   today,
   from,
+  builds,
 }: {
   change: DashChange;
   presses: ChangePresses;
@@ -122,6 +133,8 @@ export function DashChangeRow({
   today?: string;
   /** Where the change came from, as a line under its sentence: the Ask page's list names the question. */
   from?: React.ReactNode;
+  /** Where confirmed builds stand, by run id; see DashChanges. */
+  builds?: Readonly<Record<string, BuildRun>>;
 }) {
   const [change, setChange] = useState(given);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +188,8 @@ export function DashChangeRow({
   const written = change.status === 'done' || change.status === 'undone';
   const words = changeWords(change, written, today);
   const settled = change.status === 'declined' || change.status === 'undone';
+  // The run a confirmed build started, when the thread is following builds.
+  const following = builds ? buildRunId(change) : null;
 
   return (
     <div className="space-y-1.5">
@@ -255,7 +270,12 @@ export function DashChangeRow({
         </div>
       )}
 
-      {change.status === 'done' && (
+      {/* A started build in a People thread follows its run instead of saying Done (plan #2854.3). */}
+      {following && change.kind === 'start_build' && (
+        <LiveStatus line={buildLine(change.input, builds?.[following] ?? null)} />
+      )}
+
+      {change.status === 'done' && !following && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <ChangeStatus change={change} />
           <Link

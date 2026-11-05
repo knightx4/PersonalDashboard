@@ -1,14 +1,16 @@
 import { notFound, redirect } from 'next/navigation';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { todayInTimezone } from '@/lib/money';
+import { loadBuildRuns } from '@/lib/talk/build-runs';
 import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
+import { buildRunId, type BuildRun } from '@/lib/you/live-cards';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, loadThreadPage, withChats, type ThreadPage } from '@/lib/you/chat-threads';
 import { loadGroupRows } from '@/lib/you/group-chats';
 import { editHref } from '@/lib/you/people-cards-model';
-import { olderMessages, readThread, retryReply, threadChanges } from '../../actions';
+import { olderMessages, readThread, retryReply, threadBuilds, threadChanges } from '../../actions';
 import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '../../dash/actions';
 import { PeopleView } from '../../people-view';
 import { ThreadView } from './thread-view';
@@ -61,6 +63,17 @@ export default async function ChatThreadPage({
           }),
       ])
     : [{ messages: [], hasOlder: false }, []];
+  // Where the builds confirmed here stand (plan #2854.3); the thread reads them again when it cannot.
+  const runIds = changes.flatMap((change) => buildRunId(change) ?? []);
+  const builds: Record<string, BuildRun> =
+    runIds.length > 0
+      ? await Promise.all([createClient(), createCoreClient()])
+          .then(([db, core]) => loadBuildRuns(db, core, runIds))
+          .catch((error: unknown) => {
+            console.error('thread builds not read', error);
+            return {};
+          })
+      : {};
   return (
     <PeopleView rows={rows} groups={groups} current={key} timezone={settings.timezone} now={now}>
       <ThreadView
@@ -71,8 +84,9 @@ export default async function ChatThreadPage({
         typingUntil={person.typingUntil}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderMessages, read: readThread, retryReply, changes: threadChanges }}
+        actions={{ older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds }}
         changes={changes}
+        builds={builds}
         presses={{ confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange }}
         today={todayInTimezone(settings.timezone)}
       />

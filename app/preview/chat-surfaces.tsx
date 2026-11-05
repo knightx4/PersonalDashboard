@@ -6,6 +6,7 @@ import { PeopleView } from '@/app/chat/people-view';
 import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
 import type { DashChange } from '@/lib/talk/changes';
+import type { BuildRun } from '@/lib/you/live-cards';
 import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
 import { GroupThreadView } from '@/app/chat/groups/[id]/group-thread-view';
@@ -419,6 +420,139 @@ export function ChatThreadChangesSurface() {
           now={NOW}
           live={false}
           changes={ACTED_CHANGES}
+          today="2026-11-03"
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
+/** You ask Franklin for two things and he is still on it: the todo is made, the reply is not in yet. */
+const WORKING: ThreadMessage[] = [
+  ...THREAD.slice(3, 7),
+  msg('w1', 'person', 'Add a todo to finish the Northwind cover letter by Friday, and a step under the job search goal to ask Dana for a reference', '2026-11-03T08:59:40Z'),
+];
+
+const WORKING_CHANGES: DashChange[] = [
+  threadChange({
+    id: 'w-todo',
+    kind: 'add_todo',
+    input: { title: 'Finish the Northwind cover letter', body: null, dueOn: '2026-11-06', dueTime: null, pinned: false },
+    status: 'done',
+    subjectRef: 'todo.tasks:w-todo-row',
+    writtenTable: 'todo.tasks',
+    writtenRef: 'w-todo-row',
+    doneAt: '2026-11-03T08:59:50Z',
+    advisorMessageId: 'w1',
+  }),
+  threadChange({
+    id: 'w-step',
+    kind: 'add_goal_step',
+    input: { parentId: 'g-jobs', goalTitle: 'Land a product role by spring', title: 'Ask Dana for a reference', kind: 'mine' },
+    status: 'done',
+    subjectRef: 'goals.items:w-step-row',
+    writtenTable: 'goals.items',
+    writtenRef: 'w-step-row',
+    doneAt: '2026-11-03T08:59:55Z',
+    advisorMessageId: 'w1',
+  }),
+];
+
+/**
+ * The live card while they work (plan #2854.3): you asked for two things,
+ * both are made, and the reply is still being written, so the card at the
+ * foot says the newest and that one came before it.
+ */
+export function ChatThreadWorkingSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false, typingUntil: '2026-11-03T09:00:20Z' } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <PeopleView rows={rows} current={FRANKLIN.key} timezone={ZONE} now={NOW} live={false}>
+        <ChangeThreadDemo
+          person={FRANKLIN}
+          chatId={FRANKLIN.chatId}
+          page={{ messages: WORKING, hasOlder: false }}
+          typingUntil="2026-11-03T09:00:20Z"
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+          changes={WORKING_CHANGES}
+          today="2026-11-03"
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
+/** Three builds you confirmed in the thread: one built, one waiting on your answer, one going. */
+const BUILT: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('b1', 'person', 'Start the build of the texting step', '2026-11-03T07:30:00Z'),
+  msg('b2', 'advisor', 'Confirm it below and it goes.', '2026-11-03T07:30:20Z'),
+  msg('b3', 'person', 'And the export step, then the live card one', '2026-11-03T08:20:00Z'),
+  msg('b4', 'advisor', 'Both are below. The live card one is the bigger of the two.', '2026-11-03T08:20:30Z'),
+];
+
+function startedBuild(id: string, runId: string, messageId: string, number: number, outline: string, title: string): DashChange {
+  return threadChange({
+    id,
+    kind: 'start_build',
+    input: { stepId: `step-${id}`, number, outline, title, quiet: false },
+    status: 'done',
+    subjectRef: `public.plan_runs:${runId}`,
+    writtenTable: 'public.plan_runs',
+    writtenRef: runId,
+    doneAt: '2026-11-03T08:21:00Z',
+    advisorMessageId: messageId,
+  });
+}
+
+const BUILD_CHANGES: DashChange[] = [
+  startedBuild('b-text', 'run-text', 'b1', 2855, '2854.1', 'Make People feel like texting'),
+  startedBuild('b-export', 'run-export', 'b3', 2861, '2861.2', 'Export the plan as a file'),
+  startedBuild('b-live', 'run-live', 'b3', 2860, '2854.3', 'Show a small live card while a person works'),
+];
+
+const BUILD_RUNS: Record<string, BuildRun> = {
+  'run-text': { runId: 'run-text', status: 'finished', stepStatus: 'done', stopReason: null, error: null, progress: { state: 'done', action: 'Finished #2854.1', needs: null } },
+  'run-export': {
+    runId: 'run-export',
+    status: 'awaiting_input',
+    stepStatus: 'in_progress',
+    stopReason: null,
+    error: null,
+    progress: { state: 'waiting', action: 'Asked which format', needs: 'Should the export be one CSV file, or JSON that keeps the nesting?' },
+  },
+  'run-live': {
+    runId: 'run-live',
+    status: 'started',
+    stepStatus: 'in_progress',
+    stopReason: null,
+    error: null,
+    progress: { state: 'working', action: 'Running the checks: 2 of 5 passed', needs: null },
+  },
+};
+
+/**
+ * Builds followed from the thread (plan #2854.3): each confirmed build's row
+ * says where it stands from its run, built, waiting on your answer or going,
+ * with the link to its step.
+ */
+export function ChatThreadBuildsSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <PeopleView rows={rows} current={FRANKLIN.key} timezone={ZONE} now={NOW} live={false}>
+        <ChangeThreadDemo
+          person={FRANKLIN}
+          chatId={FRANKLIN.chatId}
+          page={{ messages: BUILT, hasOlder: false }}
+          typingUntil={null}
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+          changes={BUILD_CHANGES}
+          builds={BUILD_RUNS}
           today="2026-11-03"
         />
       </PeopleView>
