@@ -30,6 +30,7 @@ import {
   goalsIdle,
   fileStalls,
   OVERNIGHT_NO_PROGRESS,
+  heldBack,
   personAnsweredSince,
   outsideRunning,
   stepAddedSince,
@@ -1114,6 +1115,66 @@ describe('personAnsweredSince', () => {
     expect(personAnsweredSince(feature({ comment: 'Blocked 2026-10-10: Which one?' }), at)).toBe(
       false,
     );
+  });
+
+  it("times a same-day answer by its step's close when the answer closed the step", () => {
+    // #2926 on 5 November: the question step was answered and closed at
+    // 01:10, and the runner fired at 01:16. The answer came first.
+    const answered = feature({
+      comment: 'Answered 2026-11-05: B, hide it and keep it recoverable',
+      status: 'done',
+      completedAt: '2026-11-05T01:10:28.000Z',
+    });
+    expect(personAnsweredSince(answered, '2026-11-05T01:16:07.000Z')).toBe(false);
+    expect(personAnsweredSince(answered, '2026-11-05T01:00:00.000Z')).toBe(true);
+  });
+
+  it('spends a same-day answer once an earlier fire that day has seen it', () => {
+    const open = feature({ comment: 'Answered 2026-11-05: Use the old list.' });
+    // The first fire that day after the answer: let out once.
+    expect(personAnsweredSince(open, '2026-11-05T01:16:00.000Z')).toBe(true);
+    // A later fire, with the one before it on the same day: already spent.
+    expect(
+      personAnsweredSince(open, '2026-11-05T01:40:00.000Z', '2026-11-05T01:16:00.000Z'),
+    ).toBe(false);
+    // The fire before was the day before, so the answer is still new.
+    expect(
+      personAnsweredSince(open, '2026-11-05T01:40:00.000Z', '2026-11-04T22:00:00.000Z'),
+    ).toBe(true);
+    // A line dated after the fire's day is newer whatever came before.
+    expect(
+      personAnsweredSince(
+        feature({ comment: 'Answered 2026-11-06: Yes.' }),
+        '2026-11-05T23:00:00.000Z',
+        '2026-11-05T22:00:00.000Z',
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('heldBack on a feature answered before it was first fired', () => {
+  it('holds #2926 after a session that closed nothing, rather than sending it every tick', () => {
+    const sections = tree([
+      item({ id: 'f', number: 2926, module: 'music-pipeline' }),
+      item({
+        id: 'q',
+        parentId: 'f',
+        number: 2927,
+        status: 'done',
+        completedAt: '2026-11-05T01:10:28.000Z',
+        comment: 'Answered 2026-11-05: B, hide it and keep it recoverable',
+      }),
+      item({ id: 's', parentId: 'f', number: 2928 }),
+    ]);
+    const node = findNode(sections, 'f')!;
+    const held = heldBack(
+      node,
+      '2026-11-05T01:16:07.000Z',
+      null,
+      Date.parse('2026-11-05T01:40:00.000Z'),
+    );
+    expect(held).toMatchObject({ number: 2926, lastFiredAt: '2026-11-05T01:16:07.000Z' });
+    expect(held?.retryAt).not.toBeNull();
   });
 });
 

@@ -202,20 +202,53 @@ const ANSWER_LINE = /^(?:Answered|Accepted) (\d{4}-\d{2}-\d{2})\b/gm;
  * could not move, which is usually a question for the person. Once they have
  * answered, the wall may be gone, and holding the feature until morning
  * leaves their answer sitting unread. A thread turn carries its own time and
- * is the sharper of the two signals. A history line carries only its date, so
- * a line dated the day of the fire counts as newer: sending once more on an
- * answer given that morning costs a session, while missing an answer given
- * that evening costs the night.
+ * is the sharper of the two signals.
+ *
+ * A history line carries only its date, so one dated after the fire's day is
+ * newer and one dated before is older. One dated the same day is settled in
+ * this order:
+ *
+ * - When the step that carries it closed that same day, the close is the
+ *   answer's time. Answering a question step closes it, so this is the usual
+ *   case, and it is exact.
+ * - When an earlier fire (`previous`) was on that day or later, the answer was
+ *   already there for that fire and has been spent: it released the fire that
+ *   is now being judged, or it came before both.
+ * - Otherwise it counts as newer: sending once more on an answer given that
+ *   morning costs a session, while missing one given that evening costs the
+ *   night.
+ *
+ * On 5 November #2926's question step said `Answered 2026-11-05`, written at
+ * 01:10, six minutes before the first fire. Read as newer than every fire that
+ * day, it released the guard on every tick, and the runner sent #2926 four
+ * times, 24 minutes apart, while the first session was still building it.
  */
-export function personAnsweredSince(feature: PlanNode, since: string): boolean {
+export function personAnsweredSince(
+  feature: PlanNode,
+  since: string,
+  /** The fire before `since`, if there was one. */
+  previous: string | null = null,
+): boolean {
   const at = new Date(since).getTime();
   if (!Number.isFinite(at)) return false;
   const day = new Date(at).toISOString().slice(0, 10);
+  const before = previous ? new Date(previous).getTime() : NaN;
+  const previousDay = Number.isFinite(before) ? new Date(before).toISOString().slice(0, 10) : null;
+  const sameDayCounts = (node: PlanNode, lineDay: string): boolean => {
+    const closed = node.completedAt ? new Date(node.completedAt).getTime() : NaN;
+    if (Number.isFinite(closed) && new Date(closed).toISOString().slice(0, 10) === lineDay) {
+      return closed >= at;
+    }
+    return previousDay === null || previousDay < lineDay;
+  };
   return flatten([feature]).some(
     (node) =>
       node.thread.some(
         (turn) => turn.author === 'me' && new Date(turn.createdAt).getTime() >= at,
-      ) || [...(node.comment ?? '').matchAll(ANSWER_LINE)].some((line) => line[1] >= day),
+      ) ||
+      [...(node.comment ?? '').matchAll(ANSWER_LINE)].some(
+        (line) => line[1] > day || (line[1] === day && sameDayCounts(node, line[1])),
+      ),
   );
 }
 
@@ -393,7 +426,7 @@ export function heldBack(
   now: number,
 ): PassedOver | null {
   if (!last || !closedNothingSince(feature, last)) return null;
-  if (personAnsweredSince(feature, last)) return null;
+  if (personAnsweredSince(feature, last, previous)) return null;
   if (stepAddedSince(feature, last)) return null;
   const said = {
     id: feature.id,
