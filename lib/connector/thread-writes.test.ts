@@ -15,6 +15,7 @@ const PROJECT_THREAD = '00000000-0000-4000-8000-000000000001';
 const APP_THREAD = '00000000-0000-4000-8000-000000000002';
 const THEIRS = '00000000-0000-4000-8000-000000000003';
 const ENDED = '00000000-0000-4000-8000-000000000004';
+const THINK_THREAD = '00000000-0000-4000-8000-000000000005';
 const FEATURE = '00000000-0000-4000-8000-000000000010';
 const APP_FEATURE = '00000000-0000-4000-8000-000000000011';
 
@@ -89,6 +90,19 @@ describe('reply_in_thread', () => {
     expect(result).toMatchObject({ ok: true, rows: [{ detail: { kind: 'question', options: '["Merge it","Not yet"]' } }] });
     expect(tables['core.session_messages'][0]).toMatchObject({ thread_id: PROJECT_THREAD, options: ['Merge it', 'Not yet'] });
     expect(tables['core.session_threads'].find((row) => row.id === PROJECT_THREAD)?.state).toBe('waiting');
+  });
+
+  it('sends a notification for a think-it-through thread\'s answer, and none for a work thread (plan #2789.11)', async () => {
+    tables['core.session_threads'].push(thread(THINK_THREAD, { mode: 'think' }));
+    const thinking = ctx();
+    await runConnectorWrite(tool('reply_in_thread'), thinking, { thread_id: THINK_THREAD, kind: 'status', body: 'Reading the specs.' });
+    expect(thinking.later).not.toHaveBeenCalled();
+    await runConnectorWrite(tool('reply_in_thread'), thinking, { thread_id: THINK_THREAD, body: '**The two ways.** …' });
+    expect(thinking.later).toHaveBeenCalledTimes(1);
+
+    const working = ctx();
+    await runConnectorWrite(tool('reply_in_thread'), working, { thread_id: APP_THREAD, body: 'Done.' });
+    expect(working.later).not.toHaveBeenCalled();
   });
 
   it('writes a mockup with its link', async () => {

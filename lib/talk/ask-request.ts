@@ -31,7 +31,13 @@ import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-an
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { isOwner } from '@/lib/dev/owner';
-import { goalsRoutine } from '@/lib/feedback/routine';
+import { brokerRoutine, goalsRoutine } from '@/lib/feedback/routine';
+import { startSessionThread } from '@/lib/core/session-threads';
+import { wakeBroker } from '@/lib/threads/broker-wake';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { THINK_FALLBACK } from './thought';
+import { askTitle } from './talk';
+import { chatAsMessage } from './chat-to-session';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
@@ -43,7 +49,7 @@ import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
-import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { codeDeps } from '@/lib/dash/think-code';
 import { devAccess } from '@/lib/ask/dev';
@@ -156,6 +162,11 @@ export async function askDashInRequest(input: {
   const asScope = input.scope ?? (before?.scope as ModuleId | null | undefined) ?? null;
   const scope = asScope && settings.enabledModules.includes(asScope) ? asScope : null;
   const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
+  // Think it through goes to a session thread on this app (plan #2789.11)
+  // when the broker can be woken. Sessions work on the owner's repository and
+  // the broker reads the owner's threads alone, so another account is
+  // answered here as before, with nothing said.
+  const sessions = think ? await thinkInSession(core, user.id, input.question) : null;
 
   // Where the reply stands is kept on the chat (plan #2854.4), so a thread
   // opened after the page that asked has gone shows Dash still writing, or
@@ -227,6 +238,7 @@ export async function askDashInRequest(input: {
       model: await choosing,
       // The code is read as the owner, as Dev is (plan #2789.10).
       think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
+      thinkFallback: sessions?.fallback ?? null,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -237,6 +249,7 @@ export async function askDashInRequest(input: {
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       recordFailure: (failure) => keepFailure(core, user.id, failure),
+      ...(sessions?.toSession ? { toSession: sessions.toSession } : {}),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
@@ -282,6 +295,37 @@ export async function askDashInRequest(input: {
     }
   }
   return result;
+}
+
+/**
+ * How a thought-through question reaches a session thread (plan #2789.11):
+ * the store that starts the thread and wakes the broker, or why it is
+ * answered here instead. Null for an account that is not the owner's.
+ */
+async function thinkInSession(
+  core: CoreSupabaseClient,
+  userId: string,
+  question: string,
+): Promise<{ toSession?: NonNullable<AskStores['toSession']>; fallback?: string } | null> {
+  if (!(await isOwner())) return null;
+  const routine = brokerRoutine();
+  // wakeBroker never fires without both, so the thread would sit unanswered.
+  if (!routine.id || !routine.token) return { fallback: THINK_FALLBACK.noBroker };
+  return {
+    toSession: async (conversation) => {
+      const text = chatAsMessage(conversation, { think: true });
+      if (!text) return { ok: false, error: 'The chat had no words to send.' };
+      const { id } = await startSessionThread(
+        core,
+        userId,
+        { projectId: null, text, file: null, mode: 'think', title: askTitle(question) || question },
+        [],
+      );
+      const woken = await wakeBroker({ core: createCoreServiceSupabase(), userId, threadId: id, routine });
+      if (!woken.ok) console.error('the session broker was not woken for a thought-through question', woken.error);
+      return { ok: true, threadId: id };
+    },
+  };
 }
 
 /** How often a reply being written checks whether Stop was pressed (plan #2854.4). */

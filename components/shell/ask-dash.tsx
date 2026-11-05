@@ -67,7 +67,7 @@ import { chatSessionOptionsAction, startSessionFromChatAction } from '@/app/chat
 import { offersSession } from '@/lib/talk/chat-to-session';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
-import { ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
+import { SessionSentLine, ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
 import type { DashChoiceId } from '@/lib/core/models';
 
@@ -756,6 +756,8 @@ export function AskThread({
             {!bubbles && <LookupFold calls={turn.toolCalls} />}
             {/* What a thought-through answer cost (plan #2789.10). */}
             <ThoughtLine calls={turn.toolCalls} />
+            {/* A question sent to a session thread, followed live (plan #2789.11). */}
+            <SessionSentLine calls={turn.toolCalls} />
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
                 A todo or a note comes back as a change, drawn above with Undo.
                 In a chat on the page they rest under every answer but the

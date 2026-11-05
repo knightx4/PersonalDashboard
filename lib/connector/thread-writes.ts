@@ -5,6 +5,8 @@ import { refHref, toRef } from '@/lib/core/refs';
 import { isModuleId } from '@/lib/modules';
 import { insertPlanItem } from '@/lib/plan/insert-item';
 import { isProjectScope, type PlanScope } from '@/lib/plan/projects';
+import { sessionReplyPayload } from '@/lib/talk/reply-state';
+import { notifyPerson } from '@/lib/talk/reply-state-store';
 import type { ConnectorWriteContext, ConnectorWriteTool } from './writes';
 
 /**
@@ -57,6 +59,7 @@ type Thread = {
   project_id: string | null;
   session_id: string | null;
   state: string;
+  mode?: string | null;
 };
 
 type PlanRow = { id: string; number: number; module: string | null; status: string; kind: string; title: string };
@@ -130,7 +133,7 @@ async function threadOf(ctx: ConnectorWriteContext, db: AskDb, input: Input): Pr
   const core = await db('core');
   const query = core
     .from('session_threads')
-    .select('id, title, project_id, session_id, state')
+    .select('id, title, project_id, session_id, state, mode')
     .eq('user_id', ctx.userId);
   const { data, error } = await (threadId ? query.eq('id', threadId) : query.eq('session_id', sessionId)).maybeSingle();
   if (error) throw new Error(`Reading the thread failed: ${error.message}`);
@@ -262,6 +265,14 @@ const replyInThread: ConnectorWriteTool = {
       .eq('id', thread.id)
       .eq('user_id', ctx.userId);
     if (touchError) console.error('[connector write] thread state', touchError.message);
+
+    // A think-it-through thread's answer, or its question back, reaches the
+    // person as a notification that opens the thread (plan #2789.11): they
+    // asked from Ask Dash and have long since left the page.
+    if (thread.mode === 'think' && (kind === 'text' || kind === 'question')) {
+      const payload = sessionReplyPayload(thread, { kind, body });
+      ctx.later(() => notifyPerson(core as Parameters<typeof notifyPerson>[0], ctx.userId, payload));
+    }
 
     const what =
       kind === 'question' ? 'Asked' : kind === 'mockup' ? 'Showed a mockup' : kind === 'status' ? 'Noted' : 'Replied';

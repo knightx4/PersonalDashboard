@@ -1,10 +1,14 @@
 'use client';
 
+import { createContext, useContext } from 'react';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Lightbulb } from 'lucide-react';
 import { ToggleChip } from '@/components/ui/chip';
 import { Tooltip } from '@/components/ui/tooltip';
 import { approxDollars } from '@/lib/core/spend/estimate-types';
-import { turnThought } from '@/lib/talk/thought';
+import { sessionSentState, turnSessionSent, turnThought, type SessionSentState } from '@/lib/talk/thought';
+import { sessionThreadPath } from '@/lib/core/session-threads-model';
+import { useSessionThreadLive } from '@/components/thread/use-session-thread-live';
 import type { TalkToolCall } from '@/lib/talk/talk';
 import { cn } from '@/lib/cn';
 
@@ -88,10 +92,59 @@ export function ThoughtLine({ calls }: { calls: readonly TalkToolCall[] | undefi
         ? 'under a cent'
         : `about ${approxDollars(thought.costMicros)}`;
   return (
-    <p className="mt-2 flex items-center gap-1.5 text-small text-ink-muted">
-      <Lightbulb className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-      <span>
+    <p className="mt-2 flex items-start gap-1.5 text-small text-ink-muted">
+      <Lightbulb className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      <span className="min-w-0">
         Thought through on Opus · <span className="tabular">{cost}</span>
+        {/* Why it was not sent to a session (plan #2789.11). */}
+        {thought.fallback ? <> · Answered here because {thought.fallback}</> : null}
+      </span>
+    </p>
+  );
+}
+
+/**
+ * Under Ask Dash's reply to a question sent to a session thread (plan
+ * #2789.11): where the session has got to, heard live, and the link to the
+ * thread. Nothing under any other reply.
+ */
+export function SessionSentLine({ calls }: { calls: readonly TalkToolCall[] | undefined }) {
+  const sent = turnSessionSent(calls);
+  const fixture = useContext(SessionSentFixture);
+  const live = useSessionThreadLive({ threadId: sent?.threadId ?? null, enabled: !fixture });
+  if (!sent) return null;
+  return <SessionSentView threadId={sent.threadId} state={fixture ?? sessionSentState(live.messages, live.latest)} />;
+}
+
+/** The gallery's stand-in for the live thread: drawn in this state, with nothing heard. */
+export const SessionSentFixture = createContext<SessionSentState | null>(null);
+
+const SENT_LABEL: Record<SessionSentState['state'], string> = {
+  waiting: 'Sent to a session · Waiting for it to start',
+  working: 'Thinking it through in a session',
+  asked: 'The session has a question for you',
+  answered: 'The session has answered',
+};
+
+const SENT_LINK: Record<SessionSentState['state'], string> = {
+  waiting: 'Open the thread',
+  working: 'Open the thread',
+  asked: 'Answer it',
+  answered: 'Read it',
+};
+
+/** The line as drawn, for a given state; the gallery draws each. */
+export function SessionSentView({ threadId, state }: { threadId: string; state: SessionSentState }) {
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-small text-ink-muted" aria-live="polite">
+      <Lightbulb className="mt-0.5 size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+      <span className="min-w-0 break-words">
+        {SENT_LABEL[state.state]}
+        {state.state === 'working' ? <> · <span className="text-ink">{state.line}</span></> : null}
+        {' · '}
+        <Link href={sessionThreadPath(threadId)} className={cn(linkVariants({ tone: 'inline' }), 'press-area')}>
+          {SENT_LINK[state.state]}
+        </Link>
       </span>
     </p>
   );

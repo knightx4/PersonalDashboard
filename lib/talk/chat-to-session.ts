@@ -24,6 +24,10 @@ export function offersSession(body: string): boolean {
 
 const HEADING = 'From my Ask Dash chat. This is the conversation so far; please carry on from it.';
 
+/** The heading of a question sent to think through (plan #2789.11). */
+const THINK_HEADING =
+  'From my Ask Dash chat, with Think it through on. Please think my last question through; the conversation so far is below.';
+
 /** Said in place of the start of a chat too long to send. */
 const CUT = '(The start of the chat is left out because it was too long.)';
 
@@ -37,10 +41,14 @@ function turnText(turn: Pick<TalkTurn, 'role' | 'body'>): string {
  * SESSION_MESSAGE_MAX, oldest first, each under who said it. A chat with no
  * words in it gives an empty string.
  */
-export function chatAsMessage(turns: readonly Pick<TalkTurn, 'role' | 'body'>[]): string {
+export function chatAsMessage(
+  turns: readonly Pick<TalkTurn, 'role' | 'body'>[],
+  options: { think?: boolean } = {},
+): string {
+  const heading = options.think ? THINK_HEADING : HEADING;
   const lines = turns.filter((t) => t.body.trim()).map(turnText);
   if (lines.length === 0) return '';
-  const room = SESSION_MESSAGE_MAX - HEADING.length - CUT.length - 8;
+  const room = SESSION_MESSAGE_MAX - heading.length - CUT.length - 8;
   const kept: string[] = [];
   let used = 0;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -54,7 +62,7 @@ export function chatAsMessage(turns: readonly Pick<TalkTurn, 'role' | 'body'>[])
     used += cost;
   }
   const cut = kept.length < lines.length;
-  return [HEADING, ...(cut ? [CUT] : []), kept.join('\n\n')].join('\n\n');
+  return [heading, ...(cut ? [CUT] : []), kept.join('\n\n')].join('\n\n');
 }
 
 export type SessionProjectChoice = { id: string; label: string };
