@@ -124,6 +124,7 @@ export const youActions: ModuleActions = {
     readThread: none('own', "Having a thread open is the person's own reading of what a mentor wrote."),
     retryReply: none('own', "Asking a mentor to answer again after a failed reply is the person's own press on their thread (plan #2854.4)."),
     threadChanges: none('page', 'Reads the cards for what a person did in a thread; it serves the page (plan #2854.2.1).'),
+    threadBuilds: none('page', 'Reads where the builds confirmed in a thread stand; it serves the page (plan #2854.3).'),
     savePersonCard: none(
       'theirs',
       "Who the person talks to, and how each one sounds and what they care about, is the person's own call on their mentors; Dash does not reshape them unasked.",

@@ -1,3 +1,4 @@
+import { BUILDER_KEY } from '@/lib/you/builder-model';
 import { isQuietHours } from '@/lib/you/council-texts';
 
 /**
@@ -253,11 +254,12 @@ export function writeDevBatch(events: readonly TextEvent[]): string[] {
 
 /**
  * The builder's rule: whoever is on People under the key `builder` texts
- * about the plan by it. Nobody has that key until the builder is added as a
- * person (plan #2854.5); until then the events wait and close as they age.
+ * about the plan by it. The builder was added as that person by you 0044
+ * (plan #2854.5); lib/you/builder-model.ts has the rest of what makes it the
+ * builder.
  */
 export const BUILDER_TEXTS: FirstTextRule = {
-  key: 'builder',
+  key: BUILDER_KEY,
   kinds: TEXT_KINDS,
   defaults: TEXT_KINDS,
   dailyLimit: 4,

@@ -436,6 +436,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-search-none': ['/chat'],
   'chat-people-thread': ['/chat/people/[key]'],
   'chat-people-thread-changes': ['/chat/people/[key]'],
+  'chat-people-thread-working': ['/chat/people/[key]'],
+  'chat-people-thread-builds': ['/chat/people/[key]'],
   'chat-people-thread-typing': ['/chat/people/[key]'],
   'chat-people-thread-typing-moment': ['/chat/people/[key]'],
   'chat-people-arrives': ['/chat'],

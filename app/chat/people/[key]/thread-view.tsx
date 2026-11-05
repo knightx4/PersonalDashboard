@@ -38,7 +38,9 @@ import {
 import { editHref } from '@/lib/you/people-cards-model';
 import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
+import { LiveWorking } from '@/components/talk/live-card';
 import type { DashChange } from '@/lib/talk/changes';
+import { followedRuns, workingCard, type BuildRun } from '@/lib/you/live-cards';
 
 /**
  * One thread on the People tab (plan #2748.6): every message with one person,
@@ -58,6 +60,11 @@ import type { DashChange } from '@/lib/talk/changes';
  *   or delete proposed, is a card after their reply to the text that asked:
  *   a change made carries Undo, a proposal writes nothing until Confirm.
  *   The cards are read again whenever a text of theirs comes in.
+ * - While they are still writing the reply and have already done something
+ *   for it, a small live card at the foot says what (plan #2854.3), read
+ *   every few seconds until the reply comes in and the change card takes
+ *   over. A build you confirmed here says where it stands on its card, heard
+ *   over Realtime on its run and its session's reports until it settles.
  */
 
 export type ThreadActions = {
@@ -69,6 +76,8 @@ export type ThreadActions = {
   retryReply?: (chatId: string, advisorId: string) => Promise<{ error: string | null }>;
   /** The thread's changes as they now stand, or null when they could not be read. */
   changes?: (chatId: string) => Promise<DashChange[] | null>;
+  /** Where the thread's confirmed builds stand, by run id, or null when they could not be read (plan #2854.3). */
+  builds?: (runIds: string[]) => Promise<Record<string, BuildRun> | null>;
 };
 
 /** What the gallery reads with: nothing further back, and reading and trying again change nothing. */
@@ -103,6 +112,26 @@ const NEAR_TOP_PX = 80;
  * redraw check below see new changes each time and draw again without end.
  */
 const NO_CHANGES: DashChange[] = [];
+/** No builds, as one object, for the same reason. */
+const NO_BUILDS: Record<string, BuildRun> = {};
+
+/** While a reply is being written, how often what they have done for it is read. */
+const WORKING_POLL_MS = 2_500;
+/** Several reports close together read the builds once. */
+const BUILDS_SETTLE_MS = 750;
+
+/** Calls `run` every `ms` while `ms` is set; the newest `run` is the one called. */
+function useEvery(ms: number | null, run: () => void) {
+  const latest = useRef(run);
+  useEffect(() => {
+    latest.current = run;
+  });
+  useEffect(() => {
+    if (ms === null) return;
+    const timer = setInterval(() => latest.current(), ms);
+    return () => clearInterval(timer);
+  }, [ms]);
+}
 
 export function ThreadView({
   person,
@@ -117,6 +146,7 @@ export function ThreadView({
   loadingOlder: initialLoadingOlder = false,
   changes: initialChanges = NO_CHANGES,
   presses = NO_PRESSES,
+  builds: initialBuilds = NO_BUILDS,
   today,
   nextText = null,
 }: {
@@ -138,6 +168,8 @@ export function ThreadView({
   changes?: DashChange[];
   /** Confirm, decline and undo on those changes: Ask's own, in app/chat/dash/actions.ts. */
   presses?: ChangePresses;
+  /** Where the confirmed builds among those changes stand, by run id (loadBuildRuns). */
+  builds?: Record<string, BuildRun>;
   /** YYYY-MM-DD in the person's zone, so a due date this year leaves the year off. */
   today?: string;
   /** "Next text Monday, if there is something new", for someone with a reach-out rule (plan #2931.3). */
@@ -172,6 +204,13 @@ export function ThreadView({
   if (initialChanges !== drawnChanges) {
     setDrawnChanges(initialChanges);
     setChanges(initialChanges);
+  }
+  // The builds as the server drew them, then as a refresh left them.
+  const [builds, setBuilds] = useState<Record<string, BuildRun>>(initialBuilds);
+  const [drawnBuilds, setDrawnBuilds] = useState(initialBuilds);
+  if (initialBuilds !== drawnBuilds) {
+    setDrawnBuilds(initialBuilds);
+    setBuilds(initialBuilds);
   }
   const onChanged = useCallback((change: DashChange) => setChanges((list) => withItem(list, change)), []);
   const [draft, setDraft] = useState('');
@@ -221,6 +260,7 @@ export function ThreadView({
     if (live && chatId && scroller.current?.checkVisibility?.() !== false) void act.current.read(chatId, person.id);
   }, [live, chatId, person.id]);
 
+
   // Typing ends on its own clock.
   useEffect(() => {
     if (!live || !typingUntil) return;
@@ -254,7 +294,7 @@ export function ThreadView({
       }
     }
     footSeen.current = { height: el.scrollHeight, kids: new WeakSet(Array.from(el.children)) };
-  }, [messages, pending, typingUntil]);
+  }, [messages, pending, typingUntil, changes]);
 
   const loadOlder = useCallback(async () => {
     const el = scroller.current;
@@ -346,10 +386,58 @@ export function ThreadView({
     }
   };
 
-  const typing = isTyping(typingUntil, now);
+  // While the reply is being written, what they have done for it is read every
+  // few seconds, so the live card shows it before the reply comes in.
+  const typingNow = isTyping(typingUntil, now);
+  const awaitingReply = typingNow && pending.length === 0 && messages.at(-1)?.role === 'person';
+  useEvery(live && chatId && awaitingReply ? WORKING_POLL_MS : null, () => {
+    if (chatId) void act.current.changes?.(chatId).then((next) => next && setChanges(next));
+  });
+
+  // The builds still going are heard over Realtime: their run and their
+  // session's reports. One newly confirmed is read straight away.
+  const goingKey = followedRuns(changes, builds).join(',');
+  // What has been read so far, for the effect below, which runs once per set of builds going.
+  const heardBuilds = useRef(builds);
+  useEffect(() => {
+    heardBuilds.current = builds;
+  }, [builds]);
+  useEffect(() => {
+    if (!live || !goingKey) return;
+    const ids = goingKey.split(',');
+    const read = () => void act.current.builds?.(ids).then((next) => next && setBuilds((had) => ({ ...had, ...next })));
+    if (ids.some((id) => !(id in heardBuilds.current))) read();
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = null;
+        read();
+      }, BUILDS_SETTLE_MS);
+    };
+    const filter = `in.(${ids.join(',')})`;
+    const channel = supabase
+      .channel(`chat-builds:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'plan_runs', filter: `id=${filter}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'core', table: 'session_progress', filter: `plan_run_id=${filter}` }, refresh)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [live, goingKey]);
+
+  const typing = typingNow;
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
-  const cards = placeAfterReplies(messages, changes, (change) => change.advisorMessageId);
+  // What they have done for a reply still coming is the live card's, at the foot, until the reply settles it.
+  const working = workingCard(messages, changes, awaitingReply, today);
+  const cards = placeAfterReplies(
+    messages,
+    working ? changes.filter((change) => change.advisorMessageId !== working.messageId) : changes,
+    (change) => change.advisorMessageId,
+  );
   const empty = messages.length === 0 && pending.length === 0;
   // A failed reply is said under your last message, while nothing newer is on its way.
   const failedNote =
@@ -426,7 +514,15 @@ export function ThreadView({
                 ))}
                 {cards.has(m.id) && (
                   <MessageCard>
-                    <DashChanges changes={cards.get(m.id) ?? []} presses={presses} onChanged={onChanged} today={today} by={person.name} inThread />
+                    <DashChanges
+                      changes={cards.get(m.id) ?? []}
+                      presses={presses}
+                      onChanged={onChanged}
+                      today={today}
+                      by={person.name}
+                      builds={builds}
+                      inThread
+                    />
                   </MessageCard>
                 )}
               </Fragment>
@@ -473,7 +569,7 @@ export function ThreadView({
           </MessageNote>
         </div>
       )}
-      {typing && <TypingBubble name={person.name} />}
+      {working ? <LiveWorking card={working} name={person.name} /> : typing && <TypingBubble name={person.name} />}
     </MessagingThread>
   );
 }

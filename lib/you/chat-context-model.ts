@@ -19,7 +19,9 @@
  *             new message refers back ("you said", "last time").
  *   recent    the newest forty or so messages word for word.
  *   live      today's date, time and place, what they wrote under Now, the
- *             todos due today and the goals the message bears on.
+ *             todos due today and the goals the message bears on. The
+ *             builder reads "Dev now" here instead (plan #2854.5,
+ *             lib/you/builder-model.ts).
  *
  * Tokens are estimated from characters, at 3.5 to a token, which overcounts
  * English a little; the budgets are ceilings, so the estimate errs high.
@@ -27,6 +29,7 @@
 import type { Brain } from '@/lib/you/board-brain';
 import type { CouncilMemory } from '@/lib/you/council-model';
 import { whenDate, zoneClock, zoneDay } from '@/lib/core/when';
+import { builderHeading, devBriefLines, isBuilder, type DevBrief } from '@/lib/you/builder-model';
 
 export const LAYER_NAMES = ['persona', 'memory', 'episodes', 'recall', 'recent', 'live'] as const;
 export type LayerName = (typeof LAYER_NAMES)[number];
@@ -121,6 +124,12 @@ export type ContextLive = {
   todos: ContextTodo[];
   /** The goals the message bears on, already ranked (rankGoals). */
   goals: ContextGoal[];
+  /**
+   * The builder's "Dev now" (plan #2854.5), which it reads in place of the
+   * todos and goals; null when the plan could not be read, absent for
+   * everyone else.
+   */
+  dev?: DevBrief | null;
 };
 
 export type ChatContextInput = {
@@ -200,7 +209,9 @@ export function personaLayer(mentor: ContextMentor): ContextLayer {
       .filter(Boolean)
       .join('\n\n');
   const who = mentor.kind === 'seat' && mentor.key !== 'mentor' ? `the ${mentor.name}` : mentor.name;
-  const heading = `You are ${who}, one of the person's mentors, and you text with them in a thread that has run for as long as they have known you. The question you own: "${mentor.question}"\n\n${cutToTokens(card, 2_100)}`;
+  const heading = isBuilder(mentor)
+    ? builderHeading(cutToTokens(card, 1_600))
+    : `You are ${who}, one of the person's mentors, and you text with them in a thread that has run for as long as they have known you. The question you own: "${mentor.question}"\n\n${cutToTokens(card, 2_100)}`;
   const lines: string[] = [];
   if (brain) {
     if (brain.assessment) lines.push(`\nThe assessment you own, ${brain.assessment.name}: ${brain.assessment.text}`);
@@ -339,6 +350,7 @@ function transcriptLine(m: ContextMessage): string {
 export function liveLayer(live: ContextLive): ContextLayer {
   const today = zoneDay(live.now, live.timeZone);
   const heading = `Now: ${whenDate(live.now, { timeZone: live.timeZone, weekday: 'long', month: 'long' })}, ${zoneClock(live.now, live.timeZone)} (${live.timeZone}).`;
+  if (live.dev !== undefined) return fill('live', devBriefLines(live.dev, live.now, live.timeZone), heading, true);
   const lines: string[] = [];
   if (live.place) lines.push(`Where they live: ${live.place}.`);
   if (live.nowNote?.trim()) lines.push(`What they wrote under Now: "${cutToTokens(live.nowNote.trim(), NOW_TOKENS_MAX)}"`);

@@ -1,7 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
+import { loadBuildRuns } from '@/lib/talk/build-runs';
+import type { BuildRun } from '@/lib/you/live-cards';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
@@ -80,6 +82,23 @@ export async function threadChanges(chatId: string): Promise<DashChange[] | null
     return await loadPeopleChanges(await createCoreClient(), chatId);
   } catch (error) {
     console.error('thread changes not read', error);
+    return null;
+  }
+}
+
+/**
+ * Where the builds a thread started stand (plan #2854.3), read again when one
+ * of their runs or reports changes, so the card follows the build without a
+ * reload. Null when they could not be read; the thread keeps what it has.
+ */
+// latency: instant
+export async function threadBuilds(runIds: string[]): Promise<Record<string, BuildRun> | null> {
+  await requireUser();
+  if (!Array.isArray(runIds) || !runIds.every((id) => typeof id === 'string' && UUID.test(id))) return null;
+  try {
+    return await loadBuildRuns(await createClient(), await createCoreClient(), runIds);
+  } catch (error) {
+    console.error('thread builds not read', error);
     return null;
   }
 }

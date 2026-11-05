@@ -227,7 +227,7 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'chat',
     name: 'A text that arrives first',
     trigger: 'A mentor texting first, or replying, while the People list is open.',
-    sees: 'Their row rises to the top of the list as the rows it passes move down one place, the preview line changes to the new words, and the unread dot lands with a little give.',
+    sees: 'Their row leaves its place, the rows it passes move down one place each, and it arrives at the top of the list, the preview line changes to the new words, and the unread dot lands with a little give.',
     reducedMotion: 'The row is at the top, with the new preview and its dot, at once.',
     state: {
       built: 'yes',

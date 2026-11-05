@@ -1,6 +1,8 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { zoneDay } from '@/lib/core/when';
 import { readBrain } from '@/lib/you/board-brain';
+import { loadDevBrief } from '@/lib/you/builder-brief';
+import { isBuilder } from '@/lib/you/builder-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import {
   assembleChatContext,
@@ -212,6 +214,10 @@ async function loadLive(
   message: string,
   { now, timeZone }: LoadChatContextOptions,
 ): Promise<ContextLive> {
+  // The builder reads the plan in place of todos and goals (plan #2854.5).
+  if (isBuilder(mentor)) {
+    return { now, timeZone, place: null, nowNote: null, todos: [], goals: [], dev: await loadDevBrief(client, userId, now) };
+  }
   const today = zoneDay(now, timeZone);
   const todo = client.schema('todo') as unknown as YouSupabaseClient;
   const goals = client.schema('goals') as unknown as YouSupabaseClient;
