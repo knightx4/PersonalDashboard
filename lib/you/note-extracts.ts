@@ -2,11 +2,11 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { usageFrom, type SpendReport, type SpendSink } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
@@ -155,38 +155,35 @@ export function haikuForExtracts(client: Pick<Anthropic, 'messages'>, now: () =>
       model: EXTRACT_MODEL,
       max_tokens: 6000,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Keep the lines from the note that say who the person is. An empty list when there are none.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              lines: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    kind: { type: 'string', enum: [...EXTRACT_KINDS] },
-                    gist: { type: 'string' },
-                    quote: { type: 'string' },
-                    entry_date: { type: 'string', description: 'YYYY-MM-DD' },
-                  },
-                  required: ['kind', 'quote'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Keep the lines from the note that say who the person is. An empty list when there are none.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            lines: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  kind: { type: 'string', enum: [...EXTRACT_KINDS] },
+                  gist: { type: 'string' },
+                  quote: { type: 'string' },
+                  entry_date: { type: 'string', description: 'YYYY-MM-DD' },
                 },
+                required: ['kind', 'quote'],
               },
             },
-            required: ['lines'],
           },
+          required: ['lines'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, EXTRACT_MODEL),
+      }, EXTRACT_MODEL),
       messages: [{ role: 'user', content: extractPrompt(note) }],
     });
     onSpend({ model: EXTRACT_MODEL, usage: usageFrom(response.usage) });
     if (response.stop_reason === 'max_tokens') return null;
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    const parsed = block && block.type === 'tool_use' ? answerSchema.safeParse(block.input) : null;
+    const block = readReport(response, TOOL_NAME, EXTRACT_MODEL);
+    const parsed = block.ok ? answerSchema.safeParse(block.value) : null;
     return parsed?.success ? keepLines(parsed.data.lines, note.body, now()) : null;
   };
 }

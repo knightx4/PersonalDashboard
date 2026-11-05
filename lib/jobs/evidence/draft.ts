@@ -22,11 +22,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { APPLICATION_GUIDE } from '@/lib/jobs/drafting/application-guide';
 import { PLAIN_VOICE } from '@/lib/jobs/drafting/plain-voice';
 
@@ -169,23 +170,20 @@ export async function draftAnswer(
           cache_control: { type: 'ephemeral' },
         },
       ],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report how to approach the question, the draft written from that, and what it cites.',
-          input_schema: {
-            type: 'object',
-            // Considerations first, so they are written before the answer.
-            properties: {
-              considerations: { type: 'array', items: { type: 'string' } },
-              answer: { type: 'string' },
-              evidence_item_ids: { type: 'array', items: { type: 'string' } },
-            },
-            required: ['considerations', 'answer', 'evidence_item_ids'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report how to approach the question, the draft written from that, and what it cites.',
+        input_schema: {
+          type: 'object',
+          // Considerations first, so they are written before the answer.
+          properties: {
+            considerations: { type: 'array', items: { type: 'string' } },
+            answer: { type: 'string' },
+            evidence_item_ids: { type: 'array', items: { type: 'string' } },
           },
+          required: ['considerations', 'answer', 'evidence_item_ids'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: `${context}\n\nCall ${TOOL_NAME}.` }],
     });
   } catch (error) {
@@ -199,15 +197,13 @@ export async function draftAnswer(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TOOL_NAME,
-  );
-  if (!report || report.type !== 'tool_use') {
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
     return { ok: false, error: 'No draft came back.' };
   }
 
   return parseDraftPayload(
-    report.input,
+    report.value,
     input.bank.map((item) => item.id),
     input.banned ?? [],
   );

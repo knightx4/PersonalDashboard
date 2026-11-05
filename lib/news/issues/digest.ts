@@ -1,12 +1,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { usageFrom } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import type { NewsOperation } from '@/lib/core/spend/operations';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { findConfirmLink } from '@/lib/news/issues/confirm-link';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
@@ -526,8 +526,7 @@ export async function writeDigest(
     model: DIGEST_MODEL,
     max_tokens: MAX_TOKENS,
     system: SYSTEM,
-    tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME, DIGEST_MODEL),
+    ...reportRequest(TOOL, DIGEST_MODEL),
     messages: [
       {
         role: 'user',
@@ -548,15 +547,13 @@ export async function writeDigest(
   if (response.stop_reason === 'max_tokens') {
     throw new Error('The reply was cut off before it finished.');
   }
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use') {
+  const reportRead = readReport(response, TOOL_NAME, DIGEST_MODEL);
+  if (!reportRead.ok) {
     throw new Error(
       `The model did not report a digest (stopped: ${response.stop_reason ?? 'unknown'}).`,
     );
   }
-  const digest = readDigest(block.input, links, images);
+  const digest = readDigest(reportRead.value, links, images);
   if (typeof digest === 'string') throw new Error(digest);
   // Local means the reader's own place, so with none named it cannot be right.
   if (!options.localArea) {

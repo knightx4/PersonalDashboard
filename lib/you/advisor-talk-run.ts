@@ -1,11 +1,11 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { runDash, type DashAnswer, type DashExecutor } from '@/lib/dash/loop';
 import { dashToolsOf } from '@/lib/dash/registry';
-import { forceTool, toolBlockIn } from '@/lib/learn/graph/tool-call';
 import { CHART_TOOL } from '@/lib/talk/chart';
 import type { TalkTurn } from '@/lib/talk/talk';
 import {
@@ -98,8 +98,7 @@ export async function rememberExchange(input: {
       model: ADVISOR_MEMORY_MODEL,
       max_tokens: 1000,
       system: memorySystem(input.advisorName),
-      tools: [MEMORY_TOOL],
-      tool_choice: forceTool(MEMORY_TOOL_NAME, ADVISOR_MEMORY_MODEL),
+      ...reportRequest(MEMORY_TOOL, ADVISOR_MEMORY_MODEL),
       messages: [
         {
           role: 'user',
@@ -113,9 +112,9 @@ export async function rememberExchange(input: {
       ],
     });
     input.onSpend?.({ model: ADVISOR_MEMORY_MODEL, usage: usageFrom(reply.usage) });
-    const block = toolBlockIn(reply, MEMORY_TOOL_NAME);
-    if (!block || block.type !== 'tool_use') return { remember: [], retire: [] };
-    return memoriesFrom(block.input, input.memory);
+    const block = readReport(reply, MEMORY_TOOL_NAME, ADVISOR_MEMORY_MODEL);
+    if (!block.ok) return { remember: [], retire: [] };
+    return memoriesFrom(block.value, input.memory);
   } catch (error) {
     console.error('advisor memory pass failed', error);
     return { remember: [], retire: [] };
