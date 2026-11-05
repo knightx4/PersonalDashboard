@@ -114,8 +114,10 @@ export function parseMetricForm(
  */
 export function metricLine(metric: Metric, lists: MetricList[]): string {
   if (metric.source !== 'list') {
+    const label = { steps: 'Steps closed', files: 'Dash files', hours: 'Hours logged', applications: 'Job applications sent' }[metric.source];
     return [
-      { steps: 'Steps closed', files: 'Dash files', hours: 'Hours logged', applications: 'Job applications sent' }[metric.source],
+      // A name that already says what is counted is not repeated.
+      label === metric.name ? null : label,
       metric.period === 'week' ? 'weekly' : 'monthly',
       aimLine(metric),
     ]
