@@ -135,9 +135,24 @@ export function SessionThreadSurface({ part = 'open' }: { part?: SessionSurfaceP
             author: 'session',
             kind: 'status',
             createdAt: at(10, 51),
-            body: 'Moving the button and photographing the season page at phone width',
+            body: 'Reading the season page and where the export button sits now',
+          }),
+          message({
+            id: 'm8',
+            author: 'session',
+            kind: 'status',
+            createdAt: at(10, 54),
+            body: 'Moving Export CSV under the season name on app/seasons/[id]/page.tsx',
           }),
         ]}
+        // The session's newest report on its progress row (plan #2789.12).
+        report={{
+          key: 'p1@10:57',
+          state: 'working',
+          action: 'Photographing the season page at phone width to check the button fits beside a long season name',
+          needs: null,
+          at: at(10, 57),
+        }}
         live={false}
         now={NOW}
       />
@@ -216,7 +231,12 @@ export function SessionThreadSurface({ part = 'open' }: { part?: SessionSurfaceP
   }
   return (
     <DashPageSurface
-      sessions={SESSION_THREADS}
+      sessions={
+        part === 'working'
+          ? // A thread that moved while the list was open (plan #2789.12): marked until it is opened.
+            SESSION_THREADS.map((t, i) => (i === 1 ? { ...t, moved: true } : t))
+          : SESSION_THREADS
+      }
       session={{ id: part === 'empty' ? 'new' : thread.id, view }}
       usedOpen={false}
     />

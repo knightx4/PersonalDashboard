@@ -27,6 +27,7 @@ import {
 } from '@/lib/talk/ask-chats';
 import type { MadeChange } from '@/lib/talk/changes';
 import { useClockNow } from '@/lib/use-clock-now';
+import { useSessionThreadsLive } from '@/components/thread/use-session-threads-live';
 import {
   newSessionThreadHref,
   openSessionRef,
@@ -432,6 +433,7 @@ export function AskChats({
           sessions={sessions}
           failed={sessionsFailed}
           active={activeSession}
+          live={activeOverride === undefined}
         />
       )}
 
@@ -510,14 +512,20 @@ export function AskChats({
  * and the way to start one at the head.
  */
 function SessionThreads({
-  sessions,
+  sessions: read,
   failed,
   active,
+  live,
 }: {
   sessions: readonly SessionThread[];
   failed: boolean;
   active: string | null;
+  /** False in the gallery, which has no Realtime to follow. */
+  live: boolean;
 }) {
+  // Each thread's state and order follow Realtime, and one that moved is
+  // marked until it is opened (plan #2789.12).
+  const sessions = useSessionThreadsLive(read, active, live);
   // An empty group is not drawn: with no threads, the way in is the quiet
   // line at the foot of the list (TalkToASession).
   if (sessions.length === 0 && !failed) return null;
@@ -551,8 +559,18 @@ function SessionThreads({
                   )}
                 >
                   {/* The name alone on its line, as the chats below it (plan #2863). */}
-                  <span className={cn('block min-w-0 truncate text-ui', on ? 'font-medium text-accent' : 'text-ink')}>
-                    {thread.title}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className={cn(
+                        'block min-w-0 flex-1 truncate text-ui',
+                        on ? 'font-medium text-accent' : thread.moved ? 'font-medium text-ink' : 'text-ink',
+                      )}
+                    >
+                      {thread.title}
+                    </span>
+                    {thread.moved && !on && (
+                      <span role="img" aria-label="Something new" className="size-2 shrink-0 rounded-pill bg-accent" />
+                    )}
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-small text-ink-muted">
                     <span className="min-w-0 truncate">{thread.projectLabel}</span>

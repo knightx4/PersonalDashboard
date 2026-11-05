@@ -72,6 +72,7 @@ export default async function SessionThreadPage({
       thread={page.thread}
       messages={page.messages}
       reported={page.reported}
+      report={page.report}
       actions={ACTIONS}
       now={now}
     />

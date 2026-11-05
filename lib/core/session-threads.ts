@@ -22,6 +22,7 @@ import {
   type SessionMessage,
   type SessionThread,
 } from './session-threads-model';
+import { PROGRESS_COLUMNS, progressReportOf, type SessionProgressReport } from './session-thread-live';
 
 /**
  * The reads and writes behind the session thread screen in Chat (plan
@@ -64,6 +65,7 @@ function threadOf(row: ThreadRow, projects: readonly DevProject[], lastAt?: stri
     projectLabel: labelFor(row.project_id, projects),
     sessionId: row.session_id,
     state: stateOf(row.state),
+    updatedAt: row.updated_at,
     lastAt: lastAt && lastAt > row.updated_at ? lastAt : row.updated_at,
   };
 }
@@ -106,6 +108,8 @@ export type SessionThreadPage = {
   messages: SessionMessage[];
   /** What the session last reported on its progress row while working, if anything. */
   reported: string | null;
+  /** The newest report on its progress row, the first of the run lines under the working line (plan #2789.12). */
+  report: SessionProgressReport | null;
 };
 
 /** One thread with its messages, oldest first; null when it is not the person's or not there. */
@@ -135,7 +139,7 @@ export async function loadSessionThread(
       .limit(1000),
     core
       .from('session_progress')
-      .select('action, state, updated_at')
+      .select(PROGRESS_COLUMNS)
       .eq('user_id', userId)
       .eq('thread_id', threadId)
       .order('updated_at', { ascending: false })
@@ -153,11 +157,12 @@ export async function loadSessionThread(
     return message ? [message] : [];
   });
   const latest = messages.at(-1)?.createdAt;
-  const report = progress as { action: string; state: string } | null;
+  const report = progressReportOf(progress as Record<string, unknown> | null);
   return {
     thread: threadOf(row, projects, latest),
     messages,
     reported: report?.state === 'working' ? report.action : null,
+    report,
   };
 }
 

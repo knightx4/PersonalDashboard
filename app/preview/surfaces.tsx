@@ -8894,7 +8894,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <SessionThreadSurface part="open" />,
   },
   {
-    /* The working line (plan #2789.7): your message sent, and under it what the session last reported while the reply is to come. */
+    /* The working line (plan #2789.7): your message sent, and under it the session's status lines and progress reports since, as run lines that fill in over Realtime (plan #2789.12). In the list, the thread that moved while it was open carries a dot until it is opened. */
     id: 'chat-session-working',
     label: 'Dash · A session thread, a reply on its way',
     module: 'chat',
