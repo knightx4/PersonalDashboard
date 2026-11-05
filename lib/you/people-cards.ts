@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
 import { removeBotPhotos, signBotPhotos } from '@/lib/you/bot-photos';
@@ -271,14 +272,11 @@ export async function draftPersona(
       model: MODEL,
       max_tokens: 1_500 + THINKING_ROOM,
       system: DRAFT_RULES,
-      tools: [
-        {
-          name: DRAFT_TOOL,
-          description: 'Report the persona card.',
-          input_schema: { type: 'object', properties: { card: { type: 'string' } }, required: ['card'] },
-        },
-      ],
-      tool_choice: forceTool(DRAFT_TOOL, MODEL),
+      ...reportRequest({
+        name: DRAFT_TOOL,
+        description: 'Report the persona card.',
+        input_schema: { type: 'object', properties: { card: { type: 'string' } }, required: ['card'] },
+      }, MODEL),
       messages: [{ role: 'user', content: draftPrompt(input) }],
     });
   } catch (error) {
@@ -287,8 +285,8 @@ export async function draftPersona(
     return { ok: false, error: 'Dash could not draft the card just now.' };
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
-  const report = toolBlockIn(response, DRAFT_TOOL);
-  if (!report || report.type !== 'tool_use') return { ok: false, error: whyNoReport(response) };
-  const card = draftedCard(report.input);
+  const report = readReport(response, DRAFT_TOOL, MODEL);
+  if (!report.ok) return { ok: false, error: report.reason };
+  const card = draftedCard(report.value);
   return card ? { ok: true, card } : { ok: false, error: 'Dash wrote no card.' };
 }

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
-import { forceTool, toolBlockIn } from '@/lib/learn/graph/tool-call';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { readBrain } from '@/lib/you/board-brain';
 import { memoryLayer, personaLayer, READ_LIMITS, type ContextMentor } from '@/lib/you/chat-context-model';
@@ -221,13 +221,12 @@ async function directWithModel(anthropic: Anthropic, input: DirectorInput, spent
       model: MODELS.groupDirector,
       max_tokens: DIRECTOR_MAX_TOKENS,
       system: DIRECTOR_RULES,
-      tools: [DIRECTOR_TOOL],
-      tool_choice: forceTool(DIRECTOR_TOOL.name, MODELS.groupDirector),
+      ...reportRequest(DIRECTOR_TOOL, MODELS.groupDirector),
       messages: [{ role: 'user', content: directorPrompt(input) }],
     });
     spent.push({ model: MODELS.groupDirector, usage: usageFrom(response.usage) });
-    const block = toolBlockIn(response, DIRECTOR_TOOL.name);
-    return block && block.type === 'tool_use' ? directorPlanOf(block.input) : WAIT;
+    const block = readReport(response, DIRECTOR_TOOL.name, MODELS.groupDirector);
+    return block.ok ? directorPlanOf(block.value) : WAIT;
   } catch (error) {
     console.error('group director failed', error);
     return WAIT;
