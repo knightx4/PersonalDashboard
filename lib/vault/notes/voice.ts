@@ -2,12 +2,12 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { usageFrom, type SpendReport, type SpendSink } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { sampleFor } from '@/lib/learn/vault/classify-payload';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -112,26 +112,23 @@ export function haikuForVoice(client: Pick<Anthropic, 'messages'>): VoiceModel {
       model: VOICE_MODEL,
       max_tokens: 200,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Say whose words the note is.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              voice: { type: 'string', enum: [...VOICES] },
-              reason: { type: 'string' },
-            },
-            required: ['voice', 'reason'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Say whose words the note is.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            voice: { type: 'string', enum: [...VOICES] },
+            reason: { type: 'string' },
           },
+          required: ['voice', 'reason'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, VOICE_MODEL),
+      }, VOICE_MODEL),
       messages: [{ role: 'user', content: voicePrompt(note) }],
     });
     onSpend({ model: VOICE_MODEL, usage: usageFrom(response.usage) });
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    const parsed = block && block.type === 'tool_use' ? answerSchema.safeParse(block.input) : null;
+    const block = readReport(response, TOOL_NAME, VOICE_MODEL);
+    const parsed = block.ok ? answerSchema.safeParse(block.value) : null;
     return parsed?.success ? parsed.data : null;
   };
 }
