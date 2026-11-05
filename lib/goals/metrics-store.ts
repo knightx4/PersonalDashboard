@@ -168,7 +168,11 @@ export async function archiveMetric(client: GoalsSupabaseClient, metricId: strin
   return (data ?? []).length > 0;
 }
 
-export type MetricCounts = Metric & { counts: PeriodCount[] };
+export type MetricCounts = Metric & {
+  counts: PeriodCount[];
+  /** True when what it counts could not be read (applications, plan #2908.2); the counts are then empty. */
+  unread?: boolean;
+};
 
 type StepRow = {
   id: string;
@@ -327,7 +331,15 @@ export async function loadMetricCounts(
   const files = metrics.some((m) => m.source === 'files') ? await loadGoalFiles(client, core, treeIds) : [];
   const entries = metrics.some((m) => m.source === 'hours') ? await loadLoggedEntries(client, treeIds) : [];
   const owner = rows.find((row) => row.source === 'applications')?.user_id;
-  const applications = owner ? await loadSentApplications(client, owner) : [];
+  // A failed read of the applications marks that metric unread rather than
+  // failing the goal's other metrics.
+  let applicationsUnread = false;
+  const applications = owner
+    ? await loadSentApplications(client, owner).catch((): Awaited<ReturnType<typeof loadSentApplications>> => {
+        applicationsUnread = true;
+        return [];
+      })
+    : [];
 
   const daysOf = (metric: Metric): string[] | null => {
     if (metric.source === 'steps') return closedStepDays(steps, timeZone);
@@ -341,6 +353,7 @@ export async function loadMetricCounts(
     if (metric.source === 'hours') {
       return { ...metric, counts: sumDaysByPeriod({ amounts: loggedHourDays(entries), ...common }) };
     }
+    if (metric.source === 'applications' && applicationsUnread) return { ...metric, counts: [], unread: true };
     if (days) return { ...metric, counts: countDaysByPeriod({ days, ...common }) };
     if (!metric.collectionId || !metric.dateField) return { ...metric, counts: [] };
     return {

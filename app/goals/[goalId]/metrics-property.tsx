@@ -295,6 +295,7 @@ function MetricForm({
           <option value="steps">{SOURCE_LABELS.steps}</option>
           <option value="files">{SOURCE_LABELS.files}</option>
           <option value="hours">{SOURCE_LABELS.hours}</option>
+          <option value="applications">{SOURCE_LABELS.applications}</option>
         </Select>
       </Field>
       {source === 'list' && (
