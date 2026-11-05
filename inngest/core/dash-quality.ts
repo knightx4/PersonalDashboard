@@ -10,7 +10,9 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { costMicrosFor, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { devAccess } from '@/lib/ask/dev';
 import { answerQuestion } from '@/lib/dash/ask';
+import { codeDeps } from '@/lib/dash/think-code';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
 import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
@@ -40,7 +42,8 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
  * is given (AskContext), and the only id given is the owner's. A case that
  * names an advisor (core.dash_eval_cases.advisor, plan #2581.6) is put to
  * them as the first message of a talk, with the same lookups, and nothing of
- * the talk is kept.
+ * the talk is kept. A case with `think` on is asked with Think it through, as
+ * the person presses it (plan #2937.6).
  */
 
 const OPERATION: CoreOperation = 'check-dash-quality';
@@ -97,14 +100,14 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
     },
 
     async cases(userId, only) {
-      let query = core.from('dash_eval_cases').select('id, question, expect, advisor').eq('user_id', userId);
+      let query = core.from('dash_eval_cases').select('id, question, expect, advisor, think').eq('user_id', userId);
       query = only ? query.eq('id', only) : query.eq('active', true);
       const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw new Error(`Reading the cases failed: ${error.message}`);
-      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null }[];
+      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null; think: boolean }[];
     },
 
-    async ask(userId, question, advisor) {
+    async ask(userId, question, advisor, think) {
       if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
       const settings = await loadAccountSettings(userId, core);
       const today = todayInTimezone(settings.timezone);
@@ -151,6 +154,8 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
             queue: rehearsePaid(ctx),
             anthropicApiKey: apiKey,
             model,
+            // Think it through (plan #2937.6): Opus, the code and the mockup, as the person's press asks it.
+            think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
             onSpend: (report) => spent.push(report),
           });
       const seconds = (Date.now() - started) / 1000;
