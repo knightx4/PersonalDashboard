@@ -127,7 +127,7 @@ export function RunLinesView({
     // One list of lines scrolls in a box of fixed height, opened at the newest
     // line (note d89c72b0): a long run on Home's runner card otherwise ran the
     // page on for screens.
-    <ScrollingLines lastId={lines[lines.length - 1]?.id ?? null} className="max-h-80">
+    <ScrollingLines lastId={lines[lines.length - 1]?.id ?? null} className="max-h-[32rem]">
       <LineList lines={lines} now={now} arrived={arrived} open={asking} />
     </ScrollingLines>
   );
