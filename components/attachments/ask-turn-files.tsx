@@ -1,20 +1,34 @@
 import { FileText } from 'lucide-react';
 import { chipVariants } from '@/components/ui/chip';
+import { cn } from '@/lib/cn';
 import { attachmentSize, isImageAttachment } from '@/lib/attachments/rules';
 
 /**
  * The files sent with a question, under the person's words in the chat (plan
  * #1715): a picture as a small thumbnail that opens it, anything else as a
- * chip with its name and size. `href` opens the file through a short signed
+ * a chip with its name and size. `href` opens the file through a short signed
  * link (GET /attachments/<id>); a file still going up has none, and shows as
  * a plain chip.
+ *
+ * A message on People (plan #2974) draws its pictures `large`, as a texting
+ * app does, on the sender's side (`align="end"` for the person's own).
  */
 export type AskTurnFile = { id?: string; name: string; contentType: string; size: number; href?: string };
 
-export function AskTurnFiles({ files }: { files: readonly AskTurnFile[] }) {
+export function AskTurnFiles({
+  files,
+  large = false,
+  align = 'start',
+  label = 'Sent with this question',
+}: {
+  files: readonly AskTurnFile[];
+  large?: boolean;
+  align?: 'start' | 'end';
+  label?: string;
+}) {
   if (files.length === 0) return null;
   return (
-    <ul className="flex flex-wrap gap-1.5 pt-1" aria-label="Sent with this question">
+    <ul className={cn('flex flex-wrap gap-1.5', large ? 'py-0.5' : 'pt-1', align === 'end' && 'justify-end')} aria-label={label}>
       {files.map((file, index) => {
         const key = file.id ?? `${file.name}-${index}`;
         if (file.href && isImageAttachment(file.contentType)) {
@@ -28,7 +42,11 @@ export function AskTurnFiles({ files }: { files: readonly AskTurnFile[] }) {
                 title={file.name}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, private link; next/image cannot optimise it */}
-                <img src={file.href} alt={file.name} className="size-16 object-cover" />
+                <img
+                  src={file.href}
+                  alt={file.name}
+                  className={large ? 'max-h-60 w-auto max-w-full object-contain sm:max-w-72' : 'size-16 object-cover'}
+                />
               </a>
             </li>
           );

@@ -340,7 +340,51 @@ export function ChatPeopleSurface({
   );
 }
 
-type ThreadState = 'thread' | 'typing' | 'older' | 'failed' | 'reply-failed' | 'new' | 'not-ready' | 'loading' | 'next-text';
+type ThreadState =
+  | 'thread'
+  | 'typing'
+  | 'older'
+  | 'failed'
+  | 'reply-failed'
+  | 'new'
+  | 'not-ready'
+  | 'loading'
+  | 'next-text'
+  | 'files'
+  | 'adding';
+
+/** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
+const OFFER_FILES = [
+  { id: 'f1', name: 'Pasted image 1.png', contentType: 'image/png', size: 184_320, href: '/gallery/offer-screenshot.svg' },
+  { id: 'f2', name: 'Northwind offer letter, signed copy.pdf', contentType: 'application/pdf', size: 1_258_291, href: '#' },
+];
+
+/** The thread once the offer went with a question, and Franklin's reply that read it. */
+const FILES_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(0, 7),
+  msg('t8', 'person', 'They sent the offer. Is the equity any good?', '2026-11-03T08:58:00Z', {
+    files: OFFER_FILES,
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('t9', 'advisor', 'Four thousand units over four years is a thousand a year. The letter does not say what a unit is worth.', '2026-11-03T08:58:30Z'),
+  msg('t10', 'advisor', 'Ask them for the last valuation before the 14th. The $132,000 base is the part to weigh.', '2026-11-03T08:58:40Z'),
+  msg('t11', 'person', 'Pasted image 2.png', '2026-11-03T08:59:00Z', {
+    files: [{ id: 'f3', name: 'Pasted image 2.png', contentType: 'image/png', size: 96_256, href: '/gallery/offer-screenshot.svg' }],
+  }),
+];
+
+/** Two files in the box waiting to go, and one the box refused. */
+const ADDING_FILES = [
+  { path: 'u/00000000-0000-4000-8000-000000000001-Pasted-image-1.png', name: 'Pasted image 1.png', contentType: 'image/png' as const, size: 184_320 },
+  {
+    path: 'u/00000000-0000-4000-8000-000000000002-offer.pdf',
+    name: 'Northwind offer letter, signed copy.pdf',
+    contentType: 'application/pdf' as const,
+    size: 1_258_291,
+  },
+];
+const ADDING_ERRORS = ['Portfolio.zip cannot be added. Use an image, a PDF, a Word file, text or CSV.'];
 
 /** Franklin's rule texts next on Monday (plan #2931.3), as the thread's header says it. */
 const NEXT_TEXT = nextTextLine({ at: '2026-11-09T09:00:00Z' }, { timeZone: ZONE, now: NOW });
@@ -590,9 +634,11 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
       ? []
       : state === 'typing'
         ? THREAD.map((m) => (m.id === 't8' ? { ...m, readAt: null } : m))
-        : state === 'failed'
+        : state === 'failed' || state === 'adding'
           ? THREAD.slice(0, 7)
-          : state === 'older'
+          : state === 'files'
+            ? FILES_THREAD
+            : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))
             : THREAD;
@@ -609,6 +655,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           live={false}
           loadingOlder={state === 'older'}
           nextText={state === 'next-text' ? NEXT_TEXT : null}
+          draftFiles={state === 'adding' ? ADDING_FILES : undefined}
+          draftFileErrors={state === 'adding' ? ADDING_ERRORS : undefined}
           pending={
             state === 'failed'
               ? [

@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 vi.mock('@/lib/auth/client', () => ({ createClient: () => ({}) }));
 
-import { AddFile, filesFromPaste } from '@/components/attachments/add-file';
+import { AddFile, FileChips, filesFromPaste } from '@/components/attachments/add-file';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 
 const USER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
@@ -43,6 +43,17 @@ describe('AddFile', () => {
       <AddFile value={[1, 2, 3, 4, 5].map(shot)} onChange={() => {}} />,
     );
     expect(html).toMatch(/<button[^>]*disabled[^>]*>[\s\S]*Add a file/);
+  });
+
+  it('leaves the chips to the form when it draws the button alone (plan #2974)', () => {
+    const files = [shot(1)];
+    const html = renderToStaticMarkup(<AddFile value={files} onChange={() => {}} plus showList={false} />);
+    expect(html).toContain('aria-label="Add a file"');
+    expect(html).not.toContain('Screenshot 1.png');
+    const chips = renderToStaticMarkup(<FileChips value={files} onChange={() => {}} />);
+    expect(chips).toContain('Screenshot 1.png');
+    expect(chips).toContain('aria-label="Remove Screenshot 1.png"');
+    expect(renderToStaticMarkup(<FileChips value={[]} onChange={() => {}} />)).toBe('');
   });
 });
 

@@ -17,12 +17,17 @@ import { prefersReducedMotion } from '@/components/motion/reduced';
 import { Button, buttonVariants } from '@/components/ui/button';
 import Link from '@/components/ui/link';
 import { MessageInput } from '@/components/patterns/message-input';
+import { AddFile, FileChips, type AddFileHandle } from '@/components/attachments/add-file';
+import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
+import { FieldError } from '@/components/ui/field';
+import { filesOnlyText, type UploadedAttachment } from '@/lib/attachments/rules';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { EASE, MOTION_MS } from '@/lib/motion';
 import { MESSAGE_MAX } from '@/lib/you/council-model';
 import {
+  bubbleText,
   isTyping,
   mergeMessages,
   personInitials,
@@ -32,6 +37,7 @@ import {
   threadDetail,
   threadMessageOf,
   type PersonRow,
+  type ThreadFile,
   type ThreadMessage,
   type ThreadPage,
 } from '@/lib/you/chat-threads-model';
@@ -65,6 +71,11 @@ import { followedRuns, workingCard, type BuildRun } from '@/lib/you/live-cards';
  *   every few seconds until the reply comes in and the change card takes
  *   over. A build you confirmed here says where it stands on its card, heard
  *   over Realtime on its run and its session's reports until it settles.
+ * - Pictures and PDFs go with a message (plan #2974): the + in the box, a
+ *   paste of a screenshot or a copied file, or a drop on the box. Each goes
+ *   up to your folder of the attachments bucket as it is added and shows as
+ *   a chip until sent; in the thread a picture is a thumbnail and a PDF its
+ *   name, each opening the file. The mentor reads them with the message.
  */
 
 export type ThreadActions = {
@@ -94,12 +105,18 @@ const NO_PRESSES: ChangePresses = {
   undo: async () => ({ ok: false, error: 'Nothing is written in the gallery.', change: null }),
 };
 
-type Pending = { id: string; text: string; at: string; failed: string | null };
+type Pending = { id: string; text: string; at: string; failed: string | null; files?: UploadedAttachment[] };
 
 /** A message as it stands the moment you press send. */
-function newPending(text: string): Pending {
+function newPending(text: string, files: UploadedAttachment[] = []): Pending {
   const at = new Date();
-  return { id: `pending-${at.getTime()}-${Math.random().toString(36).slice(2, 6)}`, text, at: at.toISOString(), failed: null };
+  return {
+    id: `pending-${at.getTime()}-${Math.random().toString(36).slice(2, 6)}`,
+    text,
+    at: at.toISOString(),
+    failed: null,
+    ...(files.length > 0 ? { files } : {}),
+  };
 }
 
 /** Within this many pixels of the foot, a new message keeps the thread at the foot. */
@@ -149,6 +166,8 @@ export function ThreadView({
   builds: initialBuilds = NO_BUILDS,
   today,
   nextText = null,
+  draftFiles,
+  draftFileErrors,
 }: {
   person: PersonRow;
   chatId: string | null;
@@ -174,6 +193,9 @@ export function ThreadView({
   today?: string;
   /** "Next text Monday, if there is something new", for someone with a reach-out rule (plan #2931.3). */
   nextText?: string | null;
+  /** Files already added to the box, and why one was refused, for the gallery. */
+  draftFiles?: UploadedAttachment[];
+  draftFileErrors?: string[];
 }) {
   const [startedChatId, setChatId] = useState<string | null>(null);
   const chatId = initialChatId ?? startedChatId;
@@ -214,6 +236,11 @@ export function ThreadView({
   }
   const onChanged = useCallback((change: DashChange) => setChanges((list) => withItem(list, change)), []);
   const [draft, setDraft] = useState('');
+  // The files added to the box and not yet sent (plan #2974).
+  const [files, setFiles] = useState<UploadedAttachment[]>(draftFiles ?? []);
+  const [uploading, setUploading] = useState(false);
+  const [fileErrors, setFileErrors] = useState<string[]>(draftFileErrors ?? []);
+  const adder = useRef<AddFileHandle>(null);
   const [now, setNow] = useState(start);
   const scroller = useRef<HTMLDivElement | null>(null);
   const keepFrom = useRef<number | null>(null);
@@ -327,23 +354,31 @@ export function ThreadView({
       const res = await fetch('/api/chat/messages', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ advisorId: person.id, text: item.text }),
+        body: JSON.stringify({ advisorId: person.id, text: item.text, files: item.files ?? [] }),
       });
-      const body = (await res.json().catch(() => null)) as { chatId?: string; messageId?: string; error?: string } | null;
+      const body = (await res.json().catch(() => null)) as {
+        chatId?: string;
+        messageId?: string;
+        files?: ThreadFile[];
+        error?: string;
+      } | null;
       if (!res.ok || !body?.messageId || !body.chatId) {
         setPending((list) => list.map((p) => (p.id === item.id ? { ...p, failed: body?.error ?? 'Not sent.' } : p)));
         return;
       }
+      const sentFiles = Array.isArray(body.files) ? body.files : [];
       const sent: ThreadMessage = {
         id: body.messageId,
         chatId: body.chatId,
         role: 'person',
         kind: 'reply',
-        text: item.text,
+        // A message of files alone is saved as their names, which the bubble leaves out.
+        text: item.text || filesOnlyText(sentFiles.map((f) => f.name)),
         receipts: [],
         createdAt: item.at,
         deliveredAt: null,
         readAt: null,
+        ...(sentFiles.length > 0 ? { files: sentFiles } : {}),
       };
       // The row Realtime sends carries the server's time and receipts, and replaces this copy by id.
       setMessages((list) => mergeMessages(list, [sent]));
@@ -359,10 +394,12 @@ export function ThreadView({
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || !person.canTalk) return;
-    const item = newPending(text);
+    if ((!text && files.length === 0) || !person.canTalk || uploading) return;
+    const item = newPending(text, files);
     setPending((list) => [...list, item]);
     setDraft('');
+    setFiles([]);
+    setFileErrors([]);
     void send(item);
   };
 
@@ -458,20 +495,55 @@ export function ThreadView({
       scrollRef={scroller}
       onScroll={onScroll}
       box={
-        <form onSubmit={submit} className="flex items-end gap-2">
-          <MessageInput
-            aria-label={`Message ${person.name}`}
-            placeholder={person.canTalk ? 'Message' : 'Not ready to talk yet'}
-            value={draft}
-            maxLength={MESSAGE_MAX}
-            disabled={!person.canTalk}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <Tooltip label="Send">
-            <Button type="submit" aria-label="Send" disabled={!person.canTalk || !draft.trim()} className="size-(--control-h) shrink-0 rounded-pill px-0 max-sm:mb-[calc((2.75rem-var(--control-h))/2)]">
-              <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
-            </Button>
-          </Tooltip>
+        <form
+          onSubmit={submit}
+          className="flex flex-col gap-1.5"
+          // A file dropped on the box is added as a pasted one is.
+          onDragOver={(e) => {
+            if (person.canTalk && e.dataTransfer.types.includes('Files')) e.preventDefault();
+          }}
+          onDrop={(e) => {
+            if (adder.current?.paste(e.dataTransfer)) e.preventDefault();
+          }}
+        >
+          <FileChips value={files} onChange={setFiles} />
+          {fileErrors.length > 0 && <FieldError>{fileErrors.join(' ')}</FieldError>}
+          <div className="flex items-end gap-2">
+            <div className="shrink-0 max-sm:mb-[calc((2.75rem-var(--control-h))/2)]">
+              <AddFile
+                ref={adder}
+                value={files}
+                onChange={setFiles}
+                disabled={!person.canTalk}
+                onUploadingChange={setUploading}
+                onErrors={setFileErrors}
+                plus
+                showList={false}
+              />
+            </div>
+            <MessageInput
+              aria-label={`Message ${person.name}`}
+              placeholder={person.canTalk ? 'Message' : 'Not ready to talk yet'}
+              value={draft}
+              maxLength={MESSAGE_MAX}
+              disabled={!person.canTalk}
+              onChange={(e) => setDraft(e.target.value)}
+              // A screenshot or a copied file goes in as a file.
+              onPaste={(e) => {
+                if (adder.current?.paste(e.clipboardData)) e.preventDefault();
+              }}
+            />
+            <Tooltip label="Send">
+              <Button
+                type="submit"
+                aria-label="Send"
+                disabled={!person.canTalk || uploading || (!draft.trim() && files.length === 0)}
+                className="size-(--control-h) shrink-0 rounded-pill px-0 max-sm:mb-[calc((2.75rem-var(--control-h))/2)]"
+              >
+                <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
+              </Button>
+            </Tooltip>
+          </div>
         </form>
       }
     >
@@ -499,32 +571,41 @@ export function ThreadView({
           <MessageDay key={block.key}>{block.label}</MessageDay>
         ) : (
           <MessageGroup key={block.key} from={block.from}>
-            {block.messages.map((m, i) => (
-              <Fragment key={m.id}>
-                {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
-                <MessageBubble from={block.from} last={i === block.messages.length - 1 && !cards.has(m.id)} arriving={arrives(m)}>
-                  {m.text}
-                </MessageBubble>
-                {m.receipts.map((r) => (
-                  <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
-                    {r.label}
-                  </MessageLink>
-                ))}
-                {cards.has(m.id) && (
-                  <MessageCard>
-                    <DashChanges
-                      changes={cards.get(m.id) ?? []}
-                      presses={presses}
-                      onChanged={onChanged}
-                      today={today}
-                      by={person.name}
-                      builds={builds}
-                      inThread
-                    />
-                  </MessageCard>
-                )}
-              </Fragment>
-            ))}
+            {block.messages.map((m, i) => {
+              const words = bubbleText(m);
+              const lastOfRun = i === block.messages.length - 1 && !cards.has(m.id);
+              return (
+                <Fragment key={m.id}>
+                  {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
+                  {words !== null && (
+                    <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
+                      {words}
+                    </MessageBubble>
+                  )}
+                  {m.files && m.files.length > 0 && (
+                    <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
+                  )}
+                  {m.receipts.map((r) => (
+                    <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
+                      {r.label}
+                    </MessageLink>
+                  ))}
+                  {cards.has(m.id) && (
+                    <MessageCard>
+                      <DashChanges
+                        changes={cards.get(m.id) ?? []}
+                        presses={presses}
+                        onChanged={onChanged}
+                        today={today}
+                        by={person.name}
+                        builds={builds}
+                        inThread
+                      />
+                    </MessageCard>
+                  )}
+                </Fragment>
+              );
+            })}
             {receipt && block.messages.at(-1)?.id === receipt.id && <MessageNote>{receipt.label}</MessageNote>}
           </MessageGroup>
         ),
@@ -533,10 +614,13 @@ export function ThreadView({
         <MessageGroup from="you">
           {pending.map((p, i) => (
             <div key={p.id} className="flex flex-col items-end">
-              <span className={cn(p.failed && 'opacity-60')}>
-                <MessageBubble from="you" last={i === pending.length - 1}>
-                  {p.text}
-                </MessageBubble>
+              <span className={cn('flex flex-col items-end gap-0.5', p.failed && 'opacity-60')}>
+                {p.text && (
+                  <MessageBubble from="you" last={i === pending.length - 1 && !p.files?.length}>
+                    {p.text}
+                  </MessageBubble>
+                )}
+                {p.files && p.files.length > 0 && <AskTurnFiles files={p.files} large align="end" label="Sending with this message" />}
               </span>
               {p.failed ? (
                 <MessageNote tone="danger">

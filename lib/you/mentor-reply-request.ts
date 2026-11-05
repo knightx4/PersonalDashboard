@@ -6,7 +6,10 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import { peopleDashInRequest } from '@/lib/talk/ask-request';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { createYouClient } from '@/lib/you/auth/server';
+import { readMessageFiles, recordMessageFiles } from '@/lib/you/chat-message-files';
+import type { ThreadFile } from '@/lib/you/chat-threads-model';
 import { listRoster } from '@/lib/you/board-advisors';
 import { loadNote } from '@/lib/you/council';
 import { replyToMentor } from '@/lib/you/mentor-reply';
@@ -24,11 +27,19 @@ import { notifyPerson } from '@/lib/talk/reply-state-store';
  * every read and write, and Dash's lookups and changes run as they do in Ask.
  */
 
-export type SendInRequest = { error: string | null; saved: boolean; chatId?: string; messageId?: string; mentorKey?: string };
+export type SendInRequest = {
+  error: string | null;
+  saved: boolean;
+  chatId?: string;
+  messageId?: string;
+  mentorKey?: string;
+  /** The files recorded against the message (plan #2974). */
+  files?: ThreadFile[];
+};
 
 export async function sendMentorMessageInRequest(
   userId: string,
-  input: { advisorId: string; text: string; noteId?: string | null },
+  input: { advisorId: string; text: string; noteId?: string | null; files?: readonly UploadedAttachment[] },
 ): Promise<SendInRequest> {
   const client = await createYouClient();
   const mentor = (await listRoster(client, userId)).find((a) => a.id === input.advisorId);
@@ -43,11 +54,13 @@ export async function sendMentorMessageInRequest(
     mentor: { id: mentor.id, name: mentor.name, canTalk: canTalkOf(mentor) },
     text: input.text,
     noteId: input.noteId ?? null,
+    files: input.files,
+    recordFiles: async (messageId, files) => recordMessageFiles(await createCoreClient(), userId, messageId, files),
   });
   if (!sent.saved) return { error: sent.error, saved: false };
   // A reply already being written answers this message when it finishes.
   if (sent.claimed) after(() => replyAndAnnounce(userId, sent.chatId, mentor));
-  return { error: null, saved: true, chatId: sent.chatId, messageId: sent.messageId, mentorKey: mentor.key };
+  return { error: null, saved: true, chatId: sent.chatId, messageId: sent.messageId, mentorKey: mentor.key, files: sent.files };
 }
 
 /** The reply, once the send has answered; the send already holds the typing claim. */
@@ -67,6 +80,8 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       act: dash,
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
       claimed: true,
+      // The pictures and PDFs sent with the messages being answered (plan #2974).
+      readFiles: (messageIds) => readMessageFiles(core, messageIds),
     });
   } catch (error) {
     // replyToMentor never throws, so this is the setup before it: let go of the claim and say so.

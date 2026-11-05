@@ -65,7 +65,14 @@ export async function turnFiles(core: CoreSupabaseClient, turnId: string): Promi
  * and CSV as text, and anything that cannot be read named with the reason.
  */
 export async function readTurnFiles(core: CoreSupabaseClient, turnId: string): Promise<DashFile[]> {
-  const held = await turnFiles(core, turnId);
+  return readHeldFiles(core, await turnFiles(core, turnId));
+}
+
+/**
+ * Recorded files downloaded and read for the model, within one request's
+ * size: Ask's question files and a People message's (plan #2974) alike.
+ */
+export async function readHeldFiles(core: CoreSupabaseClient, held: readonly Attachment[]): Promise<DashFile[]> {
   const read = await Promise.all(
     held.map(async (file): Promise<DashFile> => {
       const { data, error } = await core.storage.from(ATTACHMENTS_BUCKET).download(file.path);

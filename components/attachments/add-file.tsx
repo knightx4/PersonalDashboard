@@ -57,6 +57,8 @@ export function AddFile({
   onUploadingChange,
   iconOnPhone = false,
   plus = false,
+  showList = true,
+  onErrors,
 }: {
   ref?: React.Ref<AddFileHandle>;
   value: readonly UploadedAttachment[];
@@ -74,6 +76,14 @@ export function AddFile({
   iconOnPhone?: boolean;
   /** Draw the button as a + alone at every width, as Claude's box has it (plan #2863). */
   plus?: boolean;
+  /**
+   * False: draw the button alone, and leave the chips (FileChips) and the
+   * problems (`onErrors`) to the form, for a box that keeps the + beside its
+   * words, as People's does (plan #2974).
+   */
+  showList?: boolean;
+  /** Hears why the files just chosen could not all be added, or [] when they could. */
+  onErrors?: (errors: string[]) => void;
 }) {
   const inputId = useId();
   const errorId = `${inputId}-error`;
@@ -102,6 +112,7 @@ export function AddFile({
       onUploadingChange?.(false);
     }
     setErrors(problems);
+    onErrors?.(problems);
     if (added.length > 0) onChange([...value, ...added]);
   };
 
@@ -114,11 +125,6 @@ export function AddFile({
       return true;
     },
   }));
-
-  const remove = (path: string) => {
-    onChange(value.filter((file) => file.path !== path));
-    void discardUpload(path);
-  };
 
   return (
     <div className="min-w-0 space-y-1.5">
@@ -179,31 +185,52 @@ export function AddFile({
           {uploading ? 'Adding…' : 'Add a file'}
         </Button>
       )}
-      {value.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Files to add">
-          {value.map((file) => (
-            <li
-              key={file.path}
-              className="flex min-w-0 max-w-full items-center gap-1 rounded-control bg-sunken py-0.5 pl-2 pr-0.5 text-small text-ink"
-            >
-              <span className="min-w-0 truncate">{file.name}</span>
-              <span className="shrink-0 text-ink-muted">{attachmentSize(file.size)}</span>
-              <IconButton
-                size="sm"
-                label={`Remove ${file.name}`}
-                className="hover:bg-surface"
-                disabled={disabled}
-                onClick={() => remove(file.path)}
-              >
-                <X aria-hidden strokeWidth={1.75} />
-              </IconButton>
-            </li>
-          ))}
-        </ul>
-      )}
-      {errors.length > 0 && (
+      {showList && <FileChips value={value} onChange={onChange} disabled={disabled} />}
+      {showList && errors.length > 0 && (
         <FieldError id={errorId}>{errors.join(' ')}</FieldError>
       )}
     </div>
+  );
+}
+
+/**
+ * The files added and not yet sent, each a chip with its name and size that
+ * can be taken off again, which also takes its copy back out of the folder.
+ */
+export function FileChips({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: readonly UploadedAttachment[];
+  onChange: (files: UploadedAttachment[]) => void;
+  disabled?: boolean;
+}) {
+  if (value.length === 0) return null;
+  const remove = (path: string) => {
+    onChange(value.filter((file) => file.path !== path));
+    void discardUpload(path);
+  };
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="Files to add">
+      {value.map((file) => (
+        <li
+          key={file.path}
+          className="flex min-w-0 max-w-full items-center gap-1 rounded-control bg-sunken py-0.5 pl-2 pr-0.5 text-small text-ink"
+        >
+          <span className="min-w-0 truncate">{file.name}</span>
+          <span className="shrink-0 text-ink-muted">{attachmentSize(file.size)}</span>
+          <IconButton
+            size="sm"
+            label={`Remove ${file.name}`}
+            className="hover:bg-surface"
+            disabled={disabled}
+            onClick={() => remove(file.path)}
+          >
+            <X aria-hidden strokeWidth={1.75} />
+          </IconButton>
+        </li>
+      ))}
+    </ul>
   );
 }
