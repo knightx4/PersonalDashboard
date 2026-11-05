@@ -39,14 +39,15 @@
  * (`lib/plan/ui-settle-diff.ts`). The rounds come from ui_checks with
  * DATABASE_URL, and from `.preview-shots/checks/` without it.
  *
- * With `--compare` (plan #2815.3) it does that shooting itself. The surfaces
- * the critic has judged on the step, and any its title, detail or done-when
- * links as /preview?s=<id>, are left for the critic. Every other surface its
- * files reach that has not passed is shot on this checkout and on origin/main
- * (scripts/ui-guard-compare.ts), and those that look the same are settled
- * with the reason `SAME_AS_MAIN_REASON`. It prints only the surfaces the
- * critic still has to see, and how long building, shooting and comparing
- * took. Without DATABASE_URL it prints the settle for the connector.
+ * With `--compare` (plan #2815.3, #2966.2) it does that shooting itself, as
+ * the first stage of screen.md. Every surface its files serve that has not
+ * passed, the ones the step names included, is shot on this checkout and on
+ * origin/main (scripts/ui-guard-compare.ts), and those that look the same are
+ * settled with the reason `SAME_AS_MAIN_REASON`. It prints how many it settled
+ * and how many go to the critic, the surfaces that do, and how long building,
+ * shooting and comparing took. It shoots the checkout it runs in, so
+ * run it with the commit to compare checked out; `--commit <sha>` names the
+ * commit the step's changed files are read at.
  */
 import postgres from 'postgres';
 import { httpsSql, restTransport } from '../lib/db/https-sql';
@@ -259,21 +260,21 @@ async function compareRun(input: {
   }
   const workersArg = Number(arg('--workers') ?? '3');
   const workers = Number.isFinite(workersArg) && workersArg >= 1 ? Math.min(Math.floor(workersArg), 5) : 3;
-  if (reached.length === 0) {
-    console.log(
-      named.length === 0
-        ? `Every surface ${name} serves has passed: nothing to compare.`
-        : `Nothing reached through a shared file is left to compare. For the critic: ${named.join(', ')}.`,
-    );
+  // The surfaces the step names are compared with the rest (plan #2966.2): one
+  // with no visible change is settled, and only a changed one reaches the critic.
+  const toCompare = [...named, ...reached];
+  if (toCompare.length === 0) {
+    console.log(`Every surface ${name} serves has passed: nothing to compare.`);
     return;
   }
+  console.log(`${toCompare.length} to compare with main (${named.length} named by the step, ${reached.length} reached through a shared file).`);
   const { comparisons, newOnBranch, timings } = await compareWithMain({
     root: process.cwd(),
     files,
-    reached,
+    reached: toCompare,
     workers,
   });
-  const report = compareReport({ name, step, named, comparisons, newOnBranch, timings });
+  const report = compareReport({ name, step, comparisons, newOnBranch, timings });
   console.log(report.text);
   if (report.settled.length === 0) return;
   const statement = uiSettleSql(step, report.settled, SAME_AS_MAIN_REASON);

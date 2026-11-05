@@ -70,6 +70,11 @@ registered; working offline, read the line and `REFERENCES` yourself.
   close goes in the close note by name, as an open difference from the
   reference, where the person can overrule it.
 
+**Stage 0, once the screens are drawn and before the first critic round:** run
+`npm run ui-guard -- <step> --compare` (**Compare with main first**, below).
+It settles every surface with no visible change from main, and prints how many
+it settled and how many go on. The loop that follows is for those that go on.
+
 **The loop, for each surface:**
 
 1. **Shoot main first.** Before changing anything, photograph the surface as
@@ -183,23 +188,25 @@ blocks, and that answer replaces decision #1535's A. So:
    settled and the fixes still open, in a line, so the person can overrule
    it from the step's row.
 
-**Surfaces a shared file reaches.** The close guard lists every surface a
-changed file serves, so a change to a shared row or folder can name dozens
-of screens nobody sent to the critic. Send the surfaces the step meant to
-change to the critic, then run `npm run ui-guard -- <step> --compare`
-(plan #2815.3). It treats as meant the surfaces the critic has judged on the
-step (a settle is not a look) and any its title, detail or done-when links
-as `/preview?s=<id>`, and skips those that have passed. Every other surface
-the files reach it shoots on this checkout and on origin/main, settles those
-whose shots match, and lists the rest, with the time each part took. Those
-it lists have changed: they go to the critic from round 1. It builds what is
-not running: the branch's preview on `PREVIEW_PORT` (a running one is used
+**Compare with main first (plan #2966.2).** Before any round goes to the
+critic, run `npm run ui-guard -- <step> --compare`. It is the first stage: a
+screen that looks the same as on main is signed off by comparison, and only a
+screen whose shots differ is sent to the critic. It covers every surface the
+step's files serve that has not passed: the ones the step lists as its own
+(its title, detail or done-when links as `/preview?s=<id>`, or the critic has
+judged them) and the ones a shared file reaches (a change to a shared row or
+folder can name dozens of screens nobody meant to change). It shoots each on
+this checkout and on origin/main, settles those whose four shots match with
+the reason `SAME_AS_MAIN_REASON`, and prints how many it settled and how many
+go to the critic, then lists those, with the time each part took. A surface
+main does not have is new, and goes to the critic from round 1. It builds what
+is not running: the branch's preview on `PREVIEW_PORT` (a running one is used
 only when built after the step's last change) and main's in a worktree under
 the temp folder on `PREVIEW_PORT` + 1000, kept for the next run. `--workers
 <n>` sets how many shooters a side, three by default. Do not block on these
 surfaces.
 
-The settle lets one of those through only when it looks the same as on main
+`--settle` lets a surface through that the critic has not passed only when it looks the same as on main
 (plan #2215.4). For every surface still waiting that the critic has not
 judged through three rounds, it compares the four shots in `.preview-shots/`
 with main's in `.preview-shots/before/` pixel by pixel, and refuses the whole
