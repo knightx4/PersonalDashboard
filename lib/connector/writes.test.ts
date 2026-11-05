@@ -73,6 +73,7 @@ describe('runConnectorWrite', () => {
       'save_about_me',
       'set_detail',
       'ask_board',
+      'set_reach_out',
       'talk_to_advisor',
       'mark_issue_unread',
       'save_story',
