@@ -318,6 +318,7 @@ export const youSources: ModuleSources = {
     { table: 'you.council_runs', reason: 'Bookkeeping for the board-routine sessions that write Council notes and mentors\' replies.' },
     { table: 'you.advisor_persona_versions', reason: 'The persona cards a mentor had before their current one, kept so an earlier card can be brought back; a setting of the mentor, not something they wrote, wanted or did.' },
     { table: 'you.first_text_events', reason: 'Bookkeeping for texts someone on People sends unasked: what happened on the plan and whether it was texted yet; the plan rows themselves are what happened.' },
+    { table: 'you.advisor_reach_outs', reason: 'Bookkeeping for the daily round: which row a text from someone on People named and when, so it is not named again too soon; the rows themselves are what the person wrote or did.' },
     { table: 'you.advisor_memory', reason: 'What Dash noted for an advisor to remember from their talks and meetings; Goals reading it would cite Dash to itself.' },
     { table: 'you.personality_profiles', reason: 'Dash\'s analysis across their personality tests; Goals reading it would cite Dash to itself.' },
     { table: 'you.insight_digest', reason: 'Dash\'s notes about them for its next insights call (plan #2413.9); Goals reading them would cite Dash to itself.' },

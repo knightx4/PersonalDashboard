@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -1253,5 +1253,120 @@ describe('earlier persona cards', () => {
                    values (${userA}, ${advisor.id}, 'Forged.')`,
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe('reach-out briefs and what was mentioned', () => {
+  // migrations-you/0044_reach_out_rules.sql (plan #2931.1).
+  const watch = {
+    key: 'new_roles',
+    about: 'New roles that fit you',
+    tables: ['job_search.roles'],
+    mode: 'each',
+    every_days: 1,
+    repeat_after_days: null,
+  };
+  const rule = { version: 1, watches: [watch], cannot_watch: ['Replies on LinkedIn'] };
+  let advisor = '';
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'reach', 'Reach', 'seat', 'What fits?', ${admin.json({ style: 'notionists', seed: 'reach' })})
+      returning id`;
+    advisor = row.id;
+  });
+
+  const save = (r: unknown, summary: string | null = 'Texts you when a role fits.') =>
+    asUser(
+      userA,
+      (tx) => tx`update board_advisors
+                    set reach_out_brief = 'Tell me when new jobs fit.',
+                        reach_out_rule = ${tx.json(r as never)},
+                        reach_out_summary = ${summary},
+                        reach_out_set_at = now()
+                  where id = ${advisor}`,
+    );
+
+  it('saves a well-formed rule with its sentence', async () => {
+    await save(rule);
+    await save({
+      version: 1,
+      watches: [
+        { ...watch, key: 'roundup', mode: 'roundup', every_days: 7, repeat_after_days: 30, form: 'list' },
+        { ...watch, key: 'contact', mode: 'pick', tables: ['job_search.contacts'], every_days: 14 },
+      ],
+    });
+    const [row] = await admin<{ n: number }[]>`
+      select jsonb_array_length(reach_out_rule -> 'watches') as n from you.board_advisors where id = ${advisor}`;
+    expect(row.n).toBe(2);
+  });
+
+  it('refuses a malformed rule, and a rule with no sentence', async () => {
+    const bad: unknown[] = [
+      [],
+      { watches: [watch] },
+      { version: 2, watches: [watch] },
+      { version: 1, watches: [] },
+      { version: 1, watches: [watch], extra: true },
+      { version: 1, watches: [{ ...watch, colour: 'red' }] },
+      { version: 1, watches: [watch, watch] },
+      { version: 1, watches: [{ ...watch, key: 'New Roles' }] },
+      { version: 1, watches: [{ ...watch, about: ' ' }] },
+      { version: 1, watches: [{ ...watch, tables: [] }] },
+      { version: 1, watches: [{ ...watch, tables: ['roles'] }] },
+      { version: 1, watches: [{ ...watch, tables: ['job_search.roles', 'job_search.roles'] }] },
+      { version: 1, watches: [{ ...watch, mode: 'sometimes' }] },
+      { version: 1, watches: [{ ...watch, every_days: 0 }] },
+      { version: 1, watches: [{ ...watch, every_days: 1.5 }] },
+      { version: 1, watches: [{ ...watch, every_days: '7' }] },
+      { version: 1, watches: [{ key: 'x', about: 'x', tables: ['a.b'], mode: 'each', every_days: 1 }] },
+      { version: 1, watches: [{ ...watch, repeat_after_days: 0 }] },
+      { version: 1, watches: [{ ...watch, form: 'essay' }] },
+      { version: 1, watches: [watch], cannot_watch: [''] },
+      { version: 1, watches: [watch], cannot_watch: 'LinkedIn' },
+    ];
+    for (const r of bad) {
+      await expect(save(r), JSON.stringify(r)).rejects.toThrow(/reach_out_rule_ck/);
+    }
+    await expect(save(rule, null)).rejects.toThrow(/reach_out_rule_summary_ck/);
+  });
+
+  it('keeps what a text named to its owner, written by the service role only', async () => {
+    const [chat] = await admin<{ id: string }[]>`
+      insert into you.advisor_chats (user_id, advisor_id) values (${userA}, ${advisor}) returning id`;
+    const [message] = await admin<{ id: string }[]>`
+      insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+      values (${userA}, ${chat.id}, 'advisor', 'reply', 'Two roles fit.') returning id`;
+    await admin`insert into you.advisor_reach_outs (user_id, advisor_id, message_id, watch_key, ref_table, ref_id)
+                values (${userA}, ${advisor}, ${message.id}, 'new_roles', 'job_search.roles', 'r1')`;
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, message_id, watch_key, ref_table, ref_id)
+            values (${userA}, ${advisor}, ${message.id}, 'new_roles', 'job_search.roles', 'r1')`,
+    ).rejects.toThrow(/advisor_reach_outs_message_ref/);
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+            values (${userA}, ${advisor}, 'new_roles', 'roles', 'r2')`,
+    ).rejects.toThrow(/ref_table_ck/);
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+            values (${userB}, ${advisor}, 'new_roles', 'job_search.roles', 'r2')`,
+    ).rejects.toThrow();
+
+    expect(await asUser(userA, (tx) => tx`select ref_id from advisor_reach_outs`)).toEqual([{ ref_id: 'r1' }]);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_reach_outs`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+                   values (${userA}, ${advisor}, 'new_roles', 'job_search.roles', 'r3')`,
+      ),
+    ).rejects.toThrow();
+
+    // The memory outlives the message.
+    await admin`delete from you.advisor_messages where id = ${message.id}`;
+    const [kept] = await admin<{ message_id: string | null }[]>`
+      select message_id from you.advisor_reach_outs where ref_id = 'r1'`;
+    expect(kept.message_id).toBeNull();
   });
 });
