@@ -115,12 +115,11 @@ describe('what Jev reads', () => {
     expect(JSON.stringify(state)).not.toContain('Ideas/');
   });
 
-  it('never carries a passage from a secret, audience, journal or left-out note', () => {
+  it('never carries a passage from a secret, journal or left-out note', () => {
     const idea: IdeaToScore = {
       ...IDEA,
       sources: [
         source('The vault password is hunter2.', { title: 'Passwords', voice: 'secret' }),
-        source('I argue towns should grow.', { title: 'MBA essay', voice: 'audience' }),
         source('Today I felt the town was too quiet.', { title: 'Tuesday', path: 'Journal/Tuesday.md' }),
         source('Halvorsen should hire me.', { title: 'Cover letter', path: 'Career/Letter.md' }),
         source('Use sk-ant-abc to call it.', { title: 'Setup' }),
@@ -129,7 +128,18 @@ describe('what Jev reads', () => {
     const { state } = ideaScoreState(idea, { journalFolders: ['Journal'], excludedFolders: ['Career'] });
     expect(state.passages).toEqual([]);
     const sent = JSON.stringify(state);
-    for (const word of ['hunter2', 'grow', 'quiet', 'Halvorsen', 'sk-ant']) expect(sent).not.toContain(word);
+    for (const word of ['hunter2', 'quiet', 'Halvorsen', 'sk-ant']) expect(sent).not.toContain(word);
+  });
+
+  it('carries a passage from a note written for somebody else, so its type is asked (#2947.10)', () => {
+    const idea: IdeaToScore = {
+      ...IDEA,
+      sources: [source('I take on what depends on other people first.', { title: 'Interview talking points', voice: 'audience' })],
+    };
+    const { state } = ideaScoreState(idea);
+    expect(state.passages).toEqual([
+      { note: 'Interview talking points', quote: 'I take on what depends on other people first.' },
+    ]);
   });
 
   it('keeps at most three passages, in the same order whatever order they came in', () => {
@@ -305,7 +315,7 @@ describe('scoring an idea', () => {
 
   it("stores an idea whose every passage is withheld as not the writer's own, without asking Jev", async () => {
     const fetch = respond({});
-    const idea = { ...IDEA, sources: [source('Frame the analog.', { voice: 'audience' })] };
+    const idea = { ...IDEA, sources: [source('Frame the analog.', { voice: 'secret' })] };
     const result = await scoreIdea({ idea, apiKey: 'k', fetch });
     expect(result).toMatchObject({
       ok: true,

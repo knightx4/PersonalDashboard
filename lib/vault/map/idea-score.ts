@@ -33,6 +33,11 @@ import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from './rules';
  * note as it stands now, up to PARAGRAPH_CHARS (#2947.8, the person's answer
  * A on #2947.6). All three questions read it.
  *
+ * v4 (#2947.10) rewords the type question: about three in four of the ideas
+ * v3 called someone else's were the writer's own, taken from interview
+ * talking points, cover letters and class notes. An idea is now someone
+ * else's only when the note credits it to a named source.
+ *
  * Nothing here writes to the database. The job that scores the map
  * (#2947.3) reads the position and its sources, calls scoreIdea and stores
  * the result in obsidian.position_scores.
@@ -48,7 +53,7 @@ import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from './rules';
  * asks and the novelty anchors (0-1 a textbook point, 4-5 a fresh
  * combination of known parts, 8-9 no clear precedent).
  */
-export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v3';
+export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v4';
 
 export const IDEA_TYPES = [
   'own_idea',
@@ -77,13 +82,13 @@ export const PARAGRAPH_CHARS = 1_500;
 
 const IDEA_TYPE_OPTIONS: Readonly<Record<IdeaType, string>> = {
   own_idea:
-    'The writer\'s own idea: a view they argue, a method they propose or a claim they hold, in their own words. "Neighbourhoods should be planned so a school is a ten-minute walk from every home."',
+    'The writer\'s own idea: a view they argue, a method they propose or a claim they hold, in their own words. This includes how they work, lead, learn or decide, and why they want a job, a company or a career path, wherever it is written: interview talking points, a cover letter, an application or notes for a class are still the writer speaking. When `basis` says the writer states, holds, adopts, advocates, chose or describes it as their own, it is theirs. "Neighbourhoods should be planned so a school is a ten-minute walk from every home." "I take on the dependencies on other people first, so nobody is rushed at the end."',
   project_design:
     'A design the writer works out for a place, a building, a city, an institution or a system of rules: how it is arranged and why. Not a feature of an app or product, and not part of a story. "Urban spaces should run from open squares to hidden side streets, so people can choose how public to be."',
   requirement:
     'What a particular product, tool or app should do, contain or connect to, or a task or deliverable, however it is worded ("must", "should", "could", "needs to"), with no argument for why it is a good idea. It is about one named product or role, not a claim about how people or the world work: "must" and "should" in a general claim ("leaders need to be in the field") are still the writer\'s own idea. This covers the writer\'s own product, and what an employer expects of a role. "A note-taking tool should integrate with Obsidian." "The export must include the date column."',
   others_idea:
-    'Someone else\'s idea: the note credits it to a person, book, course or article, or it summarises what a source says rather than what the writer holds. "Jacobs argues that mixed-use streets are safer."',
+    'Someone else\'s idea: the passage or `basis` credits it to a named person, author, school of thought, book, course or reading, or it sets out what a source argues rather than what the writer holds. Being written for an interview, an application or a class does not make an idea someone else\'s, and neither does an idea the writer took up and now states as their own. "Jacobs argues that mixed-use streets are safer." "The Stoics hold that you should master your thoughts, not your circumstances."',
   description:
     'A definition, an observation or a record, with no view or proposal in it: what a term means, what happened, what something looks like. Also anything inside a story the writer is inventing: a character, a motif, a plot turn, a world or its history, however it is phrased, since it is fiction and not a view about the real world. "A sonnet has fourteen lines." "A character is the heart of the planet and feels its emotions."',
 };
@@ -175,18 +180,23 @@ export type IdeaScoreState = {
 export type IdeaScorePassage = { note: string; quote: string; paragraph?: string };
 
 /**
- * Whether a source's passage may go to Jev. Never one from a secret note, one
- * written only for somebody else (an application, an essay: what it argues
- * may not be what the writer holds), or one in a journal folder or a folder
- * the person left out of the map. A passage that looks like it holds a key is
- * held back too, whatever its note.
+ * Whether a source's passage may go to Jev. Never one from a secret note, or
+ * one in a journal folder or a folder the person left out of the map. A
+ * passage that looks like it holds a key is held back too, whatever its note.
+ *
+ * Notes written for somebody else (interview talking points, a cover letter,
+ * an application) were held back too until #2947.10, on the view that what
+ * they argue may not be what the writer holds. That sent every idea from them
+ * to others_idea unasked, which was about a third of all ideas and most of
+ * the person's ideas about work, and the person asked for those to count. So
+ * they go to Jev like any other note, and the type question decides.
  */
 export function passageMaySend(
   source: IdeaSource,
   rules: VaultRules = DEFAULT_VAULT_RULES,
   paragraph: string = source.quote,
 ): boolean {
-  if (source.note.voice === 'secret' || source.note.voice === 'audience') return false;
+  if (source.note.voice === 'secret') return false;
   return whyNotRead({ path: source.note.path, body: `${source.quote}\n\n${paragraph}` }, rules) === null;
 }
 
@@ -357,13 +367,11 @@ export async function scoreIdea(input: ScoreIdeaInput): Promise<IdeaScoreResult>
 }
 
 /**
- * An idea every one of whose passages is held back (a note written for
- * somebody else, a secret note, a folder left out) has only its one-line
+ * An idea every one of whose passages is held back (a secret note, a journal,
+ * a folder left out) has only its one-line
  * summary to judge by, and the 4 November trial saw a job-application line
  * pass as the writer's own view. It is stored as not the writer's own, with no
- * scores and without a request, so nothing about it is sent. The type is
- * others_idea because what a note written for an audience says is what the
- * writer wants that audience to read, not a view they hold.
+ * scores and without a request, so nothing about it is sent.
  */
 export function withheldIdeaScore(inputHash: string): IdeaScoreResult {
   const probabilities = Object.fromEntries(IDEA_TYPES.map((t) => [t, t === 'others_idea' ? 1 : 0])) as Record<
