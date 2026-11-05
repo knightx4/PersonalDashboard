@@ -329,7 +329,7 @@ function MetricForm({
         <FieldError>{errorOn('period')}</FieldError>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Field id={`${id}-target`} label={`Aim per ${period}, if any`} error={errorOn('target')}>
+        <Field id={`${id}-target`} label={`Aim per ${period}`} error={errorOn('target')}>
           <Input
             id={`${id}-target`}
             name="target"

@@ -148,6 +148,14 @@ export function GoalMetricPropsFormStepsSurface() {
   return <Metrics metrics={[]} lists={[LISTS[1]]} shown={{ open: 'add' }} />;
 }
 
+/**
+ * Changing the applications metric: Job applications sent is chosen under
+ * What to count, and no list or date is asked for (plan #2908.2).
+ */
+export function GoalMetricPropsFormApplicationsSurface() {
+  return <Metrics shown={{ open: 'm-sent' }} />;
+}
+
 /** A new metric being saved: the button holds its pending state. */
 export function GoalMetricPropsPendingSurface() {
   return <Metrics shown={{ open: 'add', pending: true }} />;
