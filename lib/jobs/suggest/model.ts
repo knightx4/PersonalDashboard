@@ -28,6 +28,7 @@ import {
 import type { BoardPosting } from './board-pick';
 import { preferenceLines, type JobPreferences } from './preferences';
 import { MODELS } from '@/lib/core/models';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 
 export const SUGGEST_MODEL = MODELS.jobsSuggest;
 /** Each search is billed, and its results come back as input. */
@@ -681,25 +682,24 @@ export async function pickNewBoardOpenings(
           model: SUGGEST_MODEL,
           max_tokens: MAX_TOKENS,
           system: BOARD_PICK_SYSTEM,
-          tools: [
+          ...reportRequest(
             {
               name: OPENINGS_TOOL,
               description: 'Report the postings worth applying for, all in one call.',
               input_schema: OPENINGS_SCHEMA,
             },
-          ],
+            SUGGEST_MODEL,
+          ),
           messages: [{ role: 'user', content: prompt }],
         },
         { signal: AbortSignal.timeout(budget), timeout: budget, maxRetries: 0 },
       )
       .finalMessage();
     options.onSpend?.({ model: SUGGEST_MODEL, usage: usageFrom(response.usage) });
-    const call = response.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use' && block.name === OPENINGS_TOOL,
-    );
-    if (!call) return { ok: false, error: 'The pick of new board postings reported nothing.' };
+    const call = readReport(response, OPENINGS_TOOL, SUGGEST_MODEL);
+    if (!call.ok) return { ok: false, error: 'The pick of new board postings reported nothing.' };
     const offered = new Set(input.candidates.map((p) => p.url));
-    const suggestions = parseOpeningsPayload(call.input, input.taken, input.seeker.excludedIndustries).filter(
+    const suggestions = parseOpeningsPayload(call.value, input.taken, input.seeker.excludedIndustries).filter(
       (suggestion) => offered.has(suggestion.url),
     );
     return { ok: true, suggestions };

@@ -23,10 +23,11 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import {
   coverLetterView,
   mergeAsks,
@@ -193,23 +194,20 @@ export async function writeCoverLetter(
         { type: 'text', text: SYSTEM },
         { type: 'text', text: renderMaterial(material), cache_control: { type: 'ephemeral' } },
       ],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the cover letter, what it cites, what it could not ground and what to ask them.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              letter: { type: 'string' },
-              evidence_item_ids: { type: 'array', items: { type: 'string' } },
-              unsupported_claims: { type: 'array', items: { type: 'string' } },
-              asks: { type: 'array', items: { type: 'string' } },
-            },
-            required: ['letter', 'evidence_item_ids', 'unsupported_claims', 'asks'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the cover letter, what it cites, what it could not ground and what to ask them.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            letter: { type: 'string' },
+            evidence_item_ids: { type: 'array', items: { type: 'string' } },
+            unsupported_claims: { type: 'array', items: { type: 'string' } },
+            asks: { type: 'array', items: { type: 'string' } },
           },
+          required: ['letter', 'evidence_item_ids', 'unsupported_claims', 'asks'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: `${renderLetterRequest(request)}\n\nCall ${TOOL_NAME}.` }],
     });
   } catch (error) {
@@ -223,13 +221,13 @@ export async function writeCoverLetter(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = toolBlockIn(response, TOOL_NAME);
-  if (!report || report.type !== 'tool_use') {
-    return { ok: false, error: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, error: report.reason };
   }
 
   return parseCoverLetterPayload(
-    report.input,
+    report.value,
     material.evidence.items.map((item) => item.id),
     material.style.banned,
   );
