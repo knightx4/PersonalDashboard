@@ -1,4 +1,5 @@
 import { relativeLuminance } from '@/lib/theme/oklch';
+import { BUILDER_KEY } from '@/lib/you/builder-model';
 import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import type { CouncilMemory } from '@/lib/you/council-model';
 import type { TextSwitch } from '@/lib/you/first-texts';
@@ -261,8 +262,16 @@ export const ADD_HREF = `${BOTS_HREF}?add=1`;
 
 /**
  * Whether a mentor can text: a seat always, a guest once Dash has built their
- * brain, and a person of the person's own once they have a card.
+ * brain, and a person of the person's own or the builder (plan #2854.5) once
+ * they have a card.
  */
-export function canTalkOf(advisor: { kind: 'seat' | 'guest'; brainStatus: string; madeByYou?: boolean; hasPersona?: boolean }): boolean {
-  return advisor.kind === 'seat' || advisor.brainStatus === 'ready' || (advisor.madeByYou === true && advisor.hasPersona === true);
+export function canTalkOf(advisor: {
+  key?: string;
+  kind: 'seat' | 'guest';
+  brainStatus: string;
+  madeByYou?: boolean;
+  hasPersona?: boolean;
+}): boolean {
+  if (advisor.kind === 'seat' || advisor.brainStatus === 'ready') return true;
+  return (advisor.madeByYou === true || advisor.key === BUILDER_KEY) && advisor.hasPersona === true;
 }

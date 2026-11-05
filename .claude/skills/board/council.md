@@ -79,6 +79,10 @@ for someone the person made up in Chat (`made_by_you`, plan #2748.11), when
 they have a `persona`; brief them with that card in place of a brain.
 `joins_meetings` is about board meetings only and does not stop a mentor
 writing here.
+The builder (key `builder`, plan #2854.5) is not a mentor: it is a guest
+with no brain that the person did not make up, so this rule already leaves
+it out. It texts first about the plan by its own rule
+(lib/you/first-texts.ts), never in this round.
 
 Brief each mentor the way `SKILL.md` **The advisors** briefs them: a seat
 with its paragraph word for word, then its brain; a guest with the guest
