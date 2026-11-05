@@ -12,8 +12,11 @@ import type { DashCall, DashSurface } from './loop';
 
 export type DashFailureOutcome = 'failed' | 'unfinished';
 
+/** Where the failed answer was asked: one of Dash's surfaces, or a mentor's reply on People (migration 0304). */
+export type DashFailureSurface = DashSurface | 'mentor';
+
 export type DashFailure = {
-  surface: DashSurface;
+  surface: DashFailureSurface;
   outcome: DashFailureOutcome;
   /** Why, as the person or a session would read it. */
   reason: string;

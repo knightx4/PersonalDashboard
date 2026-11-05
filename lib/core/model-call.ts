@@ -92,7 +92,7 @@ export function readReply(reply: Reply, tool?: string, model?: string): ReplyRea
     return { kind: 'tool', reason: `The call reported through ${tool}.` };
   }
   if (reply.stop_reason === 'max_tokens') {
-    return { kind: 'cut_off', reason: 'The reply was cut off before it finished reporting. The section is too long for the budget.' };
+    return { kind: 'cut_off', reason: 'The reply was cut off: it reached its output budget before it finished.' };
   }
   if (reply.stop_reason === 'refusal') {
     const category = reply.stop_details?.category;

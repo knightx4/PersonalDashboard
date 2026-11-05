@@ -54,7 +54,9 @@ const execute = async () => ({ ok: true as const, rows: [] });
 describe('a failed Ask answer is kept (plan #2937.2)', () => {
   it('keeps the reason, the model and each call when no answer comes back', async () => {
     const { stores, failures } = memoryStores();
-    const client = stub([{ content: [{ type: 'text', text: 'Hmm' }], stop_reason: 'max_tokens', usage: USAGE }]);
+    // Cut off at the usual budget and again at the larger one it is asked again with.
+    const cut = { content: [{ type: 'text', text: 'Hmm' }], stop_reason: 'max_tokens', usage: USAGE };
+    const client = stub([cut, cut]);
     const result = await askDash({ question: 'Anything?', today: '2026-11-05', execute, anthropicApiKey: 'k', client }, stores);
 
     expect(result.error).toMatch(/^Dash could not answer/);
@@ -65,7 +67,10 @@ describe('a failed Ask answer is kept (plan #2937.2)', () => {
       conversationId: 'conv-new',
       turnId: 't1',
       think: false,
-      calls: [{ stop: 'max_tokens', blocks: ['text'], outputTokens: 7350, inputTokens: 1000, cachedInputTokens: 400, cacheWriteTokens: 50 }],
+      calls: [
+        { stop: 'max_tokens', blocks: ['text'], outputTokens: 7350, inputTokens: 1000, cachedInputTokens: 400, cacheWriteTokens: 50 },
+        { stop: 'max_tokens', blocks: ['text'], outputTokens: 7350, inputTokens: 1000, cachedInputTokens: 400, cacheWriteTokens: 50 },
+      ],
     });
     expect(failures[0].reason).toMatch(/cut off/);
   });

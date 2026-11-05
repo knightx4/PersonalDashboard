@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import type { DashFailure } from '@/lib/dash/failures';
 import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
@@ -259,13 +260,18 @@ describe('replyToMentor', () => {
   it('marks the chat failed, with the reason, when the reply cannot be written', async () => {
     const tables = world();
     const { stub } = anthropicStub([], { fail: true });
-    const outcome = await run(tables, stub, { ackAfterMs: 10_000 }).promise;
+    const failures: DashFailure[] = [];
+    const outcome = await run(tables, stub, { ackAfterMs: 10_000, recordFailure: async (f) => void failures.push(f) }).promise;
     const chat = tables['you.advisor_chats'][0];
     expect(chat.reply_status).toBe('failed');
     expect(chat.reply_error).toMatch(/^Money could not reply just now/);
     expect(chat.typing_until).toBeNull();
     expect(mentorRows(tables)).toHaveLength(0);
     expect(outcome.error).toBeTruthy();
+    // Kept where the daily Dash quality run reads it, naming the chat.
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ surface: 'mentor', outcome: 'failed', model: 'claude-sonnet-5-5', subjectRef: `you.advisor_chats:${CHAT}` });
+    expect(failures[0].calls.length).toBeGreaterThan(0);
   });
 
   it('answers a message sent while it was replying, in the same run', async () => {

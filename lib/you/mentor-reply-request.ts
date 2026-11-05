@@ -4,6 +4,7 @@ import { after } from 'next/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
+import { keepFailure } from '@/lib/dash/failures';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import { createYouClient } from '@/lib/you/auth/server';
@@ -66,6 +67,7 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       // Ask Dash's own actions, kept as this mentor's (plan #2854.2).
       act: dash,
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
+      recordFailure: (failure) => keepFailure(core, userId, failure),
       claimed: true,
     });
   } catch (error) {

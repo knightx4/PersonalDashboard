@@ -3,7 +3,8 @@ import { MODELS } from '@/lib/core/models';
 import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { zoneDay } from '@/lib/core/when';
 import { DASH_TOOLS } from '@/lib/dash/registry';
-import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
+import type { DashFailure } from '@/lib/dash/failures';
+import { runDash, type DashCall, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
 import {
@@ -21,7 +22,6 @@ import {
   bubblePauseMs,
   cleanAck,
   MAX_FOLLOW_UPS,
-  REPLY_MAX_TOKENS,
   REPLY_RULES,
   replyFailed,
   splitBubbles,
@@ -73,6 +73,11 @@ export type MentorReplyInput = {
   act?: PeopleDash;
   /** Keeps what the calls cost; never throws. */
   recordSpend: (operation: MentorSpendOperation, reports: SpendReport[]) => Promise<void>;
+  /**
+   * Keeps a reply that failed or came back unfinished in core.dash_failures,
+   * which the daily Dash health check and quality session read; never throws.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
   /** True when the send already claimed the typing dots for this run. */
   claimed?: boolean;
   /** For tests. */
@@ -294,14 +299,18 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       ? `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}\n\n${PEOPLE_ACTION_RULES}`
       : `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}`,
     tools: acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS,
+    // No budget of its own: texts are kept short by REPLY_RULES, and a cap
+    // small enough to enforce that is spent on thinking before a word is
+    // written (two cut-off replies on 5 November). Dash's answer budget applies.
     serverTools: peopleServerTools(input.model),
-    maxTokens: REPLY_MAX_TOKENS,
   };
   const rest = (['memory', 'episodes', 'recall', 'live'] as const).map((layer) => ctx.layers[layer].text).filter(Boolean);
 
+  const calls: DashCall[] = [];
   let answer: Awaited<ReturnType<typeof runDash>>;
   try {
     answer = await runDash({
+      onCall: (call) => calls.push(call),
       voice,
       context: { surface: 'thread', subject: null, page: null },
       turns: prompt.messages.map((m: PromptMessage) => ({ role: m.role, body: m.content })),
@@ -339,6 +348,21 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     (sum, report) => sum + (costMicrosFor(report.model, report.usage) ?? 0),
     0,
   );
+
+  // A reply that failed or was cut short goes where the daily Dash quality run reads it.
+  const failure = !answer.ok ? answer.detail : bubbles.length === 0 ? 'The reply came back empty.' : null;
+  if (failure || (answer.ok && answer.stop === 'unfinished')) {
+    await input
+      .recordFailure?.({
+        surface: 'mentor',
+        outcome: failure ? 'failed' : 'unfinished',
+        reason: failure ?? `${name}'s reply was cut short; what was kept is not the whole reply.`,
+        model: input.model,
+        subjectRef: `you.advisor_chats:${chatId}`,
+        calls,
+      })
+      .catch((error) => console.error('the failed mentor reply was not recorded', error));
+  }
 
   const ok = answer.ok && bubbles.length > 0 && !saveError;
   const round: RoundOutcome = { bubbles: saved, acked, firstBubbleMs, costMicros, ok };

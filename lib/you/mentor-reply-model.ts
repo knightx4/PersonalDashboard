@@ -18,8 +18,6 @@ export const TYPING_RENEW_MS = 4_000;
 export const ACK_AFTER_MS = 3_000;
 /** The most bubbles one reply is split into; anything past it joins the last. */
 export const MAX_BUBBLES = 5;
-/** Output tokens for one call of the reply: texts are short. */
-export const REPLY_MAX_TOKENS = 1_200;
 /** Output tokens for the first text. */
 export const ACK_MAX_TOKENS = 60;
 /** The longest first text kept, in characters. */

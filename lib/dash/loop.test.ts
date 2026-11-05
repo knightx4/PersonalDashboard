@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import { OPUS } from '@/lib/core/models';
 import { PROGRESS_NOTES_BETA } from '@/lib/learn/graph/tool-call';
-import { answerSoFar, dateLine, hiddenText, LOOK_FIRST, NOTES_ONLY, progressNotes, runDash, type DashContext, type DashVoice } from './loop';
+import { answerSoFar, CUT_OFF_MAX_TOKENS, CUT_OFF_NOTE, dateLine, hiddenText, LOOK_FIRST, NOTES_ONLY, progressNotes, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
 import { rowsOfSet, type DashSeen } from './sets';
 
@@ -342,6 +342,28 @@ describe('runDash with onText', () => {
     expect(tools.find((t) => t.name === 'todos')?.eager_input_streaming).toBeUndefined();
   });
 
+  it('keeps what the person already read when the answer is cut off part-way, and does not ask again', async () => {
+    const { stub, sent } = streaming([
+      {
+        events: [start('a1', 'answer'), delta('{"answer": "The music is in the grooves'), delta(' and in the player.\\n\\nHofstadter')],
+        message: { content: [{ type: 'tool_use', id: 'a1', name: 'answer', input: {} }], stop_reason: 'max_tokens', usage: USAGE },
+      },
+    ]);
+    const answer = await runDash({
+      voice,
+      context,
+      turns,
+      today: '2026-11-05',
+      execute: vi.fn(),
+      anthropicApiKey: 'k',
+      client: stub,
+      onText: () => undefined,
+    });
+    expect(sent).toHaveLength(1);
+    expect(answer).toMatchObject({ ok: true, stop: 'unfinished' });
+    expect(answer.ok && answer.body).toBe(`The music is in the grooves and in the player.\n\nHofstadter\n\n${CUT_OFF_NOTE}`);
+  });
+
   it('says nothing for a lookup round, and a listener that throws loses nothing', async () => {
     const { stub } = streaming([
       { events: [start('t1', 'todos'), delta('{"answer": "no"}')], message: call('t1', 'todos', {}) },
@@ -544,5 +566,40 @@ describe('a long answer with no one watching', () => {
     expect(create).not.toHaveBeenCalled();
     expect(stream).toHaveBeenCalled();
     expect(answer).toMatchObject({ ok: true, body: 'Done.' });
+  });
+});
+
+describe('a reply cut off at its budget (5 November)', () => {
+  const cut = { content: [{ type: 'thinking', thinking: '' }], stop_reason: 'max_tokens', usage: USAGE };
+
+  it('asks once more with room when it was cut off before writing anything, and the answer comes', async () => {
+    const { client: stub, sent } = client([cut, call('a1', 'answer', { answer: 'Here it is.', cited: [] })]);
+    const answer = await runDash({
+      voice: { ...voice, maxTokens: 1_200 },
+      context,
+      turns,
+      today: '2026-11-05',
+      execute: vi.fn(),
+      anthropicApiKey: 'k',
+      client: stub,
+    });
+    expect((sent as unknown as { max_tokens: number }[]).map((s) => s.max_tokens)).toEqual([1_200, CUT_OFF_MAX_TOKENS]);
+    expect(answer).toMatchObject({ ok: true, body: 'Here it is.', stop: 'answered' });
+  });
+
+  it('asks only once, and says it was cut off when the larger budget is not enough either', async () => {
+    const { client: stub, sent } = client([cut, cut]);
+    const answer = await runDash({
+      voice: { ...voice, tools: [] },
+      context,
+      turns,
+      today: '2026-11-05',
+      execute: vi.fn(),
+      anthropicApiKey: 'k',
+      client: stub,
+    });
+    expect(sent).toHaveLength(2);
+    expect(answer.ok).toBe(false);
+    expect(!answer.ok && answer.detail).toMatch(/cut off/);
   });
 });

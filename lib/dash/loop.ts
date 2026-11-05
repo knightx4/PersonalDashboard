@@ -90,6 +90,17 @@ export const TIME_BUDGET_MS = 40_000;
 export const ANSWER_MAX_TOKENS = 4000;
 /** Above this many output tokens a call must stream, or the SDK throws before sending it. */
 const STREAM_ABOVE_TOKENS = 16_000;
+/**
+ * The budget a call cut off before showing any answer is sent again with,
+ * once. Adaptive thinking counts against max_tokens, so a question that needs
+ * working through can spend a voice's whole budget thinking and stop with
+ * nothing written: a mentor asked to explain a chapter "more clearly and in
+ * depth" did, twice, on 5 November. The same request with room finishes, and
+ * costs only the tokens it uses.
+ */
+export const CUT_OFF_MAX_TOKENS = 16_000;
+/** What an answer cut off part-way ends with, after the part the person already read. */
+export const CUT_OFF_NOTE = 'The rest of this reply was cut off. Ask again for all of it.';
 /** The most rows an answer built from the lookups lists by name. */
 export const FALLBACK_ROWS = 25;
 
@@ -1045,6 +1056,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   let notes = '';
   const canLook = voice.tools.some((tool) => tool.kind === 'lookup');
   const lastRound = MAX_LOOKUPS + 1;
+  // Raised to CUT_OFF_MAX_TOKENS, once, when a call is cut off before it shows anything.
+  let budget = maxTokens;
 
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard, with room for the
@@ -1061,13 +1074,15 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
             : null;
     const mustAnswer = limit !== null || asked || round >= lastRound;
 
+    // How much of the answer the person had been shown before this call.
+    const shown = written.length;
     let response: Anthropic.Message;
     try {
       response = await callModel(
         client,
         {
           model,
-          max_tokens: maxTokens,
+          max_tokens: budget,
           ...effort,
           ...thinking,
           system,
@@ -1104,6 +1119,24 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       webCited.push(...citedSearchText(content));
       // Pages a search returned may be cited, as rows a lookup returned may (plan #2861).
       for (const page of searchedPages(content)) known.set(citationKey(page), page);
+    }
+
+    // Cut off at max_tokens. Nothing in a cut-off reply can be trusted to be
+    // whole: an answer call's input or a lookup's arguments may stop mid-way.
+    // Before any of the answer was shown, the budget was the problem and not
+    // the question (readReply), so the same round goes again once with room,
+    // without counting as a round. Part-way through the answer, the person
+    // has already read what came through, so that is kept and marked.
+    if (response.stop_reason === 'max_tokens') {
+      if (written.length === shown && budget < CUT_OFF_MAX_TOKENS) {
+        budget = CUT_OFF_MAX_TOKENS;
+        round--;
+        continue;
+      }
+      if (written.length > shown) {
+        const body = `${written.trim().slice(0, MAX_TURN - CUT_OFF_NOTE.length - 2)}\n\n${CUT_OFF_NOTE}`;
+        return { ok: true, body, toolCalls, citations: [], stop: 'unfinished', ...extras() };
+      }
     }
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');

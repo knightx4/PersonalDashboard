@@ -437,14 +437,16 @@ describe('askDash', () => {
   });
 
   it('keeps the question and records the spend when the answer fails', async () => {
-    const { client } = stubClient([reply([{ type: 'text', text: 'Hmm' }], 'max_tokens')]);
+    // Cut off twice: once at the usual budget, once at the larger one it is asked again with.
+    const { client } = stubClient([reply([{ type: 'text', text: 'Hmm' }], 'max_tokens'), reply([{ type: 'text', text: 'Hmm' }], 'max_tokens')]);
     const { stores, written, spend } = memoryStores();
     const result = await askDash(
       { question: 'Anything?', today: '2026-09-27', execute: stubExecute().execute, anthropicApiKey: 'k', client },
       stores,
     );
     expect(written).toHaveLength(1);
-    expect(spend).toHaveLength(1);
+    // Both calls cost money, so both are kept.
+    expect(spend).toHaveLength(2);
     expect(result.turns.map((t) => t.role)).toEqual(['user']);
     expect(result.error).toMatch(/^Dash could not answer: The reply was cut off/);
   });
