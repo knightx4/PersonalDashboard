@@ -2,7 +2,7 @@ import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import { LOOKUP_NOT_RUN, type TalkToolCall, type TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
 import { MOCKUP_TOOL } from './mockup';
-import { THOUGHT_CALL } from './thought';
+import { SESSION_SENT_CALL, THOUGHT_CALL } from './thought';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS } from '@/lib/ask/you-changes';
@@ -154,6 +154,7 @@ export function isShownLookup(name: string): boolean {
     name !== CHART_TOOL &&
     name !== MOCKUP_TOOL &&
     name !== THOUGHT_CALL &&
+    name !== SESSION_SENT_CALL &&
     !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name) &&
     !PAID_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
   );

@@ -45,7 +45,14 @@ type MessageRow = {
   created_at: string;
 };
 
-type ThreadRow = { id: string; title: string; project_id: string | null; session_id: string | null; state: string };
+type ThreadRow = {
+  id: string;
+  title: string;
+  project_id: string | null;
+  session_id: string | null;
+  state: string;
+  mode?: string | null;
+};
 
 function messageOf(row: MessageRow): BrokerMessage {
   return {
@@ -64,7 +71,14 @@ function messageOf(row: MessageRow): BrokerMessage {
 }
 
 function threadOf(row: ThreadRow): BrokerThread {
-  return { id: row.id, title: row.title, projectId: row.project_id, sessionId: row.session_id, state: row.state };
+  return {
+    id: row.id,
+    title: row.title,
+    projectId: row.project_id,
+    sessionId: row.session_id,
+    state: row.state,
+    mode: row.mode === 'think' ? 'think' : 'work',
+  };
 }
 
 async function fileLinks(pub: Client, paths: string[]): Promise<Map<string, string>> {
@@ -102,7 +116,7 @@ export async function brokerJobs(
 
   const { data: threadRows, error: threadError } = await core
     .from('session_threads')
-    .select('id, title, project_id, session_id, state')
+    .select('id, title, project_id, session_id, state, mode')
     .eq('user_id', userId)
     .in('id', threadIds)
     .neq('state', 'ended');

@@ -12,6 +12,12 @@
 export const SESSION_THREAD_STATES = ['queued', 'working', 'waiting', 'idle', 'ended'] as const;
 export type SessionThreadState = (typeof SESSION_THREAD_STATES)[number];
 
+/**
+ * What a thread is for (migration 0302): work on the code, or think a
+ * question from Ask Dash through with no change made (plan #2789.11).
+ */
+export type SessionThreadMode = 'work' | 'think';
+
 export type SessionMessageKind = 'text' | 'mockup' | 'question' | 'status';
 
 /** A file the person sent with a message, opened through /attachments. */

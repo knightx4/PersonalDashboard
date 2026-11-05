@@ -503,6 +503,7 @@ import {
   AskToSessionSurface,
   AskBoxSurface,
   AskThinkSurface,
+  AskThinkSessionSurface,
   FAILING_QUESTION,
   TRIP_GOAL,
   WRITING_QUESTION,
@@ -9421,6 +9422,33 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskThinkSurface part="cost" />,
+  },
+  {
+    /* Think it through sent to a session thread (plan #2789.11): Dash's
+     * reply at once, and the line under it showing the session's newest line
+     * with the link to the thread. */
+    id: 'ask-think-session',
+    label: 'Dash · A question thought through in a session',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSessionSurface part="working" />,
+  },
+  {
+    /* The same once the session's answer has landed in the thread. */
+    id: 'ask-think-session-answered',
+    label: 'Dash · The session has answered',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSessionSurface part="answered" />,
+  },
+  {
+    /* With no session runner set up, the answer written here, the cost line
+     * saying why it was not sent to a session. */
+    id: 'ask-think-fallback',
+    label: 'Dash · Thought through here, with no session runner',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskThinkSessionSurface part="fallback" />,
   },
   {
     /* @ and the start of a workspace's name in the box (plan #2748.1):
