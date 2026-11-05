@@ -22,6 +22,10 @@ import { PageColumn } from '@/components/shell/page-width';
 import { NowDashToday } from '@/components/shell/dash-today-fold';
 import { NoteListRow } from '@/components/vault/note-list-row';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
+import { VaultNowInbox } from '@/components/vault/now-inbox';
+import { loadWorkspaceInbox } from '@/lib/inbox/workspace-inbox';
+import { QuickNoteTriage } from './triage/triage';
+import { loadTriageNotes } from './triage/load';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +38,11 @@ export const dynamic = 'force-dynamic';
  * frontmatter declares one gets a date until something changes it. Sorting a
  * whole vault by a mostly-null column would look arbitrary, and would look
  * like a bug rather than a limitation.
+ *
+ * Above the list sit the vault's Inbox and its quick notes with the triage
+ * deck: both had pages of their own that nobody opened for a month, so they
+ * folded in here (plan #1496.9), and /vault/inbox and /vault/triage open this
+ * page at them. Neither is drawn while searching.
  */
 export default async function VaultPage({
   searchParams,
@@ -63,11 +72,13 @@ export default async function VaultPage({
 
   // This week's connections sit above the list, and only when not searching.
   // And which notes a run or an Ask Dash hand-off is about (plan #1964.2.2).
-  const [notes, connections, writable, working] = await Promise.all([
+  const [notes, connections, writable, working, inbox, triage] = await Promise.all([
     loadNotes(supabase, search ? { search } : {}),
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
     vaultWritable(user.id),
     workingRefsForPage(user.id),
+    search ? null : loadWorkspaceInbox(user.id, 'vault'),
+    search ? Promise.resolve([]) : loadTriageNotes(supabase, user.id),
   ]);
   const groups = groupByFolder(notes);
   // Quick notes are the top level of the Inbox folder; the list already holds them.
@@ -94,7 +105,18 @@ export default async function VaultPage({
 
       {composing !== undefined && <NewVaultNote />}
 
-      {!search && <QuickNoteRow waiting={waiting} writable={writable} />}
+      {inbox && <VaultNowInbox rows={inbox.rows} failed={inbox.failed} />}
+
+      {!search && (
+        <section id="triage" aria-label="Quick notes" className="scroll-mt-4">
+          <QuickNoteRow waiting={waiting} writable={writable} />
+          {triage.length > 0 && (
+            <div className="mb-6">
+              <QuickNoteTriage notes={triage} writable={writable} onVault />
+            </div>
+          )}
+        </section>
+      )}
 
       {!search && <NowDashToday workspace="vault" className="mb-5" />}
 

@@ -28,6 +28,7 @@ import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
 import { goalInboxCount } from '@/lib/goals/inbox';
 import { toGoalActivity } from '@/lib/goals/tree';
 import type { RunQuestion } from '@/lib/core/run-questions';
+import type { SessionQuestion } from '@/lib/core/session-questions';
 import { AskDash } from './ask-dash';
 import { FoldLine } from './fold-line';
 import { GoalLanes } from './goal-lanes';
@@ -91,6 +92,8 @@ export type HomeViewProps = {
   awayFrom?: string | null;
   /** Runs waiting on your answer (plan #1824), counted into the Inbox link. */
   waitingRuns?: RunQuestion[];
+  /** Sessions waiting on your answer (plan #2800.4), counted into the Inbox link. */
+  sessionQuestions?: SessionQuestion[];
   /** Dash's files you have not opened, newest first (plan #1861); null when they could not be read. */
   filesToRead?: FileListing[] | null;
   /** What Dash did today in Goals, the fold every Now carries (plan #1964.4). */
@@ -118,6 +121,7 @@ export function HomeView({
   canRun = false,
   awayFrom = null,
   waitingRuns = [],
+  sessionQuestions = [],
   filesToRead = [],
   dashToday,
   mentions = [],
@@ -200,7 +204,7 @@ export function HomeView({
 
           <GoalLanes
             doNext={doNext}
-            inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
+            inboxCount={goalInboxCount(onYou, dash, waitingRuns, sessionQuestions)}
             otherGoals={otherGoals}
             passiveGoals={passiveGoals}
             passiveOpen={passiveOpen}

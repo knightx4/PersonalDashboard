@@ -26,6 +26,8 @@ export type CaseExpect = {
   max_seconds?: number;
   /** True when a failed lookup is expected and the answer is graded on its words alone. */
   allow_failed_lookups?: boolean;
+  /** Tools the answer must have called, each at least once and without a refusal. */
+  calls_all?: string[];
 };
 
 /** What one run of a case gave back. */
@@ -70,6 +72,7 @@ export function parseExpect(raw: unknown): CaseExpect {
     max_lookups: parsedNumber(r.max_lookups),
     max_seconds: parsedNumber(r.max_seconds),
     allow_failed_lookups: r.allow_failed_lookups === true,
+    calls_all: parsedList(r.calls_all),
   };
 }
 
@@ -120,6 +123,11 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   const skipped = skippedLookups(outcome.toolCalls);
   if (skipped > 0) failures.push(`${skipped} lookup${skipped === 1 ? ' was' : 's were'} refused at a limit.`);
 
+  for (const name of expect.calls_all ?? []) {
+    const made = outcome.toolCalls.filter((call) => call.name === name);
+    const worked = made.some((call) => (call.result as { ok?: unknown } | undefined)?.ok !== false);
+    if (!worked) failures.push(made.length === 0 ? `The answer never called ${name}.` : `Every call to ${name} was refused.`);
+  }
   for (const text of expect.mentions_all ?? []) {
     if (!shown(text)) failures.push(`The answer does not mention "${text}".`);
   }

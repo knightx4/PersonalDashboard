@@ -34,6 +34,8 @@
  * allowed and means the guide is short a law -- which is how 13 to 15 got
  * written.
  */
+// First: names the repository before lib/plan/github.ts reads it.
+import './app-repository';
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

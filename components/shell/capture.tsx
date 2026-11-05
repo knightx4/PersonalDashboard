@@ -331,7 +331,7 @@ async function file(
     case 'vault': {
       // The Vault page's own write, so the note waits in Quick note triage.
       const result = await addQuickNote(text);
-      return result.error ? { error: result.error } : { message: 'Added to Quick note triage.' };
+      return result.error ? { error: result.error } : { message: 'Added to your vault’s quick notes.' };
     }
     case 'anything':
       // The one box files through fileCaptureBox, in AnythingPanel.

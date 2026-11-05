@@ -51,6 +51,8 @@ import {
 import { parseAreaName, parseAreaNote, parseGoalFields, toGoalActivity } from '@/lib/goals/tree';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { CHANGE_GOAL_LIST } from './goal-lists-writes';
+import { CHANGE_GOAL_DASHBOARD } from './goal-dashboard-writes';
+import { LOG_HOURS } from './goal-hours-writes';
 import { GoalsRefused } from './goals-refused';
 
 /**
@@ -2079,6 +2081,8 @@ export const GOALS_WRITES: readonly GoalsWrite[] = [
     run: changeGoalsInbox,
   },
   CHANGE_GOAL_LIST,
+  CHANGE_GOAL_DASHBOARD,
+  LOG_HOURS,
 ];
 
 /** Runs one Goals write. Never throws: a refusal or a failure is the sentence the model reads. */

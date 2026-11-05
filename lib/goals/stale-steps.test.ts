@@ -317,8 +317,8 @@ describe('the morning brief', () => {
     expect(text).toContain('"Moving a step that has sat for a week"');
   });
 
-  it('tells the run how many questions it has left, and to decide when none are', () => {
-    const base = {
+  it('never offers splitting or a "still want" question as a move', () => {
+    const text = dailyRunText({
       userId: 'u',
       runId: 'r',
       steps: [],
@@ -326,10 +326,10 @@ describe('the morning brief', () => {
         { id: 'g', title: 'Home', acceptance: null, lastDoneAt: null, quietDays: 9, stalled: false, last: null },
       ],
       stale: [{ id: 's', title: 'Clear the desk', goalId: 'g', goalTitle: 'Home', idleDays: 9, prepared: false }],
-    };
-    expect(dailyRunText({ ...base, asksLeft: 2 })).toContain('Questions left: 2, across this whole run.');
-    expect(dailyRunText({ ...base, asksLeft: 0 })).toContain('Questions left: none.');
-    expect(dailyRunText(base)).not.toContain('Questions left');
+    });
+    expect(text).toContain('Never split it into');
+    expect(text).not.toContain('Questions left');
+    expect(text).not.toContain('Split it into smaller');
   });
 
   it('says nothing about moves when no step has sat', () => {

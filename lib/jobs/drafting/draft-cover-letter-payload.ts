@@ -55,6 +55,10 @@ export const LETTER_BANNED = [
   'I am writing to apply',
   "I'd bring",
   'I would bring',
+  'passionate',
+  'leverage',
+  "I'm the only one",
+  'I am the only one',
 ];
 
 /** The person's banned constructions, then the letter's own. */
@@ -197,10 +201,9 @@ export function coverLetterView(
 }
 
 /**
- * How much of the posting is about AI. A letter to an AI-heavy role spends
- * both middle paragraphs on building with AI; one to a role that mentions it
- * in passing spends one; one to a role that never mentions it writes about
- * the work and names their AI building in a clause at most.
+ * How much of the posting is about AI. A letter to an AI-heavy role may
+ * spend its third paragraph on building with AI; any other letter leads with
+ * the role's main focus and gives AI one sentence near the end at most.
  */
 export type AiWeight = 'central' | 'some' | 'none';
 
@@ -248,11 +251,11 @@ export function aiWeight(role: Pick<GatheredMaterial['role'], 'title' | 'industr
 
 const WEIGHT_GUIDE: Record<AiWeight, string> = {
   central:
-    'AI is central to this role. Paragraphs 2 and 3 are both about building with AI, as the template describes.',
+    'AI is central to this role. Paragraph 3 may be about building with AI, as the template describes; paragraph 2 is still their main employer.',
   some:
-    'The posting mentions AI, automation or tooling, but the role is not about AI. Paragraph 2 is the AI paragraph. Paragraph 3 is about the work the posting describes, not AI.',
+    'The posting mentions AI, automation or tooling, but the role is not about AI. The role\'s main focus leads. AI gets one sentence near the end of paragraph 3, no more.',
   none:
-    'The posting does not mention AI or automation. Paragraphs 2 and 3 are about the work the posting describes. Building with AI appears at most once, as one thing they built named in a clause, and only where it serves that work. Do not suggest the team should use AI.',
+    'The posting does not mention AI or automation. The role\'s main focus leads. AI gets one sentence near the end of paragraph 3 at most, only where it serves the work. Do not suggest the team should use AI.',
 };
 
 /** One question and its answer on this application. */
@@ -305,7 +308,7 @@ export function renderLetterRequest(request: LetterRequest): string {
     aiNotes.length > 0
       ? `## Their notes on building with AI\n\nThe letter's observations about AI come from here, said the way they said them.\n\n${aiNotes.map(renderVaultPassage).join('\n\n')}`
       : weight === 'central'
-        ? '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds fewer than two.'
+        ? '## Their notes on building with AI\n\nNone found. Take observations only from what the rest of their material says about building with AI, and ask them for one if it holds none.'
         : '## Their notes on building with AI\n\nNone found. Take any observation about AI only from what the rest of their material says.',
     material.letterComments.length > 0
       ? `## Their comments on the cover letter\n\n${material.letterComments.map((comment) => `- ${comment}`).join('\n')}`

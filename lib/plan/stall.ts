@@ -419,11 +419,11 @@ export function stallRaise(
   const source = `${STALL_PREFIX}${feature.id} runs ${two.map((run) => run.id).join(' ')}`;
   const after =
     'Yes tries it again now. Close with a reason keeps it paused until you send it from its ' +
-    'row on /dev/plan. Dismiss lets the overnight runner pick it up again on its own.';
+    'row on /dev/plan. Dismiss lets the runner pick it up again on its own.';
   const stuckText = stuckLine(stuck);
 
   const lines = [
-    `Dash sent two sessions at ${named} and neither finished a step, so the overnight runner ` +
+    `Dash sent two sessions at ${named} and neither finished a step, so the runner ` +
       'has paused it rather than keep spending sessions on it. What each session ended with, newest first:',
     '',
     ...two.map(runLine),

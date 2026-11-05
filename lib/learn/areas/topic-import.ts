@@ -21,7 +21,7 @@ import {
   statedTotal,
   transcludedPages,
 } from '@/lib/learn/areas/level4';
-import { appUserAgent } from '@/lib/net/user-agent';
+import { fetchDocument } from '@/lib/learn/providers/fetch';
 
 /**
  * The import of Wikipedia's Level 4 topics (plan #2016.1).
@@ -56,8 +56,6 @@ export const REQUEST_GAP_MS = 1_500;
 
 const BACKOFF_MS = [15_000, 30_000, 60_000];
 
-const USER_AGENT = appUserAgent('PersonalTracker-Learn/1.0', 'one user');
-
 export type ImportPorts = {
   /** A GET returning the status and body. Injected by the tests. */
   get: (url: string) => Promise<{ status: number; text: string }>;
@@ -65,14 +63,21 @@ export type ImportPorts = {
   now: () => number;
 };
 
+/**
+ * Through the checked fetcher, like every other Learn source: each address and
+ * each redirect hop is checked, and the body is capped. The fetcher reports an
+ * HTTP refusal by status in `detail`, which is how a 429 reaches politeGetter's
+ * backoff; a refused address, a timeout or a bad type has no status and throws.
+ */
 export const livePorts: ImportPorts = {
   async get(url) {
-    const response = await fetch(url, {
-      headers: { 'user-agent': USER_AGENT, 'api-user-agent': USER_AGENT },
-      signal: AbortSignal.timeout(30_000),
-      cache: 'no-store',
-    });
-    return { status: response.status, text: await response.text() };
+    const result = await fetchDocument(url, { timeoutMs: 30_000 });
+    if (result.ok) return { status: 200, text: result.text };
+    const status = Number.parseInt(result.detail, 10);
+    if ((result.reason === 'error' || result.reason === 'not-found') && Number.isInteger(status)) {
+      return { status, text: '' };
+    }
+    throw new Error(`Wikipedia could not be read (${result.reason}: ${result.detail}) for ${url}`);
   },
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: () => Date.now(),

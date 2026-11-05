@@ -62,7 +62,7 @@ describe('agendaInboxRow', () => {
 
   it('keeps the link on the title when there is something else to press', () => {
     const row = agendaInboxRow(
-      entry(item({ completable: true, action: { href: '/shopping/returns', label: 'Returns' } })),
+      entry(item({ completable: true, action: { href: '/shopping/inventory/returns', label: 'Returns' } })),
       ACTIONS,
       { return_deadlines: ALL },
       '2026-03-10',
@@ -147,8 +147,8 @@ describe('queueRow', () => {
   it('says how many and opens the queue’s page', () => {
     expect(queueRow('vault-triage', 3)).toMatchObject({
       title: '3 quick notes to file',
-      href: '/vault/triage',
-      verbs: [{ label: 'File them', href: '/vault/triage' }],
+      href: '/vault#triage',
+      verbs: [{ label: 'File them', href: '/vault#triage' }],
     });
     expect(queueRow('vault-triage', 1)?.title).toBe('1 quick note to file');
     expect(queueRow('shopping-review', 2)?.section).toBe('review');

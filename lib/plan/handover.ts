@@ -19,7 +19,6 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  ownProjectRoutine,
   planRoutine,
   projectRoutine,
   type RoutineTarget,
@@ -60,7 +59,7 @@ type Db = SupabaseClient<any, 'public'>;
  * Read off the top of the row's tree, because that is what files it under a
  * section on the plan page; a step's own column can disagree with its root.
  * A project's row goes to its own routine when it has one set, and to the
- * shared projects routine otherwise (plan #2553.3). One with neither is
+ * plan routine otherwise (plan #2553.3). One with neither is
  * refused rather than sent on: with no id, the routine call falls back to the
  * plan routine, which would build the step in this repository.
  */
@@ -84,7 +83,7 @@ export function builderFor(
       ok: false,
       error:
         `${project.label} has no routine to build it yet: ` +
-        'set CLAUDE_PROJECTS_ROUTINE_ID and CLAUDE_PROJECTS_ROUTINE_TOKEN.',
+        'set CLAUDE_PLAN_ROUTINE_ID and CLAUDE_PLAN_ROUTINE_TOKEN.',
     };
   }
   return { ok: true, project, routine };
@@ -94,24 +93,15 @@ export function builderFor(
  * What tells a project's session where it is and what to read, ahead of the
  * brief.
  *
- * A project with a routine of its own is checked out by that routine, so its
- * session is only told which repository it is in. The shared routine checks
- * out this repository, so its session is told to add the project's beside it
- * and build there, keeping this checkout for the plan rows
+ * A project's session is told to add the project's repository beside the
+ * checkout it was started in and build there, keeping that checkout for the
+ * plan rows
  * (.claude/skills/plan/reference/project-routine.md).
  */
 export function projectPreamble(project: DevProject): string {
   const { owner, repo, branch } = project.repo;
   const where = `${owner}/${repo}`;
   const site = project.url ? ` (${project.url})` : '';
-  if (ownProjectRoutine(project)) {
-    return (
-      `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
-      `dashboard. Work in that repository and follow its ${project.skill}. Merge each closed ` +
-      `step to ${branch} and push. Plan rows are read and written through the Supabase ` +
-      'connector, as that skill says.\n\n'
-    );
-  }
   const check = project.checkCommand
     ? `Before merging a closed step to ${branch} there, run \`${project.checkCommand}\` in that ` +
       'repository and merge only when it passes; then push. '
@@ -126,13 +116,15 @@ export function projectPreamble(project: DevProject): string {
   return (
     `This step belongs to ${project.label}, the repository ${where}${site}, not to the ` +
     'dashboard this session checked out. Follow .claude/skills/plan/reference/project-routine.md. ' +
-    `First call add_repo for ${where} with push access, clone it beside this checkout, call ` +
+    `First find ${where}: when the routine has it among its repositories it is already checked ` +
+    `out under /home/user/${project.repo.repo}, so build in that checkout. Otherwise call add_repo ` +
+    'for it with push access, clone it beside this checkout, call ' +
     'register_repo_root on the clone, and build there: the code, the commits and the checks are ' +
     `that repository's, and its ${project.skill} says how a step is built in it. ` +
     'Read and write the plan rows with this checkout\'s scripts/plan.ts, which holds the plan for ' +
     `both. ${check}${setUp}` +
-    'If add_repo is refused, do not build anywhere else: write a setup step for the person with ' +
-    'the remedy the tool returned, as project-routine.md says, and stop.\n\n'
+    'If it is not checked out or a push to it is refused, do not build anywhere else: ' +
+    'say exactly what was refused and stop.\n\n'
   );
 }
 
@@ -635,7 +627,9 @@ export async function handFeatureToClaude(input: {
     'first step that needs a decision from me: block it with the exact question rather ' +
     'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
     'each step into the feature branch and mark it built as it reports, and put the ' +
-    'feature on main in one merge once its steps are built. The Building section says how. A step that needs data that does not exist yet, or a run that has not ' +
+    'feature on main in one merge once its steps are built. Once it holds four built steps, ' +
+    'send nothing more and land them first, then carry on. The Building section says how. ' +
+    'A step that needs data that does not exist yet, or a run that has not ' +
     'fired, gets a check-back with --from <its outline>, which holds it until then. If you end ' +
     `having closed and blocked nothing, first write why with plan.ts stopped ${node.outline} ` +
     '--reason "…": a run that says nothing is sent a session to find out why. Report every ' +

@@ -19,7 +19,7 @@ export type Seat = (typeof SEATS)[number];
 /** How a seat is named in a sentence: "the CFO". */
 export const SEAT_NAMES: Record<Seat, string> = {
   hiring_manager: 'the hiring manager',
-  mentor: 'the mentor',
+  mentor: 'Jerwyn the Elder',
   skeptic: 'the skeptic',
   cfo: 'the CFO',
   dreamer: 'the dreamer',
@@ -28,7 +28,7 @@ export const SEAT_NAMES: Record<Seat, string> = {
 /** How a seat is named on a button or over its paragraph: "Hiring manager". */
 export const SEAT_LABELS: Record<Seat, string> = {
   hiring_manager: 'Hiring manager',
-  mentor: 'Mentor',
+  mentor: 'Jerwyn the Elder',
   skeptic: 'Skeptic',
   cfo: 'CFO',
   dreamer: 'Dreamer',
@@ -362,9 +362,9 @@ export async function listBoardMeetings(
     client.from('board_marks').select(`meeting_id, ${MARK_COLUMNS}`).eq('user_id', userId),
   ]);
   if (meetings.error)
-    throw new Error(`Reading your board meetings failed: ${meetings.error.message}`);
+    throw new Error(`Reading your council meetings failed: ${meetings.error.message}`);
   if (marks.error)
-    throw new Error(`Reading your marks on the board's minutes failed: ${marks.error.message}`);
+    throw new Error(`Reading your marks on the council's minutes failed: ${marks.error.message}`);
   const byMeeting = new Map<string, BoardMark[]>();
   for (const row of (marks.data ?? []) as Record<string, unknown>[]) {
     const mark = markOf(row);
@@ -423,9 +423,9 @@ export async function loadBoardMeeting(
       .eq('user_id', userId)
       .eq('meeting_id', meetingId),
   ]);
-  if (meeting.error) throw new Error(`Reading the board meeting failed: ${meeting.error.message}`);
+  if (meeting.error) throw new Error(`Reading the council meeting failed: ${meeting.error.message}`);
   if (marks.error)
-    throw new Error(`Reading your marks on the board's minutes failed: ${marks.error.message}`);
+    throw new Error(`Reading your marks on the council's minutes failed: ${marks.error.message}`);
   if (!meeting.data) return null;
   const row = meeting.data as Record<string, unknown>;
   return {
@@ -466,7 +466,7 @@ export async function boardScorecard(
     .select('graded:minutes->graded')
     .eq('user_id', userId)
     .eq('status', 'ready');
-  if (error) throw new Error(`Reading the board's scorecard failed: ${error.message}`);
+  if (error) throw new Error(`Reading the council's scorecard failed: ${error.message}`);
   return scorecardFrom(
     ((data ?? []) as Record<string, unknown>[]).map((row) => gradedOf(row.graded)),
   );
@@ -551,7 +551,7 @@ export function meetingTitle(
   meeting: Pick<BoardMeeting, 'kind' | 'decision' | 'heldOn'> & { panelName?: string | null },
 ): string {
   if (meeting.kind === 'called' && meeting.decision) return meeting.decision;
-  const base = meeting.panelName ? `${meeting.panelName} panel meeting` : 'Board meeting';
+  const base = meeting.panelName ? `${meeting.panelName} panel meeting` : 'Council meeting';
   return meeting.heldOn ? `${base} ${heldOnLabel(meeting.heldOn)}` : base;
 }
 
@@ -576,7 +576,7 @@ export const DECISION_MAX = 500;
 
 /** What Call a meeting says while a meeting is queued or running. */
 export const MEETING_RUNNING_MESSAGE =
-  'A board meeting is already running. Its minutes will appear here when it ends.';
+  'A council meeting is already running. Its minutes will appear here when it ends.';
 
 export type MeetingState =
   | { kind: 'running'; since: string }

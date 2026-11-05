@@ -266,6 +266,14 @@ export type DashChange = NewDashChange & {
   undoneAt: string | null;
   /** What the write said it did, once done: a paid press's result line (plan #2228.2). */
   summary?: string | null;
+  /**
+   * Made or proposed by someone on People (plan #2854.2): who, the thread,
+   * and the person's text it answered, which a proposal's card hangs from in
+   * place of a turn. Absent or null for everything Dash itself did.
+   */
+  advisorId?: string | null;
+  advisorChatId?: string | null;
+  advisorMessageId?: string | null;
 };
 
 type DashChangeRow = {
@@ -282,10 +290,13 @@ type DashChangeRow = {
   declined_at: string | null;
   undone_at: string | null;
   summary?: string | null;
+  advisor_id?: string | null;
+  advisor_chat_id?: string | null;
+  advisor_message_id?: string | null;
 };
 
 export const DASH_CHANGE_SELECT =
-  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary';
+  'id, conversation_id, turn_id, kind, input, status, subject_ref, undo, created_at, done_at, declined_at, undone_at, summary, advisor_id, advisor_chat_id, advisor_message_id';
 
 export function toDashChange(row: DashChangeRow): DashChange {
   const subject = row.subject_ref ? parseRef(row.subject_ref) : null;
@@ -305,6 +316,10 @@ export function toDashChange(row: DashChangeRow): DashChange {
     declinedAt: row.declined_at,
     undoneAt: row.undone_at,
     summary: row.summary ?? null,
+    // Only on a change someone on People made, so Dash's own read as before.
+    ...(row.advisor_id ? { advisorId: row.advisor_id } : {}),
+    ...(row.advisor_chat_id ? { advisorChatId: row.advisor_chat_id } : {}),
+    ...(row.advisor_message_id ? { advisorMessageId: row.advisor_message_id } : {}),
   } as DashChange;
 }
 
@@ -414,6 +429,97 @@ export async function insertMadeChange(
   assertSchemaExposed(error, CORE_SCHEMA);
   if (error) throw new Error(`Keeping the change failed: ${error.message}`);
   return toDashChange(data as DashChangeRow);
+}
+
+/**
+ * Someone on People acting in their thread (plan #2854.2): who they are
+ * (you.board_advisors), the thread (you.advisor_chats) and the person's text
+ * the change answered (you.advisor_messages).
+ */
+export type PeopleCause = { advisorId: string; chatId: string; messageId: string };
+
+function peopleColumns(cause: PeopleCause) {
+  return {
+    surface: 'thread',
+    conversation_id: null,
+    advisor_id: cause.advisorId,
+    advisor_chat_id: cause.chatId,
+    advisor_message_id: cause.messageId,
+  };
+}
+
+/**
+ * Keeps a change someone on People made straight away, as a thread write is
+ * kept (insertMadeChange): done, with the row's values before and after, so
+ * Home and the thread's card offer its Undo, and naming who made it.
+ */
+export async function insertPeopleChange(
+  core: CoreSupabaseClient,
+  userId: string,
+  cause: PeopleCause,
+  made: MadeDashChange,
+  now: string = new Date().toISOString(),
+): Promise<DashChange> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .insert({
+      user_id: userId,
+      ...peopleColumns(cause),
+      kind: made.kind,
+      input: made.input,
+      status: 'done',
+      done_at: now,
+      subject_ref: made.subjectRef,
+      op: made.op,
+      before_values: made.op === 'insert' ? null : made.before,
+      after_values: made.op === 'delete' ? null : made.after,
+      summary: made.summary.replace(/\s+/g, ' ').trim().slice(0, 300),
+      undo: made.undo,
+    })
+    .select(DASH_CHANGE_SELECT)
+    .single();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Keeping the change failed: ${error.message}`);
+  return toDashChange(data as DashChangeRow);
+}
+
+/**
+ * Keeps a proposal someone on People made (a build, a delete, a watch, a paid
+ * press): proposed, under the person's text that asked for it, so its card
+ * in the thread confirms it the way Ask's card does. Nothing else is written.
+ */
+export async function insertPeopleProposal(
+  core: CoreSupabaseClient,
+  userId: string,
+  cause: PeopleCause,
+  change: NewDashChange,
+): Promise<DashChange> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .insert({ user_id: userId, ...peopleColumns(cause), kind: change.kind, input: change.input })
+    .select(DASH_CHANGE_SELECT)
+    .single();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Keeping the proposal failed: ${error.message}`);
+  return toDashChange(data as DashChangeRow);
+}
+
+/**
+ * Every change made or proposed in one People thread, in the order made, for
+ * the thread's cards. RLS keeps it to the signed-in person's rows; the
+ * partial index on advisor_chat_id serves it.
+ */
+export async function loadPeopleChanges(core: CoreSupabaseClient, chatId: string, limit = 200): Promise<DashChange[]> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .select(DASH_CHANGE_SELECT)
+    .eq('advisor_chat_id', chatId)
+    .eq('surface', 'thread')
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading the thread's changes failed: ${error.message}`);
+  return ((data ?? []) as DashChangeRow[]).map(toDashChange);
 }
 
 /**

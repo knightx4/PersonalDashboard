@@ -12,9 +12,7 @@ import { RouteError } from '@/components/ui/route-error';
 
 const newsSections: NavSection[] = [
   { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
-  { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
   { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
-  { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
 ];
 
 function NewsShell({ children }: { children: React.ReactNode }) {

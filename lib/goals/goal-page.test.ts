@@ -287,8 +287,8 @@ describe('stepPreps', () => {
 });
 
 describe('the goal page tabs', () => {
-  it('sends a link to a step to its row on the Steps tab', () => {
-    expect(stepAnchor('s1')).toBe('?tab=steps#step-s1');
+  it('sends a link to a step to its row on the Plan tab', () => {
+    expect(stepAnchor('s1')).toBe('?tab=plan#step-s1');
     expect(isStepAnchor(stepAnchor('s1'))).toBe(true);
     expect(isStepAnchor('#step-s1')).toBe(true);
     expect(isStepAnchor('#flag-f1')).toBe(false);

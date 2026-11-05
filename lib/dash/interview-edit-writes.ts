@@ -214,7 +214,7 @@ async function namedInterview(env: JobsWriteEnv, args: Args): Promise<Named> {
   return { interview, round, pursuit, name: interviewName(interview, round, pursuit) };
 }
 
-const pathsFor = (pursuit: Pursuit) => [pursuit.href, '/jobs/interviews', '/jobs'];
+const pathsFor = (pursuit: Pursuit) => [pursuit.href, '/jobs/pipeline', '/jobs'];
 
 // ---------------------------------------------------------------------------
 // What a change of several rows keeps, and its Undo

@@ -23,13 +23,10 @@ type Frame = {
 const FRAMES: Partial<Record<ModuleId, Frame>> = {
   shopping: {
     sections: [
-      { href: '/shopping/orders', label: 'Orders', icon: 'orders' },
+      { href: '/shopping/orders', label: 'Now', icon: 'orders' },
+      { href: '/shopping/inbox', label: 'Inbox', icon: 'inbox', badge: 3 },
       { href: '/shopping/inventory', label: 'Inventory', icon: 'inventory' },
-      { href: '/shopping/sell', label: 'Sell', icon: 'sell' },
-      { href: '/shopping/returns', label: 'Returns', icon: 'returns' },
       { href: '/shopping/saved', label: 'Saved', icon: 'saved' },
-      { href: '/shopping/share', label: 'Share', icon: 'share' },
-      { href: '/shopping/review', label: 'Review', icon: 'review', badge: 3 },
     ],
     settingsHref: '/shopping/settings',
     settingsLabel: 'Shopping settings',
@@ -38,13 +35,10 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
     sections: [
       { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
       { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-      { href: '/jobs/follow-ups', label: 'Follow-ups', icon: 'followUps' },
-      { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
       { href: '/jobs/find', label: 'Find', icon: 'find' },
       { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
       { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
       { href: '/jobs/material', label: 'Material', icon: 'answers' },
-      { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
     ],
     settingsHref: '/jobs/settings',
     settingsLabel: 'Job search settings',
@@ -63,7 +57,7 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
       { href: '/you/places', label: 'Places', icon: 'places' },
       { href: '/you/work', label: 'Work & school', icon: 'workSchool', exact: true },
       { href: '/you/insights', label: 'Insights', icon: 'insights', exact: true },
-      { href: '/you/board', label: 'Board', icon: 'board' },
+      { href: '/you/council', label: 'Council', icon: 'board' },
     ],
   },
   dev: {
@@ -85,10 +79,8 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   },
   vault: {
     sections: [
-      { href: '/vault', label: 'Notes', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
-      { href: '/vault/triage', label: 'Triage', icon: 'inbox' },
-      { href: '/vault/map', label: 'Map', icon: 'vaultMap' },
-      { href: '/vault/maya', label: 'Maya', icon: 'maya' },
+      // One room since Inbox and Triage folded into Now (plan #1496.9).
+      { href: '/vault', label: 'Now', icon: 'notes', exact: true, alsoMatches: ['/vault/n/'] },
     ],
     settingsHref: '/vault/settings',
     settingsLabel: 'Vault settings',
@@ -96,7 +88,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
   news: {
     sections: [
       { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
-      { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
       {
         href: '/news/all',
         label: 'Newsletters',
@@ -104,7 +95,6 @@ const FRAMES: Partial<Record<ModuleId, Frame>> = {
         exact: true,
         alsoMatches: ['/news/i/'],
       },
-      { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
     ],
     settingsHref: '/news/settings',
     settingsLabel: 'News settings',

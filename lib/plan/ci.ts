@@ -157,7 +157,7 @@ async function checkCommit(
 }
 
 /** A workflow run as the runs listing gives it, with what the panel links to. */
-type WorkflowRun = CheckRun & { id?: number; name?: string; html_url?: string };
+export type WorkflowRun = CheckRun & { id?: number; name?: string; html_url?: string };
 
 /** The same failing set as `checks.ts`, for picking which runs to explain. */
 const RUN_FAILED = new Set([
@@ -180,7 +180,7 @@ const EXPLAIN_BUDGET = 3;
  * rather than carried: "failed" is still true and worth storing without the
  * why, and turning it into an `error` would grey out a dot that knows it is red.
  */
-async function explainFailure(
+export async function explainFailure(
   runs: readonly WorkflowRun[],
   repo: Repo,
   token: string,

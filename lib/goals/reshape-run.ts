@@ -188,7 +188,7 @@ export function reshapeRunText(input: { userId: string; runId: string; goal: Res
     ...(waiting.length > 0
       ? [
           'Steps that wait on those questions. Where the question asked whether the person still',
-          'wants the step, do what the answer says: keep it, split it, give it a start date, or',
+          'wants the step, do what the answer says: keep it, give it a start date, or',
           'drop it with dropped_on naming the question (the section "Moving a step that has sat',
           'for a week").',
           ...waiting,

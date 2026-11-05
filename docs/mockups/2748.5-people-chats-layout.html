@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which layout for the People chats?</title>
+<style>
+  :root { --bg:#fafaf9; --ink:#1c1917; --mute:#78716c; --line:#e7e5e4; --card:#fff; --mine:#1c1917; --mineink:#fff; --theirs:#f0eeeb; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui, sans-serif; display:grid; gap:24px; }
+  .cap { font-weight:600; margin:0 0 4px; }
+  .sub { color:var(--mute); margin:0 0 10px; font-size:13px; }
+  .frame { border:1px solid var(--line); border-radius:12px; background:var(--card); overflow:hidden; }
+  .row { display:flex; gap:10px; align-items:center; padding:12px 14px; border-bottom:1px solid var(--line); }
+  .av { width:36px; height:36px; border-radius:50%; background:var(--theirs); flex:none; display:grid; place-items:center; font-weight:600; }
+  .nm { font-weight:600; }
+  .pv { color:var(--mute); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row > div:nth-child(2) { min-width:0; flex:1; }
+  .sel { background:#eff6ff; }
+  .bar { padding:12px 14px; border-bottom:1px solid var(--line); font-weight:600; }
+  .thread { padding:14px; display:grid; gap:6px; }
+  .b { max-width:78%; padding:8px 12px; border-radius:16px; background:var(--theirs); justify-self:start; }
+  .b.me { background:var(--mine); color:var(--mineink); justify-self:end; }
+  .box { display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--line); }
+  .box span { flex:1; border:1px solid var(--line); border-radius:999px; padding:8px 14px; color:var(--mute); }
+  .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; padding:14px; }
+  .fact { border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .fact small { color:var(--mute); display:block; }
+  .a-pages { display:grid; grid-template-columns:1fr; gap:12px; }
+  .b-split { display:grid; grid-template-columns:1fr; }
+  .thread-pane { display:none; }
+  .b-note { display:block; color:var(--mute); font-size:12px; padding:8px 14px; }
+  @media (min-width:900px) {
+    .a-pages { grid-template-columns:1fr 1fr; }
+    .b-split { grid-template-columns:320px 1fr; min-height:420px; }
+    .thread-pane { display:block; border-left:1px solid var(--line); }
+    .b-note { display:none; }
+  }
+</style>
+</head>
+<body>
+<section data-option="A">
+  <p class="cap">A: Use list and detail</p>
+  <p class="sub">A list of people is one page, a conversation is another, one column at every width. A laptop shows one conversation with nothing beside it.</p>
+  <div class="a-pages">
+    <div class="frame">
+      <div class="bar">People</div>
+      <div class="row"><div class="av">M</div><div><div class="nm">Maya, mentor</div><div class="pv">Sounds good, talk Thursday</div></div></div>
+      <div class="row"><div class="av">D</div><div><div class="nm">Dan, mentor</div><div class="pv">Daily note: three things for today</div></div></div>
+      <div class="row"><div class="av">S</div><div><div class="nm">Sam</div><div class="pv">You: thanks!</div></div></div>
+    </div>
+    <div class="frame">
+      <div class="bar">Maya, mentor</div>
+      <div class="facts">
+        <div class="fact"><small>Role</small>Mentor</div>
+        <div class="fact"><small>Last text</small>Today</div>
+        <div class="fact"><small>Messages</small>42</div>
+      </div>
+      <div class="thread">
+        <div class="b">Sounds good, talk Thursday</div>
+        <div class="b me">Great, see you then</div>
+      </div>
+      <div class="box"><span>Message</span></div>
+    </div>
+  </div>
+</section>
+
+<section data-option="B">
+  <p class="cap">B: Add a conversation pattern</p>
+  <p class="sub">People on the left and the open thread on the right from laptop width, one pane at a time on a phone. Bubbles yours on the right, theirs on the left, box at the foot.</p>
+  <div class="frame">
+    <div class="b-split">
+      <div class="list-pane">
+        <div class="bar">People</div>
+        <div class="row sel"><div class="av">M</div><div><div class="nm">Maya, mentor</div><div class="pv">Sounds good, talk Thursday</div></div></div>
+        <div class="row"><div class="av">D</div><div><div class="nm">Dan, mentor</div><div class="pv">Daily note: three things for today</div></div></div>
+        <div class="row"><div class="av">S</div><div><div class="nm">Sam</div><div class="pv">You: thanks!</div></div></div>
+        <span class="b-note">On a phone, tapping a person opens their thread as the next pane.</span>
+      </div>
+      <div class="thread-pane">
+        <div class="bar">Maya, mentor</div>
+        <div class="thread">
+          <div class="b">Morning! How did the interview go?</div>
+          <div class="b me">Better than expected, they asked about the dashboard</div>
+          <div class="b">Sounds good, talk Thursday</div>
+          <div class="b me">Great, see you then</div>
+        </div>
+        <div class="box"><span>Message</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+</body>
+</html>

@@ -63,7 +63,14 @@ export function QuickNoteTriage({
   actions = REAL_ACTIONS,
   alreadyPassed,
   naming = false,
+  onVault = false,
 }: {
+  /**
+   * Drawn on the Vault's Now page (plan #1496.9), whose note list already
+   * shows the Inbox folder: no list of what waits, and no way back to a page
+   * the deck is already on.
+   */
+  onVault?: boolean;
   /** For the gallery: draw the first card with its name field open. */
   naming?: boolean;
   /** Ids of notes to start as already left for later; the gallery draws Previous with it. */
@@ -108,7 +115,7 @@ export function QuickNoteTriage({
         </Banner>
       ))}
 
-      {waiting.length > 0 && (
+      {waiting.length > 0 && !onVault && (
         <SectionFold
           title="Waiting in your Inbox"
           count={waiting.length}
@@ -147,9 +154,9 @@ export function QuickNoteTriage({
             <Card padding="standard">
               <EmptyState
                 tone="finished"
-                title="Quick note triage is empty"
+                title="Every quick note is filed"
                 description="Every quick note has been sorted. New ones from the capture box wait here."
-                action={{ label: 'Back to the vault', href: '/vault' }}
+                action={onVault ? undefined : { label: 'Back to the vault', href: '/vault' }}
               />
             </Card>
           ) : (
@@ -158,7 +165,7 @@ export function QuickNoteTriage({
                 tone="finished"
                 title="That is every quick note"
                 description={`${waiting.length} left for later ${waiting.length === 1 ? 'stays' : 'stay'} in your Inbox.`}
-                secondaryAction={{ label: 'Back to the vault', href: '/vault' }}
+                secondaryAction={onVault ? undefined : { label: 'Back to the vault', href: '/vault' }}
               >
                 <Button variant="secondary" size="sm" onClick={() => setPass((p) => p + 1)}>
                   Go through them again

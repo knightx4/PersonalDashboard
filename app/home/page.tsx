@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
-import { whenDate, zoneDay, zoneParts } from '@/lib/core/when';
+import { whenDate, zoneDay } from '@/lib/core/when';
+import { greetingFor } from '@/lib/shell/greeting';
 import { cookies } from 'next/headers';
 import Link, { linkVariants } from '@/components/ui/link';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
@@ -80,16 +81,6 @@ async function safe<T>(work: PromiseLike<T>, fallback: T): Promise<T> {
   }
 }
 
-/**
- * What time of day it is where the reader is, not where the server is.
- */
-function greeting(timezone: string, now: Date): string {
-  const hour = zoneParts(now, timezone).hour;
-  if (hour < 5) return 'Still up';
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
 
 /**
  * The front door to the account, not to any one module.
@@ -295,7 +286,7 @@ async function homeContent(
         day={today}
         header={
           <HomeHeader
-            greeting={`${greeting(settings.timezone, now)}${settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}`}
+            greeting={greetingFor(settings.timezone, now, settings.displayName)}
             date={date}
             sigil={
               <Suspense fallback={null}>

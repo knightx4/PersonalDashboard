@@ -276,17 +276,21 @@ the run reads which of its closes you undid, never closes a step again on the
 evidence it was undone on, and holds back on a source whose closes you keep
 undoing (the goals skill, "Closing a step from evidence").
 
-No step of yours sits for more than a week without a move (plan #1083). The
-morning brief lists each open step of yours that nothing has touched in seven
-days (its row unchanged, nothing added or changed beneath it, no comment from
-you), and the run gives each one move: it splits the step into smaller
-sub-steps, prepares it as **Ask Dash** would, or adds a question beside it
-asking whether you still want it and makes the step wait on that question.
-Each is an ordinary change on the Goals home with an Undo. If you answer that
-you no longer want it, the re-shape run drops the step with `dropped_on`
-naming the question, which the database allows only for a question the step
-waits on and you have answered (`migrations-goals/0051`). It reads "Dropped X
-on your answer to Y", and its Undo reopens the step.
+A step of yours that nothing has touched in seven days (its row unchanged,
+nothing added or changed beneath it, no comment from you) may get one move
+from the morning run (plan #1083): Dash prepares it as **Ask Dash** would, or
+sets it to start two to four weeks later, or leaves it. Each move is an
+ordinary change on the Goals home with an Undo. Dash never splits such a step
+into sub-steps and never asks whether you still want it. Until November 2026
+it did both, and the apartment goal grew to 127 open steps and 31 open
+questions, nearly all of them Dash's; the cleanup on 4 November closed those
+questions and archived the sub-steps. You drop a step you do not want, and
+ask Dash to break one down when you want that. A question asked before then
+that you answer "drop it" still drops the step with `dropped_on` naming the
+question (`migrations-goals/0051`).
+
+When Dash maps a goal it writes one level of steps under each stage, with no
+sub-steps; the pieces of a big step go in its detail.
 
 Closing a whole goal stays yours (plan #1084). When the morning run reads a
 goal's done-when as met, its status for the day is `met`, with a short

@@ -4,6 +4,7 @@ import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { formatMoney } from '@/lib/money';
+import { ACTIVITY_HREF } from '@/lib/jobs/home/now-tabs';
 import type { ModuleId } from '@/lib/modules';
 import {
   UPDATE_WINDOW_DAYS,
@@ -70,7 +71,7 @@ async function jobUpdates(userId: string, since: string): Promise<Update[]> {
       at: row.created_at,
       text,
       detail: row.summary?.trim() || role?.title || null,
-      href: role ? `/jobs/roles/${role.id}` : '/jobs/activity',
+      href: role ? `/jobs/roles/${role.id}` : ACTIVITY_HREF,
     };
   });
 }

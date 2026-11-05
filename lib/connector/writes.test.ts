@@ -40,6 +40,18 @@ describe('runConnectorWrite', () => {
       'close_goal_step',
       'set_goal_done_when',
       'change_items',
+      'add_todo',
+      'change_todo',
+      'close_todo',
+      'mark_returned',
+      'add_role_note',
+      'move_roles',
+      'write_prep_note',
+      'rewrite_post',
+      'suggest_post',
+      'add_project',
+      'take_on_for_goal',
+      'report_progress',
       'change_reading',
       'add_learn_track',
       'add_track_reading',
@@ -61,6 +73,7 @@ describe('runConnectorWrite', () => {
       'save_about_me',
       'set_detail',
       'ask_board',
+      'talk_to_advisor',
       'mark_issue_unread',
       'save_story',
       'send_story_to_learn',
@@ -74,6 +87,8 @@ describe('runConnectorWrite', () => {
       'change_goal_form',
       'change_goals_inbox',
       'change_goal_list',
+      'change_goal_dashboard',
+      'log_hours',
       'change_item',
       'item_lists',
       'add_items',
@@ -112,6 +127,11 @@ describe('runConnectorWrite', () => {
       'change_interview',
       'change_interviewer',
       'change_interview_round',
+      'reply_in_thread',
+      'read_thread',
+      'propose_feature',
+      'add_plan_step',
+      'write_decision',
     ]);
   });
 
@@ -208,6 +228,51 @@ describe('the writes shared with Ask Dash', () => {
     });
   });
 
+  it('adds a new todo, renames it and ticks it off, as Ask Dash does, each recorded for Undo', async () => {
+    const { tables, context } = await shared({ enabledModules: ['todo'], today: '2026-10-13', timezone: 'Europe/London' });
+    tables['todo.tasks'] = [];
+    tables['todo.task_tags'] = [];
+    const added = await runConnectorWrite(tool('add_todo'), context, { title: 'Call the dentist', due_on: '2026-10-13' });
+    expect(added).toMatchObject({ ok: true, rows: [{ table: 'todo.tasks' }] });
+    expect(tables['todo.tasks']).toEqual([expect.objectContaining({ user_id: ME, title: 'Call the dentist', due_on: '2026-10-13' })]);
+    const id = tables['todo.tasks'][0].id as string;
+    // It arrives tagged by its date, as add_todo in Ask Dash does.
+    expect(tables['todo.task_tags']).toEqual([expect.objectContaining({ task_id: id, tag: 'now' })]);
+    // The table's own defaults, which the in-memory database does not fill.
+    Object.assign(tables['todo.tasks'][0], { status: 'open', parent_id: null });
+
+    const renamed = await runConnectorWrite(tool('change_todo'), context, { todo_ref: id, title: 'Call the dentist about the crown' });
+    expect(renamed).toMatchObject({ ok: true });
+    expect(tables['todo.tasks'][0]).toMatchObject({ title: 'Call the dentist about the crown' });
+
+    const closed = await runConnectorWrite(tool('close_todo'), context, { todo_ref: id });
+    expect(closed).toMatchObject({ ok: true });
+    expect(tables['todo.tasks'][0]).toMatchObject({ status: 'done' });
+    expect(tables['core.dash_actions'].map((row) => [row.surface, row.kind])).toEqual([
+      ['routine', 'add_todo'],
+      ['routine', 'change_todo'],
+      ['routine', 'close_todo'],
+    ]);
+  });
+
+  it("refuses to tick off another person's todo", async () => {
+    const TASK = '00000000-0000-4000-8000-000000000e02';
+    const { tables, context } = await shared({ enabledModules: ['todo'], today: '2026-10-13' });
+    tables['todo.tasks'] = [{ id: TASK, user_id: 'someone else', title: 'Theirs', status: 'open', parent_id: null }];
+    const result = await runConnectorWrite(tool('close_todo'), context, { todo_ref: TASK });
+    expect(result).toEqual({ ok: false, error: 'That todo is not one of theirs, or it has been deleted.' });
+    expect(tables['todo.tasks'][0]).toMatchObject({ status: 'open' });
+    expect(tables['core.dash_actions']).toEqual([]);
+  });
+
+  it('refuses a new todo when Todo is off', async () => {
+    const { tables, context } = await shared({ enabledModules: ['dev'], today: '2026-10-13' });
+    tables['todo.tasks'] = [];
+    const result = await runConnectorWrite(tool('add_todo'), context, { title: 'Call the dentist' });
+    expect(result.ok).toBe(false);
+    expect(tables['todo.tasks']).toEqual([]);
+  });
+
   it('refuses a Todo change when Todo is off', async () => {
     const { context } = await shared({ enabledModules: ['dev'], today: '2026-10-13' });
     expect(await runConnectorWrite(tool('add_event'), context, { title: 'Lunch', start_day: '2026-10-16', all_day: true })).toEqual({
@@ -284,7 +349,8 @@ describe('the writes shared with Ask Dash', () => {
       const closed = await runConnectorWrite(tool('close_goal_step'), context, { step_ref: STEP });
       expect(closed).toMatchObject({ ok: true, rows: [{ table: 'goals.items', ref: STEP }] });
       expect(tables['goals.items'].find((row) => row.id === STEP)).toMatchObject({ status: 'done' });
-      expect(actors).toEqual(['claude', 'claude']);
+      // The close is the person's own, so the evidence rule for Dash's runs does not apply.
+      expect(actors).toEqual(['claude', undefined]);
       expect(tables['core.dash_actions'].map((row) => row.kind)).toEqual(['add_goal_step', 'close_goal_step']);
     });
 
@@ -306,10 +372,85 @@ describe('the writes shared with Ask Dash', () => {
     });
   });
 
+  it('refuses talking to an advisor on a context with no lookups, or when You is off (plan #2581.7)', async () => {
+    const talk = tool('talk_to_advisor');
+    const input = { advisor: 'buffett', message: 'Should I take the offer?' };
+    expect(await runConnectorWrite(talk, ctx(), input)).toMatchObject({ ok: false });
+    const off = {
+      ...ctx(),
+      db: vi.fn() as never,
+      lookups: {} as never,
+      account: { enabledModules: ['todo' as const], today: '2026-11-04' },
+    };
+    expect(await runConnectorWrite(talk, off, input)).toEqual({
+      ok: false,
+      error: 'The You workspace is switched off, so no advisor can be talked to.',
+    });
+  });
+
   it('is refused on a context with no service-role clients', async () => {
     expect(await runConnectorWrite(tool('add_job_lead'), ctx(), { url: 'https://example.com/jobs/1' })).toEqual({
       ok: false,
       error: 'That change cannot be made through this connection.',
     });
+  });
+});
+
+describe('report_progress (plan #2800.1)', () => {
+  function withRpc(result: { data?: unknown; error?: { message: string } | null }) {
+    const rpc = vi.fn(async () => ({ data: result.data ?? null, error: result.error ?? null }));
+    return { rpc, context: { ...ctx(), userId: 'owner-1', core: { rpc } as never } };
+  }
+
+  it("writes the session's row as the account the token names", async () => {
+    const { rpc, context } = withRpc({
+      data: { id: 'row-1', state: 'waiting', plan_item_id: null, updated_at: '2026-11-04T10:00:00Z' },
+    });
+    const result = await runConnectorWrite(tool('report_progress'), context, {
+      session_id: 'cse_015abc',
+      state: 'waiting',
+      action: 'Drew the export page',
+      needs: 'CSV or JSON?',
+      project: 'music-pipeline',
+      // Who it is for comes from the token, never the input.
+      user_id: 'someone-else',
+    });
+    expect(rpc).toHaveBeenCalledWith('report_session_progress', {
+      p_user_id: 'owner-1',
+      p_session_id: 'cse_015abc',
+      p_state: 'waiting',
+      p_action: 'Drew the export page',
+      p_needs: 'CSV or JSON?',
+      p_plan_run_id: null,
+      p_plan_item_id: null,
+      p_thread_id: null,
+      p_project: 'music-pipeline',
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      rows: [{ table: 'core.session_progress', ref: 'row-1', href: '/dev/projects/music-pipeline' }],
+      note: 'Reported as waiting on the person.',
+    });
+  });
+
+  it('refuses bad input before reaching the database', async () => {
+    const { rpc, context } = withRpc({});
+    expect(
+      await runConnectorWrite(tool('report_progress'), context, { session_id: 'cse_1', state: 'waiting', action: 'Asked' }),
+    ).toEqual({ ok: false, error: 'needs is required while waiting: what the session needs from the person.' });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('passes on what the database refused', async () => {
+    const refusal = 'There is no plan run 7b7f8be3-b391-4fa8-a359-f9194b897f40 in this account.';
+    const { context } = withRpc({ error: { message: refusal } });
+    expect(
+      await runConnectorWrite(tool('report_progress'), context, {
+        session_id: 'cse_1',
+        state: 'working',
+        action: 'Started',
+        run_id: '7b7f8be3-b391-4fa8-a359-f9194b897f40',
+      }),
+    ).toEqual({ ok: false, error: refusal });
   });
 });
