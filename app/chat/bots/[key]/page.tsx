@@ -4,7 +4,16 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
-import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, saveBotPhoto, savePersonCard } from '../../actions';
+import {
+  correctPersonMemory,
+  deletePersonCard,
+  draftPersonCard,
+  removePersonMemory,
+  saveBotPhoto,
+  savePersonCard,
+  setReachOut,
+  turnOffPersonReachOut,
+} from '../../actions';
 import { BotsView } from '../../bots-view';
 import { PersonForm } from '../../people/person-form';
 
@@ -28,9 +37,10 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
   if (!KEY.test(key)) notFound();
   const user = await requireUser();
   const client = await createYouClient();
+  const now = readAt();
   const [rows, card, settings] = await Promise.all([
     loadPeople(client, user.id),
-    loadPersonCard(client, user.id, key),
+    loadPersonCard(client, user.id, key, now),
     loadAccountSettings(user.id),
   ]);
   if (!card) notFound();
@@ -40,8 +50,17 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
         key={`${card.id}-${card.persona.length}`}
         card={card}
         timezone={settings.timezone}
-        now={readAt()}
-        actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory, delete: deletePersonCard, photo: saveBotPhoto }}
+        now={now}
+        actions={{
+          save: savePersonCard,
+          draft: draftPersonCard,
+          correct: correctPersonMemory,
+          remove: removePersonMemory,
+          delete: deletePersonCard,
+          setReachOut,
+          turnOffReachOut: turnOffPersonReachOut,
+          photo: saveBotPhoto,
+        }}
       />
     </BotsView>
   );

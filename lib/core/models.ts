@@ -145,6 +145,8 @@ export const MODELS = {
   groupDirector: HAIKU,
   /** lib/you/people-cards.ts, a persona card drafted or redrafted on the People form (plan #2748.11) */
   personaDraft: SONNET,
+  /** lib/you/reach-out-make.ts, the rule made from what a person on People should text you about (plan #2931.2) */
+  reachOutRule: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
