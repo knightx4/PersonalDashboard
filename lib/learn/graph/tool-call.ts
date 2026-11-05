@@ -15,7 +15,7 @@
  * needs a prompt that asks for one.
  */
 
-import { HAIKU } from '@/lib/core/models';
+import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 
 /**
  * Given to `tool_choice` so the model reports through the tool.
@@ -34,6 +34,25 @@ export function forceTool(
 
 /** The models that accept a forced tool. */
 const FORCEABLE: ReadonlySet<string> = new Set([HAIKU]);
+
+/**
+ * The beta that returns a progress note's summary as the text of its
+ * thinking block, where otherwise it comes back empty (`thinking.display:
+ * "updates"`).
+ */
+export const PROGRESS_NOTES_BETA = 'thinking-display-updates-2026-08-18';
+
+/**
+ * Whether the model writes text longer than a sentence or two, in a turn that
+ * may call tools, as a progress note in a thinking block rather than as text,
+ * and takes `display: "updates"` to return that note's summary. Opus 5.5 and
+ * Sonnet 5.5 do; Haiku 5.5 does neither.
+ */
+export function writesProgressNotes(model: string): boolean {
+  return PROGRESS_NOTE_MODELS.has(model);
+}
+
+const PROGRESS_NOTE_MODELS: ReadonlySet<string> = new Set([OPUS, SONNET]);
 
 /**
  * Added to `max_tokens` where the tool is not forced. A model left to choose
