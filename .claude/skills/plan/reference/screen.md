@@ -186,9 +186,18 @@ blocks, and that answer replaces decision #1535's A. So:
 **Surfaces a shared file reaches.** The close guard lists every surface a
 changed file serves, so a change to a shared row or folder can name dozens
 of screens nobody sent to the critic. Send the surfaces the step meant to
-change to the critic. Settle the rest with the same command, naming in the
-reason that the step did not set out to change them, and do not block on
-them.
+change to the critic, then run `npm run ui-guard -- <step> --compare`
+(plan #2815.3). It treats as meant the surfaces the critic has judged on the
+step (a settle is not a look) and any its title, detail or done-when links
+as `/preview?s=<id>`, and skips those that have passed. Every other surface
+the files reach it shoots on this checkout and on origin/main, settles those
+whose shots match, and lists the rest, with the time each part took. Those
+it lists have changed: they go to the critic from round 1. It builds what is
+not running: the branch's preview on `PREVIEW_PORT` (a running one is used
+only when built after the step's last change) and main's in a worktree under
+the temp folder on `PREVIEW_PORT` + 1000, kept for the next run. `--workers
+<n>` sets how many shooters a side, three by default. Do not block on these
+surfaces.
 
 The settle lets one of those through only when it looks the same as on main
 (plan #2215.4). For every surface still waiting that the critic has not

@@ -17,6 +17,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   MAX_CANDIDATES,
@@ -25,7 +26,7 @@ import {
   type EvidenceSourceKind,
 } from './propose-payload';
 import { MODELS } from '@/lib/core/models';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 
 /**
  * Judgment, not retrieval: deciding what counts as a story and what is a
@@ -120,35 +121,32 @@ export async function proposeEvidenceFromSource(
       model: MODEL,
       max_tokens: 8192 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the evidence items found in the source material.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              candidates: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    body: { type: 'string' },
-                    context: { type: ['string', 'null'] },
-                    metrics: { type: ['string', 'null'] },
-                    skills: { type: 'array', items: { type: 'string' } },
-                    strength: { type: 'integer', minimum: 1, maximum: 5 },
-                  },
-                  required: ['title', 'body'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the evidence items found in the source material.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            candidates: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  body: { type: 'string' },
+                  context: { type: ['string', 'null'] },
+                  metrics: { type: ['string', 'null'] },
+                  skills: { type: 'array', items: { type: 'string' } },
+                  strength: { type: 'integer', minimum: 1, maximum: 5 },
                 },
+                required: ['title', 'body'],
               },
-              no_data: { type: 'boolean' },
             },
-            required: ['no_data'],
+            no_data: { type: 'boolean' },
           },
+          required: ['no_data'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -167,12 +165,10 @@ export async function proposeEvidenceFromSource(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TOOL_NAME,
-  );
-  if (!report || report.type !== 'tool_use') {
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
     return { ok: false, error: 'No proposal came back.' };
   }
 
-  return parseEvidenceProposalPayload(report.input);
+  return parseEvidenceProposalPayload(report.value);
 }

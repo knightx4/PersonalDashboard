@@ -15,11 +15,19 @@
 
 import { numberFromRef, refFor, type OutlineIndex } from './ref';
 
-/** The stamp itself. Written by a re-shape, read by the page and the brief. */
+/**
+ * The stamp itself. Written by a re-shape or by a batch that learned something
+ * building an earlier step, read by the page and the brief.
+ */
 export type ReshapeOrigin = {
   /**
-   * The decision whose answer produced this step, or null when the stamp
-   * names it by an outline no step has now.
+   * What produced the row: the person's answer to a decision, or what a step
+   * under the same feature found when it was built.
+   */
+  source: OriginSource;
+  /**
+   * The decision (or built step) that produced this one, or null when the
+   * stamp names it by an outline no step has now.
    */
   number: number | null;
   /** The decision as the stamp wrote it: `1084` in older stamps, `1073.4` in newer. */
@@ -30,8 +38,17 @@ export type ReshapeOrigin = {
   gist: string;
 };
 
+/** An answer to a decision, or a finding from building a step. */
+export type OriginSource = 'answer' | 'build';
+
 /** Long enough to say which answer it was; short enough to sit on a row. */
 const MAX_GIST = 160;
+
+function gistOf(text: string): string {
+  const first = text.split('\n').find((line) => line.trim()) ?? '';
+  const gist = first.trim();
+  return gist.length > MAX_GIST ? `${gist.slice(0, MAX_GIST - 1).trimEnd()}…` : gist;
+}
 
 /**
  * Compose the line. The decision is named by its outline (`1073.4`) when the
@@ -42,14 +59,24 @@ const MAX_GIST = 160;
  * something the person did not say.
  */
 export function reshapeStamp(decision: number | string, resolution: string): string {
-  const first = resolution.split('\n').find((line) => line.trim()) ?? '';
-  const gist = first.trim();
-  return `From #${String(decision).replace(/^#/, '')}'s answer: ${
-    gist.length > MAX_GIST ? `${gist.slice(0, MAX_GIST - 1).trimEnd()}…` : gist
-  }`;
+  return `From #${String(decision).replace(/^#/, '')}'s answer: ${gistOf(resolution)}`;
 }
 
-const PATTERN = /^From #(\d+(?:\.\d+)*)'s answer: (.+)$/m;
+/**
+ * The same line for a row written or rewritten because of what building an
+ * earlier step under the feature turned up: `From #1073.1's build: the rows
+ * already carry a date, so no migration is needed.`
+ *
+ * There is no answer to quote here, so the finding is the session's own
+ * words. That is why `revise` and `add --from` on a built step insist on it
+ * being given, and why the page shows it beside the row: the person reads the
+ * reason in the same place they would read an answer's.
+ */
+export function buildStamp(step: number | string, finding: string): string {
+  return `From #${String(step).replace(/^#/, '')}'s build: ${gistOf(finding)}`;
+}
+
+const PATTERN = /^From #(\d+(?:\.\d+)*)'s (answer|build): (.+)$/m;
 
 /**
  * Read it back, or null when there is none.
@@ -68,10 +95,11 @@ export function reshapeOrigin(
   const written = match[1];
   const number = numberFromRef(written, outlines);
   return {
+    source: match[2] as OriginSource,
     number,
     written,
     ref: number === null || written.includes('.') ? `#${written}` : refFor(number, outlines),
-    gist: match[2].trim(),
+    gist: match[3].trim(),
   };
 }
 

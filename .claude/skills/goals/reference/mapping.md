@@ -150,9 +150,11 @@ it as the goal's file and revise it instead.
    are open, and closes itself once they are all done or dropped (a trigger,
    `migrations-goals/0040`); never close a phase yourself. A merge is the
    exception to both halves: see "Merging duplicate steps".
-2. **Sub-steps under each phase.** Two to five, each one sitting of work, each
-   with its own `acceptance`. A sub-step bigger than one sitting gets
-   sub-steps of its own.
+2. **Steps under each phase.** Two to five, each with its own `acceptance`.
+   One level only: a step never gets sub-steps of its own when you map a
+   goal. A step bigger than one sitting stays one step, with the pieces as
+   lines in its `detail`. Break a step into sub-steps only when the person
+   asks you to ("break this down", a comment, Ask Dash on the step).
 3. **`position` in tens** (10, 20, 30) at every level, so the person's own
    steps can go between yours.
 
@@ -502,6 +504,12 @@ nothing, even when you would have chosen differently.
 Never write `help_kinds` or `help_kinds_settled_at`. A guard refuses a write
 of yours to either, and refuses a proposal on a goal whose help is settled.
 Say in the run's summary which kinds you proposed and why.
+
+### The dashboard
+
+Once the map and its lists are written, lay out the goal's dashboard when it
+has none: pick the template for its kind and save it through the script, as
+`dashboards.md` says. Lay it out after the lists, so its tiles can read them.
 
 ### A goal that is several goals
 

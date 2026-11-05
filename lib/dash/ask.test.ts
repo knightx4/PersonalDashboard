@@ -329,7 +329,8 @@ describe('askDash', () => {
       now: () => clock,
     });
 
-    expect(sent[2].tool_choice).toEqual({ type: 'none' });
+    // Tool choice stays as it was, so the cache holds (plan #2937.1).
+    expect(sent[2].tool_choice).toEqual({ type: 'auto' });
     const refused = sent[2].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
     expect(refused[0]).toMatchObject({ tool_use_id: 'u2', is_error: true });
     expect(answer).toMatchObject({ ok: true, stop: 'time', body: `One order, from eBay.\n\n${limitNote('time')}` });
@@ -387,6 +388,42 @@ describe('askDash', () => {
     // A row an earlier answer cited may be cited again without a new lookup.
     expect(written[1].turns[0].citations).toEqual([ORDER]);
     expect(result.conversation?.ref).toBe('conv-old');
+  });
+
+  it('answers the last question again on Try again, adding no question of its own (plan #2854.4)', async () => {
+    const earlier: TalkTurn[] = [
+      { id: 'a', role: 'user', body: 'What did I buy on eBay?', createdAt: '2026-09-26T10:00:00Z' },
+    ];
+    const { client, sent } = stubClient([reply([use('a', 'answer', { answer: 'eBay order 12.', cited: [] })])]);
+    const { stores, written } = memoryStores(earlier);
+
+    const result = await askDash(
+      { question: 'ignored', conversationRef: 'conv-old', retry: true, today: '2026-09-27', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+
+    expect(sent[0].messages.map((m) => m.role)).toEqual(['user']);
+    // Cached as one block, since Ask's voice can search the web (plan #2861).
+    expect(JSON.stringify(sent[0].messages[0].content)).toContain('What did I buy on eBay?');
+    // Only the answer is written: the question was kept the first time.
+    expect(written).toHaveLength(1);
+    expect(written[0].turns.map((t) => t.role)).toEqual(['assistant']);
+    expect(result.turns.map((t) => t.role)).toEqual(['user', 'assistant']);
+    expect(result.turns[0].id).toBe('a');
+  });
+
+  it('refuses Try again on a question that already has its answer', async () => {
+    const earlier: TalkTurn[] = [
+      { id: 'a', role: 'user', body: 'Hi', createdAt: '2026-09-26T10:00:00Z' },
+      { id: 'b', role: 'assistant', body: 'Hello.', createdAt: '2026-09-26T10:00:05Z' },
+    ];
+    const { stores, written } = memoryStores(earlier);
+    const result = await askDash(
+      { question: 'Hi', conversationRef: 'conv-old', retry: true, today: '2026-09-27', execute: stubExecute().execute, anthropicApiKey: 'k' },
+      stores,
+    );
+    expect(result.error).toBe('That question already has its answer.');
+    expect(written).toEqual([]);
   });
 
   it('refuses a conversation that is not there', async () => {
@@ -991,7 +1028,7 @@ describe('questions that need several lookups (plan #1437)', () => {
       ...rounds,
       reply([use('u9', 'search', { query: 'one more' })]),
       reply([], 'end_turn'),
-      // Asked once more in words, it still writes nothing.
+      // Asked once more, with where the answer goes, it still writes nothing.
       reply([], 'end_turn'),
     ]);
     const { stores, written } = memoryStores();
@@ -1007,7 +1044,8 @@ describe('questions that need several lookups (plan #1437)', () => {
       stores,
     );
 
-    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
+    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'auto' });
+    expect((sent.at(-1)?.messages.at(-1)?.role as string)).toBe('system');
     expect(result.error).toBeUndefined();
     expect(result.stop).toBe('unfinished');
     const kept = written[1].turns[0];
@@ -1058,14 +1096,13 @@ describe('questions that need several lookups (plan #1437)', () => {
     expect(!answer.ok && answer.detail).toContain('reported nothing');
   });
 
-  it('asks for the answer in words when the model twice ends its turn with nothing to show', async () => {
+  it('asks again, without the empty turn, when the model ends its turn with nothing to show', async () => {
     // Sonnet 5.5 hands back longer prose as an empty thinking block.
     const hidden = { type: 'thinking', thinking: '', signature: 's' };
     const { client, sent } = stubClient([
       reply([use('u1', 'search', { query: 'first' })]),
       reply([hidden], 'end_turn'),
-      reply([hidden], 'end_turn'),
-      reply([{ type: 'text', text: 'It waits on #1172.2.2.' }], 'end_turn'),
+      reply([use('a', 'answer', { answer: 'It waits on #1172.2.2.', cited: [] })]),
     ]);
     const { execute } = stubExecute();
     const answer = await answerQuestion({
@@ -1075,8 +1112,12 @@ describe('questions that need several lookups (plan #1437)', () => {
       anthropicApiKey: 'k',
       client,
     });
-    expect(sent).toHaveLength(4);
-    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
+    expect(sent).toHaveLength(3);
+    expect(sent.every((s) => s.tool_choice.type === 'auto')).toBe(true);
+    // The same request again with one system message after it, and no echo of the empty turn.
+    expect(sent[2].messages).toHaveLength(sent[1].messages.length + 1);
+    expect(sent[2].messages.at(-1)?.role as string).toBe('system');
+    expect(sent[2].messages.some((m) => m.role === 'assistant' && JSON.stringify(m.content).includes('"thinking"'))).toBe(false);
     expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'It waits on #1172.2.2.' });
   });
 
@@ -1231,7 +1272,8 @@ describe('a long prompt read from the cache (the Northwind question, 21 October 
     });
     const refused = sent[2].messages.at(-1)!.content as { type: string }[];
     expect(refused.map((b) => b.type)).toEqual(['tool_result', 'text']);
-    expect(sent[3].tool_choice).toEqual({ type: 'none' });
+    expect(sent[3].tool_choice).toEqual({ type: 'auto' });
+    expect(sent[3].messages.at(-1)?.role as string).toBe('system');
     expect(answer).toMatchObject({ ok: true, body: expect.stringContaining('I found the company but not its roles.') });
   });
 });

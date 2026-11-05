@@ -2,7 +2,7 @@ import { fireFeatureRoutine, type RoutineTarget } from '@/lib/feedback/routine';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 
 /**
- * The run that has Dash write new questions for the Answer tab of You (plan
+ * The run that has Dash write new questions for the Ask tab of You (plan
  * #2617.3), modelled on the Insights run (lib/you/insights-start.ts).
  *
  * The button on the tab queues a you.dash_question_runs row, then fires the
@@ -102,9 +102,14 @@ export async function latestQuestionRun(client: YouSupabaseClient, userId: strin
  * to the skill (the goals skill, "Jobs that follow another skill"); the skill
  * reads everything else by the ids here.
  */
-export function dashQuestionsBrief(input: { runId: string; userId: string }): string {
-  return [`Follow ${DASH_QUESTIONS_SKILL_PATH}`, `Question run ${input.runId}`, `user_id ${input.userId}`].join('\n');
+export function dashQuestionsBrief(input: { runId: string; userId: string; weekly?: boolean }): string {
+  const lines = [`Follow ${DASH_QUESTIONS_SKILL_PATH}`, `Question run ${input.runId}`, `user_id ${input.userId}`];
+  if (input.weekly) lines.push(WEEKLY_BRIEF_LINE);
+  return lines.join('\n');
 }
+
+/** The brief's last line when the daily cron started the run, not the button (plan #2635.1). */
+export const WEEKLY_BRIEF_LINE = 'started by the weekly check';
 
 export type StartQuestionRunResult =
   | { started: true; runId: string }
@@ -120,6 +125,8 @@ export async function startQuestionRun(input: {
   client: YouSupabaseClient;
   userId: string;
   routine: RoutineTarget;
+  /** True when the daily cron starts it (plan #2635.1); the brief says so. */
+  weekly?: boolean;
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<StartQuestionRunResult> {
@@ -154,7 +161,7 @@ export async function startQuestionRun(input: {
   const fired = await fireFeatureRoutine({
     apiKey: routine.token,
     routineId: routine.id,
-    text: dashQuestionsBrief({ runId, userId }),
+    text: dashQuestionsBrief({ runId, userId, weekly: input.weekly }),
     fetch: input.fetch,
   });
 

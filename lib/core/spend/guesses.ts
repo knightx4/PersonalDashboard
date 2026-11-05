@@ -182,6 +182,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-maya-thought': searching(run(OPUS, 25_000, 2_500), 1),
   // The title and up to 4,000 characters of one note, from the hourly job.
   'gate-maya-note': background(unit(JEV, 1_200, 0)),
+  // One map idea with up to three passages and the paragraph around each,
+  // and the type, usefulness and novelty questions: about 2,400 input tokens
+  // in the 5 November check (plan #2947.8).
+  'score-vault-ideas': background(unit(JEV, 2_400, 100)),
   // The note, Maya's thought, the thread so far and the summary, answered
   // with a reply and a new summary.
   'reply-to-maya': run(SONNET, 8_000, 900),
@@ -426,6 +430,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // About ten Ask Dash answers, each around four calls of a 75,000-token
   // prompt that is mostly read from the cache; a few hundred tokens out each.
   'check-dash-quality': background(run(SONNET, 400_000, 6_000)),
+  // About fourteen probes across the three models, a few hundred tokens each
+  // way; costed as Sonnet, the middle of the three.
+  'check-model-replies': background(run(SONNET, 6_000, 2_500)),
   // One booking email in, the day, time and place out.
   'read-appointment-email': background(unit(HAIKU, 2_500, 150)),
   // The record, up to eight events and eight subject lines in; a short email out.
@@ -507,6 +514,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // You: a personality result, its trait themes and up to fifteen cut notes
   // in, a few points out.
   'read-personality': run(SONNET, 7_000, 1_200),
+  // The advisor's brain, memory and the person's decisions and goals, about
+  // 6,000 tokens cached, resent over three or four rounds with the lookups;
+  // a short reply out (plan #2581.6).
+  'talk-to-advisor': run(SONNET, 30_000, 700),
+  // Two messages and up to sixty memories in, at most four lines out.
+  'remember-advisor-talk': run(HAIKU, 3_000, 250),
   // Every result with its themes, a dozen record lines and up to fifteen cut
   // notes in, the analysis out.
   'personality-profile': run(SONNET, 12_000, 2_000),
@@ -517,6 +530,22 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-syllabus-weeks': run(HAIKU, 12_000, 700),
   // Up to twenty files' summaries and points in, a paragraph and eight ideas out (plan #2401.7).
   'collect-course-overview': run(HAIKU, 6_000, 900),
+  // Dash's lookups (about 16,000 tokens) and the persona (about 3,000) read
+  // from the cache, the memory, the day and the recent thread (about 4,000)
+  // fresh, two or three short bubbles out (plan #2748.4).
+  'mentor-reply': run(SONNET, 23_000, 250),
+  // The persona and the last few messages in, one line out (plan #2748.4).
+  'mentor-ack': background(run(HAIKU, 3_500, 30)),
+  // The cast's cards and the last thirty messages in, a short plan out (plan #2879.1.2).
+  'group-director': background(run(HAIKU, 3_000, 120)),
+  // The bot's persona, memory and the last thirty messages in, one text out (plan #2879.1.2).
+  'group-speaker': run(SONNET, 5_000, 120),
+  // The rules, the form and for a redraft the current card in; a card of
+  // about 2,500 characters out (plan #2748.11).
+  'draft-persona': run(SONNET, 1_800, 700),
+  // The rules and the tables a rule may watch in, a short brief; a rule of
+  // two or three watches and a sentence out, with a little thinking (plan #2931.2).
+  'make-reach-out-rule': run(SONNET, 1_400, 900),
   // The digest, note extracts, signals, earlier insights and five or six
   // notes in; thinking at high effort, then three to five cards and a new
   // digest out (plan #2413.9).

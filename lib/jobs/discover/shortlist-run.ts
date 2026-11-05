@@ -15,10 +15,11 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendReport, type SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { searchStep, seekerText, type SearchRequest, type SeekerContext } from '@/lib/jobs/suggest/model';
+import { seekerText, type SeekerContext } from '@/lib/jobs/suggest/model';
 import { loadSeeker } from '@/lib/jobs/suggest/run';
 import type { DiscoveryRules, FilteredHiringLists } from './filter';
 import { readHiringLists } from './read';
@@ -152,40 +153,37 @@ export async function askForShortlist(
   spend: SpendReport[],
 ): Promise<{ picks: ShortlistPick[]; error: string | null }> {
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
-  let request: SearchRequest = {
+  // Report-only: structured output on Sonnet, so the picks never depend on
+  // the model choosing to call the tool (plan #2937.5).
+  const request = {
     model: SHORTLIST_MODEL,
     max_tokens: MAX_TOKENS,
     system: SYSTEM,
-    tools: [TOOL],
+    ...reportRequest(TOOL, SHORTLIST_MODEL),
     messages: [{ role: 'user', content: shortlistPrompt(seeker, shown.lines) }],
-  };
-  const parse = (raw: unknown) => parseShortlist(raw, shown.kept, exclude);
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const budget = options.deadline ? options.deadline - Date.now() - RESERVE_MS : DEFAULT_CALL_MS;
-    if (budget < MIN_CALL_MS) return { picks: [], error: 'There was not enough time left to ask Dash.' };
-    let response: Anthropic.Message;
-    const signal = AbortSignal.timeout(budget);
-    try {
-      response = await client.messages.stream(request, { signal, timeout: budget, maxRetries: 0 }).finalMessage();
-    } catch (error) {
-      if (signal.aborted || error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
-        return { picks: [], error: 'Dash took too long over the shortlist.' };
-      }
-      return { picks: [], error: failure(error) };
+  } as Anthropic.MessageCreateParamsNonStreaming;
+  const budget = options.deadline ? options.deadline - Date.now() - RESERVE_MS : DEFAULT_CALL_MS;
+  if (budget < MIN_CALL_MS) return { picks: [], error: 'There was not enough time left to ask Dash.' };
+  let response: Anthropic.Message;
+  const signal = AbortSignal.timeout(budget);
+  try {
+    response = await client.messages.stream(request, { signal, timeout: budget, maxRetries: 0 }).finalMessage();
+  } catch (error) {
+    if (signal.aborted || error instanceof Anthropic.APIUserAbortError || error instanceof Anthropic.APIConnectionTimeoutError) {
+      return { picks: [], error: 'Dash took too long over the shortlist.' };
     }
-    const report: SpendReport = { model: SHORTLIST_MODEL, usage: usageFrom(response.usage) };
-    spend.push(report);
-    options.onSpend?.(report);
-    const step = searchStep(request, response, SHORTLIST_TOOL, parse);
-    if (step.kind === 'report') {
-      return step.suggestions.length > 0
-        ? { picks: step.suggestions, error: null }
-        : { picks: [], error: 'Dash reported no startups worth a look.' };
-    }
-    if (step.kind === 'refused') break;
-    request = step.next;
+    return { picks: [], error: failure(error) };
   }
-  return { picks: [], error: 'Dash did not report a shortlist.' };
+  const report: SpendReport = { model: SHORTLIST_MODEL, usage: usageFrom(response.usage) };
+  spend.push(report);
+  options.onSpend?.(report);
+  const read = readReport(response, SHORTLIST_TOOL, SHORTLIST_MODEL);
+  if (!read.ok) {
+    console.error('jobs shortlist:', read.reason);
+    return { picks: [], error: 'Dash did not report a shortlist.' };
+  }
+  const picks = parseShortlist(read.value, shown.kept, exclude);
+  return picks.length > 0 ? { picks, error: null } : { picks: [], error: 'Dash reported no startups worth a look.' };
 }
 
 const EXISTING_COLUMNS =

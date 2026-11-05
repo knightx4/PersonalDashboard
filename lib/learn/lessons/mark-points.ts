@@ -1,10 +1,10 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { readReasoning, withReasoningRule, type AnswerSignals } from '@/lib/learn/confidence';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { OPENING_MODEL } from '@/lib/learn/graph/opening-probe';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { markPointsPrompt, pointMarksSchema, toPointMarks, type HandIn, type PointMark } from './point-marks';
 
 /**
@@ -67,31 +67,28 @@ export async function markAgainstPoints(input: {
       system: readReasoning(input.signals?.reasoning)
         ? withReasoningRule(input.system ?? MARK_POINTS_SYSTEM)
         : (input.system ?? MARK_POINTS_SYSTEM),
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report a mark for every point, by its number.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              marks: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    number: { type: 'integer' },
-                    met: { type: 'boolean' },
-                    note: { type: 'string' },
-                  },
-                  required: ['number', 'met', 'note'],
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report a mark for every point, by its number.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            marks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  number: { type: 'integer' },
+                  met: { type: 'boolean' },
+                  note: { type: 'string' },
                 },
+                required: ['number', 'met', 'note'],
               },
             },
-            required: ['marks'],
           },
+          required: ['marks'],
         },
-      ],
-      tool_choice: forceTool(TOOL, MARK_POINTS_MODEL),
+      }, MARK_POINTS_MODEL),
       messages: [
         {
           role: 'user',
@@ -113,10 +110,10 @@ export async function markAgainstPoints(input: {
 
   input.onSpend?.({ model: MARK_POINTS_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL, MARK_POINTS_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  const safe = pointMarksSchema.safeParse(block.input);
+  const safe = pointMarksSchema.safeParse(report.value);
   if (!safe.success) return { ok: false, detail: 'The marks came back malformed.' };
 
   const lined = toPointMarks(input.points, safe.data);

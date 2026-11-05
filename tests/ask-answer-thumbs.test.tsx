@@ -10,7 +10,7 @@ import { AnswerActions } from '@/components/talk/answer-actions';
 import type { TalkTurn } from '@/lib/talk/talk';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/ask',
+  usePathname: () => '/chat/dash',
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));

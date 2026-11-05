@@ -38,8 +38,8 @@ describe('ask_board', () => {
       lean: 'A',
     });
     if ('ok' in result) throw new Error(result.error);
-    expect(result).toMatchObject({ kind: 'ask_board', op: 'insert', row: { href: '/you/board' } });
-    expect(result.summary).toBe('Dash asked the board "Take the 6 month contract?", queued for the Sunday meeting.');
+    expect(result).toMatchObject({ kind: 'ask_board', op: 'insert', row: { href: '/you/council' } });
+    expect(result.summary).toBe('Dash asked the council "Take the 6 month contract?", queued for the Sunday meeting.');
     expect(tables['you.board_questions']).toHaveLength(1);
     expect(tables['you.board_questions'][0]).toMatchObject({
       user_id: ME,

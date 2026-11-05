@@ -2,6 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 
@@ -130,30 +131,28 @@ export async function nameAreas(input: {
       model: MODEL,
       max_tokens: 2048,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the areas inside this subject.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              not_a_subject: { type: 'boolean' },
-              areas: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    covers: { type: 'string' },
-                  },
-                  required: ['name', 'covers'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the areas inside this subject.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            not_a_subject: { type: 'boolean' },
+            areas: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  covers: { type: 'string' },
                 },
+                required: ['name', 'covers'],
               },
             },
-            required: ['areas'],
           },
+          required: ['areas'],
         },
-      ],
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -179,12 +178,12 @@ export async function nameAreas(input: {
   // Before the answer is judged: a malformed one still cost what it cost.
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: 'The call ran but reported nothing.' };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = areasPayloadSchema.safeParse(block.input);
+  const safe = areasPayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: 'The areas came back malformed.' };
   }

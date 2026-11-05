@@ -1,13 +1,13 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { NewsOperation } from '@/lib/core/spend/operations';
 import { sumByModel, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { decideWithJev } from '@/lib/jev/decide';
 import { jevEnabledFor } from '@/lib/jev/enabled';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { IMPORTANCE_RUBRIC } from './importance-rubric';
 import {
@@ -95,8 +95,7 @@ async function haikuRatings(
     model: IMPORTANCE_MODEL,
     max_tokens: 2_000,
     system: SYSTEM,
-    tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME, IMPORTANCE_MODEL),
+    ...reportRequest(TOOL, IMPORTANCE_MODEL),
     messages: [
       {
         role: 'user',
@@ -107,11 +106,9 @@ async function haikuRatings(
     ],
   });
   reports.push({ model: IMPORTANCE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use') throw new Error('The model reported no ratings.');
-  const given = (block.input as { ratings?: unknown } | null)?.ratings;
+  const reportRead = readReport(response, TOOL_NAME, IMPORTANCE_MODEL);
+  if (!reportRead.ok) throw new Error('The model reported no ratings.');
+  const given = (reportRead.value as { ratings?: unknown } | null)?.ratings;
   const ratings: Rating[] = [];
   for (const item of Array.isArray(given) ? given : []) {
     const { number, importance } = (item ?? {}) as Record<string, unknown>;

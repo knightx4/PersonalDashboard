@@ -80,7 +80,16 @@ const PUBLIC_PATHS = [
   '/api/ask/voice',
 ];
 
+/**
+ * A note from a project's own app (docs/PROJECT-NOTES.md). The app carries a
+ * token Dash gave it, never the cookie; the route checks the token and
+ * answers 401 without one. Only the notes route itself, so nothing else under
+ * /api/projects turns public by accident.
+ */
+const PROJECT_NOTES_PATH = /^\/api\/projects\/[a-z][a-z0-9-]{0,39}\/notes$/;
+
 function isPublic(pathname: string): boolean {
+  if (PROJECT_NOTES_PATH.test(pathname)) return true;
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 

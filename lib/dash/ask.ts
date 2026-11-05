@@ -1,3 +1,4 @@
+import { SESSION_OFFER } from '@/lib/talk/chat-to-session';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AskToolResult } from '@/lib/ask/db';
@@ -5,14 +6,17 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
+import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
+import { UNFINISHED_REASON, type DashFailure } from './failures';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
   runDash,
   type DashAnswer,
+  type DashCall,
   type DashExecutor,
   type DashLookupEvent,
   type DashProposer,
@@ -26,6 +30,20 @@ import { lookupInScope } from '@/lib/ask/tools';
 import { moduleById, type ModuleId } from '@/lib/modules';
 import { ASK_DASH_TOOLS, type DashPaidTool, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 import type { PaidQueued } from './paid';
+import {
+  THINK_EFFORT,
+  THINK_MAX_TOKENS,
+  THINK_MODEL,
+  THINK_RULES,
+  THINK_TIME_BUDGET_MS,
+  THINK_TOOLS,
+  THINK_WEB_SEARCH,
+  isThinkTool,
+  runThinkTool,
+  thoughtCall,
+  thoughtCost,
+  type ThinkDeps,
+} from './think';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -86,8 +104,8 @@ WHEN THEY ASK YOU TO PICK, SUGGEST OR RECOMMEND, CHOOSE FROM WHAT THEY HAVE.
 should I chase first" are answered by looking up the rows they already have
 and choosing one, or a few, saying why from what the rows say: a verdict, a
 summary, a date, what they wrote. Prefer what they have not finished or
-watched yet. You cannot browse the web, and you do not need to: what they
-saved is what they are asking about.
+watched yet. Never search the web for these: what they saved is what they
+are asking about.
 
 WHEN THE DATA CANNOT ANSWER IT, SAY SO, BUT ONLY AFTER LOOKING. Never say you
 cannot see or do something before you have made a lookup for it. If the
@@ -96,6 +114,8 @@ answer "I cannot see that" and say in a sentence what you could see instead.
 Do not fill the gap with a likely answer. Whenever an answer does not do what
 they asked, say what was missing in the answer tool's could_not, so the
 ability gets built.
+
+${WEB_RULES}
 
 ANSWER THROUGH THE answer TOOL. Match the length to what they said. A remark
 that needs nothing back ("thanks", "looks good") gets one short sentence, such
@@ -167,7 +187,7 @@ reorder, archive, close, park or reopen it, call change_goal; to edit, drop,
 reopen, block, move or archive a step, count it towards another goal or make
 it wait on another step, or set it aside until a later day or bring it back, call change_goal_step; to set a goal's measure, its
 links or an information step's form, call change_goal_number, change_goal_link
-or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list. In Shopping, to
+or change_goal_form; to snooze a row on the Goals Inbox or record whether they went to an event, call change_goals_inbox; to keep a list of its own on a goal, such as pantries to compare or groups to try, or add, change, confirm or archive its rows, call change_goal_list; to add a tile to a goal's dashboard when they ask for one in their own words ('add a chart of my balance'), move one, take one off or lay the whole dashboard out, call change_goal_dashboard. To log hours they spent on a goal or step on a day ('log 2 hours on the thesis for yesterday'), look the goal or step up and call log_hours. In Shopping, to
 change one item's name, variant, notes, group name or sell price, call
 change_item; to put items on a list, take them off or rename a list, call
 item_lists; to add books, games or other things they own, call add_items; to save a product for later, edit it, mark it bought, put it aside or bring it back, call change_saved_item. To enter an order they describe or show on a receipt, call add_order; to tag an order line or untag it, call order_item_tags; to confirm, put back, discard or restore orders in the review queue, dismiss or undismiss a waiting email, or attach one to its order, call review_orders. In Jobs, to change a role's title, location, pay, posting or company, call
@@ -179,7 +199,7 @@ thread with Maya, call write_vault_note, edit_vault_note, rename_vault_note,
 file_quick_note, rename_theme or rename_maya_question; to keep a transcript
 or correct a course, call save_transcript or change_course. When they tell you about a place they have lived, or ask to
 change one, call add_place or change_place; when they tell you about a job
-or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to put a question to their board ("ask the board whether ..."), call ask_board with the question, the options they gave, the numbers and limits from the conversation as context, and their lean if they said one; it queues the question for the Sunday meeting, and pass when 'now' only if they asked for a meeting now. Answer with the question and the link to the Board tab. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
+or ask to correct one, call save_job; when they ask what is in one of their own fields on Details, read custom_fields from list_rows on you.details, and when they ask to set one, call set_detail. When they ask you to put a question to their council or board ("ask the council whether ..."), call ask_board with the question, the options they gave, the numbers and limits from the conversation as context, and their lean if they said one; it queues the question for the Sunday meeting, and pass when 'now' only if they asked for a meeting now. Answer with the question and the link to the Council tab. When they ask someone on People to text them about something, on a schedule or not (\"have the hiring manager tell me about good-fit jobs every Monday\"), call set_reach_out with that person's name and their sentence, and repeat the summary it returns. When they ask you to remember something they said about themselves for their insights, call save_about_me with their words. When they ask for one of their X post
 drafts on the Posts tab in Dev to be shortened or reworded, call rewrite_post
 with the whole new text. When they ask for a post about the app or how
 they build it, read what it rests on, call post_pictures for a picture of that screen,
@@ -201,6 +221,10 @@ When they ask for a goal to be mapped, planned, broken down or researched,
 call start_goal_run on it, straight after add_goal for a new one, and pass
 what they asked for beyond the map as its instruction; never hand_off it.
 When they ask Dash to do or get ready one step, call work_goal_step.
+When they ask Dash to figure something out for a goal they have ("should I
+consolidate my loans", "work out which program fits me"), call
+take_on_for_goal with the question in their words: it works on that goal and
+tells them when it is done, so do not answer it yourself first.
 When you cannot tell which row they mean, ask rather than guess. Say in your
 answer what you did, and cite the row the tool returned so they can open it.
 Never change something they only asked about.
@@ -246,26 +270,77 @@ something (application answers, job notes, job roles and tasks are the exception
 three are the only requests you turn down; anything else is looked up, done
 with a tool, or handed on.
 
+WHEN THE REQUEST NEEDS A CODE CHANGE, OFFER A SESSION. When what they ask can only
+be done by changing the code of this app or of one of their projects (a new
+page, a fix to how something works, a feature), say so plainly in a sentence or
+two and end the answer with this sentence, word for word: ${SESSION_OFFER}
+The button under the answer then carries the chat to a session on that code.
+Do not use the sentence for anything your tools or hand_off can do, and never
+call a change done that you have only offered.
+
 THE PAGE THEY ASKED FROM IS CONTEXT FOR "THIS". A line after these rules may say
 which page of the app they asked from, and the row it shows. When the question
 points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
-/** How Dash speaks on Ask by default: Sonnet, the rules above, and every registered tool but a thread's own. */
-export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
+/**
+ * Ask's rules for making changes, from "YOU MAKE THE CHANGES" through the
+ * delete proposal, word for word: what the people on People act by (plan
+ * #2854.2, lib/you/people-actions.ts), so a change has one set of rules
+ * wherever it is asked for. Read out of SYSTEM so the two cannot drift.
+ */
+export const ASK_ACTION_RULES = SYSTEM.slice(
+  SYSTEM.indexOf('YOU MAKE THE CHANGES THEY ASK FOR'),
+  SYSTEM.indexOf('ANYTHING ELSE THEY ASK YOU TO DO, HAND ON'),
+).trim();
+
+/**
+ * How Dash speaks on Ask by default: Sonnet, the rules above, every
+ * registered tool but a thread's own, and web search (plan #2861).
+ */
+export const ASK_VOICE: DashVoice = {
+  model: ASK_MODEL,
+  system: SYSTEM,
+  tools: ASK_DASH_TOOLS,
+  serverTools: [dashWebSearch(ASK_MODEL)],
+};
 
 /**
  * Ask's voice for a question kept to one workspace (plan #1899.5): every
  * tool but the lookups outside it (lookupInScope). Writes stay, since a
- * change the person asks for is not a lookup. `model` is the one the person
- * chose to be answered with (plan #2458.2, lib/dash/model-choice.ts);
- * absent, Sonnet.
+ * change the person asks for is not a lookup, and not the web, since the
+ * question is kept to their own rows. `model` is the one the person chose to
+ * be answered with (plan #2458.2, lib/dash/model-choice.ts); absent, Sonnet.
+ * The web search is the one that model takes (dashWebSearch).
  */
 export function scopedVoice(scope: ModuleId | null | undefined, model: string = ASK_MODEL): DashVoice {
-  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model };
+  const voice = model === ASK_VOICE.model ? ASK_VOICE : { ...ASK_VOICE, model, serverTools: [dashWebSearch(model)] };
   if (!scope) return voice;
-  return { ...voice, tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)) };
+  return {
+    ...voice,
+    tools: voice.tools.filter((tool) => tool.kind !== 'lookup' || lookupInScope(tool.name, scope)),
+    serverTools: [],
+  };
+}
+
+/**
+ * Ask's voice with "Think it through" on (plan #2789.10; lib/dash/think.ts):
+ * Opus at high effort, Ask's rules with the thinking rules after them, web
+ * search, and the code lookups and the mockup on top of Ask's tools. The
+ * model the person chose for ordinary questions does not apply.
+ */
+export function thinkVoice(scope: ModuleId | null | undefined): DashVoice {
+  const ask = scopedVoice(scope, THINK_MODEL);
+  return {
+    ...ask,
+    system: `${SYSTEM}\n\n${THINK_RULES}`,
+    tools: [...ask.tools, ...THINK_TOOLS],
+    serverTools: [THINK_WEB_SEARCH],
+    effort: THINK_EFFORT,
+    maxTokens: THINK_MAX_TOKENS,
+    timeBudgetMs: THINK_TIME_BUDGET_MS,
+  };
 }
 
 export type AskStop = DashStop;
@@ -302,6 +377,8 @@ export async function answerQuestion(input: {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** Hears each model call as it came back (plan #2937.2). */
+  onCall?: (call: DashCall) => void;
   /** For tests: the clock the time budget reads. */
   now?: () => number;
   /** Hears each lookup start and finish. Whatever it throws is ignored. */
@@ -314,11 +391,17 @@ export async function answerQuestion(input: {
   scope?: ModuleId | null;
   /** The model the person chose to be answered with (plan #2458.2); absent, Sonnet. */
   model?: DashChoiceId;
+  /**
+   * "Think it through" (plan #2789.10): answered with thinkVoice, and the
+   * think lookups run with these. Absent: an ordinary answer.
+   */
+  think?: ThinkDeps | null;
 }): Promise<AskAnswer> {
-  const { page, scope, model, ...rest } = input;
+  const { page, scope, model, think, execute, ...rest } = input;
   return runDash({
     ...rest,
-    voice: scopedVoice(scope, model),
+    execute: think ? (name, args) => (isThinkTool(name) ? runThinkTool(name, args, think) : execute(name, args)) : execute,
+    voice: think ? thinkVoice(scope) : scopedVoice(scope, model),
     context: {
       surface: 'ask',
       subject: null,
@@ -365,6 +448,12 @@ export type AskStores = {
    * the missing ability is built (gapNote). Never throws. Absent: not filed.
    */
   noteGap?: (body: string, conversationRef: string) => Promise<void>;
+  /**
+   * Keeps an answer that failed or came back unfinished, with its reason and
+   * each model call (plan #2937.2, lib/dash/failures.ts). Never throws.
+   * Absent: not kept.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
 };
 
 /**
@@ -389,6 +478,8 @@ export type AskWriteRunner = (
   tool: DashWriteTool,
   input: unknown,
   seen: DashSeen,
+  /** The conversation's id, which a question handed to a goal reports back into (plan #2778.8). */
+  conversationId: string,
 ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
 /**
@@ -466,6 +557,11 @@ export async function askDash(
     onAsked?: (asked: { conversation: { ref: string; title: string | null }; turns: TalkTurn[] }) => void;
     /** Stops the answer; what was written by then is kept as it (plan #1899.5). */
     signal?: AbortSignal;
+    /**
+     * Try again (plan #2854.4): answer the chat's last question, which has no
+     * answer, instead of adding `question` to it. Needs `conversationRef`.
+     */
+    retry?: boolean;
     /** Rows the person added with @, kept on the question as its citations (plan #1899.5). */
     mentions?: readonly TalkCitation[];
     /** The workspace the question is kept to (plan #1899.5). */
@@ -475,6 +571,12 @@ export async function askDash(
      * Sonnet. The spend is recorded under the model that answered.
      */
     model?: DashChoiceId;
+    /**
+     * "Think it through" was on (plan #2789.10): answered on Opus at high
+     * effort with web search, the code and the mockup, and the answer keeps
+     * what it cost. Absent: an ordinary answer.
+     */
+    think?: ThinkDeps | null;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -493,9 +595,17 @@ export async function askDash(
       if (earlier.length === 0) return { turns: [], error: 'That conversation is not there any more.' };
       subject = { kind: 'ask', ref: input.conversationRef, title: askTitle(earlier[0].body) || null };
     } else {
+      if (input.retry) return { turns: [], error: 'That conversation is not there any more.' };
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [
+    // Try again (plan #2854.4): the chat's last question is answered as it
+    // was kept, and nothing new is added for it.
+    if (input.retry) {
+      const last = earlier[earlier.length - 1];
+      if (last.role !== 'user') return { turns: [], error: 'That question already has its answer.' };
+      earlier = earlier.slice(0, -1);
+      asked = [last];
+    } else asked = await stores.append(subject, [
       {
         role: 'user',
         body: question,
@@ -513,8 +623,32 @@ export async function askDash(
     console.error('ask question listener failed', error);
   }
 
+  // Every answer that fails, or comes back unfinished, is kept with why and
+  // what each model call returned (plan #2937.2).
+  const calls: DashCall[] = [];
+  const failed = async (outcome: DashFailure['outcome'], reason: string) => {
+    try {
+      await stores.recordFailure?.({
+        surface: 'ask',
+        outcome,
+        reason,
+        model: input.think ? THINK_MODEL : (input.model ?? ASK_MODEL),
+        effort: input.think ? THINK_EFFORT : null,
+        think: Boolean(input.think),
+        scope: input.scope ?? null,
+        conversationId: subject.ref,
+        turnId: asked[asked.length - 1]?.id ?? null,
+        calls,
+      });
+    } catch (error) {
+      console.error('the failed answer was not recorded', error);
+    }
+  };
+
   if (!input.anthropicApiKey) {
-    return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
+    const error = 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.';
+    await failed('failed', error);
+    return { conversation, turns: asked, error };
   }
 
   const spent: Parameters<SpendSink>[0][] = [];
@@ -534,7 +668,7 @@ export async function askDash(
   const write: DashWriter | undefined =
     apply && saveChange
       ? async (tool, args, seen) => {
-          const result = await apply(tool, args, seen);
+          const result = await apply(tool, args, seen, subject.ref);
           if (!result.ok) return { ok: false, error: result.error };
           // A thread's own tool, which Ask never offers.
           if ('recorded' in result) return { ok: false, error: 'That cannot be done from Ask. Answer in words.' };
@@ -639,25 +773,34 @@ export async function askDash(
     signal: input.signal,
     scope: input.scope,
     model: input.model,
+    think: input.think,
     onSpend: (report) => spent.push(report),
+    onCall: (call) => calls.push(call),
   });
   await stores.recordSpend(spent);
   // Filed whether or not the answer is kept: the gap is real either way.
   if (answer.ok && answer.couldNot && handed.length === 0) {
-    await stores.noteGap?.(gapNote(answer.couldNot, question), subject.ref);
+    await stores.noteGap?.(gapNote(answer.couldNot, asked[0]?.body ?? question), subject.ref);
   }
   if (!answer.ok) {
     await discard();
+    await failed('failed', answer.detail);
     return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
   }
+  if (answer.stop === 'unfinished') await failed('unfinished', UNFINISHED_REASON);
 
   let answered: TalkTurn[];
   try {
+    // A thought-through answer keeps its mark and its cost, read by the line under it.
+    const toolCalls = input.think
+      ? [...answer.toolCalls, thoughtCall({ model: THINK_MODEL, effort: THINK_EFFORT, costMicros: thoughtCost(spent) })]
+      : answer.toolCalls;
     answered = await stores.append(subject, [
-      { role: 'assistant', body: answer.body, toolCalls: answer.toolCalls, citations: answer.citations },
+      { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
     ]);
-  } catch {
+  } catch (error) {
     await discard();
+    await failed('failed', `The answer was written but not kept: ${error instanceof Error ? error.message : 'no reason given'}`);
     return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
   }
   const turnId = answered[answered.length - 1].id;

@@ -14,7 +14,7 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The post write tools, by name, which is the kind each change is kept under. */
-export const POST_CHANGE_KINDS = ['rewrite_post', 'suggest_post', 'add_project'] as const;
+export const POST_CHANGE_KINDS = ['rewrite_post', 'suggest_post', 'add_project', 'add_plan_step'] as const;
 
 export type PostChangeKind = (typeof POST_CHANGE_KINDS)[number];
 

@@ -1,10 +1,11 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { GOAL_KIND_LABELS, isGoalKind } from '@/lib/learn/goal-kind';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MAX_ITEMS_PER_SOURCE, MAX_PERFORMANCES, MAX_SOURCES } from '@/lib/learn/levels/draft-sources';
 import { documentLabel, independenceKey, unitLine } from '@/lib/learn/levels/stored-sources';
 import {
@@ -362,8 +363,7 @@ export async function compileTerritory(input: CompileInput & {
       model: TERRITORY_COMPILE_MODEL,
       max_tokens: 16_000 + THINKING_ROOM,
       system: systemFor(input.branch),
-      tools: [tool(input.frames)],
-      tool_choice: forceTool(TOOL_NAME, TERRITORY_COMPILE_MODEL),
+      ...reportRequest(tool(input.frames), TERRITORY_COMPILE_MODEL),
       messages: [{ role: 'user', content: compilePrompt(input, texts) }],
     });
   } catch (error) {
@@ -374,12 +374,12 @@ export async function compileTerritory(input: CompileInput & {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: TERRITORY_COMPILE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const read = readCompiled(block.input, input, texts);
+  const reportRead = readReport(response, TOOL_NAME, TERRITORY_COMPILE_MODEL);
+  if (!reportRead.ok) return { ok: false, detail: reportRead.reason };
+  const read = readCompiled(reportRead.value, input, texts);
   if (read.territory.topics.length === 0) {
     // Say what the reply was, so a retry that fails the same way can be read from the run.
-    const sent = asList((block.input as { topics?: unknown } | null)?.topics).length;
+    const sent = asList((reportRead.value as { topics?: unknown } | null)?.topics).length;
     const why =
       response.stop_reason === 'max_tokens'
         ? 'the reply was cut off before the topics were finished'

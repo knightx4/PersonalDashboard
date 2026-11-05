@@ -7,7 +7,7 @@ import type { RunJob } from './run-end';
 const JOBS: RunJob[] = [
   'step', 'feature', 'queue', 'reshape', 'shape', 'notes', 'review', 'comment', 'raise',
   'check_back', 'vision', 'vision_reshape', 'ci_fix', 'posts', 'spec_change', 'overhaul',
-  'audit', 'unstick',
+  'audit', 'unstick', 'land',
 ];
 
 describe('jobFile', () => {
@@ -21,6 +21,10 @@ describe('jobFile', () => {
     expect(jobFile('step')).toBe('.claude/skills/plan/reference/building.md');
     expect(jobFile('step', false)).toBe('.claude/skills/plan/SKILL.md');
     expect(jobFile('feature')).toBe('.claude/skills/plan/SKILL.md');
+  });
+
+  it('sends a land run to the front door, where landing a feature is written', () => {
+    expect(jobFile('land')).toBe('.claude/skills/plan/SKILL.md');
   });
 
   it('sends the jobs that build nothing to their own file', () => {

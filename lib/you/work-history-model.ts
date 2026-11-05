@@ -9,9 +9,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import {
   WORK_HISTORY_TOOL,
@@ -42,8 +42,7 @@ export async function askWorkHistoryModel(options: WorkHistoryModelOptions, text
       model: WORK_HISTORY_MODEL,
       max_tokens: 4_000,
       system: workHistoryPrompt(),
-      tools: [workHistoryTool() as Anthropic.Tool],
-      tool_choice: forceTool(WORK_HISTORY_TOOL, WORK_HISTORY_MODEL),
+      ...reportRequest(workHistoryTool() as Anthropic.Tool, WORK_HISTORY_MODEL),
       messages: [
         {
           role: 'user',
@@ -65,7 +64,7 @@ export async function askWorkHistoryModel(options: WorkHistoryModelOptions, text
   }
   options.onSpend?.({ model: WORK_HISTORY_MODEL, usage: usageFrom(response.usage) });
 
-  const reported = response.content.find((block) => block.type === 'tool_use' && block.name === WORK_HISTORY_TOOL);
-  if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back.' };
-  return { ok: true, input: reported.input };
+  const reported = readReport(response, WORK_HISTORY_TOOL, WORK_HISTORY_MODEL);
+  if (!reported.ok) return { ok: false, error: 'Nothing came back.' };
+  return { ok: true, input: reported.value };
 }

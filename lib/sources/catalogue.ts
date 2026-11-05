@@ -82,7 +82,15 @@ export const SOURCE_SCHEMAS: readonly string[] = [
  * that will create it. The gate lets these be missing from the database; once
  * the file lands, the entry here is stale and can go.
  */
-export const AWAITING_MIGRATION: Readonly<Record<string, string>> = {};
+export const AWAITING_MIGRATION: Readonly<Record<string, string>> = {
+  // The music pipeline's tables are made by knightx4/music-pipeline, not by a
+  // file here, so the test database has none (plan #2800.7).
+  'public.studio_songs': 'knightx4/music-pipeline',
+  'public.studio_tracks': 'knightx4/music-pipeline',
+  'public.studio_maps': 'knightx4/music-pipeline',
+  'public.studio_dash_requests': 'knightx4/music-pipeline',
+  'public.studio_keys': 'knightx4/music-pipeline',
+};
 
 export const SOURCES: readonly Source[] = MODULES.flatMap((m) => m.sources);
 export const NOT_SOURCES: readonly NotASource[] = MODULES.flatMap((m) => m.notSources);

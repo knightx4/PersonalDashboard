@@ -37,7 +37,9 @@ none of those and it still needs the person, it is a raise.
 A decision and a setup step are told apart by what closes them: a decision
 closes on what the person says, a setup step on their having gone and done
 something. Asking them to choose between two libraries is a decision; asking
-them to put a token in Vercel is a setup step.
+them to put a token in Vercel is a setup step. Asking them to try, listen to
+or check something already built is neither, and is not written anywhere: say
+what is unverified in the step's closing note and leave it to them to raise.
 
 **Read the raises at the start of a run**, before claiming a step:
 

@@ -488,28 +488,28 @@ describe('dashActivityLine', () => {
 
   it('names the night and what is left of its budget', () => {
     expect(dashActivityLine({ run: night({ featuresLeft: 4 }), session: null }, NOW)).toBe(
-      'dash · overnight run on · 4 of 6 features left',
+      'dash · runner on · 4 of 6 features left',
     );
   });
 
   it('names the session that is actually running, and the night behind it', () => {
     const session = { job: 'notes' as const, startedAt: minutesAgo(5) };
     expect(dashActivityLine({ run: night({ featuresLeft: 2 }), session }, NOW)).toBe(
-      'dash · notes run running · overnight, 2 of 6 features left',
+      'dash · notes run running · runner on, 2 of 6 features left',
     );
     expect(dashActivityLine({ run: null, session }, NOW)).toBe('dash · notes run running');
   });
 
   it('says a held night is held, whether or not a session is finishing', () => {
     expect(dashActivityLine({ run: night({ paused: true }), session: null }, NOW)).toBe(
-      'dash · overnight run held',
+      'dash · runner held',
     );
     expect(
       dashActivityLine(
         { run: night({ paused: true }), session: { job: 'feature', startedAt: minutesAgo(3) } },
         NOW,
       ),
-    ).toBe('dash · feature batch running · overnight run held');
+    ).toBe('dash · feature batch running · runner held');
   });
 
   it('stops counting a run that has been quiet for hours as work', () => {

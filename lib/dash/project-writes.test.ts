@@ -73,3 +73,39 @@ describe('add_project', () => {
     expect(tables['public.dev_projects'][0].archived_at).toBeNull();
   });
 });
+
+describe('add_plan_step', () => {
+  const step = PROJECT_WRITE_TOOLS.find((t) => t.name === 'add_plan_step')!;
+
+  it('writes a proposed step at the top of the named workspace', async () => {
+    tables['public.plan_items'] = [];
+    const result = await step.apply(ctx(), { title: 'Move the Overnight panel to Home', detail: 'It runs all day now; rename it.', module: 'dev' });
+    expect(result).toMatchObject({ ok: true, kind: 'add_plan_step', op: 'insert' });
+    expect(tables['public.plan_items']).toEqual([
+      expect.objectContaining({ user_id: ME, title: 'Move the Overnight panel to Home', status: 'proposed', module: 'dev', parent_id: null }),
+    ]);
+  });
+
+  it('refuses an unknown workspace and a missing title, writing nothing', async () => {
+    tables['public.plan_items'] = [];
+    expect((await step.apply(ctx(), { title: 'x', module: 'cooking' })).ok).toBe(false);
+    expect((await step.apply(ctx(), { title: ' ' })).ok).toBe(false);
+    expect(tables['public.plan_items']).toEqual([]);
+  });
+
+  it('hangs under a numbered step and takes its workspace', async () => {
+    tables['public.plan_items'] = [{ id: 'p1', user_id: ME, number: 2483, module: 'jobs', position: 10 }];
+    await step.apply(ctx(), { title: 'Child', under: '#2483' });
+    const child = tables['public.plan_items'].find((row) => row.title === 'Child');
+    expect(child).toMatchObject({ parent_id: 'p1', module: 'jobs', status: 'proposed' });
+  });
+});
+
+describe('add_plan_step instructions', () => {
+  const step = PROJECT_WRITE_TOOLS.find((t) => t.name === 'add_plan_step')!;
+  it('asks for everything worked out in the conversation, not only what was typed', () => {
+    expect(step.definition.description).toMatch(/worked out in that conversation goes into the detail/);
+    const detail = (step.definition.input_schema as { properties: { detail: { description: string } } }).properties.detail;
+    expect(detail.description).toMatch(/whole conversation/);
+  });
+});

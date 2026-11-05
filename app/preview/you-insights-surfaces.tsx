@@ -8,7 +8,8 @@ import { insightRunState } from '@/lib/you/insights-run';
 /**
  * The Insights tab in the gallery (plan #2413.5): three insights waiting,
  * one marked wrong and one not quite under Earlier, and each hidden part
- * drawn open. The fixtures run long, as a run's prose does.
+ * drawn open. The fixtures run long, as a run's prose does. Each card is
+ * about a life area (plan #2629.5), and three areas have no insight yet.
  */
 
 const NOW = Date.parse('2026-10-18T09:00:00Z');
@@ -34,14 +35,17 @@ const waiting: Insight[] = [
     layers: [
       {
         depth: 'saw',
+        headline: 'Every project you dropped stopped on the day it was ready to be shown.',
         text: 'Three side projects in your vault stop within a week of the note that says "show it to someone": the recipe site, the running log and the board game rules.',
       },
       {
         depth: 'deeper',
+        headline: 'Being judged is the part you step away from, not the work.',
         text: 'Each replacement was smaller and private. The judgement, more than the work, is what you step away from.',
       },
       {
         depth: 'further',
+        headline: 'The same reflex is probably shaping how you look for work.',
         text: 'Your Big Five puts neuroticism high and your notes on the job search say the same thing about interviews, so the pattern likely reaches past side projects into how you look for work.',
       },
     ],
@@ -76,6 +80,8 @@ const waiting: Insight[] = [
     question: 'Which of the projects you dropped would you still pick up if nobody would ever see it?',
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
@@ -83,8 +89,8 @@ const waiting: Insight[] = [
     kind: 'tension',
     claim: 'You say you want to live somewhere quiet, but every place you were happiest was in the middle of a city.',
     layers: [
-      { depth: 'saw', text: 'Your places list rates Lisbon and Chicago highest, and both were city-centre flats.' },
-      { depth: 'deeper', text: 'Quiet may stand in for having time of your own rather than for fewer people around.' },
+      { depth: 'saw', headline: null, text: 'Your places list rates Lisbon and Chicago highest, and both were city-centre flats.' },
+      { depth: 'deeper', headline: null, text: 'Quiet may stand in for having time of your own rather than for fewer people around.' },
     ],
     receipts: [
       { source: 'you.places', rowId: 'p2', quote: 'Lisbon, 5 of 5', link: '/you/places' },
@@ -101,6 +107,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c3',
+    areaName: 'Home',
   },
   {
     id: '00000000-0000-4000-8000-000000000003',
@@ -108,8 +116,8 @@ const waiting: Insight[] = [
     kind: 'strength',
     claim: 'You finish courses you pick yourself and drop the ones someone else chose for you.',
     layers: [
-      { depth: 'saw', text: 'Four of the five courses you finished in Learn were ones you added; both you dropped came from work.' },
-      { depth: 'deeper', text: 'Choosing it is what keeps you going, more than the subject.' },
+      { depth: 'saw', headline: null, text: 'Four of the five courses you finished in Learn were ones you added; both you dropped came from work.' },
+      { depth: 'deeper', headline: null, text: 'Choosing it is what keeps you going, more than the subject.' },
     ],
     receipts: [{ source: 'learn.courses', rowId: 'c4', quote: '4 of 5 finished were added by you', link: null }],
     confidence: 'high',
@@ -123,6 +131,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c4',
+    areaName: 'Learning',
   },
   {
     id: '00000000-0000-4000-8000-000000000006',
@@ -130,8 +140,8 @@ const waiting: Insight[] = [
     kind: 'prediction',
     claim: 'Within five days of the next rejection, you will spend at least three late nights building Dash and send no applications.',
     layers: [
-      { depth: 'saw', text: 'After each of the last four rejections, late-night build sessions rose within the week and applications stopped.' },
-      { depth: 'deeper', text: 'Building gives a finished thing by morning when the search gives nothing back.' },
+      { depth: 'saw', headline: null, text: 'After each of the last four rejections, late-night build sessions rose within the week and applications stopped.' },
+      { depth: 'deeper', headline: null, text: 'Building gives a finished thing by morning when the search gives nothing back.' },
     ],
     receipts: [{ source: 'job_search.applications', rowId: 'a7', quote: '4 of 4 rejections followed by build nights', link: null }],
     confidence: 'medium',
@@ -150,6 +160,8 @@ const waiting: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
 ];
 
@@ -159,7 +171,7 @@ const marked: Insight[] = [
     runId: null,
     kind: 'pattern',
     claim: 'You avoid the phone and do everything you can by email.',
-    layers: [{ depth: 'saw', text: 'Most of your job search replies are by email.' }],
+    layers: [{ depth: 'saw', headline: null, text: 'Most of your job search replies are by email.' }],
     receipts: [],
     confidence: 'medium',
     liveRef: null,
@@ -176,13 +188,15 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
   {
     id: '00000000-0000-4000-8000-000000000005',
     runId: null,
     kind: 'value',
     claim: 'You care more about who you work with than about what the company makes.',
-    layers: [{ depth: 'saw', text: 'Your notes on companies mention the team before the product.' }],
+    layers: [{ depth: 'saw', headline: null, text: 'Your notes on companies mention the team before the product.' }],
     receipts: [],
     confidence: 'medium',
     liveRef: null,
@@ -195,6 +209,8 @@ const marked: Insight[] = [
     question: null,
     answer: null,
     answeredAt: null,
+    areaId: '00000000-0000-4000-8000-0000000000c1',
+    areaName: 'Career',
   },
 ];
 
@@ -253,6 +269,24 @@ const withFired = (): Insight[] => {
   );
 };
 
+/** Their open areas in Goals: three with no insight yet, one of them long. */
+const areas = [
+  { id: '00000000-0000-4000-8000-0000000000c1', name: 'Career' },
+  { id: '00000000-0000-4000-8000-0000000000c2', name: 'Health' },
+  { id: '00000000-0000-4000-8000-0000000000c3', name: 'Home' },
+  { id: '00000000-0000-4000-8000-0000000000c4', name: 'Learning' },
+  { id: '00000000-0000-4000-8000-0000000000c5', name: 'Money' },
+  { id: '00000000-0000-4000-8000-0000000000c6', name: 'Friends, family and the people close to you' },
+];
+
+/** The Home card marked, so choosing Home finds nothing waiting (plan #2629.5). */
+const homeMarked = (): Insight[] =>
+  [...waiting, ...marked].map((card) =>
+    card.areaName === 'Home'
+      ? { ...card, verdict: { verdict: 'right', note: null, decidedAt: '2026-10-18T08:30:00Z' } }
+      : card,
+  );
+
 const run = (status: InsightRun['status'], error: string | null = null): InsightRun => ({
   id: '00000000-0000-4000-8000-0000000000aa',
   status,
@@ -270,6 +304,7 @@ export function YouInsightsPreview({
   empty = false,
   fired = false,
   prediction = false,
+  homeDone = false,
 }: {
   open?: InsightsOpen;
   state?: 'ready' | 'running' | 'failed';
@@ -278,6 +313,8 @@ export function YouInsightsPreview({
   fired?: boolean;
   /** The checked prediction at the front of the deck. */
   prediction?: boolean;
+  /** The one Home card already marked. */
+  homeDone?: boolean;
 }) {
   const latest =
     state === 'running'
@@ -290,7 +327,9 @@ export function YouInsightsPreview({
       insights={
         empty
           ? []
-          : fired
+          : homeDone
+            ? homeMarked()
+            : fired
             ? withFired()
             : prediction
               ? [...waiting.filter((i) => i.check), ...waiting.filter((i) => !i.check), ...marked]
@@ -311,6 +350,7 @@ export function YouInsightsPreview({
         lastImportedAt: '2026-10-20T09:30:00Z',
       }}
       timezone="Europe/London"
+      areas={areas}
       actions={actions}
       open={open}
     />

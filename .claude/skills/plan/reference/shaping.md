@@ -61,6 +61,18 @@ goes in approved, and its procedure is the last section of this file.
    Put migrations and schema first, the page last, and the tests inside the
    step they test rather than as a step of their own.
 
+   **Every step's detail stands alone.** A builder reads only the step's
+   brief (`lib/plan/brief.ts`), never the idea or its comments, so anything not
+   written into the step's detail and done-when is lost. Carry every
+   constraint, file, example, edge case and decision from the idea, its comment
+   thread and the person's instructions into the steps they apply to, and do
+   not summarise the specifics away. Settled decisions and the feature's
+   done-when already reach the brief as "Decided so far" and "Destination", so
+   they need not be repeated; anything still open belongs in the step's own
+   detail. Re-read each detail as a builder who has seen nothing else: if it
+   would have to open the idea to know which file, which case or which
+   number, it is not finished.
+
    **Shape for building side by side.** A feature run builds up to three
    ready steps at once (`SKILL.md`, Building, step 3), and every step pays
    the same fixed cost of a brief, design check, gate and merge, about half
@@ -160,6 +172,16 @@ goes in approved, and its procedure is the last section of this file.
    B — Make <the new pattern> a pattern of its own. <its rule in one or two sentences, and its component and gallery entry as part of this feature>.
    Recommend <A or B>: <why>."
    ```
+
+   **A decision about a screen carries a mockup of each option.** Draw the
+   options in one HTML file, put `data-option="A"`, `data-option="B"` on the
+   element that holds each, and add `--mockup <file>` (and `--link <published
+   page>` if you published it) to the `add`. It photographs each option at 390
+   and 1280 wide and keeps the pictures beside the question. `add` refuses a
+   decision whose title or detail names a screen, layout, pattern or tab
+   without one; a question that is not about how something looks takes
+   `--no-mockup "<why>"`. Keep the file in `docs/mockups/`. `plan.ts mockup
+   <n> --mockup <file>` attaches or replaces them on a question already written.
 
    Until it is answered, the step's detail says `Pattern: none fits, see
    #<the decision>`. The brief reads any name that is not one of the three

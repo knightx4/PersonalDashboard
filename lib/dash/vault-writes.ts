@@ -219,7 +219,7 @@ async function writeVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMade
     what,
     rest: ' in your Inbox',
     summary: `Dash wrote the note "${what}" in the vault's Inbox.`,
-  }, ['/vault/triage']);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ async function fileQuickNoteTool(env: VaultWriteEnv, args: Args): Promise<VaultM
     summary: into
       ? `Dash filed the quick note "${quickName}" into the note "${what}".`
       : `Dash made the quick note "${quickName}" a note of its own, "${what}".`,
-  }, ['/vault/triage', noteHref(quickPath)]);
+  }, [noteHref(quickPath)]);
   return filed.warning ? { ...made, summary: `${made.summary} ${filed.warning}` } : made;
 }
 

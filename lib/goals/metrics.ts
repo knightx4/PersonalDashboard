@@ -23,10 +23,11 @@ export type MetricPeriod = (typeof METRIC_PERIODS)[number];
 /**
  * What a metric counts (plan #2397.1, migration goals 0085): the records of a
  * list, the goal's closed steps, the files Dash wrote under the goal, or the
- * hours logged on it (migration goals 0089). Only a list metric has a list
- * and a date field; the others have null in both.
+ * hours logged on it (migration goals 0089), or the job applications you sent
+ * (plan #2908.1, migration goals 0094). Only a list metric has a list and a
+ * date field; the others have null in both.
  */
-export const METRIC_SOURCES = ['list', 'steps', 'files', 'hours'] as const;
+export const METRIC_SOURCES = ['list', 'steps', 'files', 'hours', 'applications'] as const;
 export type MetricSource = (typeof METRIC_SOURCES)[number];
 
 export type Metric = {
@@ -277,5 +278,29 @@ export function loggedHourDays(entries: LoggedEntry[]): { day: string; amount: n
     if (entry.undoneAt) return [];
     const hours = hoursOf(entry.quantity, entry.unit);
     return hours === null ? [] : [{ day: entry.happenedOn, amount: hours }];
+  });
+}
+
+/** A job application as an applications metric reads it (job_search.applications). */
+export type SentApplication = {
+  submittedAt: string | null;
+  /** The application's status, a hand override included. */
+  status: string;
+  outcome: string | null;
+};
+
+/**
+ * The days an applications metric counts (plan #2908.1): each application
+ * sent, on the day of its submitted_at in the account's zone. One never sent
+ * has no submitted_at and is left out, as is one withdrawn, whether its status
+ * or its outcome says so. Every application of the owner counts, on whichever
+ * goal the metric sits.
+ */
+export function sentApplicationDays(applications: SentApplication[], timeZone: string): string[] {
+  const zone = safeTimeZone(timeZone);
+  return applications.flatMap((application) => {
+    if (!application.submittedAt) return [];
+    if (application.status === 'withdrawn' || application.outcome === 'withdrawn') return [];
+    return [dayIn(application.submittedAt, zone)];
   });
 }

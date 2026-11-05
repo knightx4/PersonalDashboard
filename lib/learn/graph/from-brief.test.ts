@@ -18,7 +18,9 @@ function clientReturning(...replies: Reply[]) {
     if (reply.error) create.mockRejectedValueOnce(reply.error);
     else {
       create.mockResolvedValueOnce({
-        content: [{ type: 'tool_use', name: 'report_chain', input: reply.input }],
+        // Sonnet's report arrives as structured output, as JSON text (plan #2937.4).
+        content: [{ type: 'text', text: JSON.stringify(reply.input) }],
+        stop_reason: 'end_turn',
         usage: reply.usage,
       });
     }
@@ -511,9 +513,9 @@ describe('what understanding a node looks like', () => {
   it('asks for them in the tool schema', async () => {
     const client = clientReturning({ input: BITCOIN });
     await ask(client);
-    const tool = createOf(client).mock.calls[0][0].tools[0];
-    const concept = tool.input_schema.properties.concepts.items;
+    const concept = createOf(client).mock.calls[0][0].output_config.format.schema.properties.concepts.items;
     expect(concept.required).toContain('mastery');
-    expect(concept.properties.mastery.maxItems).toBe(4);
+    // Structured output takes no maxItems, so the bound is said in the description (plan #2937.4).
+    expect(concept.properties.mastery.description).toContain('at most 4 items');
   });
 });

@@ -3,6 +3,7 @@ import { ArrowUpRight, Mail, Minus, X } from 'lucide-react';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { ActivityTone } from '@/lib/jobs/activity/load';
+import { ACTIVITY_HREF } from '@/lib/jobs/home/now-tabs';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Note } from '@/components/ui/note';
@@ -23,16 +24,13 @@ const TONE_ICON: Record<
   muted: Minus,
 };
 
-/** Where the whole feed is, with the check-inbox button above it. */
-export const ACTIVITY_HREF = '/jobs/activity';
-
 /**
  * What came in since your last visit (plan #1152). Last on Today.
  *
  * Read by loadSinceView (lib/jobs/home/since-load.ts) and drawn here, so the
- * gallery can draw it from fixtures. The Activity tab is gone (plan #1591):
- * "See all" leads to the full feed and the button that checks the inbox now,
- * which are still at their own address.
+ * gallery can draw it from fixtures. "See all" opens Now's Activity tab
+ * (plan #1496.7.2), with the full feed and the button that checks the inbox
+ * now.
  */
 export function SinceList({ since, timezone }: { since: SinceView; timezone: string }) {
   if (since.state === 'failed') {

@@ -162,8 +162,8 @@ of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
 first three are the shapes the gallery shows most, the fourth was added for
 pages that hold several views of one thing, the fifth for overview pages on a
-wide screen, the sixth for pages of peer sections, and the seventh for talking
-to Dash at length:
+wide screen, the sixth for pages of peer sections, the seventh for talking
+to Dash at length, and the eighth for texting people:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
@@ -196,6 +196,14 @@ to Dash at length:
   too. Hidden or shown is kept on the device. On a phone the list is the page
   and a chat opens over it (decision 1900, answered B, with the list
   collapsible as in other chat apps).
+- **Messaging**: the Chat workspace's People tab, ongoing texts with mentors
+  (decision 2748.5, answered B). From laptop width the list of people sits on
+  the left and the open thread on the right, each a pane as tall as the
+  window; on a phone one pane is drawn at a time, with the way back above the
+  person's name. Bubbles are yours on the right and theirs on the left,
+  grouped by sender, oldest at the top, with the box fixed at the foot. It is
+  a pattern of its own because the conversation pattern's hideable list,
+  reading-width chat and glance column do not fit it.
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

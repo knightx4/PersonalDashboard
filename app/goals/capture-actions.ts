@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestDashDeps } from '@/lib/ask/clients';
+import { keepFailure } from '@/lib/dash/failures';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -127,7 +128,13 @@ export async function fileGoalCapture(
       context: () => loadCaptureContext(reader, { userId: user.id, today }),
       ask: (message, file) =>
         askCaptureModel(
-          { apiKey: key, captureId, today, onSpend: (report) => spend.push(report) },
+          {
+            apiKey: key,
+            captureId,
+            today,
+            onSpend: (report) => spend.push(report),
+            recordFailure: (failure) => keepFailure(dash.core, user.id, failure),
+          },
           message,
           file,
         ),

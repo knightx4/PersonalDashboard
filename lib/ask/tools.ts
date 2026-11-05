@@ -407,7 +407,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'goal_status',
     description:
-      'Each of the person\'s open goals with its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. Each links to the goal\'s page.',
+      'Each of the person\'s open goals with its area and its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. The note lists all their areas, in order, and totals count goals per area, so this answers "what areas are my goals in". Each links to the goal\'s page.',
     input_schema: {
       type: 'object',
       properties: {
@@ -732,6 +732,7 @@ export function isAskToolName(name: string): name is AskToolName {
 }
 
 const MODULE_LABELS: Record<ModuleId, string> = {
+  chat: 'Chat',
   shopping: 'Shopping',
   jobs: 'Job search',
   vault: 'Vault',

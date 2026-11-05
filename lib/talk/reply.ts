@@ -2,8 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MAX_TURN, toModelMessages, type TalkTurn } from './talk';
 import { MODELS } from '@/lib/core/models';
 
@@ -87,18 +88,15 @@ export async function replyAbout(input: {
       model: TALK_MODEL,
       max_tokens: 1500 + THINKING_ROOM,
       system,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Give your reply to the person.',
-          input_schema: {
-            type: 'object',
-            properties: { reply: { type: 'string', description: 'The reply, in plain prose.' } },
-            required: ['reply'],
-          },
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Give your reply to the person.',
+        input_schema: {
+          type: 'object',
+          properties: { reply: { type: 'string', description: 'The reply, in plain prose.' } },
+          required: ['reply'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, TALK_MODEL),
+      }, TALK_MODEL),
       messages,
     });
   } catch (error) {
@@ -107,10 +105,10 @@ export async function replyAbout(input: {
 
   input.onSpend?.({ model: TALK_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, TALK_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  const parsed = replySchema.safeParse(block.input);
+  const parsed = replySchema.safeParse(report.value);
   const reply = parsed.success ? parsed.data.reply.trim() : '';
   if (!reply) return { ok: false, detail: 'The reply came back empty.' };
   return { ok: true, reply: reply.slice(0, MAX_TURN) };
