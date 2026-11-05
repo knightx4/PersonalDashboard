@@ -54,6 +54,9 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # is, where it came from and why it would be
                                                # useful: a bare title is refused
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
+npm run friction -- log "<what happened>" --kind <kind> [--lesson <key>] [--cost <min>] [--from <n>]
+                                               # something cost you time: say so as it happens
+npm run friction -- lessons                    # what other builders kept running into
 ```
 
 Every `<n>` above is a step's outline, the `1073.4` its row on the page heads
@@ -64,6 +67,28 @@ outline. `SKILL.md`, **Naming a step**, has
 the rule in full.
 
 ## The loop
+
+**Read the lessons, and add to them.** `start <n>` ends with what other
+builders kept running into, costliest first, each with what to do instead.
+Read them before anything else: they are the mistakes this repository has
+already paid for. Then, whenever something costs you time, record it the
+moment it happens with `npm run friction -- log`, not only when the run
+stops. Something costs you time when:
+
+- a tool refuses you, or you run a command again after it failed;
+- a gate check fails, a test you did not expect breaks, or a migration will
+  not apply;
+- a doc, a stop line or an error message pointed you the wrong way;
+- you made a mistake and had to undo it, or guessed and guessed wrong;
+- something took far longer than it should have (`--kind slow`).
+
+Give `--kind` (guard, gate, tool, mistake, misled, slow) and `--cost` in
+minutes when you know it. When the log names a lesson it may belong to,
+file it there (`--lesson <key>`); otherwise the daily builder review files
+it. `plan.ts`, the gate and the writing check record their own refusals, so
+log what they cannot see: the wrong turn, the misleading doc, the hour lost.
+One line takes seconds and is how the next builder is spared it
+(`.claude/skills/builder-loop/SKILL.md` is the review that reads them).
 
 **Write run lines as you go.** The run's page shows what you write with
 `activity <n>`: `--kind action` right after claiming ("Claimed #n"), after each
@@ -278,6 +303,8 @@ session building the next step:
 - **Anything you wrote outside your own step**: a decision and its dependency
   edge, steps written for a waiting step you settled, an idea filed, a raise. By outline and title.
 - **Any step that became ready** when you closed yours.
+- **What cost you time**, each one already logged with `npm run friction --
+  log`, by its lesson key. "Nothing" is a fine answer.
 
 Keep it to what the next session needs. A page is too long; three lines is too
 short.

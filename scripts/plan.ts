@@ -141,7 +141,7 @@ import {
   storedScopeOf,
   type DevProject,
 } from '../lib/plan/projects';
-import { builtBeneathExpiries, endsWithBuiltLine } from '../lib/plan/built';
+import { builtBeneathExpiries, chooseBuiltCommit, endsWithBuiltLine, type BranchCommit } from '../lib/plan/built';
 import { landNowLine } from '../lib/plan/land';
 import { planBrief, STATUS_WORD, type BriefPicture } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
@@ -201,7 +201,17 @@ import {
 } from '../lib/plan/ref';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import type { SpendReport } from '../lib/core/spend/pricing';
-import { checkWriting, writingNote, writingWarning, type WritingText } from '../lib/writing/check';
+import {
+  checkWriting,
+  flaggedAt,
+  WRITING_NOTE_AT,
+  WRITING_PATTERNS,
+  writingNote,
+  writingWarning,
+  type WritingText,
+} from '../lib/writing/check';
+import { knownLesson, writingLesson } from '../lib/plan/friction';
+import { lessonsForBuilder, recordToolFriction } from '../lib/plan/friction-store';
 import { writingSpendRow } from '../lib/writing/ledger';
 import {
   blockPatch,
@@ -301,6 +311,18 @@ async function checkRowWriting(
       await sql`
         update plan_items set comment = coalesce(comment || E'\n\n', '') || ${note}
         where id = ${row.id} and user_id = ${userId}`;
+      // Counted, so a rule plan text breaks every week shows as one lesson (scripts/friction.ts).
+      for (const flagged of flaggedAt(result, WRITING_NOTE_AT)) {
+        const label = WRITING_PATTERNS[flagged.pattern].label;
+        const said = await recordToolFriction(sql, userId, {
+          kind: 'writing',
+          what: `${ref(row.number)}: ${label}`,
+          lesson: writingLesson(label),
+          cost: 2,
+          planItemId: row.id,
+        });
+        if (said) console.warn(said);
+      }
     }
   } catch (error) {
     console.warn(`Writing check did not run: ${error instanceof Error ? error.message : error}`);
@@ -399,6 +421,46 @@ function currentCommit(): string | null {
   }
 }
 
+/**
+ * A close or built refusal, counted as friction under its lesson so the daily
+ * builder review sees how often each wall is hit (scripts/friction.ts). Returns
+ * what to tell the builder about it, or null.
+ */
+async function refusedFriction(sql: Sql, userId: string, planItemId: string, refusal: string): Promise<string | null> {
+  return recordToolFriction(sql, userId, {
+    kind: 'guard',
+    what: refusal,
+    lesson: knownLesson(refusal),
+    planItemId,
+  });
+}
+
+/** A commit's subject line, or null when git does not know it. */
+function commitSubject(sha: string): string | null {
+  if (!/^[0-9a-f]{7,40}$/i.test(sha)) return null;
+  try {
+    return execSync(`git log -1 --format=%s ${sha}`, { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/** The branch's own commits (not yet on origin/main), newest first, merges left out. */
+function branchCommits(): BranchCommit[] {
+  try {
+    const out = execSync('git log --no-merges --format=%h%x09%s origin/main..HEAD', { encoding: 'utf8' });
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [sha, ...rest] = line.split('\t');
+        return { sha, subject: rest.join('\t') };
+      });
+  } catch {
+    return [];
+  }
+}
+
 function currentBranch(): string | null {
   try {
     const name = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
@@ -458,8 +520,14 @@ async function doneRefusal(
   }
   const checks = inputs.surfaces.length
     ? await sql<CheckRound[]>`
+        with recursive below as (
+          select id, number from plan_items where user_id = ${userId} and number = ${number}
+          union all
+          select p.id, p.number from plan_items p join below b on p.parent_id = b.id
+        )
         select surface, round, verdict from ui_checks
-        where user_id = ${userId} and step = ${number}`
+        where user_id = ${userId} and step in (select number from below)
+        order by round, created_at`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });
 }
@@ -1695,6 +1763,9 @@ async function main(): Promise<void> {
         set status = 'in_progress', block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`${ref(item.number)} in progress.`);
+      // What other builders kept running into, so this one does not (scripts/friction.ts).
+      const lessons = await lessonsForBuilder(sql, userId);
+      if (lessons) console.log(lessons);
       return;
     }
 
@@ -1964,8 +2035,22 @@ async function main(): Promise<void> {
           `${ref(item.number)} is ${STATUS_WORD[item.status]}. Only a step being built can be marked built.`,
         );
       }
-      const commit = arg('--commit') ?? currentCommit();
-      if (!commit) fail('No commit to record: pass --commit <sha>.');
+      // The step's own commit, not whatever HEAD is (lib/plan/built.ts, #2879).
+      const given = arg('--commit');
+      await loadOutlines(sql, userId);
+      const chosen = chooseBuiltCommit({
+        number: item.number,
+        outline: typed(item.number),
+        given,
+        givenSubject: given ? commitSubject(given) : null,
+        head: currentCommit(),
+        branch: branchCommits(),
+      });
+      if ('refusal' in chosen) {
+        const said = await refusedFriction(sql, userId, item.id, chosen.refusal);
+        fail(said ? `${chosen.refusal}\n${said}` : chosen.refusal);
+      }
+      const commit = chosen.commit;
       const branch = arg('--branch') ?? currentBranch();
       if (!branch || branch === 'main') {
         fail('built is for a step on its feature branch. A step on main closes with done.');
@@ -1978,7 +2063,7 @@ async function main(): Promise<void> {
             comment = ${item.comment ? `${item.comment}\n\n${line}` : line}
         where id = ${item.id} and user_id = ${userId}`;
       console.log(
-        `${ref(item.number)} built on ${branch} (${commit}). It closes when its feature lands: plan.ts land <feature>.`,
+        `${ref(item.number)} built on ${branch} (${commit}, ${chosen.why}). It closes when its feature lands: plan.ts land <feature>.`,
       );
       // A batch lands once its feature holds four built steps, so a long
       // feature ships in pieces rather than all at the end (plan #2815.2).
@@ -2034,7 +2119,8 @@ async function main(): Promise<void> {
         const commit = row.commit_sha as string;
         const refusal = await doneRefusal(sql, userId, number, commit);
         if (refusal) {
-          refused.push(`${ref(number)}: ${refusal}`);
+          const said = await refusedFriction(sql, userId, row.id as string, refusal);
+          refused.push(`${ref(number)}: ${refusal}${said ? `\n${said}` : ''}`);
           continue;
         }
         const line = `Done ${stamp}: on main with ${ref(item.number)}.`;
@@ -2168,7 +2254,10 @@ async function main(): Promise<void> {
 
       if (command === 'done' && commit) {
         const refusal = await doneRefusal(sql, userId, item.number, commit, namedRepo(arg('--repo')));
-        if (refusal) fail(refusal);
+        if (refusal) {
+          const said = await refusedFriction(sql, userId, item.id, refusal);
+          fail(said ? `${refusal}\n${said}` : refusal);
+        }
       }
 
       const stamp = new Date().toISOString().slice(0, 10);

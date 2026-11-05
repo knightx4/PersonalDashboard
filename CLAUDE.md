@@ -161,6 +161,20 @@ the fix after it deploys by re-asking that one case,
 cents; asking every case costs about $1, which the person does not want spent
 on testing more than monthly.
 
+## What costs a session time is written down
+
+Whatever costs you time while working here goes in `build_friction` as it
+happens, not only when a run stops: a tool that refused, a check that
+failed again, a doc that pointed the wrong way, a mistake undone, an hour
+lost. `npm run friction -- log "<what happened>" --kind <kind>` takes a
+line. `plan.ts`, the gate and the writing check record their own refusals.
+
+`npm run friction -- lessons` lists what sessions keep running into, with
+what to do instead; `plan.ts start` prints the same before you build. A
+daily review ([.claude/skills/builder-loop/SKILL.md](.claude/skills/builder-loop/SKILL.md))
+removes the costliest cause in code and teaches the rest, and a lesson
+marked fixed reopens itself when anyone hits it again.
+
 ## The assistant is Dash
 
 In anything the person reads, the assistant is **Dash**, never "Claude": labels,

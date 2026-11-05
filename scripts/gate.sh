@@ -115,6 +115,10 @@ if [ "$failed" = 1 ]; then
     echo >&2
     echo "gate: FAILED at $(cat "$LOGS/$l.failed")" >&2
     tail -n 60 "$LOGS/$l.log" >&2
+    # Counted for the builder review (scripts/friction.ts), so a check that
+    # fails for builder after builder becomes a lesson. Never fails the gate
+    # itself, and does nothing without database credentials.
+    timeout 30 npx tsx scripts/friction.ts gate "$(cat "$LOGS/$l.failed")" --log "$LOGS/$l.log" 2>&1 >/dev/null | sed 's/^/    /' >&2 || true
   done
   exit 1
 fi
