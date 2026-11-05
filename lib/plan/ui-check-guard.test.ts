@@ -3,6 +3,7 @@ import {
   filesOfStep,
   isScreenFile,
   uiCheckRefusal,
+  stepAndBelowSql,
   uiGuardSql,
   uiSettleSql,
   unpassedSurfaces,
@@ -200,8 +201,9 @@ describe('uiGuardSql', () => {
   it('asks for every surface whose latest round is not a pass', () => {
     const sql = uiGuardSql(42, ['news-saved', 'news-home']);
     expect(sql).toContain("array['news-saved', 'news-home']");
-    expect(sql).toContain('c.step = 42');
-    expect(sql).toContain('order by c.round desc limit 1');
+    expect(sql).toContain('c.step in (with recursive below as (');
+    expect(sql).toContain('number = 42');
+    expect(sql).toContain('order by c.round desc, c.created_at desc limit 1');
     expect(sql).toContain("not in ('pass', 'accepted')");
     expect(sql).toContain('from plan_items p where p.number = 42');
   });
@@ -212,6 +214,15 @@ describe('uiGuardSql', () => {
     );
     expect(() => uiGuardSql(1, ["a'; select 1"])).toThrow();
     expect(() => uiGuardSql(1, ['a'], "x' or 1=1")).toThrow();
+  });
+});
+
+describe('stepAndBelowSql', () => {
+  it('walks every step beneath the one named, under the owner given', () => {
+    const sql = stepAndBelowSql(2880, "'owner'");
+    expect(sql).toContain("user_id = 'owner' and number = 2880");
+    expect(sql).toContain('join below b on p.parent_id = b.id');
+    expect(() => stepAndBelowSql(0, "'owner'")).toThrow();
   });
 });
 

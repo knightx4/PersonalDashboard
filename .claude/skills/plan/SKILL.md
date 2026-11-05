@@ -261,13 +261,20 @@ thousand tokens, and gets to the end.
      `npm run lint`, and `npx vitest run` on the test files beside the files
      it touched. A step that breaks these goes back to its builder before the
      next one merges on top of it.
-   - Run `npm run ui-guard -- <outline> --commit <the branch's head>` for a step
-     that changed a screen, and send a step it refuses back to the critic.
-     These are the builder's working checks; the rounds that close the step
-     come from the land review below.
+   - Run `npm run ui-guard -- <outline> --commit <the step's own commit>` for
+     a step that changed a screen, and send a step it refuses back to the
+     critic. The step's own commit is the one whose subject ends
+     `(plan #<outline>)`, not the branch's head: on #2879 three steps were
+     checked against a later step's commit and six runs went into critic
+     rounds for screens they never touched. These are the builder's working
+     checks; the rounds that close the step come from the land review below.
    - `built <n> --note "…"`, with the note the subagent wrote. The step stays
-     in progress and records the commit and the branch; `done` would refuse it,
-     because the commit is not on main yet.
+     in progress and records its commit and the branch; `done` would refuse
+     it, because the commit is not on main yet. Without `--commit`, `built`
+     records the newest commit on the branch whose subject names the step,
+     and refuses a commit that names a different one. So commit each step
+     under its own `(plan #<outline>)` subject, and mark it built as soon as
+     it merges rather than all at the end.
    - **Fix the plan ahead of the builders.** Read the report's **What this
      means for the steps still to come** against the steps not yet sent, and
      bring the plan in line with it before the next round goes out (below,

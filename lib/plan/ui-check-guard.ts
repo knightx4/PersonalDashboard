@@ -12,6 +12,11 @@
  * round asking for fixes (the screen was re-shot after wiring) is not a pass
  * any more, and a later round that passes settles an earlier failure.
  *
+ * A step's rounds are its own and those recorded under every step beneath
+ * it. A parent step or a feature row is built through its children, and the
+ * critic judges each surface under the child that drew it; #2540 and #2879.1
+ * could not close because the guard looked only at the parent's own number.
+ *
  * This file has no side effects: git is passed in as a function, and the
  * rounds are passed in as rows, so the rule is tested without either.
  */
@@ -317,6 +322,21 @@ export function uiCheckRefusal(input: {
  * with the latest round and verdict, so no rows means the step may close.
  * The verdict list comes from `PASSING_VERDICTS`, so the two cannot drift.
  */
+/**
+ * The numbers of a step and every step beneath it, as a SQL subquery over
+ * plan_items for the given owner expression. Rounds under any of them count
+ * for the step (see the file header).
+ */
+export function stepAndBelowSql(step: number, owner: string): string {
+  if (!Number.isInteger(step) || step < 1) throw new Error(`"${step}" is not a step number.`);
+  return (
+    '(with recursive below as (' +
+    `select id, number from plan_items where user_id = ${owner} and number = ${step} ` +
+    'union all select p.id, p.number from plan_items p join below b on p.parent_id = b.id' +
+    ') select number from below)'
+  );
+}
+
 export function uiGuardSql(step: number, surfaces: readonly string[], userId?: string): string {
   if (userId !== undefined && !/^[0-9a-f-]{36}$/i.test(userId)) {
     throw new Error(`"${userId}" is not a user id.`);
@@ -337,8 +357,9 @@ export function uiGuardSql(step: number, surfaces: readonly string[], userId?: s
     `from unnest(array[${list}]::text[]) as s(surface)`,
     'left join lateral (',
     '  select c.round, c.verdict from ui_checks c',
-    `  where c.user_id = ${owner} and c.step = ${step} and c.surface = s.surface`,
-    '  order by c.round desc limit 1',
+    `  where c.user_id = ${owner} and c.step in ${stepAndBelowSql(step, owner)}`,
+    '    and c.surface = s.surface',
+    '  order by c.round desc, c.created_at desc limit 1',
     ') last on true',
     'left join lateral (',
     '  select (c.layout->>\'ok\')::boolean as ok from ui_checks c',
