@@ -7,6 +7,7 @@ import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
 import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
+import { REACH_OUT_COLUMNS, readSentBy, reachOutViewOf } from '@/lib/you/reach-out-card';
 import {
   ASK_MAX,
   briefOf,
@@ -38,15 +39,20 @@ export * from '@/lib/you/people-cards-model';
 const MODEL = MODELS.personaDraft;
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const CARD_COLUMNS = 'id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when';
+const CARD_COLUMNS = `id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when, ${REACH_OUT_COLUMNS}`;
 
 /** One person's form, their earlier cards and what they remember, or null when they are not on the council. */
-export async function loadPersonCard(client: YouSupabaseClient, userId: string, key: string): Promise<PersonCard | null> {
+export async function loadPersonCard(
+  client: YouSupabaseClient,
+  userId: string,
+  key: string,
+  now: number = Date.now(),
+): Promise<PersonCard | null> {
   const found = await client.from('board_advisors').select(CARD_COLUMNS).eq('user_id', userId).eq('key', key).eq('active', true).maybeSingle();
   if (found.error) throw new Error(`Reading them failed: ${found.error.message}`);
   const row = found.data as Record<string, unknown> | null;
   if (!row || typeof row.id !== 'string') return null;
-  const [versions, memory] = await Promise.all([
+  const [versions, memory, sent] = await Promise.all([
     client
       .from('advisor_persona_versions')
       .select('id, persona, made_by, ask, created_at')
@@ -62,6 +68,7 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
       .is('retired_at', null)
       .order('created_at', { ascending: false })
       .limit(60),
+    row.reach_out_rule == null ? Promise.resolve([]) : readSentBy(client, userId, row.id),
   ]);
   if (versions.error) throw new Error(`Reading their earlier cards failed: ${versions.error.message}`);
   if (memory.error) throw new Error(`Reading what they remember failed: ${memory.error.message}`);
@@ -78,6 +85,7 @@ export async function loadPersonCard(client: YouSupabaseClient, userId: string, 
     versions: (versions.data ?? []).flatMap((v) => versionOf(v as Record<string, unknown>) ?? []),
     memory: (memory.data ?? []).flatMap((m) => memoryOf(m as Record<string, unknown>) ?? []) as CouncilMemory[],
     texts: textsOf(str(row.key), row.text_when),
+    reachOut: reachOutViewOf(row, sent, now),
   };
 }
 

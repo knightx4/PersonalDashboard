@@ -2,6 +2,7 @@ import { relativeLuminance } from '@/lib/theme/oklch';
 import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import type { CouncilMemory } from '@/lib/you/council-model';
 import type { TextSwitch } from '@/lib/you/first-texts';
+import type { ReachOutView } from '@/lib/you/reach-out-card-model';
 
 /**
  * Adding and editing the people you chat with (plan #2748.11), kept pure so
@@ -229,6 +230,8 @@ export type PersonCard = {
    * lib/you/first-texts.ts (plan #2854.1); null for everyone else.
    */
   texts: TextSwitch[] | null;
+  /** What you told them to text you about, and what Dash made of it (plan #2931.3); absent for someone new. */
+  reachOut?: ReachOutView;
 };
 
 /** A new person's form before anything is typed: the first palette colour nobody uses yet. */
