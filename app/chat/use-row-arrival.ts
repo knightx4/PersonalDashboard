@@ -39,7 +39,7 @@ function leave(root: HTMLElement, el: HTMLElement, top: number) {
     ghost.remove();
     root.style.position = was;
   };
-  const run = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LEAVE_MS, easing: 'linear', fill: 'forwards' });
+  const run = ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: LEAVE_MS, easing: EASE.sway, fill: 'forwards' });
   run.finished.then(done).catch(done);
 }
 
@@ -90,7 +90,7 @@ export function useRowArrival(
             { opacity: 0, offset: LEAVE_MS / total },
             { opacity: 1, offset: 1 },
           ],
-          { duration: total, easing: 'linear' },
+          { duration: total, easing: EASE.sway },
         );
       } else if (Math.abs(dy) > 1) {
         // The rows it passes wait for its place to clear, then move down one place each.
