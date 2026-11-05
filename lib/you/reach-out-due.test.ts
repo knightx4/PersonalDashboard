@@ -6,11 +6,15 @@ import {
   dueSummary,
   dueWatchesOf,
   namedLately,
+  readWatchRows,
   watchClock,
+  watchReaderFor,
+  type SchemaReader,
   type CandidateRow,
   type RulePerson,
   type SentRef,
 } from './reach-out-due';
+import { REACH_OUT_TABLES } from './reach-out-make';
 import type { ReachOutRule, ReachOutWatch } from './reach-out-rule';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -230,5 +234,70 @@ describe('the round with rules', () => {
       '    - job_search.applications a1 | Row a1',
     ]);
     expect(dueBriefLines([])).toEqual([]);
+  });
+});
+
+/** A PostgREST stand-in that records each call and returns the rows given. */
+function fakeDb(rows: Record<string, unknown>[]) {
+  const calls: { schema: string; from: string; ops: [string, ...unknown[]][] } = { schema: '', from: '', ops: [] };
+  const query: Record<string, unknown> = {};
+  for (const op of ['select', 'eq', 'neq', 'is', 'gt', 'order']) {
+    query[op] = (...args: unknown[]) => {
+      calls.ops.push([op, ...args]);
+      return query;
+    };
+  }
+  query.limit = async (...args: unknown[]) => {
+    calls.ops.push(['limit', ...args]);
+    return { data: rows, error: null };
+  };
+  const db = ((schema: string) => {
+    calls.schema = schema;
+    return {
+      from: (name: string) => {
+        calls.from = name;
+        return query;
+      },
+    };
+  }) as unknown as SchemaReader;
+  return { db, calls };
+}
+
+describe('reading the tables a rule watches', () => {
+  it('has a reader for every table a rule may watch', () => {
+    const missing = REACH_OUT_TABLES.map((t) => t.table).filter((t) => watchReaderFor(t) === null);
+    expect(missing).toEqual([]);
+  });
+
+  it.each([
+    ['job_search.suggestions', 'job_search', 'suggestions', 'headline', 'created_at', ['neq', 'status', 'dismissed']],
+    ['you.insights', 'you', 'insights', 'claim', 'created_at', ['eq', 'status', 'shown']],
+    ['goals.items', 'goals', 'items', 'title', 'updated_at', ['is', 'archived_at', null]],
+    ['public.plan_items', 'public', 'plan_items', 'title', 'updated_at', ['neq', 'status', 'dropped']],
+    ['public.ideas', 'public', 'ideas', 'body', 'created_at', ['is', 'dismissed_at', null]],
+  ] as const)('reads %s for the owner alone, live rows only', async (table, schema, from, title, newest, filter) => {
+    const { db, calls } = fakeDb([{ id: 'r1', [title]: 'A row worth a text', [newest]: '2026-11-01T08:00:00Z' }]);
+    const rows = await readWatchRows(db, 'owner-id', table, '2026-10-26T09:00:00Z');
+    expect(calls.schema).toBe(schema);
+    expect(calls.from).toBe(from);
+    expect(calls.ops).toContainEqual(['eq', 'user_id', 'owner-id']);
+    expect(calls.ops).toContainEqual([...filter]);
+    expect(calls.ops).toContainEqual(['gt', newest, '2026-10-26T09:00:00Z']);
+    expect(calls.ops).toContainEqual(['order', newest, { ascending: false }]);
+    expect(rows).toEqual([{ table, ref: 'r1', title: 'A row worth a text', at: '2026-11-01T08:00:00Z' }]);
+  });
+
+  it('reads a catalogued table through the catalogue, scoped to its owner', async () => {
+    const { db, calls } = fakeDb([]);
+    await readWatchRows(db, 'owner-id', 'job_search.applications', null);
+    expect(calls.schema).toBe('job_search');
+    expect(calls.ops.some(([op, col, v]) => op === 'eq' && v === 'owner-id' && typeof col === 'string')).toBe(true);
+    expect(calls.ops.some(([op]) => op === 'gt')).toBe(false);
+  });
+
+  it('reads nothing from a table it has no reader for', async () => {
+    const { db, calls } = fakeDb([{ id: 'x' }]);
+    expect(await readWatchRows(db, 'owner-id', 'public.no_such_table', null)).toEqual([]);
+    expect(calls.from).toBe('');
   });
 });

@@ -30,7 +30,8 @@ const MODEL = MODELS.reachOutRule;
 /**
  * The tables a rule may watch, each with what a text about it would say.
  * The daily round (#2931.5) reads rows from these and nothing else, so a
- * table goes here only when the round knows how to name its rows. Every
+ * table goes here only when the round knows how to name its rows (a reader
+ * in reach-out-due.ts, which reach-out-due.test.ts checks). Every
  * entry is in the sources catalogue (reach-out-make.test.ts checks).
  */
 export const REACH_OUT_TABLES = [

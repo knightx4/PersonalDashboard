@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { asText, listableSource, ownerColumn, viaTitle } from '@/lib/ask/list-rows';
-import { readableName } from '@/lib/sources/types';
+import { readableName, type Source } from '@/lib/sources/types';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { parseReachOutRule, type ReachOutRule, type ReachOutWatch } from '@/lib/you/reach-out-rule';
 
@@ -25,7 +25,7 @@ import { parseReachOutRule, type ReachOutRule, type ReachOutWatch } from '@/lib/
  * nobody due and nobody else free is never started, and the brief hands the
  * session each due person with the rows they may name. The session writes
  * one advisor_reach_outs row per row a text names, with the same ref_id form
- * this reads (the table's `ref` column from the sources catalogue: a vault
+ * this reads (the table's `ref` column from its reader below: a vault
  * note's path, otherwise its id).
  *
  * A person with no rule is not read here and keeps the round's own choice.
@@ -268,30 +268,123 @@ async function readSent(you: YouSupabaseClient, userId: string, advisorIds: stri
   return byAdvisor;
 }
 
+/** A filter that keeps a watch to live rows: `eq`, `neq`, or `is` null. */
+export type WatchFilter = { column: string; op: 'eq' | 'neq' | 'is'; value: string | null };
+
+/** How the due check reads one watchable table. */
+export type WatchReader = {
+  /** The table PostgREST reads, inside the watched table's schema. */
+  from: string;
+  /** The column naming the row's owner. */
+  owner: string;
+  /** The column a text names the row by (advisor_reach_outs.ref_id). */
+  ref: string;
+  /** The column the brief quotes as the row's title. */
+  title: string;
+  /** The column that says how new a row is. */
+  newest: string;
+  /** Rows the round should not name: dismissed, retired, archived. */
+  filters?: readonly WatchFilter[];
+};
+
 /**
- * The person's rows in one catalogued table, newest first, newer than
- * `since` when given. A table the catalogue cannot list (unknown, or tied
- * to its owner through a join) gives none.
+ * Watchable tables the sources catalogue does not list (lib/ask/list-rows.ts
+ * LISTABLE), each read here by name. They are not sources because Goals
+ * should not cite them, but a person on People may still talk about them: the
+ * Jerwyn example watches you.insights and the builder example watches
+ * plan_items and ideas (plan #2931). Every one is tied to its owner by
+ * user_id, and the plan's and ideas' owner is the account that owns the app.
+ */
+export const EXTRA_WATCH_READERS: Readonly<Record<string, WatchReader>> = {
+  'job_search.suggestions': {
+    from: 'suggestions',
+    owner: 'user_id',
+    ref: 'id',
+    title: 'headline',
+    newest: 'created_at',
+    filters: [{ column: 'status', op: 'neq', value: 'dismissed' }],
+  },
+  'you.insights': {
+    from: 'insights',
+    owner: 'user_id',
+    ref: 'id',
+    title: 'claim',
+    newest: 'created_at',
+    filters: [{ column: 'status', op: 'eq', value: 'shown' }],
+  },
+  // A step's change of status or due date is what a text about it says, so
+  // updated_at is its clock.
+  'goals.items': {
+    from: 'items',
+    owner: 'user_id',
+    ref: 'id',
+    title: 'title',
+    newest: 'updated_at',
+    filters: [{ column: 'archived_at', op: 'is', value: null }],
+  },
+  // A step shipping is an update, not a new row.
+  'public.plan_items': {
+    from: 'plan_items',
+    owner: 'user_id',
+    ref: 'id',
+    title: 'title',
+    newest: 'updated_at',
+    filters: [{ column: 'status', op: 'neq', value: 'dropped' }],
+  },
+  'public.ideas': {
+    from: 'ideas',
+    owner: 'user_id',
+    ref: 'id',
+    title: 'body',
+    newest: 'created_at',
+    filters: [{ column: 'dismissed_at', op: 'is', value: null }],
+  },
+};
+
+/**
+ * How the due check reads a watched table: its own entry above, otherwise
+ * the sources catalogue's, when list_rows can read it. Null for a table
+ * neither knows, which a watch then reads nothing from.
+ */
+export function watchReaderFor(table: string): (WatchReader & { titleVia?: NonNullable<Source['titleVia']> }) | null {
+  const extra = EXTRA_WATCH_READERS[table];
+  if (extra) return extra;
+  const source = listableSource(table);
+  if (!source) return null;
+  return {
+    from: readableName(source),
+    owner: ownerColumn(source) as string,
+    ref: source.ref ?? 'id',
+    title: source.title,
+    newest: source.newest ?? 'created_at',
+    ...(source.titleVia ? { titleVia: source.titleVia } : {}),
+  };
+}
+
+/**
+ * The person's rows in one watchable table, newest first, newer than
+ * `since` when given. A table with no reader gives none.
  */
 export async function readWatchRows(db: SchemaReader, userId: string, table: string, since: string | null): Promise<CandidateRow[]> {
-  const source = listableSource(table);
-  if (!source) return [];
-  const owner = ownerColumn(source) as string;
-  const refColumn = source.ref ?? 'id';
-  const newest = source.newest ?? 'created_at';
-  const plain = [...new Set([refColumn, source.title, newest])];
-  const columns = source.titleVia ? [...plain, `${source.titleVia.embed}(${source.titleVia.column})`] : plain;
+  const reader = watchReaderFor(table);
+  if (!reader) return [];
+  const { ref: refColumn, newest, titleVia } = reader;
+  const plain = [...new Set([refColumn, reader.title, newest])];
+  const columns = titleVia ? [...plain, `${titleVia.embed}(${titleVia.column})`] : plain;
   let query = db(table.split('.')[0])
-    .from(readableName(source))
+    .from(reader.from)
     .select(columns.join(', '))
-    .eq(owner, userId);
+    .eq(reader.owner, userId);
+  for (const f of reader.filters ?? []) {
+    query = f.op === 'eq' ? query.eq(f.column, f.value) : f.op === 'neq' ? query.neq(f.column, f.value) : query.is(f.column, null);
+  }
   if (since) query = query.gt(newest, since);
   const { data, error } = await query.order(newest, { ascending: false }).limit(ROWS_READ);
   if (error) throw new Error(`${table}: ${error.message}`);
   return ((data ?? []) as unknown as Record<string, unknown>[]).flatMap((row) => {
     const ref = asText(row[refColumn]);
     if (!ref) return [];
-    const title = (source.titleVia ? viaTitle(row, source.titleVia) : null) ?? asText(row[source.title]) ?? ref;
+    const title = (titleVia ? viaTitle(row, titleVia) : null) ?? asText(row[reader.title]) ?? ref;
     return [{ table, ref, title, at: asText(row[newest]) }];
   });
 }
