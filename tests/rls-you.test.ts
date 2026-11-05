@@ -1265,8 +1265,8 @@ describe("a bot's picture", () => {
   beforeAll(async () => {
     const [a, b] = await admin<{ id: string }[]>`
       insert into you.board_advisors (user_id, key, name, kind, question)
-      values (${userA}, 'photo-bot', 'Photo Bot', 'guest', 'What would you do?'),
-             (${userA}, 'other-photo-bot', 'Other Bot', 'guest', 'What would you do?')
+      values (${userA}, 'photo_bot', 'Photo Bot', 'guest', 'What would you do?'),
+             (${userA}, 'other_photo_bot', 'Other Bot', 'guest', 'What would you do?')
       returning id`;
     botA = a.id;
     otherBotA = b.id;
