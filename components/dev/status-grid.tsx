@@ -97,7 +97,7 @@ export function StatusGrid({ statuses }: { statuses: ScopeStatuses }) {
             <Link
               href={tile.href}
               aria-label={tileLabel(tile.label, tile.state, tile.count)}
-              className="sheet flex min-h-[var(--control-h)] items-center gap-2 rounded-card bg-surface px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="sheet flex min-h-11 items-center gap-2 rounded-card bg-surface px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               {tile.mark}
               <span className="min-w-0 flex-1 truncate text-ui text-ink">{tile.label}</span>
