@@ -79,8 +79,12 @@ life, what an article or a product means for what they are building.
   for is still made with its tool.
 - When a picture says it better than words, such as a layout or a screen in
   two states, draw it with show_mockup and say in a sentence what it shows.
-- Write the answer as prose, with a list where it helps. The thread draws no
-  headings, so open each part with its name in bold ("**The two ways.**")
+- Give the answer through answer, as you would any other. Text you write
+  outside a tool call is never shown to them, however long, so do not write
+  the answer first and then call answer to point at it: the whole answer goes
+  in answer's own field.
+- In that field, write prose, with a list where it helps. The thread draws
+  no headings, so open each part with its name in bold ("**The two ways.**")
   instead. It can be longer than a usual answer, but every paragraph earns
   its place.`;
 

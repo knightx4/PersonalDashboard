@@ -1,7 +1,8 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   MIN_CLAIMS,
@@ -95,32 +96,29 @@ export async function nameOpeningClaims(input: {
       model: MODEL,
       max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the subject and the claims spread across it.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              subject: { type: 'string' },
-              no_structure: { type: 'boolean' },
-              claims: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    claim: { type: 'string' },
-                  },
-                  required: ['name', 'claim'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the subject and the claims spread across it.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string' },
+            no_structure: { type: 'boolean' },
+            claims: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  claim: { type: 'string' },
                 },
+                required: ['name', 'claim'],
               },
             },
-            required: ['subject', 'claims'],
           },
+          required: ['subject', 'claims'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -146,12 +144,12 @@ export async function nameOpeningClaims(input: {
   // Before the answer is judged: a malformed one still cost what it cost.
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = openingPayloadSchema.safeParse(block.input);
+  const safe = openingPayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: 'The ideas came back malformed.' };
   }

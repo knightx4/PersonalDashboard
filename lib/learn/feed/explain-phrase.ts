@@ -2,8 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import { MAX_MATERIAL, TALK_MODEL } from '@/lib/talk/reply';
 
@@ -133,28 +134,25 @@ export async function explainPhraseOnCard(input: {
       model: EXPLAIN_MODEL,
       max_tokens: 1000 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Give the explanation, and the Wikipedia article that teaches the phrase.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              explanation: { type: 'string', description: 'Three to five sentences, plain prose.' },
-              article: {
-                type: ['string', 'null'],
-                description: 'The English Wikipedia article title, exactly, or null.',
-              },
-              section: {
-                type: ['string', 'null'],
-                description: "The section heading in that article, or null for the article's opening.",
-              },
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Give the explanation, and the Wikipedia article that teaches the phrase.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            explanation: { type: 'string', description: 'Three to five sentences, plain prose.' },
+            article: {
+              type: ['string', 'null'],
+              description: 'The English Wikipedia article title, exactly, or null.',
             },
-            required: ['explanation', 'article', 'section'],
+            section: {
+              type: ['string', 'null'],
+              description: "The section heading in that article, or null for the article's opening.",
+            },
           },
+          required: ['explanation', 'article', 'section'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, EXPLAIN_MODEL),
+      }, EXPLAIN_MODEL),
       messages: [{ role: 'user', content: explainPrompt(input.phrase, input.card) }],
     });
   } catch (error) {
@@ -163,9 +161,9 @@ export async function explainPhraseOnCard(input: {
 
   input.onSpend?.({ model: EXPLAIN_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const read = readExplanation(block.input);
+  const report = readReport(response, TOOL_NAME, EXPLAIN_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const read = readExplanation(report.value);
   if (typeof read === 'string') return { ok: false, detail: read };
   return { ok: true, ...read };
 }

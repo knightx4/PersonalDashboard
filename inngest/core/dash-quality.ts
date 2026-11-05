@@ -1,5 +1,6 @@
 import 'server-only';
 
+import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createServiceSchemaSupabase, createServiceSupabase } from '@/inngest/supabase-admin';
@@ -8,11 +9,14 @@ import { executeAskTool } from '@/lib/ask/tools';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { CoreOperation } from '@/lib/core/spend/operations';
-import { costMicrosFor, type SpendReport } from '@/lib/core/spend/pricing';
+import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
+import { devAccess } from '@/lib/ask/dev';
 import { answerQuestion } from '@/lib/dash/ask';
+import { codeDeps } from '@/lib/dash/think-code';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import { runModelCheck, type ModelCheckPorts } from '@/lib/dash/quality/model-replies';
 import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
@@ -40,7 +44,8 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
  * is given (AskContext), and the only id given is the owner's. A case that
  * names an advisor (core.dash_eval_cases.advisor, plan #2581.6) is put to
  * them as the first message of a talk, with the same lookups, and nothing of
- * the talk is kept.
+ * the talk is kept. A case with `think` on is asked with Think it through, as
+ * the person presses it (plan #2937.6).
  */
 
 const OPERATION: CoreOperation = 'check-dash-quality';
@@ -97,14 +102,14 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
     },
 
     async cases(userId, only) {
-      let query = core.from('dash_eval_cases').select('id, question, expect, advisor').eq('user_id', userId);
+      let query = core.from('dash_eval_cases').select('id, question, expect, advisor, think').eq('user_id', userId);
       query = only ? query.eq('id', only) : query.eq('active', true);
       const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw new Error(`Reading the cases failed: ${error.message}`);
-      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null }[];
+      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null; think: boolean }[];
     },
 
-    async ask(userId, question, advisor) {
+    async ask(userId, question, advisor, think) {
       if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
       const settings = await loadAccountSettings(userId, core);
       const today = todayInTimezone(settings.timezone);
@@ -151,6 +156,8 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
             queue: rehearsePaid(ctx),
             anthropicApiKey: apiKey,
             model,
+            // Think it through (plan #2937.6): Opus, the code and the mockup, as the person's press asks it.
+            think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
             onSpend: (report) => spent.push(report),
           });
       const seconds = (Date.now() - started) / 1000;
@@ -253,6 +260,27 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       return (data ?? []) as HealthConnectorCall[];
     },
 
+    async failures(userId, since) {
+      const { data, error } = await core
+        .from('dash_failures')
+        .select('id, surface, outcome, reason, model, calls')
+        .eq('user_id', userId)
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(DAY_ROWS);
+      if (error) throw new Error(`Reading the day's failed answers failed: ${error.message}`);
+      return ((data ?? []) as { id: string; surface: string; outcome: 'failed' | 'unfinished'; reason: string; model: string; calls: unknown }[]).map(
+        (row) => ({
+          id: row.id,
+          surface: row.surface,
+          outcome: row.outcome,
+          reason: row.reason,
+          model: row.model,
+          stops: Array.isArray(row.calls) ? row.calls.map((call) => ((call as { stop?: unknown })?.stop as string | null) ?? null) : [],
+        }),
+      );
+    },
+
     async start(row) {
       const { data, error } = await core
         .from('dash_eval_runs')
@@ -298,6 +326,78 @@ export async function runDashQualityCheck(trigger: DashQualityTrigger, only: str
   return runDashQuality(dashQualityPorts(core), {
     trigger,
     only,
+    deploy: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
+  });
+}
+
+const MODEL_OPERATION: CoreOperation = 'check-model-replies';
+
+/**
+ * The daily model reply check's ports (lib/dash/quality/model-replies.ts,
+ * plan #2937.7): each probe sent as written, its tokens kept as spend, and
+ * the run kept in core.dash_eval_runs under trigger 'models'. It reads none
+ * of the person's rows; the owner is only whose spend and note it is.
+ */
+export function modelCheckPorts(core: CoreSupabaseClient): ModelCheckPorts {
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+  const quality = dashQualityPorts(core);
+  let client: Anthropic | null = null;
+
+  return {
+    owner: () => quality.owner(),
+
+    async call(request) {
+      if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
+      client ??= new Anthropic({ apiKey, maxRetries: 1 });
+      const started = Date.now();
+      const options = request.beta.length > 0 ? { headers: { 'anthropic-beta': request.beta.join(',') } } : undefined;
+      try {
+        const reply = await client.messages.create(request.params, options);
+        return { ok: true, reply, usage: usageFrom(reply.usage), seconds: (Date.now() - started) / 1000 };
+      } catch (err) {
+        if (err instanceof Anthropic.APIError) {
+          return { ok: false, status: typeof err.status === 'number' ? err.status : null, message: err.message, seconds: (Date.now() - started) / 1000 };
+        }
+        throw err;
+      }
+    },
+
+    async spend(userId, model, usage) {
+      await recordSpend(core, userId, { module: 'core', operation: MODEL_OPERATION, model, usage });
+    },
+
+    async start(row) {
+      const { data, error } = await core
+        .from('dash_eval_runs')
+        .insert({ user_id: row.userId, trigger: 'models', model: row.models, deploy: row.deploy })
+        .select('id')
+        .single();
+      if (error || !data) throw new Error(`Starting the run failed: ${error?.message ?? 'no id'}`);
+      return String((data as { id: string }).id);
+    },
+
+    async finish(id, row) {
+      const { error } = await core
+        .from('dash_eval_runs')
+        .update({
+          finished_at: new Date().toISOString(),
+          cases: row.cases,
+          passed: row.passed,
+          results: row.results,
+          cost_micros: row.costMicros,
+          note_id: row.noteId,
+          error: row.error,
+        })
+        .eq('id', id);
+      if (error) throw new Error(`Saving the run failed: ${error.message}`);
+    },
+
+    writeNote: (userId, body) => quality.writeNote(userId, body),
+  };
+}
+
+export async function runModelReplyCheck() {
+  return runModelCheck(modelCheckPorts(createCoreServiceSupabase()), {
     deploy: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
   });
 }

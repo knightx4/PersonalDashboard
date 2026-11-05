@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   openingGradeSchema,
@@ -140,22 +140,19 @@ async function writeOne(
       model: OPENING_MODEL,
       max_tokens: 1024,
       system: WRITE_SYSTEM,
-      tools: [
-        {
-          name: WRITE_TOOL,
-          description: 'Report the question and the answer it expects.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              question: { type: 'string' },
-              expected: { type: 'string' },
-              unusable: { type: 'boolean' },
-            },
-            required: ['question', 'expected'],
+      ...reportRequest({
+        name: WRITE_TOOL,
+        description: 'Report the question and the answer it expects.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            expected: { type: 'string' },
+            unusable: { type: 'boolean' },
           },
+          required: ['question', 'expected'],
         },
-      ],
-      tool_choice: forceTool(WRITE_TOOL, OPENING_MODEL),
+      }, OPENING_MODEL),
       messages: [
         {
           role: 'user',
@@ -177,12 +174,12 @@ async function writeOne(
   // Before the answer is judged: a useless one still cost what it cost.
   input.onSpend?.({ model: OPENING_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === WRITE_TOOL);
-  if (!block || block.type !== 'tool_use') {
+  const report = readReport(response, WRITE_TOOL, OPENING_MODEL);
+  if (!report.ok) {
     return { ok: false, dropped: { name: input.claim.name, reason: 'error' } };
   }
 
-  const safe = openingQuestionSchema.safeParse(block.input);
+  const safe = openingQuestionSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, dropped: { name: input.claim.name, reason: 'error' } };
   }
@@ -294,22 +291,19 @@ export async function gradeWrittenAnswer(input: {
       model: OPENING_MODEL,
       max_tokens: 512,
       system,
-      tools: [
-        {
-          name: GRADE_TOOL,
-          description: 'Report whether the written answer is the one expected.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              why: { type: 'string' },
-              correct: { type: 'boolean' },
-              ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
-            },
-            required: ['why', 'correct'],
+      ...reportRequest({
+        name: GRADE_TOOL,
+        description: 'Report whether the written answer is the one expected.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            why: { type: 'string' },
+            correct: { type: 'boolean' },
+            ...(input.hint ? HINT_TOOL_PROPERTIES : {}),
           },
+          required: ['why', 'correct'],
         },
-      ],
-      tool_choice: forceTool(GRADE_TOOL, OPENING_MODEL),
+      }, OPENING_MODEL),
       messages: [
         {
           role: 'user',
@@ -333,16 +327,16 @@ export async function gradeWrittenAnswer(input: {
 
   input.onSpend?.({ model: OPENING_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === GRADE_TOOL);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, GRADE_TOOL, OPENING_MODEL);
+  if (!report.ok) {
+    return { ok: false, detail: report.reason };
   }
 
-  const safe = openingGradeSchema.safeParse(block.input);
+  const safe = openingGradeSchema.safeParse(report.value);
   if (!safe.success) return { ok: false, detail: 'The grade came back malformed.' };
 
   if (!input.hint || safe.data.correct) return { ok: true, correct: safe.data.correct, why: safe.data.why };
-  const raw = block.input as { hint?: unknown; miss_kind?: unknown };
+  const raw = report.value as { hint?: unknown; miss_kind?: unknown };
   return {
     ok: true,
     correct: false,

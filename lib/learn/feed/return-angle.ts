@@ -2,8 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { ReturnAngleRequest, ReturnAngleResult } from './level3';
 import { describeProgress, NAME_MATERIAL_MODEL } from './name-material';
 
@@ -98,21 +98,18 @@ export async function nameReturnAngle(input: {
       model: NAME_MATERIAL_MODEL,
       max_tokens: 512,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the section of the article this person should read next.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              section: { type: ['string', 'null'] },
-              basis: { type: 'string' },
-            },
-            required: ['section', 'basis'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the section of the article this person should read next.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            section: { type: ['string', 'null'] },
+            basis: { type: 'string' },
           },
+          required: ['section', 'basis'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, NAME_MATERIAL_MODEL),
+      }, NAME_MATERIAL_MODEL),
       messages: [{ role: 'user', content: describeReturn(input.request) }],
     });
   } catch (error) {
@@ -123,7 +120,7 @@ export async function nameReturnAngle(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: NAME_MATERIAL_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readAngle(block.input);
+  const report = readReport(response, TOOL_NAME, NAME_MATERIAL_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return readAngle(report.value);
 }

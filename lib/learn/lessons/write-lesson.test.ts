@@ -255,9 +255,10 @@ describe('writing a lesson', () => {
   }
 
   const usage = { input_tokens: 1_200, output_tokens: 600 };
+  // Sonnet's report arrives as structured output: JSON text after its thinking (plan #2937.4).
   const replyWith = (input: unknown) => ({
-    content: [{ type: 'tool_use', name: 'report_lesson', input }],
-    stop_reason: 'tool_use',
+    content: [{ type: 'thinking', thinking: '' }, { type: 'text', text: JSON.stringify(input) }],
+    stop_reason: 'end_turn',
     usage,
   });
 
@@ -278,7 +279,8 @@ describe('writing a lesson', () => {
       source: { segmentId: 'seg-1', itemTitle: 'CHIPS and Science Act', heading: 'Manufacturing' },
     });
     expect(spent).toEqual(['claude-sonnet-5-5']);
-    expect(calls[0]).toMatchObject({ model: 'claude-sonnet-5-5', tool_choice: { type: 'auto' } });
+    // Sonnet takes no forced tool, so the report comes back as structured output (plan #2937.4).
+    expect(calls[0]).toMatchObject({ model: 'claude-sonnet-5-5', output_config: { format: { type: 'json_schema' } } });
   });
 
   it('leaves an unrelated source off the lesson', async () => {
@@ -310,7 +312,7 @@ describe('writing a lesson', () => {
       client,
       onSpend: (report) => spent.push(report.model),
     });
-    expect(result).toEqual({ outcome: 'failed', detail: 'The call answered in prose instead of reporting (stopped: end_turn).' });
+    expect(result).toEqual({ outcome: 'failed', detail: 'The reply was not the JSON its schema asked for (stopped: end_turn).' });
     expect(spent).toHaveLength(1);
   });
 

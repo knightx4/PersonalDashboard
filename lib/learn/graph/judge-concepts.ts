@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   isConcreteCost,
@@ -144,33 +144,30 @@ export function anthropicConceptJudge(options: {
         model: CONCEPT_JUDGE_MODEL,
         max_tokens: 2048,
         system: SYSTEM,
-        tools: [
-          {
-            name: TOOL_NAME,
-            description: 'Report a verdict for each concept.',
-            input_schema: {
-              type: 'object',
-              properties: {
-                verdicts: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string' },
-                      verdict: { type: 'string', enum: ['keep', 'weak', 'drop'] },
-                      separating_question: { type: ['string', 'null'] },
-                      cost_if_wrong: { type: ['string', 'null'] },
-                      reason: { type: 'string' },
-                    },
-                    required: ['name', 'verdict', 'reason'],
+        ...reportRequest({
+          name: TOOL_NAME,
+          description: 'Report a verdict for each concept.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              verdicts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    verdict: { type: 'string', enum: ['keep', 'weak', 'drop'] },
+                    separating_question: { type: ['string', 'null'] },
+                    cost_if_wrong: { type: ['string', 'null'] },
+                    reason: { type: 'string' },
                   },
+                  required: ['name', 'verdict', 'reason'],
                 },
               },
-              required: ['verdicts'],
             },
+            required: ['verdicts'],
           },
-        ],
-        tool_choice: forceTool(TOOL_NAME, CONCEPT_JUDGE_MODEL),
+        }, CONCEPT_JUDGE_MODEL),
         messages: [{ role: 'user', content: lines.join('\n') }],
       });
     } catch (error) {
@@ -184,12 +181,12 @@ export function anthropicConceptJudge(options: {
     // cost what it cost.
     options.onSpend?.({ model: CONCEPT_JUDGE_MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    if (!block || block.type !== 'tool_use') {
-      return { ok: false, detail: whyNoReport(response) };
+    const report = readReport(response, TOOL_NAME, CONCEPT_JUDGE_MODEL);
+    if (!report.ok) {
+      return { ok: false, detail: report.reason };
     }
 
-    const raw = (block.input as { verdicts?: unknown }).verdicts;
+    const raw = (report.value as { verdicts?: unknown }).verdicts;
     if (!Array.isArray(raw)) {
       return { ok: false, detail: 'The check came back without its verdicts.' };
     }

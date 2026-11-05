@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   classifyPayloadSchema,
@@ -9,7 +10,6 @@ import {
   type NoteClass,
 } from '@/lib/learn/vault/classify-payload';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * What kind of note this is, in one cheap call.
@@ -76,24 +76,21 @@ export async function classifyNote(input: {
     model: MODEL,
     max_tokens: 300,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: 'Say what kind of note this is.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            class: {
-              type: 'string',
-              enum: ['knowledge', 'mixed', 'evidence', 'operational'],
-            },
-            reason: { type: 'string' },
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: 'Say what kind of note this is.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          class: {
+            type: 'string',
+            enum: ['knowledge', 'mixed', 'evidence', 'operational'],
           },
-          required: ['class', 'reason'],
+          reason: { type: 'string' },
         },
+        required: ['class', 'reason'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, MODEL),
+    }, MODEL),
     messages: [
       {
         role: 'user',
@@ -104,9 +101,8 @@ export async function classifyNote(input: {
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  const parsed =
-    block && block.type === 'tool_use' ? classifyPayloadSchema.safeParse(block.input) : null;
+  const report = readReport(response, TOOL_NAME, MODEL);
+  const parsed = report.ok ? classifyPayloadSchema.safeParse(report.value) : null;
 
   // A classifier that fails reads as operational rather than as knowledge. The
   // cost of wrongly skipping a note is that it is not read this time; the cost

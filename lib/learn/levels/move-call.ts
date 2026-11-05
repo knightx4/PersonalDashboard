@@ -1,10 +1,11 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { whyMalformed } from '@/lib/learn/graph/chain-payload';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { MapTopic } from '@/lib/learn/levels/draft-payload';
 import { LADDER } from '@/lib/learn/levels/ladder';
 import { assignPayloadSchema, readAssignment, type Assignment, type MoveConcept } from '@/lib/learn/levels/move';
@@ -93,40 +94,37 @@ export async function assignConcepts(
       model: MODEL,
       max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the topic and level for every claim.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              placements: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    concept: { type: 'integer', minimum: 1 },
-                    topic: { type: 'string' },
-                    level: { type: 'integer', minimum: 1, maximum: 10 },
-                    unsure: { type: 'string' },
-                  },
-                  required: ['concept', 'topic', 'level'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the topic and level for every claim.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            placements: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  concept: { type: 'integer', minimum: 1 },
+                  topic: { type: 'string' },
+                  level: { type: 'integer', minimum: 1, maximum: 10 },
+                  unsure: { type: 'string' },
                 },
-              },
-              new_topics: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { name: { type: 'string' }, scope: { type: 'string' } },
-                  required: ['name', 'scope'],
-                },
+                required: ['concept', 'topic', 'level'],
               },
             },
-            required: ['placements'],
+            new_topics: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { name: { type: 'string' }, scope: { type: 'string' } },
+                required: ['name', 'scope'],
+              },
+            },
           },
+          required: ['placements'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: assignPrompt(input) }],
     });
   } catch (error) {
@@ -136,10 +134,10 @@ export async function assignConcepts(
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  const safe = assignPayloadSchema.safeParse(block.input);
+  const safe = assignPayloadSchema.safeParse(report.value);
   if (!safe.success) return { ok: false, detail: whyMalformed(safe.error) };
 
   return { ok: true, assignment: readAssignment(safe.data, input.concepts, input.map) };

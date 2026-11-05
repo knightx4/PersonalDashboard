@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ProbeRow } from '@/lib/learn/graph/session';
 import { MODELS } from '@/lib/core/models';
@@ -149,21 +149,18 @@ export async function nameMisconception(input: {
       model: MODEL,
       max_tokens: 512,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Name what they appear to believe.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              misconception: { type: 'string' },
-              unclear: { type: 'boolean' },
-            },
-            required: ['misconception'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Name what they appear to believe.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            misconception: { type: 'string' },
+            unclear: { type: 'boolean' },
           },
+          required: ['misconception'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -197,12 +194,12 @@ export async function nameMisconception(input: {
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const payload = block.input as { misconception?: unknown; unclear?: unknown };
+  const payload = report.value as { misconception?: unknown; unclear?: unknown };
   if (payload.unclear === true) {
     return {
       ok: false,

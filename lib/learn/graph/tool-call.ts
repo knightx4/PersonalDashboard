@@ -15,25 +15,15 @@
  * needs a prompt that asks for one.
  */
 
-import { HAIKU } from '@/lib/core/models';
+import { readReply } from '@/lib/core/model-call';
 
-/**
- * Given to `tool_choice` so the model reports through the tool.
- *
- * Forced where the model allows it. Opus 5.5 and Sonnet 5.5 reject a forced
- * tool with a 400, so for them the choice is left to the model and the prompt
- * asks for the tool by name; `whyNoReport` below covers the reply that answers
- * in prose instead.
+/*
+ * Which models take a forced tool and which write progress notes are rules
+ * of the model, kept in lib/core/model-rules.ts with every other (plan
+ * #2937.3). They are passed on from here for the calls that already import
+ * them from this file.
  */
-export function forceTool(
-  name: string,
-  model: string,
-): { type: 'tool'; name: string } | { type: 'auto' } {
-  return FORCEABLE.has(model) ? { type: 'tool', name } : { type: 'auto' };
-}
-
-/** The models that accept a forced tool. */
-const FORCEABLE: ReadonlySet<string> = new Set([HAIKU]);
+export { forceTool, PROGRESS_NOTES_BETA, writesProgressNotes } from '@/lib/core/model-rules';
 
 /**
  * Added to `max_tokens` where the tool is not forced. A model left to choose
@@ -54,21 +44,10 @@ export function toolBlockIn<T extends Reply>(reply: T, name: string): T['content
 }
 
 /**
- * Why there is no tool block, in one sentence a person can act on.
- *
- * `max_tokens` is called out by name because it is the failure that looks like
- * a model problem and is a budget problem: the same section succeeds with a
- * larger one, and nothing about the prompt needs touching.
+ * Why there is no tool block, in one sentence a person can act on: the
+ * reason `readReply` (lib/core/model-call.ts) gives for a reply cut off,
+ * refused, answered in prose, or with nothing to show.
  */
 export function whyNoReport(reply: Reply): string {
-  if (reply.stop_reason === 'max_tokens') {
-    return 'The reply was cut off before it finished reporting. The section is too long for the budget.';
-  }
-
-  const text = reply.content.find((part) => part.type === 'text');
-  if (text) {
-    return `The call answered in prose instead of reporting (stopped: ${reply.stop_reason ?? 'unknown'}).`;
-  }
-
-  return `The call ran but reported nothing (stopped: ${reply.stop_reason ?? 'unknown'}).`;
+  return readReply(reply).reason;
 }

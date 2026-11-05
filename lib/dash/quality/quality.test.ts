@@ -167,6 +167,7 @@ describe('a run', () => {
       turns: async () => [],
       spend: async () => [],
       connectorCalls: async () => [],
+      failures: async () => [],
       start: async () => 'run-1',
       finish: async (_id, row) => {
         finished.push(row);
@@ -203,6 +204,24 @@ describe('a run', () => {
     const summary = await runDashQuality(threw.port, { trigger: 'manual', deploy: null });
     expect(summary.passed).toBe(0);
     expect(threw.notes[0]).toContain('The run threw: overloaded');
+  });
+
+  it('asks a think case with Think it through on, and holds a long answer to its length', async () => {
+    const asked: (boolean | undefined)[] = [];
+    const think = ports({
+      cases: async () => [
+        { id: 't1', question: 'think deep on this', expect: { min_chars: 100, mentions_all: ['form'] }, think: true },
+        { id: 't2', question: 'an everyday question', expect: {} },
+      ],
+      ask: async (_user, question, _advisor, thinking) => {
+        asked.push(thinking);
+        return { outcome: answered(question.startsWith('think') ? 'The edit form. '.repeat(3) : 'Fine.'), costMicros: 1 };
+      },
+    });
+    const summary = await runDashQuality(think.port, { trigger: 'manual', deploy: null });
+    expect(asked).toEqual([true, false]);
+    expect(summary.passed).toBe(1);
+    expect(think.notes[0]).toContain('characters, fewer than the 100');
   });
 
   it('still reports the day when the cases cannot be read', async () => {

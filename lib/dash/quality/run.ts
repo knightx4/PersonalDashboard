@@ -1,4 +1,4 @@
-import { dashHealth, type DashHealth, type HealthConnectorCall, type HealthSpend, type HealthTurn } from './health';
+import { dashHealth, type DashHealth, type HealthConnectorCall, type HealthFailure, type HealthSpend, type HealthTurn } from './health';
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 
 /**
@@ -9,8 +9,8 @@ import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
  * failed. The ports are inngest/core/dash-quality.ts.
  */
 
-/** `advisor`: an advisor's key to put the question to in a one-on-one talk (plan #2581.6); absent or null asks Ask Dash. */
-export type EvalCase = { id: string; question: string; expect: unknown; advisor?: string | null };
+/** `think`: asked with Think it through on (plan #2937.6). `advisor`: an advisor's key to put the question to in a one-on-one talk (plan #2581.6); absent or null asks Ask Dash. */
+export type EvalCase = { id: string; question: string; expect: unknown; advisor?: string | null; think?: boolean };
 
 /**
  * health: the free daily run, which asks no case. monthly: every active case.
@@ -39,11 +39,13 @@ export type DashQualityPorts = {
    * Asks one question as a new chat, read-only, and kept nowhere: of Ask
    * Dash, or of the advisor named, as a first message to them.
    */
-  ask(userId: string, question: string, advisor?: string | null): Promise<{ outcome: CaseOutcome; costMicros: number }>;
+  ask(userId: string, question: string, advisor?: string | null, think?: boolean): Promise<{ outcome: CaseOutcome; costMicros: number }>;
   turns(userId: string, since: string): Promise<HealthTurn[]>;
   spend(userId: string, since: string): Promise<HealthSpend[]>;
   /** What connected apps called through the connector (core.connector_calls). */
   connectorCalls(userId: string, since: string): Promise<HealthConnectorCall[]>;
+  /** The answers Dash could not give (core.dash_failures, plan #2937.2). */
+  failures(userId: string, since: string): Promise<HealthFailure[]>;
   start(row: { userId: string; trigger: DashQualityTrigger; model: string; deploy: string | null }): Promise<string>;
   finish(id: string, row: { cases: number; passed: number; results: CaseResult[]; health: DashHealth; costMicros: number; noteId: string | null; error: string | null }): Promise<void>;
   writeNote(userId: string, body: string): Promise<string>;
@@ -117,9 +119,9 @@ export async function runDashQuality(
     const cases = options.trigger === 'health' ? [] : await ports.cases(userId, options.only ?? undefined);
     results = await inTurns(cases, CASE_CONCURRENCY, async (c): Promise<CaseResult> => {
       // A question put to an advisor names them, so the note says who failed it.
-      const asked = c.advisor ? `(to ${c.advisor}) ${c.question}` : c.question;
+      const asked = c.advisor ? `(to ${c.advisor}) ${c.question}` : c.think ? `(thinking it through) ${c.question}` : c.question;
       try {
-        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null);
+        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null, c.think === true);
         const failures = gradeAnswer(parseExpect(c.expect), outcome);
         return {
           case: c.id,
@@ -146,6 +148,7 @@ export async function runDashQuality(
     await ports.turns(userId, since),
     await ports.spend(userId, since),
     await ports.connectorCalls(userId, since),
+    await ports.failures(userId, since),
   );
   if (error) health.alerts.unshift(`The run could not read its cases: ${error}`);
   const body = qualityNote(results, health, runId);

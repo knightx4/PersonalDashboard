@@ -6,9 +6,9 @@ import {
   heuristicParseReferences,
   type ReferenceCandidate,
 } from '@/lib/learn/import/parse-heuristic';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Reading a pasted list into references, and nothing more.
@@ -87,33 +87,30 @@ async function llmParse(
     model: MODEL,
     max_tokens: 4096,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: 'Report the works this paste names.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            references: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  author: { type: ['string', 'null'] },
-                  url: { type: ['string', 'null'] },
-                  why: { type: ['string', 'null'] },
-                  raw: { type: ['string', 'null'] },
-                },
-                required: ['title'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: 'Report the works this paste names.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          references: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                author: { type: ['string', 'null'] },
+                url: { type: ['string', 'null'] },
+                why: { type: ['string', 'null'] },
+                raw: { type: ['string', 'null'] },
               },
+              required: ['title'],
             },
           },
-          required: ['references'],
         },
+        required: ['references'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, MODEL),
+    }, MODEL),
     messages: [{ role: 'user', content: text.slice(0, MAX_INPUT_CHARS) }],
   });
 
@@ -121,10 +118,10 @@ async function llmParse(
   // fell through to the heuristic still spent a call.
   onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use');
-  if (!block || block.type !== 'tool_use') throw new Error('no tool call');
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) throw new Error('no tool call');
 
-  const safe = parseResultSchema.safeParse(block.input);
+  const safe = parseResultSchema.safeParse(report.value);
   if (!safe.success) throw new Error('tool call did not match the schema');
 
   return toCandidates(safe.data);
