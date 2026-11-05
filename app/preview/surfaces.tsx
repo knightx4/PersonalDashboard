@@ -9052,7 +9052,7 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="chat-arrival"]',
       shows:
-        'The Mentor’s row rises from the third place to the top as the rows it passes move down one place each, its preview line changes to the new text and its unread dot lands.',
+        'The Mentor’s row leaves the third place, the rows it passes move down one place each without crossing it, and it arrives at the top with its preview line changed to the new text and its unread dot landing.',
     },
     render: () => <ChatArrivalMomentSurface />,
   },
