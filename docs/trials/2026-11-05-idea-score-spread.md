@@ -128,3 +128,88 @@ The same 30 ideas, scored twice (`jev-1.13.0`):
   (#7, #12, #24, #27, #28, #30), and requirement took #2, #4, #11, #29 and in
   run 1 #5. Fewer ideas keep a score than before (10 against 23), which
   matters for novelty's spread: it is still 3 to 28.
+
+## Re-check with the paragraph around each quote (plan #2947.8)
+
+Rubric `idea-score-2026-11-v3`, model `jev-1.13.0`. The person answered A on
+#2947.6: keep the ten novelty levels and their wording, and give Jev more of
+the note. Each passage now carries the quoted sentence and, beside it, the
+paragraph around the quote in the note as it stands, widened to its
+neighbours in the same section up to 1,500 characters (`paragraphAround`).
+All three questions read it. Secret, audience-only and journal notes are
+still never sent, and a paragraph that looks like it holds a key is held
+back with its quote.
+
+The sample is the same 30, drawn by the query above with one change: each
+note in `sources` also carries `'body', nt.body`, so the paragraph can be
+cut from it. Of the 36 sources, 35 quotes were still in their note; #13's
+note has changed since its quote was taken, so it sent the quote alone.
+24 passages were sent in all, 23 of them with a paragraph, 174 to 1,500
+characters long (median 921).
+
+| # | type, run 1 / run 2 | usefulness | novelty |
+| ---: | --- | --- | --- |
+| 1 | own idea | 42, 42 | 11, 11 |
+| 2 | requirement | | |
+| 3 | description | | |
+| 4 | requirement | | |
+| 5 | own idea | 44, 45 | 26, 27 |
+| 6 | own idea | 33, 33 | 8, 7 |
+| 7 | withheld | | |
+| 8 | someone else's | | |
+| 9 | own idea | 50, 50 | 12, 13 |
+| 10 | own idea | 54, 54 | 24, 23 |
+| 11 | requirement | | |
+| 12 | withheld | | |
+| 13 | requirement | | |
+| 14 | own idea | 46, 45 | 11, 11 |
+| 15 | design | 47, 46 | 26, 26 |
+| 16 | description | | |
+| 17 | own idea / description | 26, - | 34, - |
+| 18 | someone else's | | |
+| 19 | requirement | | |
+| 20 | design / own idea | 60, 61 | 30, 30 |
+| 21 | withheld | | |
+| 22 | someone else's | | |
+| 23 | someone else's | | |
+| 24 | withheld | | |
+| 25 | design | 56, 58 | 27, 26 |
+| 26 | withheld | | |
+| 27 | withheld | | |
+| 28 | withheld | | |
+| 29 | requirement | | |
+| 30 | withheld | | |
+
+"Withheld" is an idea none of whose passages may be sent, stored as someone
+else's idea with no request.
+
+**Spread.** Novelty ran from 8 to 34 in the first run (10 ideas scored) and
+7 to 30 in the second (9), 26 and 23 points of the range; by bands of 20 it
+was 4, 6, 0, 0, 0 and 4, 5, 0, 0, 0. Jev's likeliest novelty level was 0 to 3
+for every idea, as before, and no idea put more than 3% on level 6 or above.
+The most any idea put on level 4 or above was 32% (#17). Usefulness ran from
+26 to 61.
+
+**Repeat.** All 9 ideas scored in both runs were within 2 points on both
+scores. The type was the same in both runs for 28 of 30: #17 moved from own
+idea to description, so it lost its scores in run 2, and #20 moved between
+design and own idea, which are both scored.
+
+**Types.** The paragraph moved some types against v2: #3 and #16 went from
+own idea to description, #18 from design to someone else's idea, and #9 from
+someone else's idea to own idea. Ten ideas keep a score, as in v2.
+
+**Cost.** 44 requests (16 of the 60 were withheld and not sent) took 106,092
+input and 4,033 output tokens, about 2,400 input tokens a request against
+about 2,000 with the quote alone. At Jev's $0.042 a million input tokens the
+two runs cost under half a cent.
+
+### Verdict
+
+Novelty still fails. With the paragraph it spans 26 points (8 to 34), against
+25 (3 to 28) from the quote alone and the 50 the check asked for. The whole
+range moved up about 5 points; it did not open out. Repeat still passes.
+
+Widening further or rewriting the novelty levels is not done here. #2947.6
+named its option B as the fallback, and that changes what novelty means, so
+it goes back to the person as a new question.
