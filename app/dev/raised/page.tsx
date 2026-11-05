@@ -19,6 +19,8 @@ import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadRecentScreenChanges } from '@/lib/plan/screen-change-load';
 import { planRefHref } from '@/lib/comments/refs';
+import { StatusGrid } from '@/components/dev/status-grid';
+import { scopeStatuses } from '@/lib/plan/scope-status';
 import { ShippedScreens, type ShippedScreen } from '@/components/dev/screen-change';
 import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
@@ -207,6 +209,7 @@ export default async function DevRaisedPage() {
         // page did for itself while the card was there.
         refreshReadings
       />
+      <StatusGrid statuses={scopeStatuses(sections)} />
       {shipped.some((screen) => screen.change.after) && (
         <Group title="Shipped lately">
           <ShippedScreens screens={shipped} />
