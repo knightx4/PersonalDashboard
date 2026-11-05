@@ -12,7 +12,7 @@ import {
   TypingBubble,
 } from '@/components/patterns/messaging';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Input } from '@/components/ui/field';
+import { MessageInput } from '@/components/patterns/message-input';
 import Link from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
@@ -262,19 +262,17 @@ export function GroupThreadView({
       scrollRef={scroller}
       onScroll={onScroll}
       box={
-        <form onSubmit={submit} className="flex items-center gap-2">
-          <Input
+        <form onSubmit={submit} className="flex items-end gap-2">
+          <MessageInput
             aria-label={`Message ${title}`}
             placeholder={canSend ? 'Message the group' : 'Add a bot in Settings first'}
             value={draft}
             maxLength={MESSAGE_MAX}
             disabled={!canSend}
             onChange={(e) => setDraft(e.target.value)}
-            className="flex-1 rounded-pill border-border bg-sunken max-sm:min-h-11"
-            enterKeyHint="send"
           />
           <Tooltip label="Send">
-            <Button type="submit" aria-label="Send" disabled={!canSend || !draft.trim()} className="size-(--control-h) rounded-pill px-0">
+            <Button type="submit" aria-label="Send" disabled={!canSend || !draft.trim()} className="size-(--control-h) shrink-0 rounded-pill px-0 max-sm:mb-[calc((2.75rem-var(--control-h))/2)]">
               <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
             </Button>
           </Tooltip>

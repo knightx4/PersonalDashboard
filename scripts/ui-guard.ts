@@ -304,14 +304,24 @@ async function stepText(databaseUrl: string, step: number): Promise<string> {
   }
 }
 
-/** The step's recorded rounds in ui_checks, under the account whose plan it is on. */
+/** The step's recorded rounds in ui_checks (its own and its children's), under the account whose plan it is on. */
 async function stepRounds(databaseUrl: string, step: number): Promise<CheckRound[]> {
   const sql = connect(databaseUrl);
   try {
+    // Its own rounds and those of every step beneath it (ui-check-guard.ts).
     return await sql<CheckRound[]>`
+      with recursive owner as (
+        select p.user_id from plan_items p where p.number = ${step} limit 1
+      ), below as (
+        select p.id, p.number from plan_items p
+        where p.number = ${step} and p.user_id = (select user_id from owner)
+        union all
+        select p.id, p.number from plan_items p join below b on p.parent_id = b.id
+      )
       select c.surface, c.round, c.verdict from ui_checks c
-      where c.step = ${step}
-        and c.user_id = (select p.user_id from plan_items p where p.number = ${step} limit 1)`;
+      where c.step in (select number from below)
+        and c.user_id = (select user_id from owner)
+      order by c.round, c.created_at`;
   } finally {
     await sql.end({ timeout: 5 });
   }

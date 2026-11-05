@@ -66,6 +66,23 @@ function useLiveThreads(live: boolean) {
   }, [live, router]);
 }
 
+/**
+ * A chat is fetched ahead from its row (note 7f038fc1), so it can open drawn
+ * from a copy read a while before the press. Opened from one older than this,
+ * the page is read again behind it once, and anything said since merges in
+ * by id, without the loading screen.
+ */
+const FETCHED_AHEAD_MS = 5_000;
+
+function useFreshOnOpen(drawnAt: number, live: boolean) {
+  const router = useRouter();
+  useEffect(() => {
+    if (live && Date.now() - drawnAt > FETCHED_AHEAD_MS) router.refresh();
+    // Once per page opened: a redraw brings a new drawnAt but is already fresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 /** Now, moved on when the soonest typing ends so "typing…" goes without a reload. */
 function useTypingClock(rows: readonly PersonRow[], groups: readonly GroupRow[], start: number, live: boolean): number {
   const [now, setNow] = useState(start);
@@ -125,6 +142,7 @@ export function PeopleList({
   live?: boolean;
 }) {
   useLiveThreads(live);
+  useFreshOnOpen(start, live);
   const now = useTypingClock(rows, groups, start, live);
   const listRef = useRef<HTMLUListElement>(null);
   const entries = entriesOf(rows, groups);
@@ -188,6 +206,10 @@ function PersonItem({
     <li data-person-row={row.id} className="relative rounded-control">
       <Link
         href={threadHref(row.key)}
+        // The whole thread is fetched ahead, so moving between chats opens
+        // it at once instead of on the loading screen (note 7f038fc1). A new
+        // message redraws the list, which refreshes what was fetched.
+        prefetch
         aria-current={current && !wide ? 'page' : undefined}
         className={cn(
           'grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken',
@@ -225,6 +247,10 @@ function GroupItem({ row, current, wide, timezone, now }: { row: GroupRow; curre
     <li data-person-row={row.id} className="relative rounded-control">
       <Link
         href={groupHref(row.id)}
+        // The whole thread is fetched ahead, so moving between chats opens
+        // it at once instead of on the loading screen (note 7f038fc1). A new
+        // message redraws the list, which refreshes what was fetched.
+        prefetch
         aria-current={current && !wide ? 'page' : undefined}
         className={cn(
           'grid min-h-11 grid-cols-[2.75rem_minmax(0,1fr)_auto] items-start gap-2.5 rounded-control px-2 py-2 hover:bg-sunken',

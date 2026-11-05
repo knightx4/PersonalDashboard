@@ -8,6 +8,7 @@ import {
   repositoryByName,
 } from '@/lib/plan/project-add';
 import { loadDevProjects, PROJECT_COLUMNS } from '@/lib/plan/projects';
+import { decidesSomething } from '@/lib/plan/decision-titles';
 import { insertPlanItem } from '@/lib/plan/insert-item';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { MODULE_IDS } from '@/lib/modules';
@@ -114,6 +115,13 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
   if (!title) throw new Refused('title is missing: say what the step is in a short line.');
   if (title.length > MAX_TITLE) {
     throw new Refused(`That title is longer than a step's name can be (${MAX_TITLE} characters). Put the rest in detail.`);
+  }
+  // A step that asks them to choose is a question, not work (note 35687c09):
+  // ask it in this conversation with the options, rather than filing a step.
+  if (decidesSomething(title)) {
+    throw new Refused(
+      `"${title}" asks them to choose, and a step is work to build. Ask them the question here with two to four options and your recommendation, and add the step for the option they pick.`,
+    );
   }
   const detail = typeof args.detail === 'string' && args.detail.trim() ? args.detail.trim() : null;
   if (detail && detail.length > MAX_DETAIL) {
