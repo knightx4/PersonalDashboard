@@ -104,3 +104,27 @@ Repeat passes. Novelty fails: it uses 25 points of the range where the check
 asked for 50, so the ten levels and the note's passage did not spread it out.
 The type gate fails too, dropping one of the trial's seven. The question of
 what to do about novelty is #2947's decision, and the Map list waits on it.
+
+## Re-check after the type question changed (plan #2947.7)
+
+Rubric `idea-score-2026-11-v2`. The type options now say that a story's
+characters, motifs and worlds are descriptions, that a product's or role's
+"should" and "must" lines are requirements (a general claim with "should" in
+it stays the writer's own idea), and that a project design is a design of a
+place, institution or rules, not an app feature. An idea with sources, none of
+which may be sent, is stored as `others_idea` with no scores and no request.
+The same 30 ideas, scored twice (`jev-1.13.0`):
+
+- Of the trial's seven: #13 and #19 now requirement, #17 description, #21 and
+  #26 withheld or others_idea, so five are dropped. #18 (large votes made hard
+  by design) and #25 (a gradient from public squares to hidden side streets)
+  are sorted as project designs in both runs and keep their scores; each is the
+  writer's design of a governance or a place, and the question was not bent to
+  drop them.
+- Scored in both runs: 10 of 30 (11 in run 2, where #5 moved from requirement
+  to own idea). Usefulness 7 to 62, novelty 3 to 28, all within 2 points
+  across runs. Same type in both runs: 29 of 30.
+- Six more ideas, all from application notes, were stored without a request
+  (#7, #12, #24, #27, #28, #30), and requirement took #2, #4, #11, #29 and in
+  run 1 #5. Fewer ideas keep a score than before (10 against 23), which
+  matters for novelty's spread: it is still 3 to 28.

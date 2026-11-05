@@ -44,7 +44,7 @@ import { DEFAULT_VAULT_RULES, whyNotRead, type VaultRules } from './rules';
  * asks and the novelty anchors (0-1 a textbook point, 4-5 a fresh
  * combination of known parts, 8-9 no clear precedent).
  */
-export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v1';
+export const IDEA_SCORE_RUBRIC_VERSION = 'idea-score-2026-11-v2';
 
 export const IDEA_TYPES = [
   'own_idea',
@@ -68,19 +68,19 @@ const IDEA_TYPE_OPTIONS: Readonly<Record<IdeaType, string>> = {
   own_idea:
     'The writer\'s own idea: a view they argue, a method they propose or a claim they hold, in their own words. "Neighbourhoods should be planned so a school is a ten-minute walk from every home."',
   project_design:
-    'A design for something the writer is building or imagining: an app, a building, a city, a game, a story world. It says how the thing should work or be made. "The reading app shows one paragraph at a time and asks a question before the next."',
+    'A design the writer works out for a place, a building, a city, an institution or a system of rules: how it is arranged and why. Not a feature of an app or product, and not part of a story. "Urban spaces should run from open squares to hidden side streets, so people can choose how public to be."',
   requirement:
-    'A task, a spec item or a deliverable, with nothing argued: what has to be done or what a product must do, not why. "The export must include the date column."',
+    'What a particular product, tool or app should do, contain or connect to, or a task or deliverable, however it is worded ("must", "should", "could", "needs to"), with no argument for why it is a good idea. It is about one named product or role, not a claim about how people or the world work: "must" and "should" in a general claim ("leaders need to be in the field") are still the writer\'s own idea. This covers the writer\'s own product, and what an employer expects of a role. "A note-taking tool should integrate with Obsidian." "The export must include the date column."',
   others_idea:
     'Someone else\'s idea: the note credits it to a person, book, course or article, or it summarises what a source says rather than what the writer holds. "Jacobs argues that mixed-use streets are safer."',
   description:
-    'A definition, a motif, an observation or a record, with no view or proposal in it: what a term means, a recurring image in a story, what happened, what something looks like. "A sonnet has fourteen lines."',
+    'A definition, an observation or a record, with no view or proposal in it: what a term means, what happened, what something looks like. Also anything inside a story the writer is inventing: a character, a motif, a plot turn, a world or its history, however it is phrased, since it is fiction and not a view about the real world. "A sonnet has fourteen lines." "A character is the heart of the planet and feels its emotions."',
 };
 
 export const IDEA_TYPE_QUESTION = {
   type: 'choice',
   question:
-    "`idea` is one idea taken from somebody's personal notes, with `basis` saying how it was found and `passages` quoting the notes it was taken from, each with the note's title. What kind of idea is it? Judge from the passages as well as the summary: a summary can make a quoted source or a story motif read like the writer's own view.",
+    "`idea` is one idea taken from somebody's personal notes, with `basis` saying how it was found and `passages` quoting the notes it was taken from, each with the note's title. What kind of idea is it? Judge from the passages as well as the summary: a summary can make a quoted source, a story motif or a product requirement read like the writer's own view. Take the passages' own wording as the test: a note that only lists what a thing should do is a requirement even when the summary phrases it as a principle.",
   options: IDEA_TYPE_OPTIONS,
 } as const;
 
@@ -308,6 +308,7 @@ export type ScoreIdeaInput = {
  */
 export async function scoreIdea(input: ScoreIdeaInput): Promise<IdeaScoreResult> {
   const { state, inputHash } = ideaScoreState(input.idea, input.rules);
+  if (state.passages.length === 0 && input.idea.sources.length > 0) return withheldIdeaScore(inputHash);
   const result = await askJevAll({
     state,
     questions: IDEA_SCORE_QUESTIONS,
@@ -318,6 +319,39 @@ export async function scoreIdea(input: ScoreIdeaInput): Promise<IdeaScoreResult>
   });
   if (!result.ok) return result;
   return readIdeaScore(result.answers as ScoreAnswers, inputHash);
+}
+
+/**
+ * An idea every one of whose passages is held back (a note written for
+ * somebody else, a secret note, a folder left out) has only its one-line
+ * summary to judge by, and the 4 November trial saw a job-application line
+ * pass as the writer's own view. It is stored as not the writer's own, with no
+ * scores and without a request, so nothing about it is sent. The type is
+ * others_idea because what a note written for an audience says is what the
+ * writer wants that audience to read, not a view they hold.
+ */
+export function withheldIdeaScore(inputHash: string): IdeaScoreResult {
+  const probabilities = Object.fromEntries(IDEA_TYPES.map((t) => [t, t === 'others_idea' ? 1 : 0])) as Record<
+    IdeaType,
+    number
+  >;
+  return {
+    ok: true,
+    score: {
+      ideaType: 'others_idea',
+      typeConfidence: 1,
+      typeProbabilities: probabilities,
+      usefulness: null,
+      usefulnessConfidence: null,
+      usefulnessLevels: null,
+      novelty: null,
+      noveltyConfidence: null,
+      noveltyLevels: null,
+      model: 'not-asked',
+      rubricVersion: IDEA_SCORE_RUBRIC_VERSION,
+      inputHash,
+    },
+  };
 }
 
 function cut(text: string): string {

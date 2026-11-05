@@ -221,6 +221,29 @@ describe('scoring an idea', () => {
     expect(result).toMatchObject({ ok: true, score: { ideaType: 'requirement', novelty: null } });
   });
 
+  it("stores an idea whose every passage is withheld as not the writer's own, without asking Jev", async () => {
+    const fetch = respond({});
+    const idea = { ...IDEA, sources: [source('Frame the analog.', { voice: 'audience' })] };
+    const result = await scoreIdea({ idea, apiKey: 'k', fetch });
+    expect(result).toMatchObject({
+      ok: true,
+      score: { ideaType: 'others_idea', usefulness: null, novelty: null, model: 'not-asked' },
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('still asks about an idea with no sources at all', async () => {
+    const fetch = respond(answersBody('own_idea', levels({ 3: 1 }), levels({ 2: 1 })));
+    const result = await scoreIdea({ idea: { ...IDEA, sources: [] }, apiKey: 'k', fetch });
+    expect(result).toMatchObject({ ok: true, score: { ideaType: 'own_idea' } });
+  });
+
+  it('names story notes and product requirements in the type options', () => {
+    const { description, requirement } = IDEA_SCORE_QUESTIONS.type.options;
+    expect(description).toMatch(/story/);
+    expect(requirement).toMatch(/should/);
+  });
+
   it("fails an own idea whose score could not be read, so it is asked again", async () => {
     const fetch = respond(answersBody('own_idea', levels({ 5: 1 }), null));
     const result = await scoreIdea({ idea: IDEA, apiKey: 'k', fetch });
