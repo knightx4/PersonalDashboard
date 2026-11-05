@@ -182,6 +182,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'write-maya-thought': searching(run(OPUS, 25_000, 2_500), 1),
   // The title and up to 4,000 characters of one note, from the hourly job.
   'gate-maya-note': background(unit(JEV, 1_200, 0)),
+  // One map idea with up to three passages and the paragraph around each,
+  // and the type, usefulness and novelty questions: about 2,400 input tokens
+  // in the 5 November check (plan #2947.8).
+  'score-vault-ideas': background(unit(JEV, 2_400, 100)),
   // The note, Maya's thought, the thread so far and the summary, answered
   // with a reply and a new summary.
   'reply-to-maya': run(SONNET, 8_000, 900),
