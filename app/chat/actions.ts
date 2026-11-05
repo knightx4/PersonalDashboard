@@ -11,6 +11,7 @@ import { createYouClient } from '@/lib/you/auth/server';
 import { setBotPhoto } from '@/lib/you/bot-photos';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
+import { withMessageFiles } from '@/lib/you/chat-message-files';
 import {
   createGroup,
   deleteGroup,
@@ -61,7 +62,8 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   const user = await requireUser();
   if (!UUID.test(chatId) || !Number.isFinite(Date.parse(before))) return { error: 'Those messages cannot be read.' };
   try {
-    return await loadThreadPage(await createYouClient(), user.id, chatId, before);
+    const page = await loadThreadPage(await createYouClient(), user.id, chatId, before);
+    return { ...page, messages: await withMessageFiles(await createCoreClient(), page.messages) };
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };

@@ -7,6 +7,7 @@ import { loadBuildRuns } from '@/lib/talk/build-runs';
 import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import { buildRunId, type BuildRun } from '@/lib/you/live-cards';
 import { createYouClient } from '@/lib/you/auth/server';
+import { withMessageFiles } from '@/lib/you/chat-message-files';
 import { loadPeople, loadThreadPage, withChats, type ThreadPage } from '@/lib/you/chat-threads';
 import { loadGroupRows } from '@/lib/you/group-chats';
 import { editHref } from '@/lib/you/people-cards-model';
@@ -60,7 +61,16 @@ export default async function ChatThreadPage({
   });
   const [page, changes]: [ThreadPage, DashChange[]] = chatId
     ? await Promise.all([
-        loadThreadPage(client, user.id, chatId),
+        // The files sent with each message (plan #2974); the thread still opens without them.
+        loadThreadPage(client, user.id, chatId).then(async (found) => ({
+          ...found,
+          messages: await createCoreClient()
+            .then((core) => withMessageFiles(core, found.messages))
+            .catch((error: unknown) => {
+              console.error('thread files not read', error);
+              return found.messages;
+            }),
+        })),
         // The thread still opens when its cards cannot be read; a reply re-reads them.
         createCoreClient()
           .then((core) => loadPeopleChanges(core, chatId))

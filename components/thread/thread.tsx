@@ -28,6 +28,7 @@ import type { ChangePresses } from '@/components/talk/dash-changes';
 import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '@/app/chat/dash/actions';
 import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
+import { filesOnlyText } from '@/lib/attachments/rules';
 import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash, withoutMention } from '@/lib/comments/mention';
 import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
@@ -44,6 +45,11 @@ import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { boxTrigger, replaceTrigger, type BoxTrigger } from '@/lib/talk/box-commands';
 import { chatReadRows } from '@/lib/talk/chat-trail';
 import { sourceMarks, type SourceMark } from '@/components/talk/source-marks';
+
+/** A question sent as its files alone, whose words are only their names (plan #2974): the files are drawn, not the names. */
+function onlyFiles(turn: Pick<TalkTurn, 'body' | 'files'>): boolean {
+  return Boolean(turn.files?.length) && turn.body === filesOnlyText((turn.files ?? []).map((file) => file.name));
+}
 
 /**
  * Every conversation in the app, and the box for adding to it
@@ -1358,7 +1364,9 @@ function TalkThread({
    * whatever is in the box where it is.
    */
   const submit = (raw: string = draft, fromBox = true) => {
-    const checked = turnBody(raw);
+    // Files with no words are sent as their names (plan #2974), since a turn is never empty.
+    const filesAlone = withFiles && fromBox && !raw.trim() && files.length > 0;
+    const checked = turnBody(filesAlone ? filesOnlyText(files.map((file) => file.name)) : raw);
     if ('error' in checked) {
       setError(checked.error);
       return;
@@ -1535,9 +1543,11 @@ function TalkThread({
             mark={mine ? undefined : mark(turn.id === landed ? 'done' : undefined)}
           >
             {mine ? (
-              <p className="text-body whitespace-pre-wrap">
-                <LinkedText text={turn.body} />
-              </p>
+              !onlyFiles(turn) && (
+                <p className="text-body whitespace-pre-wrap">
+                  <LinkedText text={turn.body} />
+                </p>
+              )
             ) : (
               <>
                 {lead?.(turn)}
@@ -1613,9 +1623,11 @@ function TalkThread({
                 {/* An answer is written as markdown (note 7cf4109a); what you
                     typed stays as you typed it. */}
                 {mine ? (
-                  <p className="text-body whitespace-pre-wrap">
-                    <LinkedText text={turn.body} />
-                  </p>
+                  !onlyFiles(turn) && (
+                    <p className="text-body whitespace-pre-wrap">
+                      <LinkedText text={turn.body} />
+                    </p>
+                  )
                 ) : (
                   <Words body={turn.body} refs="outlines" />
                 )}
@@ -1839,7 +1851,7 @@ function TalkThread({
                 )
           }
           sendLabel="Send"
-          sendDisabled={!draft.trim() || sending || uploading}
+          sendDisabled={(!draft.trim() && files.length === 0) || sending || uploading}
         />
       )}
 
