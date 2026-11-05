@@ -104,7 +104,7 @@ function BotsList({ rows, current, adding }: { rows: readonly PersonRow[]; curre
                   lit && 'bg-accent-tint hover:bg-accent-tint',
                 )}
               >
-                <PersonMark initials={personInitials(row.name)} colour={row.colour} />
+                <PersonMark initials={personInitials(row.name)} colour={row.colour} photo={row.photo} />
                 <span className="min-w-0">
                   <span className="block truncate text-body font-semibold text-ink">{row.name}</span>
                   {line && <span className="block truncate text-small text-ink-muted">{line}</span>}

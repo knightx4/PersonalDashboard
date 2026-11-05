@@ -229,6 +229,11 @@ export type PersonCard = {
    * lib/you/first-texts.ts (plan #2854.1); null for everyone else.
    */
   texts: TextSwitch[] | null;
+  /**
+   * A signed link to the picture the person uploaded for them (plan #2955),
+   * drawn in place of their initials; null or absent for none.
+   */
+  photo?: string | null;
 };
 
 /** A new person's form before anything is typed: the first palette colour nobody uses yet. */

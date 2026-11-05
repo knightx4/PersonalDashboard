@@ -15,6 +15,7 @@ import { Segmented } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { whenDate } from '@/lib/core/when';
 import { MENTOR_PALETTE, personInitials } from '@/lib/you/chat-threads-model';
+import { uploadBotPhoto } from '@/lib/you/bot-photo-upload';
 import type { CouncilMemory } from '@/lib/you/council-model';
 import { ruleFor } from '@/lib/you/first-texts';
 import {
@@ -36,6 +37,7 @@ import {
   type PersonCard,
   type PersonaVersion,
 } from '@/lib/you/people-cards-model';
+import { BotPhotoField, type BotPhotoActions } from './bot-photo-field';
 
 /**
  * Adding a bot, or editing one already there (plan #2748.11), on Chat's Bots
@@ -67,6 +69,14 @@ export type PersonFormActions = {
   remove: (id: string) => Promise<{ error: string | null }>;
   /** Delete the bot, its chats and what it remembers. */
   delete: (advisorId: string) => Promise<{ error: string | null }>;
+  /** Save the bot's picture after the form has uploaded it, or take it off with null (plan #2955). */
+  photo?: (advisorId: string, path: string | null) => Promise<{ error: string | null }>;
+};
+
+/** The gallery's picture presses: nothing is uploaded or saved. */
+const NO_PHOTO_ACTIONS: BotPhotoActions = {
+  upload: async () => ({ error: 'The gallery uploads nothing.' }),
+  save: async () => ({ error: 'The gallery saves nothing.' }),
 };
 
 /** The gallery's presses: nothing is saved. */
@@ -91,6 +101,8 @@ export function PersonForm({
   editing = null,
   scrollTo = null,
   deleting: initialDeleting = false,
+  photoBusy = false,
+  photoError = null,
 }: {
   card: PersonCard;
   timezone: string;
@@ -108,11 +120,17 @@ export function PersonForm({
   scrollTo?: 'card' | 'versions' | 'memory' | 'texts' | 'delete' | null;
   /** For the gallery: the confirm before the bot is deleted. */
   deleting?: boolean;
+  /** For the gallery: a picture uploading. */
+  photoBusy?: boolean;
+  /** For the gallery: a picture that could not be uploaded. */
+  photoError?: string | null;
 }) {
   const router = useRouter();
   const adding = !card.id;
   const [name, setName] = useState(card.name);
   const [colour, setColour] = useState(card.colour);
+  const [photo, setPhoto] = useState<string | null>(card.photo ?? null);
+  const photoActions: BotPhotoActions = actions.photo ? { upload: uploadBotPhoto, save: actions.photo } : NO_PHOTO_ACTIONS;
   const [brief, setBrief] = useState<PersonBrief>(card.brief);
   const [persona, setPersona] = useState(card.persona);
   const [joins, setJoins] = useState(card.joinsMeetings);
@@ -170,7 +188,7 @@ export function PersonForm({
   return (
     <MessagingPanel
       title={adding ? 'Add a bot' : `Edit ${card.name}`}
-      avatar={<PersonMark initials={personInitials(name)} colour={colour} size="sm" />}
+      avatar={<PersonMark initials={personInitials(name)} colour={colour} photo={photo} size="sm" />}
       back={{ href: BOTS_HREF, label: 'Bots' }}
       crumbs={[{ label: 'Bots', href: BOTS_HREF }]}
       foot={
@@ -187,6 +205,16 @@ export function PersonForm({
     >
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <section className="flex flex-col gap-4">
+          <BotPhotoField
+            advisorId={card.id}
+            initials={personInitials(name)}
+            colour={colour}
+            photo={photo}
+            onPhoto={setPhoto}
+            actions={photoActions}
+            busy={photoBusy}
+            error={photoError}
+          />
           <Field id="person-name" label="Name">
             <Input id="person-name" value={name} maxLength={PERSON_NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="off" />
           </Field>
@@ -214,6 +242,7 @@ export function PersonForm({
               ))}
             </div>
           </div>
+          {adding && <p className="-mt-2 text-small text-ink-muted">You can add a picture once they are added.</p>}
           <Field id="person-about" label="Shown under their name">
             <Input
               id="person-about"
