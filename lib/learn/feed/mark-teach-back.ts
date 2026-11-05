@@ -2,8 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { OPENING_MODEL } from '@/lib/learn/graph/opening-probe';
 import type { ExplanationMarking, Marking } from './teach-back';
 
@@ -121,14 +121,11 @@ async function call(
       model: TEACH_BACK_MODEL,
       max_tokens: 1024,
       system: input.system,
-      tools: [
-        {
-          name: input.tool,
-          description: input.description,
-          input_schema: { type: 'object', properties: input.properties, required: input.required },
-        },
-      ],
-      tool_choice: forceTool(input.tool, TEACH_BACK_MODEL),
+      ...reportRequest({
+        name: input.tool,
+        description: input.description,
+        input_schema: { type: 'object', properties: input.properties, required: input.required },
+      }, TEACH_BACK_MODEL),
       messages: [{ role: 'user', content: input.content }],
     });
   } catch (error) {
@@ -138,9 +135,9 @@ async function call(
   // Before the answer is judged: a useless one still cost what it cost.
   input.onSpend?.({ model: TEACH_BACK_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === input.tool);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, input: block.input };
+  const report = readReport(response, input.tool, TEACH_BACK_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, input: report.value };
 }
 
 /** Mark the explanation and write the follow-up. Never throws. */

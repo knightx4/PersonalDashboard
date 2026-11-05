@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import {
   FIRST_UNITS_MAX,
   FIRST_UNITS_MIN,
@@ -147,32 +148,29 @@ export async function writeCurriculum(input: {
       model: CURRICULUM_MODEL,
       max_tokens: 3000 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the units of the curriculum, in teaching order.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              units: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    covers: { type: 'string' },
-                    outcome: { type: 'string' },
-                  },
-                  required: ['title', 'covers', 'outcome'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the units of the curriculum, in teaching order.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            units: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  covers: { type: 'string' },
+                  outcome: { type: 'string' },
                 },
+                required: ['title', 'covers', 'outcome'],
               },
-              goal_unit: { type: ['integer', 'null'] },
             },
-            required: ['units', 'goal_unit'],
+            goal_unit: { type: ['integer', 'null'] },
           },
+          required: ['units', 'goal_unit'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, CURRICULUM_MODEL),
+      }, CURRICULUM_MODEL),
       messages: [
         {
           role: 'user',
@@ -190,11 +188,9 @@ export async function writeCurriculum(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readCurriculum(block.input, input.units);
+  const report = readReport(response, TOOL_NAME, CURRICULUM_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return readCurriculum(report.value, input.units);
 }
 
 const OUTLINE_SYSTEM = `You write the whole curriculum for one track of study that the person set as a learning goal. They will see every unit from the start and work through them at their own pace, so this is the complete course from its first unit to its last.
@@ -271,32 +267,29 @@ export async function writeOutline(input: {
       model: CURRICULUM_MODEL,
       max_tokens: 6000 + THINKING_ROOM,
       system: OUTLINE_SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the units of the curriculum, in teaching order.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              units: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    covers: { type: 'string' },
-                    outcome: { type: 'string' },
-                  },
-                  required: ['title', 'covers', 'outcome'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the units of the curriculum, in teaching order.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            units: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  covers: { type: 'string' },
+                  outcome: { type: 'string' },
                 },
+                required: ['title', 'covers', 'outcome'],
               },
-              goal_unit: { type: ['integer', 'null'] },
             },
-            required: ['units', 'goal_unit'],
+            goal_unit: { type: ['integer', 'null'] },
           },
+          required: ['units', 'goal_unit'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, CURRICULUM_MODEL),
+      }, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: outlinePrompt(input) }],
     });
   } catch (error) {
@@ -305,10 +298,10 @@ export async function writeOutline(input: {
 
   input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, CURRICULUM_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
   return readOutline(
-    block.input,
+    report.value,
     input.bounds,
     input.units.map((unit) => unit.title),
   );
@@ -411,22 +404,19 @@ export async function writeNextUnit(input: NextUnitPromptInput & {
       model: CURRICULUM_MODEL,
       max_tokens: 800 + THINKING_ROOM,
       system: NEXT_SYSTEM,
-      tools: [
-        {
-          name: NEXT_TOOL_NAME,
-          description: 'Report the next unit of the curriculum.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              covers: { type: 'string' },
-              outcome: { type: 'string' },
-            },
-            required: ['title', 'covers', 'outcome'],
+      ...reportRequest({
+        name: NEXT_TOOL_NAME,
+        description: 'Report the next unit of the curriculum.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            covers: { type: 'string' },
+            outcome: { type: 'string' },
           },
+          required: ['title', 'covers', 'outcome'],
         },
-      ],
-      tool_choice: forceTool(NEXT_TOOL_NAME, CURRICULUM_MODEL),
+      }, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: nextUnitPrompt(input) }],
     });
   } catch (error) {
@@ -435,10 +425,10 @@ export async function writeNextUnit(input: NextUnitPromptInput & {
 
   input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === NEXT_TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, NEXT_TOOL_NAME, CURRICULUM_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
   return readNextUnit(
-    block.input,
+    report.value,
     input.units.map((unit) => unit.title),
   );
 }
@@ -502,21 +492,18 @@ export async function describeUnit(input: {
       model: CURRICULUM_MODEL,
       max_tokens: 600 + THINKING_ROOM,
       system: DESCRIBE_SYSTEM,
-      tools: [
-        {
-          name: DESCRIBE_TOOL_NAME,
-          description: 'Report what the unit covers and its outcome.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              covers: { type: 'string' },
-              outcome: { type: 'string' },
-            },
-            required: ['covers', 'outcome'],
+      ...reportRequest({
+        name: DESCRIBE_TOOL_NAME,
+        description: 'Report what the unit covers and its outcome.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            covers: { type: 'string' },
+            outcome: { type: 'string' },
           },
+          required: ['covers', 'outcome'],
         },
-      ],
-      tool_choice: forceTool(DESCRIBE_TOOL_NAME, CURRICULUM_MODEL),
+      }, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: describeUnitPrompt(input) }],
     });
   } catch (error) {
@@ -525,7 +512,7 @@ export async function describeUnit(input: {
 
   input.onSpend?.({ model: CURRICULUM_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === DESCRIBE_TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readUnitDescription(block.input);
+  const report = readReport(response, DESCRIBE_TOOL_NAME, CURRICULUM_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return readUnitDescription(report.value);
 }

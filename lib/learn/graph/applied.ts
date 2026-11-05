@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   appliedPayloadSchema,
@@ -137,23 +137,20 @@ export async function writeAppliedCase(input: {
       model: APPLIED_MODEL,
       max_tokens: 1024,
       system: WRITE_SYSTEM,
-      tools: [
-        {
-          name: WRITE_TOOL,
-          description: 'Report one case testing this claim, and the answer it expects.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              situation: { type: 'string' },
-              question: { type: 'string' },
-              expected: { type: 'string' },
-              unusable: { type: 'boolean' },
-            },
-            required: ['situation', 'question', 'expected'],
+      ...reportRequest({
+        name: WRITE_TOOL,
+        description: 'Report one case testing this claim, and the answer it expects.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            situation: { type: 'string' },
+            question: { type: 'string' },
+            expected: { type: 'string' },
+            unusable: { type: 'boolean' },
           },
+          required: ['situation', 'question', 'expected'],
         },
-      ],
-      tool_choice: forceTool(WRITE_TOOL, APPLIED_MODEL),
+      }, APPLIED_MODEL),
       messages: [
         {
           role: 'user',
@@ -179,12 +176,12 @@ export async function writeAppliedCase(input: {
 
   input.onSpend?.({ model: APPLIED_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === WRITE_TOOL);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, WRITE_TOOL, APPLIED_MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = appliedPayloadSchema.safeParse(block.input);
+  const safe = appliedPayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'rejected', detail: 'The case came back malformed.' };
   }

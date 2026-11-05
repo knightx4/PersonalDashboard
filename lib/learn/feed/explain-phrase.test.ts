@@ -21,7 +21,7 @@ const card = {
   text: 'Takeaway: AlphaGo won by pairing\nneural networks with a tree search over moves.',
 };
 
-type Sent = { model: string; system: string; tool_choice: unknown; messages: { role: string; content: string }[] };
+type Sent = { model: string; system: string; tool_choice?: unknown; output_config?: { format?: { type: string } }; messages: { role: string; content: string }[] };
 
 function stubClient(content: unknown[]) {
   const sent: Sent[] = [];
@@ -112,7 +112,9 @@ describe('the call', () => {
       section: null,
     });
     expect(sent[0]!.model).toBe(EXPLAIN_MODEL);
-    expect(sent[0]!.tool_choice).toEqual({ type: 'auto' });
+    // Sonnet takes no forced tool, so the report comes back as structured output (plan #2937.4).
+    expect(sent[0]!.tool_choice).toBeUndefined();
+    expect(sent[0]!.output_config?.format?.type).toBe('json_schema');
     expect(sent[0]!.messages[0]!.content).toBe(explainPrompt('tree search', card));
     expect(sent[0]!.messages[0]!.content).toContain('"tree search"');
     expect(sent[0]!.messages[0]!.content).toContain('AlphaGo beat Lee Sedol');

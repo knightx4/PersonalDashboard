@@ -2,13 +2,13 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import type postgres from 'postgres';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { storeCatalogueFigures } from '@/lib/learn/catalogue/figures';
 import { storeStructureMaterial } from '@/lib/learn/catalogue/structure-material';
 import { storeStructure } from '@/lib/learn/catalogue/structure-store';
 import type { GoalToClassify } from '@/lib/learn/goal-kind';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import {
   fetchOcwCourseStructure,
   findOcwCourses,
@@ -97,28 +97,25 @@ export async function proposeOcwCourses(input: {
       model: OCW_PROPOSE_MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the MIT course numbers that teach this goal, best first.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              courses: {
-                type: 'array',
-                maxItems: MAX_PROPOSED_COURSES,
-                items: {
-                  type: 'object',
-                  properties: { number: { type: 'string' }, title: { type: 'string' } },
-                  required: ['number', 'title'],
-                },
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the MIT course numbers that teach this goal, best first.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            courses: {
+              type: 'array',
+              maxItems: MAX_PROPOSED_COURSES,
+              items: {
+                type: 'object',
+                properties: { number: { type: 'string' }, title: { type: 'string' } },
+                required: ['number', 'title'],
               },
             },
-            required: ['courses'],
           },
+          required: ['courses'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, OCW_PROPOSE_MODEL),
+      }, OCW_PROPOSE_MODEL),
       messages: [{ role: 'user', content: describeGoal(input.goal) }],
     });
   } catch (error) {
@@ -128,9 +125,9 @@ export async function proposeOcwCourses(input: {
 
   input.onSpend?.({ model: OCW_PROPOSE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, courses: readProposedCourses(block.input) };
+  const report = readReport(response, TOOL_NAME, OCW_PROPOSE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, courses: readProposedCourses(report.value) };
 }
 
 export type OcwPullLine =

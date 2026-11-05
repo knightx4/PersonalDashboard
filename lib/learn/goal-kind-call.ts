@@ -1,9 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { GOAL_KINDS, readKinds, type GoalToClassify, type KindAnswer } from '@/lib/learn/goal-kind';
 
 /**
@@ -78,31 +78,28 @@ export async function classifyGoals(input: {
       model: GOAL_KIND_MODEL,
       max_tokens: 2048,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the kind of each goal, by its number, with a one-sentence reason.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              kinds: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    goal: { type: 'integer' },
-                    kind: { type: 'string', enum: [...GOAL_KINDS] },
-                    reason: { type: 'string' },
-                  },
-                  required: ['goal', 'kind', 'reason'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the kind of each goal, by its number, with a one-sentence reason.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            kinds: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  goal: { type: 'integer' },
+                  kind: { type: 'string', enum: [...GOAL_KINDS] },
+                  reason: { type: 'string' },
                 },
+                required: ['goal', 'kind', 'reason'],
               },
             },
-            required: ['kinds'],
           },
+          required: ['kinds'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, GOAL_KIND_MODEL),
+      }, GOAL_KIND_MODEL),
       messages: [{ role: 'user', content: describeGoals(goals) }],
     });
   } catch (error) {
@@ -113,7 +110,7 @@ export async function classifyGoals(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: GOAL_KIND_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, answers: readKinds(block.input, goals.length) };
+  const report = readReport(response, TOOL_NAME, GOAL_KIND_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, answers: readKinds(report.value, goals.length) };
 }
