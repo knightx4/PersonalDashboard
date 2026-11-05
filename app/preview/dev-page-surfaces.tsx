@@ -1,3 +1,5 @@
+import { StatusGrid } from '@/components/dev/status-grid';
+import type { ScopeStatuses } from '@/lib/plan/scope-status';
 import { PageHeader } from '@/components/shell/page-header';
 import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
@@ -921,6 +923,17 @@ const conversations: Conversation[] = [
 
 const NOW = Date.parse('2026-10-06T08:00:00Z');
 
+const STATUS_FIXTURE: ScopeStatuses = {
+  everything: { state: 'ready', count: 112 },
+  scopes: [
+    { scope: 'jobs', label: 'Jobs', project: null, state: 'ready', count: 3 },
+    { scope: 'learn', label: 'Learn', project: null, state: 'waiting', count: 0 },
+    { scope: 'goals', label: 'Goals', project: null, state: 'empty', count: 0 },
+    { scope: 'dev', label: 'Dev', project: null, state: 'ready', count: 14 },
+    { scope: 'studio', label: 'Studio, a project with the longest name there is', project: null, state: 'waiting', count: 0 },
+  ],
+};
+
 export function DevRaisedSurface() {
   return column(
     <>
@@ -961,6 +974,7 @@ export function DevRaisedSurface() {
           { ref: '#1688', title: 'Returns list on Shopping' },
         ]}
       />
+      <StatusGrid statuses={STATUS_FIXTURE} />
       <CheckBacksPanel
         now={NOW}
         rows={[
