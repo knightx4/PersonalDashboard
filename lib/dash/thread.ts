@@ -3,7 +3,8 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
 import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation, TalkToolCall } from '@/lib/talk/talk';
-import { MAX_LOOKUPS, runDash, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { MAX_LOOKUPS, runDash, type DashCall, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { UNFINISHED_REASON, type DashFailure } from './failures';
 import type { PaidQueued } from './paid';
 import {
   threadDashTools,
@@ -163,6 +164,12 @@ export type ThreadDash = {
   queue?: (tool: DashPaidTool, input: unknown, seen: DashSeen) => Promise<PaidQueued>;
   /** Keeps a queued paid press as proposed, under the comment that asked for it. */
   saveProposal?: (change: NewDashChange, cause: ThreadCause) => Promise<DashChange>;
+  /**
+   * Keeps a reply that failed or came back unfinished, with its reason and
+   * each model call (plan #2937.2, lib/dash/failures.ts). Never throws.
+   * Absent: not kept.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
 };
 
 /** What a thread's hand-off did: started something, or why not. */
@@ -313,6 +320,23 @@ export async function replyInThread(input: {
       : undefined;
 
   const { handOff, acknowledge } = input;
+  // A reply that fails is kept with why and each call (plan #2937.2).
+  const calls: DashCall[] = [];
+  const failed = async (outcome: DashFailure['outcome'], reason: string) => {
+    try {
+      await dash.recordFailure?.({
+        surface: 'thread',
+        outcome,
+        reason,
+        model: input.voice.model,
+        effort: input.voice.effort ?? null,
+        subjectRef: input.subject.ref,
+        calls,
+      });
+    } catch (error) {
+      console.error('the failed reply was not recorded', error);
+    }
+  };
   const answer = await runDash({
     voice: input.voice,
     context: { surface: 'thread', subject: input.subject, page: null },
@@ -343,8 +367,11 @@ export async function replyInThread(input: {
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     onSpend: input.onSpend,
+    onCall: (call) => calls.push(call),
     now: input.now,
   });
+  if (!answer.ok) await failed(made.length > 0 || queued.length > 0 ? 'unfinished' : 'failed', answer.detail);
+  else if (answer.stop === 'unfinished') await failed('unfinished', UNFINISHED_REASON);
   if (!answer.ok) {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {

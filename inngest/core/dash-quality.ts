@@ -253,6 +253,27 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       return (data ?? []) as HealthConnectorCall[];
     },
 
+    async failures(userId, since) {
+      const { data, error } = await core
+        .from('dash_failures')
+        .select('id, surface, outcome, reason, model, calls')
+        .eq('user_id', userId)
+        .gte('created_at', since)
+        .order('created_at', { ascending: true })
+        .limit(DAY_ROWS);
+      if (error) throw new Error(`Reading the day's failed answers failed: ${error.message}`);
+      return ((data ?? []) as { id: string; surface: string; outcome: 'failed' | 'unfinished'; reason: string; model: string; calls: unknown }[]).map(
+        (row) => ({
+          id: row.id,
+          surface: row.surface,
+          outcome: row.outcome,
+          reason: row.reason,
+          model: row.model,
+          stops: Array.isArray(row.calls) ? row.calls.map((call) => ((call as { stop?: unknown })?.stop as string | null) ?? null) : [],
+        }),
+      );
+    },
+
     async start(row) {
       const { data, error } = await core
         .from('dash_eval_runs')

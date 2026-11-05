@@ -7,12 +7,14 @@ import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff
 import { DASH_MODELS } from './models';
 import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
+import { UNFINISHED_REASON, type DashFailure } from './failures';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
   runDash,
   type DashAnswer,
+  type DashCall,
   type DashExecutor,
   type DashLookupEvent,
   type DashProposer,
@@ -350,6 +352,8 @@ export async function answerQuestion(input: {
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
+  /** Hears each model call as it came back (plan #2937.2). */
+  onCall?: (call: DashCall) => void;
   /** For tests: the clock the time budget reads. */
   now?: () => number;
   /** Hears each lookup start and finish. Whatever it throws is ignored. */
@@ -419,6 +423,12 @@ export type AskStores = {
    * the missing ability is built (gapNote). Never throws. Absent: not filed.
    */
   noteGap?: (body: string, conversationRef: string) => Promise<void>;
+  /**
+   * Keeps an answer that failed or came back unfinished, with its reason and
+   * each model call (plan #2937.2, lib/dash/failures.ts). Never throws.
+   * Absent: not kept.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
 };
 
 /**
@@ -588,8 +598,32 @@ export async function askDash(
     console.error('ask question listener failed', error);
   }
 
+  // Every answer that fails, or comes back unfinished, is kept with why and
+  // what each model call returned (plan #2937.2).
+  const calls: DashCall[] = [];
+  const failed = async (outcome: DashFailure['outcome'], reason: string) => {
+    try {
+      await stores.recordFailure?.({
+        surface: 'ask',
+        outcome,
+        reason,
+        model: input.think ? THINK_MODEL : (input.model ?? ASK_MODEL),
+        effort: input.think ? THINK_EFFORT : null,
+        think: Boolean(input.think),
+        scope: input.scope ?? null,
+        conversationId: subject.ref,
+        turnId: asked[asked.length - 1]?.id ?? null,
+        calls,
+      });
+    } catch (error) {
+      console.error('the failed answer was not recorded', error);
+    }
+  };
+
   if (!input.anthropicApiKey) {
-    return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
+    const error = 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.';
+    await failed('failed', error);
+    return { conversation, turns: asked, error };
   }
 
   const spent: Parameters<SpendSink>[0][] = [];
@@ -716,6 +750,7 @@ export async function askDash(
     model: input.model,
     think: input.think,
     onSpend: (report) => spent.push(report),
+    onCall: (call) => calls.push(call),
   });
   await stores.recordSpend(spent);
   // Filed whether or not the answer is kept: the gap is real either way.
@@ -724,8 +759,10 @@ export async function askDash(
   }
   if (!answer.ok) {
     await discard();
+    await failed('failed', answer.detail);
     return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
   }
+  if (answer.stop === 'unfinished') await failed('unfinished', UNFINISHED_REASON);
 
   let answered: TalkTurn[];
   try {
@@ -736,8 +773,9 @@ export async function askDash(
     answered = await stores.append(subject, [
       { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
     ]);
-  } catch {
+  } catch (error) {
     await discard();
+    await failed('failed', `The answer was written but not kept: ${error instanceof Error ? error.message : 'no reason given'}`);
     return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
   }
   const turnId = answered[answered.length - 1].id;
