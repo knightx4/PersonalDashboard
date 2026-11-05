@@ -352,6 +352,11 @@ npx tsx scripts/plan.ts block <your step> --on <the decision> \
   --ask "Which of the options on #<the decision>?"
 ```
 
+A step whose title would start "Decide", "Choose", "Pick" or "Select" is
+always this kind of question, never a build or setup step: `add` turns one
+away unless it is `--kind decision`. Letter its options in the detail, one per
+line as `A — …` (or `(A) …` inline), so the plan page offers each as a button.
+
 `--on` writes the dependency edge and is what makes that block clear itself:
 answering the question puts the step back in the ready list without anybody
 unblocking it by hand. Every block names what it waits on. A key or an account
