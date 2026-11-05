@@ -118,7 +118,7 @@ describe('the schedule since 0279', () => {
 });
 
 describe('the model reply schedule (0297)', () => {
-  const models = statementsOf('0297_dash_quality_model_replies.sql');
+  const models = statementsOf('0299_dash_quality_model_replies.sql');
 
   it('runs every day, after the health run, through its own trigger', () => {
     const unschedule = models.indexOf("jobname = 'dash-quality-models-daily'");
