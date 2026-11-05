@@ -17,6 +17,8 @@ import {
   setGroupMembers,
   type Reacted,
 } from '@/lib/you/group-chats';
+import { retryMentorReplyInRequest } from '@/lib/you/mentor-reply-request';
+import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import {
   addPerson,
   ASK_MAX,
@@ -55,6 +57,24 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+/**
+ * The changes someone on People made or proposed in one thread (plan
+ * #2854.2.1), read again when their reply comes in, so its cards show
+ * without a reload. Null when they could not be read; the thread keeps what
+ * it has.
+ */
+// latency: instant
+export async function threadChanges(chatId: string): Promise<DashChange[] | null> {
+  await requireUser();
+  if (!UUID.test(chatId)) return null;
+  try {
+    return await loadPeopleChanges(await createCoreClient(), chatId);
+  } catch (error) {
+    console.error('thread changes not read', error);
+    return null;
   }
 }
 
@@ -173,6 +193,19 @@ export async function readThread(chatId: string, advisorId: string): Promise<voi
   }
 }
 
+/** Try again on a mentor's reply that failed (plan #2854.4); the reply comes over Realtime as a sent one does. */
+// latency: instant
+export async function retryReply(chatId: string, advisorId: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(chatId) || !UUID.test(advisorId)) return { error: 'That thread is not there any more.' };
+  try {
+    return await retryMentorReplyInRequest(user.id, chatId, advisorId);
+  } catch (error) {
+    console.error('mentor reply not retried', error);
+    return { error: 'The reply could not start. Try again.' };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Adding and editing a person (plan #2748.11).
 // ---------------------------------------------------------------------------
@@ -185,6 +218,8 @@ export type PersonSaveInput = {
   brief: PersonBrief;
   persona: string;
   joinsMeetings: boolean;
+  /** What they text first about, for someone with a rule (plan #2854.1). */
+  textWhen?: string[];
   /** Who wrote the card as it is saved. */
   author: CardAuthor;
 };

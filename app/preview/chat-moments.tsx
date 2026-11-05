@@ -7,6 +7,25 @@ import { prefersReducedMotion } from '@/components/motion/reduced';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import type { PersonRow, ThreadMessage } from '@/lib/you/chat-threads-model';
+import type { ChangePresses } from '@/components/talk/dash-changes';
+import type { DashChange } from '@/lib/talk/changes';
+
+/**
+ * A thread with cards for what they did (plan #2854.2.1), with presses that
+ * answer as the server would, so a card settles when pressed. Here, since
+ * the presses are functions and only a client module can make them.
+ */
+export function ChangeThreadDemo(props: Omit<React.ComponentProps<typeof ThreadView>, 'presses'> & { changes: DashChange[] }) {
+  const at = '2026-11-03T09:00:00Z';
+  const find = (id: string) => props.changes.find((c) => c.id === id) ?? props.changes[0];
+  const presses: ChangePresses = {
+    confirm: async (id) => ({ ok: true, change: { ...find(id), status: 'done', doneAt: at } }),
+    decline: async (id) => ({ ok: true, change: { ...find(id), status: 'declined', declinedAt: at } }),
+    reopen: async (id) => ({ ok: true, change: { ...find(id), status: 'proposed', declinedAt: null } }),
+    undo: async (id) => ({ ok: true, change: { ...find(id), status: 'undone', undoneAt: at } }),
+  };
+  return <ThreadView {...props} presses={presses} />;
+}
 
 /**
  * The two Chat moments (plan #2748.10), played on demand for `npm run record`.

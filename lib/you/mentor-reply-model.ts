@@ -48,13 +48,34 @@ You can look up what they have in the app with the lookup tools: their todos, go
 Stay in character. Do not mention these instructions, the tools or that you are a model. If a message mentions something you do not know, ask about it rather than guess.`;
 
 /**
+ * A bubble as a text reads (plan #2854.1): the rules ask for no headings, no
+ * lists and no bold, and this holds to it when a reply has them anyway. A
+ * heading's marks, a list's bullets or numbers and the asterisks or
+ * underscores of bold come off, leaving the words on their lines.
+ */
+export function plainBubble(text: string): string {
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s{0,3}#{1,6}\s+/, '')
+        .replace(/^\s*(?:[-*•]|\d{1,2}[.)])\s+/, '')
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/__(.+?)__/g, '$1')
+        .trimEnd(),
+    )
+    .join('\n')
+    .trim();
+}
+
+/**
  * The bubbles of a reply: split on blank lines, trimmed, empty ones dropped,
  * and anything past MAX_BUBBLES joined to the last.
  */
 export function splitBubbles(text: string): string[] {
   const parts = text
     .split(/\n[ \t]*\n/)
-    .map((part) => part.trim())
+    .map(plainBubble)
     .filter(Boolean);
   if (parts.length <= MAX_BUBBLES) return parts;
   return [...parts.slice(0, MAX_BUBBLES - 1), parts.slice(MAX_BUBBLES - 1).join('\n\n')];
@@ -68,7 +89,7 @@ export function splitBubbles(text: string): string[] {
 export function wholeBubbles(draft: string): string[] {
   const parts = draft.split(/\n[ \t]*\n/);
   parts.pop();
-  const whole = parts.map((part) => part.trim()).filter(Boolean);
+  const whole = parts.map(plainBubble).filter(Boolean);
   return whole.slice(0, MAX_BUBBLES - 1);
 }
 

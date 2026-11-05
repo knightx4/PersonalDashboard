@@ -3,6 +3,7 @@ import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
 import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   mentorColour,
+  replyFailedOf,
   SEARCH_MAX,
   seatAreaOf,
   sortPeople,
@@ -23,7 +24,7 @@ export * from '@/lib/you/chat-threads-model';
  * (lib/you/mentor-reply-request.ts), not through here.
  */
 
-type ChatRow = { id: string; advisorId: string; typingUntil: string | null; lastReadAt: string | null };
+type ChatRow = { id: string; advisorId: string; typingUntil: string | null; lastReadAt: string | null; replyFailed: string | null };
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 const strOrNull = (value: unknown): string | null => str(value) || null;
@@ -38,7 +39,7 @@ async function readChats(client: YouSupabaseClient, userId: string): Promise<{ c
   const [chats, colours] = await Promise.all([
     client
       .from('advisor_chats')
-      .select('id, advisor_id, typing_until, last_read_at, last_message_at')
+      .select('id, advisor_id, typing_until, last_read_at, last_message_at, reply_status, reply_error')
       .eq('user_id', userId)
       .order('last_message_at', { ascending: false, nullsFirst: false }),
     client.from('board_advisors').select('id, colour').eq('user_id', userId),
@@ -52,6 +53,7 @@ async function readChats(client: YouSupabaseClient, userId: string): Promise<{ c
       advisorId,
       typingUntil: strOrNull(row.typing_until),
       lastReadAt: strOrNull(row.last_read_at),
+      replyFailed: replyFailedOf(row),
     });
   }
   const colourOf = new Map<string, string | null>();
@@ -80,6 +82,7 @@ async function personRow(
     unread: false,
     typingUntil: chat?.typingUntil ?? null,
     lastReadAt: chat?.lastReadAt ?? null,
+    replyFailed: chat?.replyFailed ?? null,
   };
   if (!chat) return base;
   let unreadQuery = client

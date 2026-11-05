@@ -7,7 +7,8 @@ import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import { newPersonCard, type PersonCard } from '@/lib/you/people-cards-model';
 import { BotsView } from '@/app/chat/bots-view';
 import { PersonForm } from '@/app/chat/people/person-form';
-import { CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
+import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
+import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
 /**
  * Chat's Bots tab (plan #2879.3) in the gallery: every bot A to Z, with none,
@@ -50,6 +51,7 @@ export const FRANKLIN_PERSON: PersonCard = {
   },
   persona: FRANKLIN_CARD,
   joinsMeetings: true,
+  texts: null,
   versions: [
     {
       id: 'v2',
@@ -215,6 +217,40 @@ export function ChatPersonEditSurface({
                     : null
           }
         />
+      </BotsView>
+    </Shell>
+  );
+}
+
+/** The builder's form (plan #2854.1): what it texts first about, with failed or stalled builds switched off. */
+const BUILDER_PERSON: PersonCard = {
+  id: '00000000-0000-4000-8000-000000000007',
+  key: BUILDER_ROW.key,
+  name: BUILDER_ROW.name,
+  colour: BUILDER_ROW.colour,
+  kind: 'guest',
+  madeByYou: true,
+  brief: {
+    who: 'Dev',
+    length: 'short',
+    bubbles: 'few',
+    tone: 'Brief and plain',
+    cares: 'What shipped, what is building and what needs me.',
+    never: 'Detail I did not ask for.',
+  },
+  persona: 'You are the builder. You keep the person up to date on Dev in a few plain lines, and give detail only when asked.',
+  joinsMeetings: false,
+  versions: [],
+  memory: [],
+  texts: textSwitches(BUILDER_TEXTS, ['needs_you', 'question', 'shipped']),
+};
+
+/** The builder's form scrolled to the switches for when it texts first. */
+export function ChatPersonTextsSurface() {
+  return (
+    <Shell path={`/chat/bots/${BUILDER_ROW.key}`}>
+      <BotsView rows={[BUILDER_ROW, ...EVERYONE]} current={BUILDER_ROW.key}>
+        <PersonForm card={BUILDER_PERSON} timezone={ZONE} now={NOW} scrollTo="texts" />
       </BotsView>
     </Shell>
   );
