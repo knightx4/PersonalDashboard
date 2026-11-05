@@ -80,7 +80,30 @@ A worker that ended with nothing built: `npx tsx scripts/plan.ts stopped
 A run whose worker has not reported for two hours is ended the same way, as
 the plan page's sweep would.
 
-### 3. Nothing queued
+### 3. Copy each worker's own summary (plan #2800.2)
+
+A worker that never calls report_progress still shows a current line on the
+project's page. List the open sessions (this dispatcher's runs and the
+broker's threads; it is the same list):
+
+```sh
+npm run -s session-sync -- open
+```
+
+For each session with `"origin": "run"`, call `get_session` and run:
+
+```sh
+npm run -s session-sync -- copy <session id> --status <running|idle|ended|archived> \
+  --summary "<the session's own summary, as get_session returns it>" --activity "<its last activity time, ISO>"
+```
+
+It writes the worker's state and latest action into its progress row, unless
+the worker reported something newer itself, in which case it only moves the
+row's time. Do it on every tick for every open worker, whether or not step 2
+closed its run. Leave out `--summary` or `--activity` when `get_session` has
+none. Skip the `"origin": "thread"` sessions: the broker copies those.
+
+### 4. Nothing queued
 
 Say so in one line and stop. Do not look for other work.
 

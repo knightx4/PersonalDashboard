@@ -100,10 +100,35 @@ thread no longer shows a session at work. Leave `waiting` threads as they
 are: they wait on the person's answer, and their session is meant to be
 stopped.
 
-### 4. End the turn
+### 4. Copy each session's own summary (plan #2800.2)
+
+A session that never calls report_progress still shows a current line. List
+the open sessions this broker and the projects dispatcher started:
+
+```sh
+npm run -s session-sync -- open
+```
+
+For each one, call `get_session` and run:
+
+```sh
+npm run -s session-sync -- copy <session id> --status <running|idle|ended|archived> \
+  --summary "<the session's own summary, as get_session returns it>" --activity "<its last activity time, ISO>"
+```
+
+The script writes the state, the latest action and the thread or run the
+session belongs to into its progress row, unless the session reported
+something newer itself; then it only moves the row's time, so every open
+session ends the wake with a row no older than it. Leave `--summary` out when
+`get_session` returns none, and `--activity` when it gives no time. A session
+the script does not list (`"kind": "unknown"`) is skipped. Do this for every
+open session, including the ones step 3 left alone and the ones just started.
+A failure on one is not a reason to skip the rest.
+
+### 5. End the turn
 
 One line: how many sessions you started, how many messages you passed on,
-and any thread that failed. Then stop and wait for the next wake. Do not look
+how many progress rows you copied, and any thread that failed. Then stop and wait for the next wake. Do not look
 for other work.
 
 ## What you never do
