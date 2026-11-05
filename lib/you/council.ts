@@ -30,6 +30,7 @@ import {
 } from '@/lib/you/council-model';
 import { unreadTextsOf, type TextRow, type TextThread } from '@/lib/you/council-texts';
 import { canTalkOf } from '@/lib/you/people-cards-model';
+import { dueBriefLines, loadReachOutDue, readRulePeople, type DuePerson, type SchemaReader } from '@/lib/you/reach-out-due';
 
 export * from '@/lib/you/council-model';
 
@@ -343,8 +344,17 @@ export async function forgetMemory(
 // Runs: the daily round and a mentor's reply.
 // ---------------------------------------------------------------------------
 
-export function adviceBrief(input: { runId: string; userId: string }): string {
-  return [`Follow ${COUNCIL_SKILL_PATH}`, `Council advice ${input.runId}`, `user_id ${input.userId}`].join('\n');
+/**
+ * The daily round's brief. People due by their own reach-out rule (plan
+ * #2931.5) follow the first three lines, each with the rows they may name.
+ */
+export function adviceBrief(input: { runId: string; userId: string; due?: readonly DuePerson[] }): string {
+  return [
+    `Follow ${COUNCIL_SKILL_PATH}`,
+    `Council advice ${input.runId}`,
+    `user_id ${input.userId}`,
+    ...dueBriefLines(input.due ?? []),
+  ].join('\n');
 }
 
 export function replyBrief(input: { runId: string; chatId: string; userId: string }): string {
@@ -470,8 +480,11 @@ export type AdviceDecision = { start: true } | { start: false; skipped: string }
  *     call starts it once their morning begins (plan #2748.7).
  *   - Nothing piles up: with six texts unread, or three sent today, no
  *     text could be saved, so the round is not fired at all.
- *   - Someone can speak: every mentor on the council already has an unread
- *     text, or none is on it.
+ *   - Someone can speak: a mentor with no reach-out rule and no unread
+ *     text, whom the round chooses by judgement as before, or a person due
+ *     by their own rule (plan #2931.5) with no unread text. A person with a
+ *     rule speaks only when due, so a council of people with rules, none
+ *     due, starts no round.
  *   - Memory still runs: when a conversation is due a summary (plan
  *     #2748.8), the round starts whatever the note caps say, and writes
  *     the mentors' memory with no notes.
@@ -481,8 +494,10 @@ export function decideAdviceRun(input: {
   latest: { status: string; requestedAt: string } | null;
   unread: number;
   writtenToday: number;
-  /** Mentors on the council with no unread note. */
+  /** Mentors on the council with no reach-out rule and no unread text. */
   free: number;
+  /** People due by their reach-out rule with no unread text (plan #2931.5). */
+  due?: number;
   /** Mentor conversations over and due a summary. */
   episodesDue?: number;
   /** The person's quiet hours, when no mentor texts them. */
@@ -501,7 +516,9 @@ export function decideAdviceRun(input: {
   if ((input.episodesDue ?? 0) > 0) return { start: true };
   if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} mentor texts are unread` };
   if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has sent its texts for today' };
-  if (input.free <= 0) return { start: false, skipped: 'every mentor already has an unread text' };
+  if (input.free <= 0 && (input.due ?? 0) <= 0) {
+    return { start: false, skipped: 'nobody is free to text: every mentor without a rule has an unread text, and nobody is due by their rule' };
+  }
   return { start: true };
 }
 
@@ -514,6 +531,12 @@ export async function maybeStartAdviceRun(input: {
   fetch?: typeof globalThis.fetch;
   /** The person's quiet hours, when no mentor texts them. */
   quiet?: boolean;
+  /**
+   * A client for each schema, to read the tables reach-out rules watch
+   * (plan #2931.5). Without it nobody is due by a rule, and people with a
+   * rule stay silent.
+   */
+  db?: SchemaReader;
 }): Promise<{ skipped: string } | { started: true; runId: string }> {
   const { client, userId } = input;
   const now = input.now ?? Date.now();
@@ -554,7 +577,12 @@ export async function maybeStartAdviceRun(input: {
     if (r.error) throw new Error(`Reading the council failed: ${r.error.message}`);
   }
   const unreadBy = new Set((unread.data ?? []).map((r) => r.advisorId));
-  const free = ((roster.data ?? []) as { id: string }[]).filter((r) => !unreadBy.has(r.id)).length;
+  // A person with a rule speaks only when it makes them due (plan #2931.5).
+  const reach = input.db
+    ? await loadReachOutDue({ you: client, db: input.db, userId, unreadBy, now })
+    : { people: await readRulePeople(client, userId, unreadBy), due: [] };
+  const ruled = new Set(reach.people.map((p) => p.advisorId));
+  const free = ((roster.data ?? []) as { id: string }[]).filter((r) => !unreadBy.has(r.id) && !ruled.has(r.id)).length;
   const latestRow = latest.data as { status: string; requested_at: string } | null;
   const decision = decideAdviceRun({
     now,
@@ -562,6 +590,7 @@ export async function maybeStartAdviceRun(input: {
     unread: (unread.data ?? []).length,
     writtenToday: today.count ?? 0,
     free,
+    due: reach.due.length,
     quiet: input.quiet,
     episodesDue: ((episodes.data ?? []) as { ended_at: string; summarised_at: string | null }[]).filter((e) =>
       episodeDue({ endedAt: e.ended_at, summarisedAt: e.summarised_at }, now),
@@ -574,7 +603,7 @@ export async function maybeStartAdviceRun(input: {
     userId,
     kind: 'advice',
     routine: input.routine,
-    brief: (runId) => adviceBrief({ runId, userId }),
+    brief: (runId) => adviceBrief({ runId, userId, due: reach.due }),
     staleAfterMs: ADVICE_STALE_AFTER_MS,
     now,
     fetch: input.fetch,
