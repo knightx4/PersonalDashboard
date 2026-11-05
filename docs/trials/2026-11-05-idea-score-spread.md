@@ -1,0 +1,106 @@
+# Vault idea scores: spread and repeat (5 November 2026)
+
+Plan #2947.4. Thirty map ideas were sorted and scored twice by Jev with
+`scoreIdea` (lib/vault/map/idea-score.ts, rubric `idea-score-2026-11-v1`,
+model `jev-1.13.0`), to see whether the scores spread out and hold still
+before they reach the Map. Nothing was written to the database.
+
+Novelty was judged against the ten-level rubric #2947.2 wrote from the
+step's description. The 4 November trial's own 1-to-5 wording was never
+saved, so the two are not the same rubric.
+
+## The sample
+
+The trial's list of 30 was not saved either. This sample is drawn the way the
+step describes, by `md5(id || 'score30')`, over the held positions of kind
+`position` (1,166 rows, the "about 1,200" the feature names). Its #17 is a
+story motif, #13 and #19 read as product requirements and #26 as rubric text,
+which fits what the trial found at those numbers, so it is very likely the
+same 30.
+
+```sql
+with sample as (
+  select p.id, p.statement, p.basis,
+         row_number() over (order by md5(p.id::text || 'score30')) as n
+  from obsidian.positions p
+  where p.user_id = :owner and p.kind = 'position' and p.stance = 'held'
+  order by md5(p.id::text || 'score30')
+  limit 30
+)
+select s.n, s.id, s.statement, s.basis,
+  (select json_agg(json_build_object('quote', ps.quote, 'note',
+            json_build_object('title', nt.title, 'path', nt.path, 'voice', nt.voice))
+          order by ps.created_at)
+   from obsidian.position_sources ps
+   join obsidian.notes nt on nt.id = ps.note_id and nt.user_id = :owner
+   where ps.position_id = s.id and ps.user_id = :owner) as sources
+from sample s order by s.n
+```
+
+Run it with `npx tsx scripts/sql.ts --file`, save the output, and pass it to
+`npx tsx --conditions react-server scripts/idea-score-check.ts <sample.json> <rules.json>`.
+
+## Results
+
+| # | type, run 1 / run 2 | usefulness | novelty |
+| ---: | --- | --- | --- |
+| 1 | own idea | 36, 36 | 7, 8 |
+| 2 | design | 46, 47 | 17, 18 |
+| 3 | own idea | 8, 7 | 3, 3 |
+| 4 | design | 33, 34 | 14, 15 |
+| 5 | own idea | 40, 40 | 20, 18 |
+| 6 | own idea | 29, 28 | 6, 6 |
+| 7 | own idea | 19, 19 | 8, 8 |
+| 8 | someone else's | | |
+| 9 | someone else's | | |
+| 10 | design / own idea | 51, 50 | 17, 17 |
+| 11 | requirement | | |
+| 12 | own idea | 23, 24 | 23, 24 |
+| 13 | design | 30, 31 | 17, 17 |
+| 14 | own idea | 43, 43 | 6, 6 |
+| 15 | design | 46, 47 | 25, 25 |
+| 16 | own idea | 14, 13 | 28, 28 |
+| 17 | own idea / design | 25, 25 | 28, 28 |
+| 18 | own idea | 57, 57 | 17, 17 |
+| 19 | design | 28, 29 | 16, 15 |
+| 20 | design | 63, 63 | 27, 26 |
+| 21 | own idea | 42, 43 | 16, 16 |
+| 22 | someone else's | | |
+| 23 | someone else's | | |
+| 24 | own idea | 48, 48 | 12, 13 |
+| 25 | design | 55, 55 | 15, 15 |
+| 26 | requirement | | |
+| 27 | own idea | 13, 12 | 3, 3 |
+| 28 | own idea | 28, 28 | 20, 20 |
+| 29 | requirement | | |
+| 30 | own idea | 17, 16 | 6, 6 |
+
+**Spread.** 23 of the 30 were scored in both runs. Usefulness ran from 8 to
+63 (7 to 63 in the second run); by bands of 20 it was 5, 8, 9, 1 and 0.
+Novelty ran from 3 to 28 in both runs, 25 points of the range; by bands of 20
+it was 16, 7, 0, 0, 0 in the first run and 17, 6, 0, 0, 0 in the second.
+Jev's likeliest novelty level was 0 to 3 for every idea, and no idea put
+more than 7% on level 6 or above.
+
+**Repeat.** All 23 ideas were within 5 points on both scores; the largest
+difference was 1 on usefulness and 2 on novelty. The type was the same in
+both runs for 28 of 30. #10 and #17 moved between own idea and design, which
+are both scored, so no score was lost.
+
+**Types.** The gate dropped seven ideas: #8, #9, #22 and #23 as someone
+else's idea, and #11, #26 and #29 as requirements. Of the seven the trial
+said were not the person's own ideas, it dropped only #26. It kept #17 (a
+story motif: the five types have no place for fiction), #13 and #19 (sorted
+as designs rather than requirements), #21 (from a job application, whose
+passage is held back by voice, so Jev saw only the one-line summary), and
+#18 and #25.
+
+**Cost.** 60 requests took 118,284 input and 5,504 output tokens, about 2,000
+a request.
+
+## Verdict
+
+Repeat passes. Novelty fails: it uses 25 points of the range where the check
+asked for 50, so the ten levels and the note's passage did not spread it out.
+The type gate fails too, dropping one of the trial's seven. The question of
+what to do about novelty is #2947's decision, and the Map list waits on it.
