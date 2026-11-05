@@ -7,6 +7,8 @@ import {
   IDEA_TYPES,
   ideaInputHash,
   ideaScoreState,
+  paragraphAround,
+  PARAGRAPH_CHARS,
   scoreIdea,
   scoreOutOf100,
   type IdeaSource,
@@ -108,7 +110,7 @@ describe('what Jev reads', () => {
     expect(state).toEqual({
       idea: IDEA.statement,
       basis: IDEA.basis,
-      passages: [{ note: 'On walkable towns', text: IDEA.sources[0].quote }],
+      passages: [{ note: 'On walkable towns', quote: IDEA.sources[0].quote }],
     });
     expect(JSON.stringify(state)).not.toContain('Ideas/');
   });
@@ -141,6 +143,86 @@ describe('what Jev reads', () => {
   it('drops a repeated passage', () => {
     const { state } = ideaScoreState({ ...IDEA, sources: [IDEA.sources[0], IDEA.sources[0]] });
     expect(state.passages).toHaveLength(1);
+  });
+});
+
+describe('the paragraph around the quote', () => {
+  const QUOTE = 'A walkable town needs fewer shops, so each one gets the footfall to survive.';
+  const BODY = [
+    '---',
+    'tags: [towns]',
+    '---',
+    '# Towns',
+    '',
+    'Some opening thoughts on towns.',
+    '',
+    '## Shops',
+    '',
+    'Most planners want more shops on every street.',
+    '',
+    `I think the opposite. ${QUOTE} Fewer, busier shops last.`,
+    '',
+    'That is why the old high streets died.',
+    '',
+    '## Parking',
+    '',
+    'Parking is another matter.',
+  ].join('\n');
+
+  it('takes the paragraph and its neighbours in the same section, heading included', () => {
+    expect(paragraphAround(BODY, QUOTE)).toBe(
+      [
+        '## Shops',
+        'Most planners want more shops on every street.',
+        `I think the opposite. ${QUOTE} Fewer, busier shops last.`,
+        'That is why the old high streets died.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('never reaches into the next section or the frontmatter', () => {
+    const paragraph = paragraphAround(BODY, QUOTE)!;
+    expect(paragraph).not.toContain('Parking');
+    expect(paragraph).not.toContain('opening thoughts');
+    expect(paragraph).not.toContain('tags');
+  });
+
+  it('stays within the limit, keeping the quote', () => {
+    const paragraph = paragraphAround(BODY, QUOTE, 140)!;
+    expect(paragraph).toBe(`I think the opposite. ${QUOTE} Fewer, busier shops last.`);
+  });
+
+  it('cuts a paragraph longer than the limit to a window around the quote', () => {
+    const long = `${'Before. '.repeat(300)}${QUOTE} ${'After. '.repeat(300)}`;
+    const paragraph = paragraphAround(long, QUOTE)!;
+    expect(paragraph).toContain(QUOTE);
+    expect(paragraph.startsWith('…')).toBe(true);
+    expect(paragraph.endsWith('…')).toBe(true);
+    expect(paragraph.length).toBeLessThanOrEqual(PARAGRAPH_CHARS + 2);
+  });
+
+  it('is null when the note no longer holds the quote', () => {
+    expect(paragraphAround('A different note now.', QUOTE)).toBeNull();
+  });
+
+  it('goes to Jev beside the quote, and changes the hash', () => {
+    const withBody: IdeaToScore = { ...IDEA, sources: [source(QUOTE, { body: BODY })] };
+    const { state, inputHash } = ideaScoreState(withBody);
+    expect(state.passages[0].quote).toBe(QUOTE);
+    expect(state.passages[0].paragraph).toContain('That is why the old high streets died.');
+    expect(JSON.stringify(state)).not.toContain('Parking');
+    expect(inputHash).not.toBe(ideaScoreState(IDEA).inputHash);
+  });
+
+  it('is left out when the note gives nothing beyond the quote', () => {
+    const { state } = ideaScoreState({ ...IDEA, sources: [source(QUOTE, { body: QUOTE })] });
+    expect(state.passages[0]).toEqual({ note: 'On walkable towns', quote: QUOTE });
+  });
+
+  it('holds back a passage whose paragraph looks like it carries a key', () => {
+    const body = `${QUOTE}\nCall it with sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789.`;
+    const { state } = ideaScoreState({ ...IDEA, sources: [source(QUOTE, { body })] });
+    expect(state.passages).toEqual([]);
   });
 });
 
