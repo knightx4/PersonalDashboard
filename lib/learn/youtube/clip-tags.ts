@@ -2,8 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { CLIP_MODEL, matchServes } from './clips';
 
 /**
@@ -128,34 +128,31 @@ export async function tagClipBatch(input: {
         model: TAG_MODEL,
         max_tokens: 4000,
         system: TAG_SYSTEM,
-        tools: [
-          {
-            name: TAG_TOOL,
-            description: 'Report the subjects each clip serves.',
-            input_schema: {
-              type: 'object',
-              properties: {
-                clips: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      clip: { type: 'integer', description: 'The number of the clip.' },
-                      subjects: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Every subject it serves, names copied exactly from the list.',
-                      },
+        ...reportRequest({
+          name: TAG_TOOL,
+          description: 'Report the subjects each clip serves.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              clips: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    clip: { type: 'integer', description: 'The number of the clip.' },
+                    subjects: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Every subject it serves, names copied exactly from the list.',
                     },
-                    required: ['clip', 'subjects'],
                   },
+                  required: ['clip', 'subjects'],
                 },
               },
-              required: ['clips'],
             },
+            required: ['clips'],
           },
-        ],
-        tool_choice: forceTool(TAG_TOOL, TAG_MODEL),
+        }, TAG_MODEL),
         messages: [{ role: 'user', content: tagPrompt(input.subjects, input.clips) }],
       },
       input.timeoutMs !== undefined ? { timeout: Math.max(1_000, input.timeoutMs), maxRetries: 0 } : undefined,
@@ -164,8 +161,8 @@ export async function tagClipBatch(input: {
     return { outcome: 'failed', detail: error instanceof Error ? error.message : 'Tagging the clips failed.' };
   }
   input.onSpend?.({ model: TAG_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TAG_TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  const subjects = readTagReply(block.input, input.clips, input.subjects);
+  const report = readReport(response, TAG_TOOL, TAG_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
+  const subjects = readTagReply(report.value, input.clips, input.subjects);
   return subjects ? { outcome: 'tagged', subjects } : { outcome: 'failed', detail: 'The tags came back malformed.' };
 }
