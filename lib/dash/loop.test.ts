@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import { answerSoFar, dateLine, LOOK_FIRST, runDash, type DashContext, type DashVoice } from './loop';
+import { OPUS } from '@/lib/core/models';
+import { PROGRESS_NOTES_BETA } from '@/lib/learn/graph/tool-call';
+import { answerSoFar, dateLine, hiddenText, LOOK_FIRST, NOTES_ONLY, progressNotes, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
 import { rowsOfSet, type DashSeen } from './sets';
 
@@ -416,5 +418,106 @@ describe('a refusal before looking', () => {
     const answer = await runDash({ voice, context, turns: ask, today: '2026-10-07', execute, anthropicApiKey: 'k', client: stub });
     expect(sent).toHaveLength(2);
     expect(answer).toMatchObject({ ok: true, couldNot: 'pick a video: no way to browse YouTube' });
+  });
+});
+
+describe('an answer written out of sight (plan #2937.1, 4 November 2026)', () => {
+  type Sent = {
+    tool_choice: { type: string };
+    thinking?: unknown;
+    tools: { name: string; strict?: boolean }[];
+    messages: { role: string; content: unknown }[];
+  };
+  /** A client that also keeps the headers each call was sent with. */
+  function recording(replies: unknown[]) {
+    const sent: Sent[] = [];
+    const headers: unknown[] = [];
+    const stub = {
+      messages: {
+        create: async (params: Sent, options?: { headers?: unknown }) => {
+          sent.push(structuredClone(params));
+          headers.push(options?.headers);
+          const next = replies[sent.length - 1];
+          if (!next) throw new Error('no reply scripted');
+          return next;
+        },
+      },
+    } as unknown as Anthropic;
+    return { stub, sent, headers };
+  }
+  const SEARCH = { type: 'web_search_20260209', name: 'web_search', max_uses: 5 } as unknown as Anthropic.ToolUnion;
+  // Think it through: Opus 5.5 at high effort, with web search.
+  const think: DashVoice = { model: OPUS, system: 'Rules.', tools: [dashTool('todos')!], serverTools: [SEARCH], effort: 'high' };
+  const question = [{ role: 'user' as const, body: 'Should the plan page show what each run cost?' }];
+  const row = { table: 'public.todos', ref: 't-1', title: 'Price the runs', href: '/todos' };
+  const execute = vi.fn(async () => ({ ok: true as const, rows: [row] }));
+  // The reply that held the answer: an end_turn with only an empty thinking block.
+  const outOfSight = (thinking = '') => ({
+    content: [{ type: 'thinking', thinking, signature: 'sig' }],
+    stop_reason: 'end_turn',
+    usage: { ...USAGE, output_tokens: 7350 },
+  });
+  const threeLookups = [call('l1', 'todos', {}), call('l2', 'todos', {}), call('l3', 'todos', {})];
+
+  it('asks once more with the same request and a system message, never echoing the empty turn, and the answer comes back', async () => {
+    const { stub, sent, headers } = recording([
+      ...threeLookups,
+      outOfSight(),
+      call('a1', 'answer', { answer: 'Yes: show it under each run.', cited: [] }),
+    ]);
+    const answer = await runDash({ voice: think, context, turns: question, today: '2026-11-04', execute, anthropicApiKey: 'k', client: stub });
+
+    expect(answer).toMatchObject({ ok: true, stop: 'answered', body: 'Yes: show it under each run.' });
+    expect(sent).toHaveLength(5);
+    // Tool choice never changes, so no call throws the cache away.
+    expect(sent.map((s) => s.tool_choice.type)).toEqual(['auto', 'auto', 'auto', 'auto', 'auto']);
+    // Every call asks for the progress notes' summaries.
+    for (const s of sent) expect(s.thinking).toEqual({ type: 'adaptive', display: 'updates' });
+    for (const h of headers) expect(h).toEqual({ 'anthropic-beta': PROGRESS_NOTES_BETA });
+    expect(sent[0].tools.find((t) => t.name === 'answer')?.strict).toBe(true);
+    // The re-ask is the call before it plus one system message.
+    expect(sent[4].messages.slice(0, -1)).toEqual(sent[3].messages);
+    expect(sent[4].messages.at(-1)).toEqual({ role: 'system', content: hiddenText('answer') });
+    expect(JSON.stringify(sent[4].messages)).not.toContain('"thinking"');
+  });
+
+  it('keeps the progress notes as an unfinished answer when the re-ask is out of sight too', async () => {
+    const { stub, sent } = recording([
+      ...threeLookups,
+      outOfSight('Show the cost under each run, from the spend ledger.'),
+      outOfSight('Short.'),
+    ]);
+    const answer = await runDash({ voice: think, context, turns: question, today: '2026-11-04', execute, anthropicApiKey: 'k', client: stub });
+    expect(sent).toHaveLength(5);
+    expect(answer).toMatchObject({
+      ok: true,
+      stop: 'unfinished',
+      body: `Show the cost under each run, from the spend ledger.\n\n${NOTES_ONLY}`,
+    });
+  });
+
+  it('falls back to what the lookups found when nothing at all came back', async () => {
+    const { stub, sent } = recording([...threeLookups, outOfSight(), outOfSight()]);
+    const answer = await runDash({ voice: think, context, turns: question, today: '2026-11-04', execute, anthropicApiKey: 'k', client: stub });
+    expect(sent).toHaveLength(5);
+    expect(answer).toMatchObject({ ok: true, stop: 'unfinished', citations: [row] });
+  });
+
+  it('asks a model without progress notes for nothing extra', async () => {
+    const { stub, sent, headers } = recording([call('a1', 'answer', { answer: 'Done.', cited: [] })]);
+    await runDash({ voice, context, turns, today: '2026-11-04', execute, anthropicApiKey: 'k', client: stub });
+    expect(sent[0].thinking).toBeUndefined();
+    expect(headers[0]).toBeUndefined();
+  });
+
+  it('reads the notes from thinking blocks only', () => {
+    expect(
+      progressNotes([
+        { type: 'thinking', thinking: ' First. ' },
+        { type: 'thinking', thinking: '' },
+        { type: 'text' },
+        { type: 'thinking', thinking: 'Second.' },
+      ]),
+    ).toBe('First.\n\nSecond.');
   });
 });
