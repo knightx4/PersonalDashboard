@@ -77,6 +77,52 @@ Each preference names an `example` surface that shows it done right. When you
 are unsure whether a shot breaks one, and the example has shots in
 `.preview-shots/`, open the example and compare.
 
+## What the gate already holds
+
+`npm run check:ui` (scripts/check-ui.ts) fails new code that breaks these
+shapes, and a builder runs it before you see the shots. They were added
+(plan #2966.1) because they were the laws your fixes cited most often among
+the ones a script can find in the source. Do not spend a fix on one of these
+shapes: the code that drew it has either passed the gate already or says on
+the line why it is right.
+
+- **Law 15.** A CardSection `hint`; a muted sentence of four words or more
+  directly under an `h2`, `h3`, SectionHeading or SectionLabel; a caption
+  whose words are the placeholder or label of the control under it.
+- **Law 18.** A `<p>` or heading set `text-center`.
+- **Law 14.** A Textarea, ComposeBody or raw `<textarea>` standing open in a
+  component that lists items, with no condition above it.
+- **Law 1.** A line reading "Nothing … yet", "None … yet" or "No … yet" as a
+  section's text or its `empty` prop. A zero count beside a SectionHeading,
+  SectionLabel or CardSection heading is not drawn at all.
+- **Law 16.** A DashAction with no `paid`, `estimate`, `costText` or
+  `routine`, and Dash's mark inside a Button built by hand.
+
+Older rules in the same file hold parts of laws 4, 9, 10, 11 and 13 the same
+way: a raw hex, a control height written as a number, a rounded box with a
+full border drawn by hand, a Card per mapped row, a raw `<details>`.
+
+The gate holds the shape, not the whole law. Still cite the law for a break
+these shapes do not cover: an explanation set in body ink, a sentence in a
+`<div>`, a row whose values miss the right edge, an empty card with no
+sentence in it, a paid press with no Dash mark.
+
+These stay with you, because the source cannot show them:
+
+- **Law 9, beyond control heights.** Whether the room fits the content depends on the width, the data
+  and what wraps at 390. Only a rendered shot shows a row taking three lines.
+- **`taste:no-bare-text`.** Whether text sits on a panel depends on which
+  component draws the ground around it, often in another file.
+- **Law 17.** Whether a value is the default, or a menu lines up with its
+  button, is decided at runtime.
+- **Law 4.** Whether green means money came back depends on what the number
+  is, which the class list does not say. The gate holds only the hex and the
+  stage-tint parts.
+- **Law 2.** A count that disagrees with another, or a cut-off column with no
+  sign of more, depends on the data.
+- **Law 18, beyond centring.** Edges and right-aligned values are positions on
+  the rendered page.
+
 ## How to look
 
 Open every shot with Read. Look at the phone shots first and longest: 390 is
