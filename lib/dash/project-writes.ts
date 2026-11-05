@@ -211,7 +211,7 @@ const STEP_INPUT: Anthropic.Tool['input_schema'] = {
   type: 'object',
   properties: {
     title: { type: 'string', description: 'What the step is, in a short line of their words.' },
-    detail: { type: 'string', description: 'Everything else they said about it: why, where, what done looks like. Keep every detail they gave.' },
+    detail: { type: 'string', description: 'Everything a builder needs that the title leaves out: why, where, what done looks like, and every constraint, file, example, edge case and decision from the whole conversation, including what you worked out with them, not only their own words. Do not summarise specifics away.' },
     module: {
       type: 'string',
       description: 'The workspace it belongs to, by id (dev, jobs, goals and so on); leave it out for the app as a whole. Ignored when under is given.',
@@ -244,7 +244,7 @@ export const PROJECT_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
     runs: sameAs(['lib/comments/act.ts#addStep', 'lib/plan/insert-item.ts#insertPlanItem']),
     definition: {
       name: 'add_plan_step',
-      description: `Add a step to the build plan in Dev, when they ask for one ("add a step to move the Overnight panel to Home"). It arrives as a proposal for them to approve on the plan page; it is not built and nothing starts. Write the title in a short line and put everything they said in detail. ${DONE_NOTE}`,
+      description: `Add a step to the build plan in Dev, when they ask for one ("add a step to move the Overnight panel to Home"). It arrives as a proposal for them to approve on the plan page; it is not built and nothing starts. Write the title in a short line and put everything in detail, complete enough for a builder who reads only the step to build from it. When they plan something with you in chat, whether they give detailed instructions or ask you to think it through first, everything worked out in that conversation goes into the detail (every constraint, file, example, edge case and decision, yours as well as theirs), not only what they typed. ${DONE_NOTE}`,
       input_schema: STEP_INPUT,
     },
     apply: guarded('add_plan_step', addPlanStep),

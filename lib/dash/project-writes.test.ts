@@ -100,3 +100,12 @@ describe('add_plan_step', () => {
     expect(child).toMatchObject({ parent_id: 'p1', module: 'jobs', status: 'proposed' });
   });
 });
+
+describe('add_plan_step instructions', () => {
+  const step = PROJECT_WRITE_TOOLS.find((t) => t.name === 'add_plan_step')!;
+  it('asks for everything worked out in the conversation, not only what was typed', () => {
+    expect(step.definition.description).toMatch(/worked out in that conversation goes into the detail/);
+    const detail = (step.definition.input_schema as { properties: { detail: { description: string } } }).properties.detail;
+    expect(detail.description).toMatch(/whole conversation/);
+  });
+});
