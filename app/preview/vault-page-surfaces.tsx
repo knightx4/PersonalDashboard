@@ -2,6 +2,8 @@ import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
 import { VaultMapView } from '@/app/vault/map/map-view';
 import { ThemeView } from '@/app/vault/map/[id]/theme-view';
+import { IdeasList, IdeasLoading } from '@/app/vault/map/ideas-view';
+import type { IdeaCounts, IdeaListPage, IdeaRow } from '@/lib/vault/map/ideas';
 import { MayaListView } from '@/app/vault/maya/maya-view';
 import { MayaThreadView } from '@/app/vault/maya/[id]/thread-view';
 import { VaultSettingsView } from '@/app/vault/settings/settings-view';
@@ -133,6 +135,124 @@ const mergeLog: MergeLogPage = {
 
 export function VaultMapSurface() {
   return <VaultMapView themes={themes} capped={false} sweep={sweep} mergeLog={mergeLog} />;
+}
+
+// ---- Map: the ideas, ranked (plan #2947.5) ---------------------------------
+
+const ideaRows: IdeaRow[] = [
+  {
+    id: 'i1',
+    statement: 'A plan nobody has rehearsed is a wish: the only version of a process I trust is the one we ran last night.',
+    usefulness: 81,
+    novelty: 36,
+    combined: 54,
+    theme: { id: 't2', name: 'Rehearsal over planning' },
+    source: { quote: 'The only version of the close I trust is the one we ran last night.', path: 'Work/Nightly close.md', title: 'Nightly close' },
+  },
+  {
+    id: 'i2',
+    statement: 'Buying a flat is mostly a bet that you will want to live in one place for a decade, and that bet got worse.',
+    usefulness: 72,
+    novelty: 31,
+    combined: 47,
+    theme: { id: 't1', name: 'Housing and who it is for' },
+    source: { quote: 'What I wanted was not the flat, it was to stop moving, and I can have that without a mortgage.', path: 'Housing/Why I stopped wanting to buy.md', title: 'Why I stopped wanting to buy' },
+  },
+  {
+    id: 'i3',
+    statement: 'A household budget should be written as the stocks it keeps topped up, with the monthly flows set from how far each one is from full, rather than as a list of categories with a cap on each.',
+    usefulness: 64,
+    novelty: 28,
+    combined: 42,
+    theme: { id: 't4', name: 'Delays in systems' },
+    source: { quote: 'Budget the reservoirs, not the pipes.', path: 'Money/Budget as stocks and flows, a sketch for the app I keep meaning to build.md', title: 'Budget as stocks and flows, a sketch for the app I keep meaning to build' },
+  },
+  {
+    id: 'i4',
+    statement: 'Walking a city at night shows what it is for better than any map of it.',
+    usefulness: 38,
+    novelty: 22,
+    combined: 29,
+    theme: { id: 't5', name: 'Walking' },
+    source: null,
+  },
+  {
+    id: 'i5',
+    statement: 'What a dashboard leaves out is a decision someone made, and it should say so.',
+    usefulness: 0,
+    novelty: 70,
+    combined: 1,
+    theme: null,
+    source: { quote: 'Every chart is an argument about what did not make the cut.', path: 'Work/Dashboards.md', title: 'Dashboards' },
+  },
+];
+
+const ideaCounts: IdeaCounts = { listed: 312, requirements: 41, othersIdeas: 12, descriptions: 9, unscored: 420 };
+
+const ideaList: IdeaListPage = { rows: ideaRows, counts: ideaCounts, sort: 'combined', page: 1, pages: 7 };
+
+function IdeasFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <VaultMapView themes={[]} capped={false} sweep={sweep} mergeLog={mergeLog} view="ideas" ideas={children} />
+  );
+}
+
+export function VaultMapIdeasSurface() {
+  return (
+    <IdeasFrame>
+      <IdeasList state={{ status: 'ready', list: ideaList, jevOn: true }} />
+    </IdeasFrame>
+  );
+}
+
+export function VaultMapIdeasSortSurface() {
+  return (
+    <IdeasFrame>
+      <IdeasList state={{ status: 'ready', list: ideaList, jevOn: true }} menuOpen />
+    </IdeasFrame>
+  );
+}
+
+export function VaultMapIdeasEmptySurface() {
+  return (
+    <IdeasFrame>
+      <IdeasList
+        state={{
+          status: 'ready',
+          jevOn: true,
+          list: {
+            rows: [],
+            counts: { listed: 0, requirements: 0, othersIdeas: 0, descriptions: 0, unscored: 1185 },
+            sort: 'combined',
+            page: 1,
+            pages: 1,
+          },
+        }}
+      />
+    </IdeasFrame>
+  );
+}
+
+export function VaultMapIdeasLoadingSurface() {
+  return (
+    <IdeasFrame>
+      <IdeasLoading sort="combined" />
+    </IdeasFrame>
+  );
+}
+
+export function VaultMapIdeasErrorSurface() {
+  return (
+    <IdeasFrame>
+      <IdeasList
+        state={{
+          status: 'error',
+          sort: 'combined',
+          message: 'Could not read the scored ideas: canceling statement due to statement timeout',
+        }}
+      />
+    </IdeasFrame>
+  );
 }
 
 // ---- Map: one theme --------------------------------------------------------
