@@ -23,8 +23,10 @@ import { isQuietHours } from '@/lib/you/council-texts';
  *     wait, and the morning's first pass sends them as one text.
  *   - A small daily limit. A rule sends at most `dailyLimit` texts on a UTC
  *     day; past it the events wait for tomorrow.
- *   - Pushed only for what needs the person today. A batch with nothing of
- *     the kind `today` marks is saved without a notification.
+ *   - Every text comes with a notification. A text first is one the person
+ *     did not ask for, so it reaches the phone whatever it is about (note
+ *     6a69a1c3); it used to push only a batch holding something to do today,
+ *     and a build shipped or failed sat unseen in the thread.
  *   - Theirs to change. What counts as worth a text is a list of switches on
  *     the person's form (board_advisors.text_when, null for the rule's
  *     defaults). An event of a kind switched off is closed unsent.
@@ -40,12 +42,12 @@ export function isTextKind(value: unknown): value is TextKind {
   return typeof value === 'string' && (TEXT_KINDS as readonly string[]).includes(value);
 }
 
-/** Each kind as the person's form lists it, and whether it is worth a notification today. */
-export const TEXT_KIND_INFO: Record<TextKind, { label: string; hint: string; today: boolean }> = {
-  needs_you: { label: 'A step needs you', hint: 'Something to set up, or a build stuck until you act. With a notification.', today: true },
-  question: { label: 'A question is waiting for your answer', hint: 'With a notification.', today: true },
-  shipped: { label: 'A build shipped', hint: 'In the thread, without a notification.', today: false },
-  failed: { label: 'A build failed or stalled', hint: 'In the thread, without a notification.', today: false },
+/** Each kind as the person's form lists it. Every one is texted with a notification. */
+export const TEXT_KIND_INFO: Record<TextKind, { label: string; hint: string }> = {
+  needs_you: { label: 'A step needs you', hint: 'Something to set up, or a build stuck until you act.' },
+  question: { label: 'A question is waiting for your answer', hint: 'A decision on the plan, or a run asking you.' },
+  shipped: { label: 'A build shipped', hint: 'What reached main.' },
+  failed: { label: 'A build failed or stalled', hint: 'A run that stopped before it finished.' },
 };
 
 /** No text until the newest event has been quiet this long, so a burst becomes one text. */
@@ -143,7 +145,7 @@ export function decideFirstText(input: {
   return {
     send: true,
     bubbles,
-    push: live.some((e) => TEXT_KIND_INFO[e.kind].today),
+    push: true,
     texted: live.map((e) => e.id),
     close,
   };
