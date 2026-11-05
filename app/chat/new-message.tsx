@@ -159,7 +159,7 @@ export function NewMessage({
                       on && 'bg-accent-tint hover:bg-accent-tint disabled:hover:bg-accent-tint',
                     )}
                   >
-                    <PersonMark initials={personInitials(row.name)} colour={row.colour} />
+                    <PersonMark initials={personInitials(row.name)} colour={row.colour} photo={row.photo} />
                     <span className="min-w-0">
                       <span className={cn('block truncate text-body font-semibold', row.canTalk ? 'text-ink' : 'text-ink-muted')}>{row.name}</span>
                       <span className="block truncate text-small text-ink-muted">

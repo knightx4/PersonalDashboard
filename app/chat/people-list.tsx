@@ -152,7 +152,7 @@ export function PeopleList({
         </form>
       </div>
       {hits ? (
-        <SearchResults hits={hits} query={query ?? ''} current={current} wide={currentWide} timezone={timezone} now={now} />
+        <SearchResults hits={hits} rows={rows} query={query ?? ''} current={current} wide={currentWide} timezone={timezone} now={now} />
       ) : (
         // One run, as the reference: the threads newest first, then those never
         // written to, whose quiet "Say hello" is never a line of theirs (sortPeople).
@@ -194,7 +194,7 @@ function PersonItem({
           current && (wide ? 'min-[720px]:bg-accent-tint' : 'bg-accent-tint hover:bg-accent-tint'),
         )}
       >
-        <PersonMark initials={personInitials(row.name)} colour={row.colour} />
+        <PersonMark initials={personInitials(row.name)} colour={row.colour} photo={row.photo} />
         <span className="min-w-0">
           <span className={cn('block truncate text-body text-ink', row.unread ? 'font-bold' : 'font-semibold')}>
             {row.name}
@@ -252,6 +252,7 @@ function GroupItem({ row, current, wide, timezone, now }: { row: GroupRow; curre
 
 function SearchResults({
   hits,
+  rows,
   query,
   current,
   wide,
@@ -259,6 +260,8 @@ function SearchResults({
   now,
 }: {
   hits: readonly SearchHit[];
+  /** Everyone on the list, for each hit's picture. */
+  rows: readonly PersonRow[];
   query: string;
   /** The key of the open thread: its first result is lit, as the open row is. */
   current: string | null;
@@ -267,6 +270,7 @@ function SearchResults({
   now: number;
 }) {
   const lit = hits.find((hit) => hit.key === current)?.id ?? null;
+  const photoOf = new Map(rows.map((r) => [r.key, r.photo ?? null]));
   if (hits.length === 0) {
     return (
       <div className="px-4 py-2">
@@ -296,7 +300,7 @@ function SearchResults({
                 hit.id === lit && (wide ? 'min-[720px]:bg-accent-tint' : 'bg-accent-tint hover:bg-accent-tint'),
               )}
             >
-              <PersonMark initials={personInitials(hit.name)} colour={hit.colour} />
+              <PersonMark initials={personInitials(hit.name)} colour={hit.colour} photo={photoOf.get(hit.key)} />
               <span className="min-w-0">
                 <span className="block truncate text-body font-semibold text-ink">{hit.name}</span>
                 <span className="line-clamp-2 text-small text-ink-muted">

@@ -3,7 +3,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, type PersonRow } from '@/lib/you/chat-threads';
 import { newPersonCard } from '@/lib/you/people-cards-model';
-import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, savePersonCard } from '../actions';
+import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, saveBotPhoto, savePersonCard } from '../actions';
 import { BotsView } from '../bots-view';
 import { PersonForm } from '../people/person-form';
 
@@ -41,7 +41,7 @@ export default async function ChatBotsPage({ searchParams }: { searchParams: Pro
           card={newPersonCard(found.rows.map((r) => r.colour))}
           timezone={settings.timezone}
           now={readAt()}
-          actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory, delete: deletePersonCard }}
+          actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory, delete: deletePersonCard, photo: saveBotPhoto }}
         />
       </BotsView>
     );

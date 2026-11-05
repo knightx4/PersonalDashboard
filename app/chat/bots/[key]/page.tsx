@@ -4,7 +4,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
-import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, savePersonCard } from '../../actions';
+import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, saveBotPhoto, savePersonCard } from '../../actions';
 import { BotsView } from '../../bots-view';
 import { PersonForm } from '../../people/person-form';
 
@@ -41,7 +41,7 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
         card={card}
         timezone={settings.timezone}
         now={readAt()}
-        actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory, delete: deletePersonCard }}
+        actions={{ save: savePersonCard, draft: draftPersonCard, correct: correctPersonMemory, remove: removePersonMemory, delete: deletePersonCard, photo: saveBotPhoto }}
       />
     </BotsView>
   );

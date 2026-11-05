@@ -163,7 +163,7 @@ describe('deletePerson (plan #2879.3)', () => {
       ['left_at', null],
     ]);
     const retired = calls.find((c) => c.table === 'board_advisors' && c.op === 'update');
-    expect(retired?.values).toEqual({ active: false, joins_meetings: false });
+    expect(retired?.values).toEqual({ active: false, joins_meetings: false, photo_path: null });
   });
 
   it('never deletes a seat, nor someone not found', async () => {

@@ -136,6 +136,7 @@ export const youActions: ModuleActions = {
     removePersonMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them; the line is kept, retired.'),
     startChatWith: none('theirs', 'Who the person starts a chat with is their own call on their chats.'),
     deletePersonCard: none('deletes'),
+    saveBotPhoto: none('theirs', "Which picture stands for each bot is the person's own call on their bots; Dash does not change it unasked (plan #2955)."),
     // Group chats (plan #2879.1.3).
     startGroupWith: none('theirs', 'Which bots the person talks to together, and what the group is called, is their own call on their chats.'),
     saveGroup: none('theirs', "A group's name and who is in it are the person's own call on their chats; Dash does not reshape a group unasked."),

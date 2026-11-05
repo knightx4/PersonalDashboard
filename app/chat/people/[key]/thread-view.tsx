@@ -356,7 +356,7 @@ export function ThreadView({
     <MessagingThread
       name={person.name}
       detail={threadDetail(person)}
-      avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} size="sm" />}
+      avatar={<PersonMark initials={personInitials(person.name)} colour={person.colour} photo={person.photo} size="sm" />}
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
       actions={
@@ -478,7 +478,7 @@ export function ThreadView({
 function EmptyThread({ person }: { person: PersonRow }) {
   return (
     <div className="my-auto flex flex-col items-center gap-2 px-4 py-8 text-center">
-      <PersonMark initials={personInitials(person.name)} colour={person.colour} size="lg" />
+      <PersonMark initials={personInitials(person.name)} colour={person.colour} photo={person.photo} size="lg" />
       <p className="mt-1 text-body font-semibold text-ink">{person.name}</p>
       <p className="max-w-xs text-ui text-ink-muted">
         {person.canTalk

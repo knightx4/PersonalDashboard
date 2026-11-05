@@ -342,10 +342,13 @@ export function MessagingPlaceholder({ children }: { children: React.ReactNode }
 export function PersonMark({
   initials,
   colour,
+  photo,
   size = 'md',
 }: {
   initials: string;
   colour?: string;
+  /** A picture the person chose for them (plan #2955), drawn in place of the initials. */
+  photo?: string | null;
   size?: 'sm' | 'md' | 'lg';
 }) {
   return (
@@ -353,14 +356,19 @@ export function PersonMark({
       aria-hidden
       style={colour ? { backgroundColor: colour } : undefined}
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full font-display font-semibold',
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full font-display font-semibold',
         colour ? 'text-white' : 'bg-accent-tint text-accent',
         size === 'lg' && 'size-16 text-title',
         size === 'md' && 'size-11 text-ui',
         size === 'sm' && 'size-8 text-small',
       )}
     >
-      {initials}
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a signed storage link, which the image loader cannot cache
+        <img src={photo} alt="" className="size-full object-cover" />
+      ) : (
+        initials
+      )}
     </span>
   );
 }

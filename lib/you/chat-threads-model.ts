@@ -153,6 +153,8 @@ export type PersonRow = {
    * when nothing failed. The thread says so with Try again.
    */
   replyFailed?: string | null;
+  /** A signed link to the picture the person uploaded for them (plan #2955); null or absent draws their initials. */
+  photo?: string | null;
 };
 
 /** Said when a failed reply kept no reason. */
