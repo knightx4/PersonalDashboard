@@ -9,6 +9,7 @@ import {
   deletePersonCard,
   draftPersonCard,
   removePersonMemory,
+  saveBotPhoto,
   savePersonCard,
   setReachOut,
   turnOffPersonReachOut,
@@ -58,6 +59,7 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
           delete: deletePersonCard,
           setReachOut,
           turnOffReachOut: turnOffPersonReachOut,
+          photo: saveBotPhoto,
         }}
       />
     </BotsView>

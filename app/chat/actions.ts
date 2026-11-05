@@ -6,6 +6,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
+import { setBotPhoto } from '@/lib/you/bot-photos';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
 import {
@@ -276,6 +277,27 @@ export async function draftPersonCard(input: {
   );
   await recordSpendReports(await createCoreClient(), user.id, { module: 'you', operation: 'draft-persona' }, reports);
   return drafted.ok ? { card: drafted.card } : { error: drafted.error };
+}
+
+/**
+ * A bot's picture (plan #2955): point them at the image the form has just
+ * uploaded to their folder of the you-bot-photos bucket, or at none with
+ * null, which draws their initials again. The picture replaced is removed.
+ */
+// latency: pending
+export async function saveBotPhoto(advisorId: string, path: string | null): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  if (path !== null && typeof path !== 'string') return { error: 'That picture was not saved. Try again.' };
+  try {
+    const found = await setBotPhoto(await createYouClient(), user.id, advisorId, path);
+    if (!found) return { error: 'They are not on your list.' };
+    revalidatePath('/chat', 'layout');
+    return { error: null };
+  } catch (error) {
+    console.error('bot picture not saved', error);
+    return { error: path ? 'That picture was not saved. Try again.' : 'The picture was not taken off. Try again.' };
+  }
 }
 
 /** Delete from the Bots tab (plan #2879.3): the bot, its chats and what it remembers. */

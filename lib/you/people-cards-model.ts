@@ -232,6 +232,11 @@ export type PersonCard = {
   texts: TextSwitch[] | null;
   /** What you told them to text you about, and what Dash made of it (plan #2931.3); absent for someone new. */
   reachOut?: ReachOutView;
+  /**
+   * A signed link to the picture the person uploaded for them (plan #2955),
+   * drawn in place of their initials; null or absent for none.
+   */
+  photo?: string | null;
 };
 
 /** A new person's form before anything is typed: the first palette colour nobody uses yet. */

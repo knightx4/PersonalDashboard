@@ -1370,3 +1370,58 @@ describe('reach-out briefs and what was mentioned', () => {
     expect(kept.message_id).toBeNull();
   });
 });
+
+describe("a bot's picture", () => {
+  // migrations-you/0044_bot_photos.sql (plan #2955): board_advisors.photo_path
+  // points into the bot's own folder of the you-bot-photos bucket.
+  let botA = '';
+  let otherBotA = '';
+
+  beforeAll(async () => {
+    const [a, b] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question)
+      values (${userA}, 'photo_bot', 'Photo Bot', 'guest', 'What would you do?'),
+             (${userA}, 'other_photo_bot', 'Other Bot', 'guest', 'What would you do?')
+      returning id`;
+    botA = a.id;
+    otherBotA = b.id;
+  });
+
+  it("keeps a path in the bot's own folder, and clears it back to none", async () => {
+    const path = `${userA}/${botA}/0b6c3f4e-1d2a-4c5b-9e8f-7a6b5c4d3e2f.png`;
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = ${path} where id = ${botA}`);
+    const [row] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(row.photo_path).toBe(path);
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    const [cleared] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(cleared.photo_path).toBeNull();
+  });
+
+  it("refuses a path in another account's folder or under another bot", async () => {
+    const bad = [
+      () => admin`update you.board_advisors set photo_path = ${`${userB}/${botA}/x.png`} where id = ${botA}`,
+      () => admin`update you.board_advisors set photo_path = ${`${userA}/${otherBotA}/x.png`} where id = ${botA}`,
+      () => admin`update you.board_advisors set photo_path = ${`${userA}/${botA}/`} where id = ${botA}`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+
+  it("does not let another account set a bot's picture", async () => {
+    await asUser(userB, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = ${`${userA}/${botA}/a.png`} where id = ${botA}`);
+    await asUser(userB, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    const [row] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(row.photo_path).toBe(`${userA}/${botA}/a.png`);
+  });
+
+  it('keeps each account to its own folder of the you-bot-photos bucket', async () => {
+    const own = (user: string, name: string) =>
+      asUser(user, (tx) => tx<{ ok: boolean }[]>`select you.bot_photo_is_own(${name}) as ok`).then(([row]) => row.ok);
+
+    expect(await own(userA, `${userA}/${botA}/p.png`)).toBe(true);
+    expect(await own(userB, `${userA}/${botA}/p.png`)).toBe(false);
+    expect(await own(userA, `${userA}/p.png`)).toBe(false);
+    expect(await own(userA, `${userA}/${botA}/`)).toBe(false);
+    expect(await own(userA, `${userA}/${botA}/deeper/p.png`)).toBe(false);
+  });
+});
