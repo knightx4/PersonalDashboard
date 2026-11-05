@@ -160,6 +160,17 @@ export const goalsActions: ModuleActions = {
     estimateGoalCapture: none('page'),
     goalCaptureCosts: none('page'),
   },
+  'app/goals/hours/actions.ts': {
+    loadHoursDay: none('page', 'Reads one day for the Hours page drawer.'),
+  },
+  'app/goals/progress-actions.ts': {
+    changeProgressEntry: none(
+      'own',
+      'Corrects hours, a day or a note the person logged, which only they know to be wrong.',
+    ),
+    undoLoggedProgress: none('theirs', 'Undo: takes back their own logged entry.'),
+    restoreLoggedProgress: none('theirs', 'Undo: brings back an entry they just took back.'),
+  },
   'app/goals/mention-actions.ts': {
     dismissMentionAction: none('theirs'),
     undismissMentionAction: none('theirs'),

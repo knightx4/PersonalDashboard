@@ -9,12 +9,13 @@
  * `--conditions react-server` lets lib/jev/client.ts load under plain tsx.
  * Needs TYPESAFE_API_KEY. The sample file is what scripts/sql.ts prints for
  * the query in docs/trials/2026-11-05-idea-score-spread.md: rows of
- * { n, id, statement, basis, sources }, sources as scoreIdea takes them. The
+ * { n, id, statement, basis, sources }, sources as scoreIdea takes them, each
+ * note with its body so the paragraph around the quote is sent (#2947.8). The
  * rules file is the person's obsidian.vault_connections row as scripts/sql.ts
  * prints it; the default rules are used without it.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { scoreIdea, type IdeaScore, type IdeaSource } from '../lib/vault/map/idea-score';
+import { ideaScoreState, scoreIdea, type IdeaScore, type IdeaSource } from '../lib/vault/map/idea-score';
 import { DEFAULT_VAULT_RULES } from '../lib/vault/map/rules';
 import { rulesFromRow } from '../lib/vault/map/vault-rules';
 import { jevApiKey } from '../lib/jev/wire';
@@ -66,6 +67,17 @@ async function main() {
   const rules = rulesPath
     ? rulesFromRow((JSON.parse(readFileSync(rulesPath, 'utf8')) as Record<string, unknown>[])[0] ?? {})
     : DEFAULT_VAULT_RULES;
+
+  const sent = rows.flatMap(
+    (row) => ideaScoreState({ statement: row.statement, basis: row.basis, sources: row.sources ?? [] }, rules).state.passages,
+  );
+  const lengths = sent.flatMap((passage) => (passage.paragraph ? [passage.paragraph.length] : [])).sort((a, b) => a - b);
+  console.log(
+    `Passages sent: ${sent.length}; with a paragraph around the quote: ${lengths.length}` +
+      (lengths.length
+        ? `, ${lengths[0]} to ${lengths[lengths.length - 1]} characters, median ${lengths[Math.floor(lengths.length / 2)]}`
+        : ''),
+  );
 
   const tokens = { input: 0, output: 0 };
   const first = await scoreAll(rows, rules, tokens);
