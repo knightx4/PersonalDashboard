@@ -26,7 +26,18 @@
 export const PASSING_VERDICTS: readonly string[] = ['pass', 'accepted'];
 
 /** One recorded round, as much of a `ui_checks` row as the guard reads. */
-export type CheckRound = { surface: string; round: number; verdict: string };
+export type CheckRound = {
+  surface: string;
+  round: number;
+  verdict: string;
+  /**
+   * The round's answer to "does the layout match the reference", when the
+   * critic was asked (plan #2966.5): true for yes, false for no, null or
+   * absent when the surface has no reference or the round predates the
+   * question.
+   */
+  layout_ok?: boolean | null;
+};
 
 /** A surface that has not passed, and the last thing on record for it. */
 export type UnpassedSurface = {
@@ -34,7 +45,25 @@ export type UnpassedSurface = {
   /** The latest round recorded, or null when there is none. */
   round: number | null;
   verdict: string | null;
+  /** True when the surface's latest layout answer is no, whatever its verdict says. */
+  layoutNo?: true;
 };
+
+/**
+ * The surfaces whose layout is still wrong: their latest round that answered
+ * the layout question said no (plan #2966.5). A later round that answers yes
+ * clears it; a round that never asked, and a settle, do not. The person's
+ * accept writes a round that answers yes.
+ */
+export function layoutBlocked(checks: readonly CheckRound[]): Set<string> {
+  const latest = new Map<string, CheckRound>();
+  for (const check of checks) {
+    if (check.layout_ok === undefined || check.layout_ok === null) continue;
+    const seen = latest.get(check.surface);
+    if (!seen || check.round > seen.round) latest.set(check.surface, check);
+  }
+  return new Set([...latest.values()].filter((c) => c.layout_ok === false).map((c) => c.surface));
+}
 
 /** Runs git with these arguments and returns its stdout; throws when git fails. */
 export type GitRunner = (args: string[]) => string;
@@ -107,17 +136,27 @@ export function unpassedSurfaces(
     const seen = latest.get(check.surface);
     if (!seen || check.round > seen.round) latest.set(check.surface, check);
   }
+  const wrongLayout = layoutBlocked(checks);
   const out: UnpassedSurface[] = [];
   for (const surface of surfaces) {
     const last = latest.get(surface);
-    if (last && PASSING_VERDICTS.includes(last.verdict)) continue;
-    out.push({ surface, round: last?.round ?? null, verdict: last?.verdict ?? null });
+    const layoutNo = wrongLayout.has(surface);
+    if (last && PASSING_VERDICTS.includes(last.verdict) && !layoutNo) continue;
+    out.push({
+      surface,
+      round: last?.round ?? null,
+      verdict: last?.verdict ?? null,
+      ...(layoutNo ? { layoutNo: true as const } : {}),
+    });
   }
   return out;
 }
 
 function describe(missing: UnpassedSurface): string {
   if (missing.round === null) return `${missing.surface} (no round recorded)`;
+  if (missing.layoutNo) {
+    return `${missing.surface} (its layout does not match the reference: a round has to answer yes)`;
+  }
   return `${missing.surface} (round ${missing.round} asked for fixes)`;
 }
 
@@ -153,6 +192,10 @@ export function uiCheckRefusal(input: {
     `npm run ui-guard -- ${input.step} --compare, which settles those that look the same. ` +
     `A surface still failing after round 3 is yours to settle: ` +
     `npm run ui-guard -- ${input.step} --settle "<why>". ` +
+    (missing.some((m) => m.layoutNo)
+      ? `A layout that differs from its reference is not settled; it waits for a round that answers yes ` +
+        `to the layout question, or for the person's answer. `
+      : '') +
     `screen.md, beside building.md in the plan skill, has the loop.`
   );
 }
@@ -186,7 +229,12 @@ export function uiGuardSql(step: number, surfaces: readonly string[], userId?: s
     `  where c.user_id = ${owner} and c.step = ${step} and c.surface = s.surface`,
     '  order by c.round desc limit 1',
     ') last on true',
-    `where last.verdict is null or last.verdict not in (${passing});`,
+    'left join lateral (',
+    '  select (c.layout->>\'ok\')::boolean as ok from ui_checks c',
+    `  where c.user_id = ${owner} and c.step = ${step} and c.surface = s.surface and c.layout is not null`,
+    '  order by c.round desc limit 1',
+    ') lay on true',
+    `where last.verdict is null or last.verdict not in (${passing}) or lay.ok is false;`,
   ].join('\n');
 }
 
@@ -223,7 +271,7 @@ export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
     "      or strpos(reverse(p.comment), reverse('Answered ')) < strpos(reverse(p.comment), reverse('Blocked ')))",
     '  limit 1',
     '), waiting as (',
-    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    '  select s.surface, coalesce(last.round, 0) + 1 as round, lay.ok is not null as has_layout',
     `  from unnest(array[${list}]::text[]) as s(surface)`,
     '  cross join step',
     '  left join lateral (',
@@ -231,11 +279,18 @@ export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
     `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
     '    order by c.round desc limit 1',
     '  ) last on true',
-    `  where last.verdict is null or last.verdict not in (${passing})`,
+    '  left join lateral (',
+    "    select (c.layout->>'ok')::boolean as ok from ui_checks c",
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface and c.layout is not null`,
+    '    order by c.round desc limit 1',
+    '  ) lay on true',
+    `  where last.verdict is null or last.verdict not in (${passing}) or lay.ok is false`,
     ')',
-    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots, layout)',
     `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
-    "  'Accepted by you: ' || step.answer, '{}'::text[]",
+    "  'Accepted by you: ' || step.answer, '{}'::text[],",
+    // The person's answer is the one thing that clears a layout that differs.
+    "  case when waiting.has_layout then '{\"ok\": true, \"answer\": \"Accepted by you.\"}'::jsonb end",
     'from waiting cross join step',
     'returning surface, round;',
   ].join('\n');

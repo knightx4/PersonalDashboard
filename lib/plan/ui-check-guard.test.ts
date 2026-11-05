@@ -6,6 +6,7 @@ import {
   uiGuardSql,
   uiSettleSql,
   unpassedSurfaces,
+  layoutBlocked,
   type GitRunner,
 } from './ui-check-guard';
 
@@ -110,6 +111,41 @@ describe('unpassedSurfaces', () => {
       { surface: 'b', round: null, verdict: null },
       { surface: 'a', round: 3, verdict: 'fix' },
     ]);
+  });
+});
+
+describe('layout answers (plan #2966.5)', () => {
+  it('keeps a surface waiting while its latest layout answer is no, even after a pass or a settle', () => {
+    const rounds = [
+      { surface: 'people', round: 1, verdict: 'fix', layout_ok: false },
+      { surface: 'people', round: 2, verdict: 'accepted', layout_ok: null },
+    ];
+    expect(layoutBlocked(rounds)).toEqual(new Set(['people']));
+    expect(unpassedSurfaces(['people'], rounds)).toEqual([
+      { surface: 'people', round: 2, verdict: 'accepted', layoutNo: true },
+    ]);
+  });
+
+  it('clears when a later round answers yes', () => {
+    const rounds = [
+      { surface: 'people', round: 1, verdict: 'fix', layout_ok: false },
+      { surface: 'people', round: 2, verdict: 'pass', layout_ok: true },
+    ];
+    expect(unpassedSurfaces(['people'], rounds)).toEqual([]);
+  });
+
+  it('refuses the close and says what clears it', () => {
+    const why = uiCheckRefusal({
+      step: 1,
+      files: ['app/people/page.tsx'],
+      surfaces: ['people'],
+      checks: [{ surface: 'people', round: 1, verdict: 'fix', layout_ok: false }],
+    });
+    expect(why).toContain('layout does not match the reference');
+  });
+
+  it('puts the layout in the connector guard sql', () => {
+    expect(uiGuardSql(5, ['people'])).toContain('lay.ok is false');
   });
 });
 

@@ -458,7 +458,7 @@ async function doneRefusal(
   }
   const checks = inputs.surfaces.length
     ? await sql<CheckRound[]>`
-        select surface, round, verdict from ui_checks
+        select surface, round, verdict, (layout->>'ok')::boolean as layout_ok from ui_checks
         where user_id = ${userId} and step = ${number}`
     : [];
   return uiCheckRefusal({ step: number, ...inputs, checks });

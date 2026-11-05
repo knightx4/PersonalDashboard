@@ -60,6 +60,14 @@ export type CriticQuestion = (typeof CRITIC_QUESTIONS)[number];
 export type CriticAnswer = { answer: string; ok: boolean };
 export type CriticAnswers = Record<CriticQuestion, CriticAnswer>;
 
+/**
+ * The layout question, asked when the surface has a reference (plan #2966.5):
+ * do the panes, where the list and the content sit, and what each row holds
+ * match the reference? `ok` false fails the round whatever the laws say, and
+ * the screen is wired only after a round that answers yes.
+ */
+export type CriticLayout = CriticAnswer;
+
 export type CriticVerdict = {
   surface: string;
   round: number;
@@ -68,6 +76,8 @@ export type CriticVerdict = {
   earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
   questions: CriticAnswers;
+  /** Present on a round for a surface with a reference; null otherwise. */
+  layout: CriticLayout | null;
 };
 
 /** The row a round writes, with the user and the shot paths filled in later. */
@@ -81,6 +91,7 @@ export type UiCheckRow = {
   earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
   questions: CriticAnswers;
+  layout: CriticLayout | null;
   shots: string[];
   commit_sha: string | null;
 };
@@ -153,7 +164,13 @@ function text(value: unknown, field: string): string {
  * gives it and for the surface and round it was saved under. Nothing is
  * rewritten: a verdict that does not fit is refused, never repaired.
  */
-export function parseVerdict(raw: string, surface: string, round: number): CriticVerdict {
+export function parseVerdict(
+  raw: string,
+  surface: string,
+  round: number,
+  /** True when the surface has a reference registered, so the layout question must be answered. */
+  hasReference = false,
+): CriticVerdict {
   let data: unknown;
   try {
     data = JSON.parse(raw);
@@ -205,7 +222,31 @@ export function parseVerdict(raw: string, surface: string, round: number): Criti
   if (v.verdict === 'pass' && !questions.eye.ok) {
     throw new Error('The verdict passes a screen whose first answer says the eye has no clear place to go; that is a fix.');
   }
-  return { surface, round, verdict: v.verdict, fixes, earlier, notes, questions };
+  const layout = parseLayout(v.layout, hasReference);
+  // A layout that differs fails the round whatever the laws say (plan #2966.5).
+  if (v.verdict === 'pass' && layout && !layout.ok) {
+    throw new Error('The verdict passes a screen whose layout answer says it does not match the reference; that is a fix.');
+  }
+  return { surface, round, verdict: v.verdict, fixes, earlier, notes, questions, layout };
+}
+
+/** The `layout` answer: required for a surface with a reference, kept when given for one without. */
+function parseLayout(value: unknown, hasReference: boolean): CriticLayout | null {
+  if (value === undefined || value === null) {
+    if (hasReference) {
+      throw new Error(
+        'This surface has a reference, so the verdict has to answer the layout question: ' +
+          '"layout": { "answer": "...", "ok": true or false }.',
+      );
+    }
+    return null;
+  }
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('The verdict layout is not an object.');
+  const a = value as Record<string, unknown>;
+  const answer = text(a.answer, 'layout answer');
+  if (!answer.trim()) throw new Error('The verdict\'s layout answer is empty.');
+  if (typeof a.ok !== 'boolean') throw new Error('The verdict\'s layout answer has no ok of true or false.');
+  return { answer, ok: a.ok };
 }
 
 /** The `questions` object: all three answered, each with its words and `ok`. */
@@ -245,6 +286,7 @@ export function checkRow(
     earlier: verdict.earlier,
     notes: verdict.notes,
     questions: verdict.questions,
+    layout: verdict.layout,
     shots,
     commit_sha: commitSha,
   };
@@ -278,16 +320,18 @@ export function connectorSql(row: UiCheckRow): string {
     ? `array[${row.shots.map((s) => `'${s.replace(/'/g, '')}'`).join(', ')}]::text[]`
     : `'{}'::text[]`;
   return [
-    'insert into ui_checks (user_id, step, note_id, surface, round, verdict, fixes, earlier, notes, questions, shots, commit_sha)',
+    'insert into ui_checks (user_id, step, note_id, surface, round, verdict, fixes, earlier, notes, questions, layout, shots, commit_sha)',
     `select ${owner}, ${row.step ?? 'null'}, ${row.note_id ? `'${row.note_id}'::uuid` : 'null'},`,
     `  '${row.surface}', ${row.round}, '${row.verdict}',`,
     `  ${encoded(JSON.stringify(row.fixes))}::jsonb,`,
     `  ${encoded(JSON.stringify(row.earlier))}::jsonb,`,
     `  ${row.notes === null ? 'null' : encoded(row.notes)},`,
     `  ${encoded(JSON.stringify(row.questions))}::jsonb,`,
+    `  ${row.layout === null ? 'null' : `${encoded(JSON.stringify(row.layout))}::jsonb`},`,
     `  ${shots}, ${row.commit_sha ? `'${row.commit_sha.replace(/[^0-9a-f]/gi, '')}'` : 'null'}`,
     `on conflict ${conflict} do update set verdict = excluded.verdict, fixes = excluded.fixes,`,
     '  earlier = excluded.earlier, notes = excluded.notes, questions = excluded.questions,',
+    '  layout = excluded.layout,',
     '  commit_sha = excluded.commit_sha,',
     '  shots = case when cardinality(excluded.shots) > 0 then excluded.shots else ui_checks.shots end',
     'returning id, surface, round, verdict, jsonb_array_length(fixes) as fixes;',

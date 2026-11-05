@@ -54,6 +54,7 @@ import {
   isScreenFile,
   uiAcceptSql,
   uiCheckRefusal,
+  layoutBlocked,
   uiGuardSql,
   uiSettleSql,
   type CheckRound,
@@ -186,7 +187,17 @@ async function main(): Promise<void> {
     if (compare.length > 0) {
       console.log(`Shots match main's on ${compare.length === 1 ? compare[0] : `all ${compare.length}: ${compare.join(', ')}`}.`);
     }
-    const statement = uiSettleSql(step, surfaces, settle);
+    // A layout that differs from its reference is not the builder's to settle (plan #2966.5).
+    const wrongLayout = layoutBlocked(checks);
+    const settleable = surfaces.filter((s) => !wrongLayout.has(s));
+    if (wrongLayout.size > 0) {
+      console.log(
+        `Not settled: ${[...wrongLayout].join(', ')} ${wrongLayout.size === 1 ? 'differs' : 'differ'} from the ` +
+          `reference in layout. Fix the layout and run a round that answers yes, or leave it for the person's answer.`,
+      );
+    }
+    const statement = uiSettleSql(step, settleable, settle);
+    if (!statement) return;
     if (!databaseUrl) {
       console.log('\nRun this through the Supabase connector. It settles each surface still waiting.\n');
       console.log(statement);
@@ -309,7 +320,7 @@ async function stepRounds(databaseUrl: string, step: number): Promise<CheckRound
   const sql = connect(databaseUrl);
   try {
     return await sql<CheckRound[]>`
-      select c.surface, c.round, c.verdict from ui_checks c
+      select c.surface, c.round, c.verdict, (c.layout->>'ok')::boolean as layout_ok from ui_checks c
       where c.step = ${step}
         and c.user_id = (select p.user_id from plan_items p where p.number = ${step} limit 1)`;
   } finally {

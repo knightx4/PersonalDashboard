@@ -270,6 +270,19 @@ A reference link given with no pictures has not been photographed yet: answer
 with the fix `no shots`, the same as for a missing shot, so the builder saves
 the pictures first.
 
+## Layout against the reference
+
+Do this section only when the prompt gives a reference, on every round, before
+anything else about it. Answer in the verdict's `layout` field whether the
+layout matches the reference: the panes (one or two, and which side), where
+the list and the content sit, and what each row holds. Look at the 1280 shots
+first, then the phone ones. `ok` is true only when a person laid the two side
+by side would say the same structure is drawn; colour, type and data
+differences do not count here. A full-width list against a two-pane mockup is
+`ok: false`. When `ok` is false the verdict is `fix`, whatever else passes,
+with a fix naming the difference and `"breaks": "reference"`. Give no
+`layout` field when the prompt's reference is "none".
+
 ## Hidden parts
 
 Do this section only when the prompt lists hidden parts. The hidden-parts
@@ -376,6 +389,10 @@ block, so it must parse, and nothing after it.
   ],
   "earlier": [],
   "notes": "",
+  "layout": {
+    "answer": "Two panes: the conversation list on the left and the open thread on the right, as in the reference.",
+    "ok": true
+  },
   "questions": {
     "eye": {
       "answer": "The contact's name, the largest and darkest text on the page, which is what the page is for.",
@@ -415,6 +432,9 @@ block, so it must parse, and nothing after it.
   `{ "where": "...", "done": true }`. Empty on round 1.
 - `notes` is for what you noticed that no law or preference covers. It never
   fails a screen.
+- `layout` is `{ "answer": "...", "ok": true }`, present only when the prompt
+  gives a reference (see above); the recorder refuses a verdict without it on
+  a surface that has one, and refuses a pass whose `ok` is false.
 - `questions` has all three answers, `eye`, `competition` and `lines`, each
   `{ "answer": "...", "ok": true }`. The answer is a sentence saying what you
   saw, not "yes" alone. A verdict missing any of the three is refused when
