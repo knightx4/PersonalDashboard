@@ -9,6 +9,7 @@ import { MAX_MOCKUP_HTML, mockupDocument, parseMockup, turnMockups } from '@/lib
 import type { NewTalkTurn, TalkSubject } from '@/lib/talk/talk';
 import { turnThought } from '@/lib/talk/thought';
 import { answerQuestion, askDash, ASK_VOICE, thinkVoice, type AskStores } from './ask';
+import { MAX_WEB_SEARCHES } from './web-search';
 import { THINK_EFFORT, THINK_MODEL, THINK_RULES, THINK_TIME_BUDGET_MS, thoughtCost, type ThinkDeps } from './think';
 import { cleanPath, MAX_CODE_CHARS, readCode, searchCode } from './think-code';
 
@@ -178,7 +179,7 @@ describe('answerQuestion with Think it through', () => {
     expect(JSON.stringify(sent[1].messages.at(-1))).toContain('Dev belongs to the owner');
   });
 
-  it('with the switch off, asks as before: the chosen model, no effort, no web search, no think tools', async () => {
+  it('with the switch off, asks as before: the chosen model, no effort, Ask\'s own web search, no think tools', async () => {
     const { client, sent } = stubClient([
       { content: [use('u1', 'answer', { answer: 'Sonnet.', cited: [] })], stop_reason: 'tool_use', usage: USAGE },
     ]);
@@ -192,7 +193,8 @@ describe('answerQuestion with Think it through', () => {
     expect(sent[0].model).toBe(SONNET);
     expect(sent[0].output_config).toBeUndefined();
     const names = sent[0].tools.map((tool) => tool.name);
-    expect(names).not.toContain('web_search');
+    // Ask's own search, capped lower than thinking's (plan #2861).
+    expect(sent[0].tools.find((tool) => tool.name === 'web_search')).toMatchObject({ max_uses: MAX_WEB_SEARCHES });
     expect(names).not.toContain('read_code');
     expect(names).not.toContain('show_mockup');
     expect(sent[0].system[0].text).not.toContain(THINK_RULES);

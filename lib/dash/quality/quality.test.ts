@@ -11,6 +11,22 @@ function answered(body: string, extra: Partial<Extract<CaseOutcome, { ok: true }
 }
 
 describe('grading an answer', () => {
+  it('holds a web case to a search and a cited page, and a rows case to no search (plan #2861)', () => {
+    const page = { table: 'web', ref: 'https://jev.example/', title: 'Jev (jev.example)', href: 'https://jev.example/' };
+    const cited = parseExpect({ web: 'cited' });
+    expect(gradeAnswer(cited, answered('Jev is an app.', { citations: [page], webSearches: 1 }))).toEqual([]);
+    expect(gradeAnswer(cited, answered('Jev is an app.'))).toEqual([
+      'The answer never searched the web.',
+      'The answer cites no web page.',
+    ]);
+    const none = parseExpect({ web: 'none' });
+    expect(gradeAnswer(none, answered('You spent $40.'))).toEqual([]);
+    expect(gradeAnswer(none, answered('You spent $40.', { webSearches: 2 }))).toEqual([
+      'It searched the web 2 times for a question their rows answer.',
+    ]);
+    expect(parseExpect({ web: 'sometimes' }).web).toBeUndefined();
+  });
+
   it('passes an answer that shows what the case expects', () => {
     const expect_ = parseExpect({ mentions_all: ['northwind'], cites_any: ['Northwind'], max_lookups: 4 });
     expect(gradeAnswer(expect_, answered('You applied to one role at Northwind.'))).toEqual([]);

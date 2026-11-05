@@ -12,6 +12,7 @@ import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
 import { whenDate, whenWeekday } from '@/lib/core/when';
 import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
+import { searchedPages, textCitedPages } from './web-search';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -178,9 +179,11 @@ export type DashVoice = {
   tools: readonly DashTool[];
   /**
    * Anthropic's own tools, run on their side, sent ahead of the registry
-   * tools: Maya's web search (plan #1479). A voice with any is let choose
-   * between them and its tools each round rather than made to call one, and
-   * asked once more for its answer if it stops without one.
+   * tools: Maya's web search (plan #1479), and Ask's and People's (plan
+   * #2861, lib/dash/web-search.ts), whose pages an answer cites as rows. A
+   * voice with any is let choose between them and its tools each round
+   * rather than made to call one, and asked once more for its answer if it
+   * stops without one.
    */
   serverTools?: readonly Anthropic.ToolUnion[];
   /**
@@ -1092,7 +1095,12 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     });
     inputTokens += budgetTokens(usage, previousPrompt);
     previousPrompt = usage.inputTokens + usage.cacheWriteTokens + usage.cachedInputTokens;
-    if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
+    if (choose) {
+      const content = response.content as { type: string; content?: unknown; citations?: unknown }[];
+      webCited.push(...citedSearchText(content));
+      // Pages a search returned may be cited, as rows a lookup returned may (plan #2861).
+      for (const page of searchedPages(content)) known.set(citationKey(page), page);
+    }
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
     const answered = uses.find((c) => c.name === finishName);
@@ -1246,7 +1254,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       if (uses.length === 0 && text && stopped !== 'max_tokens') {
         const stop: DashStop = limit ?? 'answered';
         const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
-        return { ok: true, body: `${text.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
+        const pages = textCitedPages(response.content as { type: string; citations?: unknown }[]);
+        return { ok: true, body: `${text.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: pages, stop };
       }
       // Told to answer and made more lookups instead, which is how a jobs
       // question failed after five rounds of lookups ("stopped: tool_use").

@@ -1,3 +1,4 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import type { AskToolResult } from '@/lib/ask/db';
 import { ASK_ACTION_RULES } from '@/lib/dash/ask';
 import type { DashProposer, DashQueuer, DashSeen, DashWriter } from '@/lib/dash/loop';
@@ -11,6 +12,7 @@ import {
   type DashWriteTool,
 } from '@/lib/dash/registry';
 import { CHART_TOOL } from '@/lib/talk/chart';
+import { dashWebSearch, WEB_RULES } from '@/lib/dash/web-search';
 import type { DashChange, MadeDashChange, NewDashChange, PeopleCause } from '@/lib/talk/changes';
 
 /**
@@ -42,6 +44,22 @@ import type { DashChange, MadeDashChange, NewDashChange, PeopleCause } from '@/l
 export const PEOPLE_TOOLS: readonly DashTool[] = ASK_DASH_TOOLS.filter(
   (tool) => tool.kind !== 'handoff' && tool.name !== CHART_TOOL,
 );
+
+/**
+ * The tools run on Anthropic's side that every person on People has beside
+ * PEOPLE_TOOLS (plan #2861): web search, so the builder or the CFO can look
+ * something up mid-chat. Ask's search, for the model they answer with.
+ */
+export function peopleServerTools(model: string): Anthropic.ToolUnion[] {
+  return [dashWebSearch(model)];
+}
+
+/**
+ * What a person on People is told about the web: Ask's rules, and that a
+ * text names its source, since a thread shows no citations under it.
+ */
+export const PEOPLE_WEB_RULES = `${WEB_RULES} In a text, also name the site a fact came
+from and give its link, since nothing is shown under a text.`;
 
 /**
  * What a person on People is told about acting, after their own card and

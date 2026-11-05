@@ -1,5 +1,6 @@
 import type { TalkCitation, TalkToolCall } from '@/lib/talk/talk';
 import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
+import { WEB_TABLE } from '@/lib/dash/web-search';
 
 /**
  * Grading one answer of the nightly Dash check (supabase/migrations/0277).
@@ -30,6 +31,11 @@ export type CaseExpect = {
   allow_failed_lookups?: boolean;
   /** Tools the answer must have called, each at least once and without a refusal. */
   calls_all?: string[];
+  /**
+   * The web (plan #2861): 'cited', the answer searched and cites a page it
+   * found; 'none', it made no search, for a question their rows answer.
+   */
+  web?: 'cited' | 'none';
 };
 
 /** What one run of a case gave back. */
@@ -41,6 +47,8 @@ export type CaseOutcome =
       citations: readonly TalkCitation[];
       toolCalls: readonly TalkToolCall[];
       seconds: number;
+      /** The web searches the answer made, from its spend; absent when not counted. */
+      webSearches?: number;
     }
   | { ok: false; detail: string; toolCalls: readonly TalkToolCall[]; seconds: number };
 
@@ -76,6 +84,7 @@ export function parseExpect(raw: unknown): CaseExpect {
     max_seconds: parsedNumber(r.max_seconds),
     allow_failed_lookups: r.allow_failed_lookups === true,
     calls_all: parsedList(r.calls_all),
+    web: r.web === 'cited' || r.web === 'none' ? r.web : undefined,
   };
 }
 
@@ -142,6 +151,14 @@ export function gradeAnswer(expect: CaseExpect, outcome: CaseOutcome): string[] 
   }
   if (expect.cites_any && !expect.cites_any.some((t) => cited.some((title) => title.includes(t.toLowerCase())))) {
     failures.push(`No cited row matches ${expect.cites_any.map((t) => `"${t}"`).join(', ')}.`);
+  }
+  const searches = outcome.webSearches ?? 0;
+  if (expect.web === 'cited') {
+    if (searches === 0) failures.push('The answer never searched the web.');
+    if (!outcome.citations.some((c) => c.table === WEB_TABLE)) failures.push('The answer cites no web page.');
+  }
+  if (expect.web === 'none' && searches > 0) {
+    failures.push(`It searched the web ${searches} time${searches === 1 ? '' : 's'} for a question their rows answer.`);
   }
   if (expect.min_chars !== undefined && body.length < expect.min_chars) {
     failures.push(`The answer is ${body.length} characters, fewer than the ${expect.min_chars} it should run to.`);

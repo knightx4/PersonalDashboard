@@ -1083,10 +1083,11 @@ function Cited({ citations, added = false }: { citations: readonly TalkCitation[
               <span className="min-w-0 truncate">{citation.title}</span>
             </Link>
           ) : (
-            // A message Dash searched in Gmail (plan #1316): it opens there, in a new tab.
+            // A message Dash searched in Gmail (plan #1316), or a page it found on
+            // the web (plan #2861): it opens there, in a new tab.
             <a href={citation.href} target="_blank" rel="noopener noreferrer" className={CITED_LINK}>
               <span className="min-w-0 truncate">{citation.title}</span>
-              <span className="sr-only"> (opens in Gmail)</span>
+              <span className="sr-only">{citation.table === 'web' ? ' (opens the page in a new tab)' : ' (opens in Gmail)'}</span>
             </a>
           )}
         </li>

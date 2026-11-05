@@ -167,7 +167,16 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         await recordSpend(core, userId, { module: 'core', operation: OPERATION, model: report.model, usage: report.usage });
       }
       const outcome = answer.ok
-        ? { ok: true as const, body: answer.body, stop: answer.stop, citations: answer.citations, toolCalls: answer.toolCalls, seconds }
+        ? {
+            ok: true as const,
+            body: answer.body,
+            stop: answer.stop,
+            citations: answer.citations,
+            toolCalls: answer.toolCalls,
+            seconds,
+            // Searches run on Anthropic's side, so only the spend counts them (plan #2861).
+            webSearches: spent.reduce((sum, report) => sum + (report.usage.webSearchRequests ?? 0), 0),
+          }
         : { ok: false as const, detail: answer.detail, toolCalls: answer.toolCalls, seconds };
       return { outcome, costMicros };
     },
