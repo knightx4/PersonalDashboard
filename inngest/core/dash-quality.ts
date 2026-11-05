@@ -1,5 +1,6 @@
 import 'server-only';
 
+import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createServiceSchemaSupabase, createServiceSupabase } from '@/inngest/supabase-admin';
@@ -8,11 +9,12 @@ import { executeAskTool } from '@/lib/ask/tools';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { CoreOperation } from '@/lib/core/spend/operations';
-import { costMicrosFor, type SpendReport } from '@/lib/core/spend/pricing';
+import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { answerQuestion } from '@/lib/dash/ask';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import { runModelCheck, type ModelCheckPorts } from '@/lib/dash/quality/model-replies';
 import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
 import { readMail } from '@/lib/inbox/read-mail';
@@ -298,6 +300,78 @@ export async function runDashQualityCheck(trigger: DashQualityTrigger, only: str
   return runDashQuality(dashQualityPorts(core), {
     trigger,
     only,
+    deploy: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
+  });
+}
+
+const MODEL_OPERATION: CoreOperation = 'check-model-replies';
+
+/**
+ * The daily model reply check's ports (lib/dash/quality/model-replies.ts,
+ * plan #2937.7): each probe sent as written, its tokens kept as spend, and
+ * the run kept in core.dash_eval_runs under trigger 'models'. It reads none
+ * of the person's rows; the owner is only whose spend and note it is.
+ */
+export function modelCheckPorts(core: CoreSupabaseClient): ModelCheckPorts {
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+  const quality = dashQualityPorts(core);
+  let client: Anthropic | null = null;
+
+  return {
+    owner: () => quality.owner(),
+
+    async call(request) {
+      if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
+      client ??= new Anthropic({ apiKey, maxRetries: 1 });
+      const started = Date.now();
+      const options = request.beta.length > 0 ? { headers: { 'anthropic-beta': request.beta.join(',') } } : undefined;
+      try {
+        const reply = await client.messages.create(request.params, options);
+        return { ok: true, reply, usage: usageFrom(reply.usage), seconds: (Date.now() - started) / 1000 };
+      } catch (err) {
+        if (err instanceof Anthropic.APIError) {
+          return { ok: false, status: typeof err.status === 'number' ? err.status : null, message: err.message, seconds: (Date.now() - started) / 1000 };
+        }
+        throw err;
+      }
+    },
+
+    async spend(userId, model, usage) {
+      await recordSpend(core, userId, { module: 'core', operation: MODEL_OPERATION, model, usage });
+    },
+
+    async start(row) {
+      const { data, error } = await core
+        .from('dash_eval_runs')
+        .insert({ user_id: row.userId, trigger: 'models', model: row.models, deploy: row.deploy })
+        .select('id')
+        .single();
+      if (error || !data) throw new Error(`Starting the run failed: ${error?.message ?? 'no id'}`);
+      return String((data as { id: string }).id);
+    },
+
+    async finish(id, row) {
+      const { error } = await core
+        .from('dash_eval_runs')
+        .update({
+          finished_at: new Date().toISOString(),
+          cases: row.cases,
+          passed: row.passed,
+          results: row.results,
+          cost_micros: row.costMicros,
+          note_id: row.noteId,
+          error: row.error,
+        })
+        .eq('id', id);
+      if (error) throw new Error(`Saving the run failed: ${error.message}`);
+    },
+
+    writeNote: (userId, body) => quality.writeNote(userId, body),
+  };
+}
+
+export async function runModelReplyCheck() {
+  return runModelCheck(modelCheckPorts(createCoreServiceSupabase()), {
     deploy: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? null,
   });
 }
