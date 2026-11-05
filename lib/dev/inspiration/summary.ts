@@ -2,10 +2,10 @@ import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import { timestampedTranscript } from './takeaways';
 import { MODELS } from '@/lib/core/models';
 
@@ -62,18 +62,15 @@ export async function summariseVideo(input: {
       model: SUMMARY_MODEL,
       max_tokens: 600,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the points the video makes.',
-          input_schema: {
-            type: 'object',
-            properties: { points: { type: 'array', maxItems: MAX_POINTS, items: { type: 'string' } } },
-            required: ['points'],
-          },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the points the video makes.',
+        input_schema: {
+          type: 'object',
+          properties: { points: { type: 'array', maxItems: MAX_POINTS, items: { type: 'string' } } },
+          required: ['points'],
         },
-      ],
-      tool_choice: forceTool(TOOL, SUMMARY_MODEL),
+      }, SUMMARY_MODEL),
       messages: [
         {
           role: 'user',
@@ -82,8 +79,8 @@ export async function summariseVideo(input: {
       ],
     });
     input.onSpend?.({ model: SUMMARY_MODEL, usage: usageFrom(response.usage) });
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
-    return block && block.type === 'tool_use' ? readSummaryReply(block.input) : null;
+    const block = readReport(response, TOOL, SUMMARY_MODEL);
+    return block.ok ? readSummaryReply(block.value) : null;
   } catch {
     return null;
   }

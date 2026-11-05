@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MAX_EVIDENCE, MAX_OBSERVATIONS, type RawObservation } from './observations';
 import { MODELS } from '@/lib/core/models';
 
@@ -92,36 +93,33 @@ export async function writeObservations(
     model: OBSERVATIONS_MODEL,
     max_tokens: 2000 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: `Report what you noticed: up to ${MAX_OBSERVATIONS} observations, or an empty list.`,
-        input_schema: {
-          type: 'object',
-          properties: {
-            observations: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  sentence: { type: 'string' },
-                  evidence: { type: 'array', items: { type: 'string' } },
-                },
-                required: ['sentence', 'evidence'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: `Report what you noticed: up to ${MAX_OBSERVATIONS} observations, or an empty list.`,
+      input_schema: {
+        type: 'object',
+        properties: {
+          observations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                sentence: { type: 'string' },
+                evidence: { type: 'array', items: { type: 'string' } },
               },
+              required: ['sentence', 'evidence'],
             },
           },
-          required: ['observations'],
         },
+        required: ['observations'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, OBSERVATIONS_MODEL),
+    }, OBSERVATIONS_MODEL),
     messages: [{ role: 'user', content: `${observationsPrompt(input)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: OBSERVATIONS_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return [];
-  const reported = (block.input as { observations?: unknown }).observations;
+  const report = readReport(response, TOOL_NAME, OBSERVATIONS_MODEL);
+  if (!report.ok) return [];
+  const reported = (report.value as { observations?: unknown }).observations;
   return Array.isArray(reported) ? (reported as RawObservation[]) : [];
 }

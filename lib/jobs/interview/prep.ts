@@ -23,12 +23,13 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 import { PREP_MISSING_LABEL, type PrepContext } from './prep-context';
 import { parsePrepPayload, type PrepResult } from './prep-payload';
 import { MODELS } from '@/lib/core/models';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 
 /** Reading a room off a handful of rows is judgment, not retrieval. */
 const MODEL = MODELS.jobsInterviewPrep;
@@ -274,56 +275,53 @@ export async function writePrepNote(
           cache_control: { type: 'ephemeral' },
         },
       ],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the prep note, section by section.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              round_summary: { type: 'string' },
-              interviewers: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    contact_id: { type: 'string' },
-                    note: { type: 'string' },
-                  },
-                  required: ['contact_id', 'note'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the prep note, section by section.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            round_summary: { type: 'string' },
+            interviewers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  contact_id: { type: 'string' },
+                  note: { type: 'string' },
                 },
+                required: ['contact_id', 'note'],
               },
-              points: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    requirement_index: { type: 'integer', minimum: 0 },
-                    note: { type: 'string' },
-                  },
-                  required: ['requirement_index', 'note'],
-                },
-              },
-              stories: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    evidence_item_id: { type: 'string' },
-                    note: { type: 'string' },
-                  },
-                  required: ['evidence_item_id', 'note'],
-                },
-              },
-              prior_rounds_note: { type: ['string', 'null'] },
-              questions_to_ask: { type: 'array', items: { type: 'string' } },
-              missing: { type: 'array', items: { type: 'string' } },
             },
-            required: ['round_summary', 'questions_to_ask', 'missing'],
+            points: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  requirement_index: { type: 'integer', minimum: 0 },
+                  note: { type: 'string' },
+                },
+                required: ['requirement_index', 'note'],
+              },
+            },
+            stories: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  evidence_item_id: { type: 'string' },
+                  note: { type: 'string' },
+                },
+                required: ['evidence_item_id', 'note'],
+              },
+            },
+            prior_rounds_note: { type: ['string', 'null'] },
+            questions_to_ask: { type: 'array', items: { type: 'string' } },
+            missing: { type: 'array', items: { type: 'string' } },
           },
+          required: ['round_summary', 'questions_to_ask', 'missing'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -342,12 +340,10 @@ export async function writePrepNote(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TOOL_NAME,
-  );
-  if (!report || report.type !== 'tool_use') {
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
     return { ok: false, error: 'No prep note came back.' };
   }
 
-  return parsePrepPayload(report.input, context, input.banned ?? []);
+  return parsePrepPayload(report.value, context, input.banned ?? []);
 }

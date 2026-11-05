@@ -21,11 +21,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import type { MemoryRpcClient, QuestionEmbedder } from '@/lib/memory/search';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import {
   APPLICATION_DRAFT_TOOL,
   mergeApplicationDrafts,
@@ -273,8 +274,7 @@ export async function draftApplicationAnswers(
             model: MODEL,
             max_tokens: maxTokens,
             system,
-            tools: [TOOL],
-            tool_choice: forceTool(APPLICATION_DRAFT_TOOL, MODEL),
+            ...reportRequest(TOOL, MODEL),
             messages,
           },
           left !== null ? { timeout: Math.max(10_000, left), maxRetries: 0 } : undefined,
@@ -301,12 +301,12 @@ export async function draftApplicationAnswers(
   if ((first.message.stop_reason as string) === 'refusal') {
     return { ok: false, error: 'Dash could not draft these answers.' };
   }
-  const report = toolBlockIn(first.message, APPLICATION_DRAFT_TOOL);
-  if (!report || report.type !== 'tool_use') {
-    console.error('draft application:', whyNoReport(first.message));
+  const report = readReport(first.message, APPLICATION_DRAFT_TOOL, MODEL);
+  if (!report.ok) {
+    console.error('draft application:', report.reason);
     return { ok: false, error: 'No drafts came back.' };
   }
-  const parsed = parseApplicationDraftPayload(report.input, { ...context, requested: selectedIds });
+  const parsed = parseApplicationDraftPayload(report.value, { ...context, requested: selectedIds });
   if (!parsed.ok) return parsed;
 
   const answers = parsed.payload.answers;
@@ -315,18 +315,24 @@ export async function draftApplicationAnswers(
 
   const timeLeft = options.deadline ? options.deadline - Date.now() : Infinity;
   if (over.length > 0 && timeLeft >= RETRY_NEEDS_MS) {
+    // A report through the tool is answered with its result; structured
+    // output came back as text, so the retry is an ordinary user turn.
+    const reported = first.message.content.find((part) => part.type === 'tool_use' && part.name === APPLICATION_DRAFT_TOOL);
     messages.push(
       { role: 'assistant', content: first.message.content as Anthropic.ContentBlockParam[] },
       {
         role: 'user',
-        content: [{ type: 'tool_result', tool_use_id: report.id, content: renderRetryRequest(over, limits) }],
+        content:
+          reported && reported.type === 'tool_use'
+            ? [{ type: 'tool_result', tool_use_id: reported.id, content: renderRetryRequest(over, limits) }]
+            : renderRetryRequest(over, limits),
       },
     );
     const second = await call(messages);
     calls = 2;
-    const retried = second.ok ? toolBlockIn(second.message, APPLICATION_DRAFT_TOOL) : null;
-    if (retried && retried.type === 'tool_use') {
-      const shortened = parseApplicationDraftPayload(retried.input, {
+    const retried = second.ok ? readReport(second.message, APPLICATION_DRAFT_TOOL, MODEL) : null;
+    if (retried?.ok) {
+      const shortened = parseApplicationDraftPayload(retried.value, {
         ...context,
         requested: over.map((answer) => answer.answerId),
       });
@@ -339,10 +345,8 @@ export async function draftApplicationAnswers(
           if (!answer.overLimit || (before && answer.overLimit.count < before.count)) answers[at] = answer;
         }
       }
-    } else if (second.ok) {
-      console.error('draft application retry:', whyNoReport(second.message));
     } else {
-      console.error('draft application retry:', second.error);
+      console.error('draft application retry:', second.ok ? retried?.reason : second.error);
     }
   }
 

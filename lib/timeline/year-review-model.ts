@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MAX_PARAGRAPH_EVIDENCE, YEAR_TOPICS, type RawParagraph } from './year-review';
 import { MODELS } from '@/lib/core/models';
 
@@ -73,37 +74,34 @@ export async function writeYearParagraphs(
     model: YEAR_REVIEW_MODEL,
     max_tokens: 4000 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: 'Write the year up: at most one paragraph per topic, each with the ids of the events it is about.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            paragraphs: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  topic: { type: 'string', enum: [...YEAR_TOPICS] },
-                  text: { type: 'string' },
-                  evidence: { type: 'array', items: { type: 'string' } },
-                },
-                required: ['topic', 'text', 'evidence'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: 'Write the year up: at most one paragraph per topic, each with the ids of the events it is about.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          paragraphs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                topic: { type: 'string', enum: [...YEAR_TOPICS] },
+                text: { type: 'string' },
+                evidence: { type: 'array', items: { type: 'string' } },
               },
+              required: ['topic', 'text', 'evidence'],
             },
           },
-          required: ['paragraphs'],
         },
+        required: ['paragraphs'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, YEAR_REVIEW_MODEL),
+    }, YEAR_REVIEW_MODEL),
     messages: [{ role: 'user', content: `${summary}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: YEAR_REVIEW_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return [];
-  const written = (block.input as { paragraphs?: unknown }).paragraphs;
+  const report = readReport(response, TOOL_NAME, YEAR_REVIEW_MODEL);
+  if (!report.ok) return [];
+  const written = (report.value as { paragraphs?: unknown }).paragraphs;
   return Array.isArray(written) ? (written as RawParagraph[]) : [];
 }
