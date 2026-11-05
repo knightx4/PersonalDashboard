@@ -93,6 +93,13 @@ describe('add_plan_step', () => {
     expect(tables['public.plan_items']).toEqual([]);
   });
 
+  it('refuses a step that asks them to decide, since that is a question for the chat', async () => {
+    tables['public.plan_items'] = [];
+    const result = await step.apply(ctx(), { title: 'Decide how Ask Dash reaches the studio', module: 'dev' });
+    expect(result.ok).toBe(false);
+    expect(tables['public.plan_items']).toEqual([]);
+  });
+
   it('hangs under a numbered step and takes its workspace', async () => {
     tables['public.plan_items'] = [{ id: 'p1', user_id: ME, number: 2483, module: 'jobs', position: 10 }];
     await step.apply(ctx(), { title: 'Child', under: '#2483' });

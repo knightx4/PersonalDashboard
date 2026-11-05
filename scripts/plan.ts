@@ -229,6 +229,7 @@ import {
 } from '../lib/plan/tree';
 import { requireSupabaseProjectUrl } from '../lib/db/project';
 import { createClient } from '@supabase/supabase-js';
+import { decisionKindRefusal } from '../lib/plan/decision-titles';
 import { PLAN_MOCKUPS_BUCKET, mockupRefusal, mockupStoragePath, optionLettersIn } from '../lib/plan/mockups';
 import { shootMockup, type MockupShot } from './mockup-shoot';
 
@@ -1362,6 +1363,8 @@ async function main(): Promise<void> {
       if (size && !isPlanSize(size)) fail('Size is s, m or l.');
       const kind = arg('--kind') ?? 'build';
       if (!isPlanKind(kind)) fail('Kind is build, decision or setup.');
+      const notADecision = decisionKindRefusal({ kind, title });
+      if (notADecision) fail(notADecision);
 
       // A question about a screen carries a picture of each option (#2810.3).
       const mockupFile = arg('--mockup');

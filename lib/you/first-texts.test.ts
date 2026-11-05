@@ -47,10 +47,11 @@ describe('decideFirstText', () => {
     expect(d.bubbles).toEqual(['#2854.3 is a question for you: Which card?', 'Shipped 2: #2854.1 (Step 1) and #2854.2 (Step 2).']);
   });
 
-  it('pushes only when something needs the person today', () => {
+  // Note 6a69a1c3: a text first is unprompted, so every one reaches the phone.
+  it('pushes every text, a shipped build as well as a step that needs the person', () => {
     const shipped = decide([ev('1')]);
     const needs = decide([ev('1'), ev('2', { kind: 'needs_you' })]);
-    expect(shipped.send && shipped.push).toBe(false);
+    expect(shipped.send && shipped.push).toBe(true);
     expect(needs.send && needs.push).toBe(true);
   });
 
