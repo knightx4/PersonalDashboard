@@ -93,7 +93,10 @@ export function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-/** The text the broker is woken with. It carries the whole test, since the broker's skill (#2789.6) does not exist yet. */
+/**
+ * The text the broker is woken with. It carries the whole test; the broker's
+ * skill (#2789.6) leaves wake-test threads alone (lib/threads/broker-model.ts).
+ */
 export function wakeText(threadId: string, n: number): string {
   return [
     `Wake-up measurement ${n} of ${TRIAL_COUNT}. This is a timing test, not a message from the person. Do exactly these three things, in order, and nothing else.`,

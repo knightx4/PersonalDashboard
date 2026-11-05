@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
@@ -15,12 +16,16 @@ import {
   startSessionThread,
 } from '@/lib/core/session-threads';
 import { isThreadId, type SessionMessage } from '@/lib/core/session-threads-model';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { brokerRoutine } from '@/lib/feedback/routine';
+import { wakeBroker } from '@/lib/threads/broker-wake';
 
 /**
  * The presses on a session thread in Chat (plan #2789.7): start one, send a
  * message with or without a file, and answer a question with one of its
- * options. Each writes rows only; the broker hands what you wrote to the
- * session (#2789.1). The work and its rules are lib/core/session-threads.ts.
+ * options. Each writes its rows, then wakes the session broker once the
+ * answer has gone (#2789.6), which hands what you wrote to the thread's
+ * session. The work and its rules are lib/core/session-threads.ts.
  */
 
 export type SessionOutcome<T> = ({ ok: true } & T) | { ok: false; error: string };
@@ -29,6 +34,13 @@ const PROJECT = /^[a-z][a-z0-9-]{0,39}$/;
 
 function oneFile(input: unknown, userId: string): UploadedAttachment | null {
   return parseUploadedAttachments(input === undefined || input === null ? [] : [input], userId)[0] ?? null;
+}
+
+/** Wake the broker for a thread after the response, so the press does not wait on the fire. */
+function wake(userId: string, threadId: string): void {
+  after(async () => {
+    await wakeBroker({ core: createCoreServiceSupabase(), userId, threadId, routine: brokerRoutine() });
+  });
 }
 
 function failed(error: unknown, fallback: string): { ok: false; error: string } {
@@ -55,6 +67,7 @@ export async function startSessionThreadAction(input: {
       { projectId, text: String(input.text ?? ''), file: oneFile(input.file, user.id) },
       projects,
     );
+    wake(user.id, id);
     revalidatePath('/chat/dash', 'layout');
     return { ok: true, id };
   } catch (error) {
@@ -77,6 +90,7 @@ export async function sendSessionMessageAction(input: {
       text: String(input.text ?? ''),
       file: oneFile(input.file, user.id),
     });
+    wake(user.id, input.threadId);
     revalidatePath('/chat/dash', 'layout');
     return { ok: true, message };
   } catch (error) {
@@ -93,10 +107,11 @@ export async function answerSessionMessageAction(input: {
   const user = await requireUser();
   if (!isThreadId(String(input.messageId))) return { ok: false, error: 'That question could not be found.' };
   try {
-    await answerThreadQuestion(await createCoreClient(), user.id, {
+    const { threadId } = await answerThreadQuestion(await createCoreClient(), user.id, {
       messageId: input.messageId,
       answer: String(input.answer ?? ''),
     });
+    wake(user.id, threadId);
     revalidatePath('/chat/dash', 'layout');
     return { ok: true };
   } catch (error) {
@@ -112,9 +127,10 @@ export async function pickSessionMockupAction(input: {
   const user = await requireUser();
   if (!isThreadId(String(input.messageId))) return { ok: false, error: 'That mockup could not be found.' };
   try {
-    const { step } = await pickMockup(await createCoreClient(), await createClient(), user.id, {
+    const { step, threadId } = await pickMockup(await createCoreClient(), await createClient(), user.id, {
       messageId: input.messageId,
     });
+    wake(user.id, threadId);
     revalidatePath('/chat/dash', 'layout');
     return { ok: true, step };
   } catch (error) {
@@ -131,7 +147,11 @@ export async function commentOnSessionMockupAction(input: {
   const user = await requireUser();
   if (!isThreadId(String(input.messageId))) return { ok: false, error: 'That mockup could not be found.' };
   try {
-    await commentOnMockup(await createCoreClient(), user.id, { messageId: input.messageId, text: String(input.text ?? '') });
+    const { threadId } = await commentOnMockup(await createCoreClient(), user.id, {
+      messageId: input.messageId,
+      text: String(input.text ?? ''),
+    });
+    wake(user.id, threadId);
     revalidatePath('/chat/dash', 'layout');
     return { ok: true };
   } catch (error) {
