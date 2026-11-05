@@ -65,8 +65,8 @@ export function DashChanges({
   by?: string;
   /**
    * Drawn in a People thread as the end of the reply (plan #2854.2.1): no
-   * gap above and the corner tucked toward the reply. The fill stays sunken:
-   * on their bubble's fill a link falls short of 4.5:1 in light.
+   * gap above and the corner tucked toward the reply, in the fill of their
+   * bubbles; a finished change is one quiet line instead (plan #2854.2.2).
    */
   inThread?: boolean;
   /**
@@ -83,31 +83,47 @@ export function DashChanges({
   );
   if (changes.length === 0) return null;
   const free = changes.filter((change) => change.kind !== 'paid_action');
-  const verb = free.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
+  // In a People thread a finished change is one quiet line under its bubble
+  // (plan #2854.2.2); what still waits on a press, or was declined or taken
+  // back, keeps a card, in the fill of their bubbles.
+  const lines = inThread ? free.filter((change) => change.status === 'done' && !(builds && buildRunId(change))) : [];
+  const cards = inThread ? free.filter((change) => !lines.includes(change)) : free;
+  const verb = cards.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
+  const row = (change: DashChange, line = false) => (
+    <DashChangeRow
+      change={change}
+      presses={presses}
+      onChanged={onChanged}
+      today={today}
+      builds={builds}
+      line={line}
+    />
+  );
   return (
     <>
-      {free.length > 0 && (
+      {lines.length > 0 && (
+        <ul aria-label={lines.length === 1 ? `The change ${by} made` : `The changes ${by} made`} className="space-y-0.5 px-1 sm:w-max sm:max-w-xl">
+          {lines.map((change) => (
+            <li key={change.id}>{row(change, true)}</li>
+          ))}
+        </ul>
+      )}
+      {cards.length > 0 && (
         <ul
-          aria-label={free.length === 1 ? `The change ${by} ${verb}` : `The changes ${by} ${verb}`}
+          aria-label={cards.length === 1 ? `The change ${by} ${verb}` : `The changes ${by} ${verb}`}
           className={cn(
-            'divide-y divide-border bg-sunken px-3',
-            inThread ? 'rounded-pane rounded-tl-control' : 'mt-2 rounded-card',
+            'divide-y divide-border px-3',
+            inThread ? 'mt-0.5 rounded-pane rounded-tl-control bg-them [&_a]:text-current [&_a]:underline' : 'mt-2 rounded-card bg-sunken',
           )}
         >
-          {free.map((change) => (
+          {cards.map((change) => (
             <li key={change.id} className="py-2.5">
-              <DashChangeRow
-                change={change}
-                presses={presses}
-                onChanged={onChanged}
-                today={today}
-                builds={builds}
-              />
+              {row(change)}
             </li>
           ))}
         </ul>
       )}
-      {paid.length > 0 && <PaidCard changes={paid} presses={presses} onChanged={onChanged} />}
+      {paid.length > 0 && <PaidCard changes={paid} presses={presses} onChanged={onChanged} inThread={inThread} />}
     </>
   );
 }
@@ -126,6 +142,7 @@ export function DashChangeRow({
   today,
   from,
   builds,
+  line = false,
 }: {
   change: DashChange;
   presses: ChangePresses;
@@ -135,6 +152,8 @@ export function DashChangeRow({
   from?: React.ReactNode;
   /** Where confirmed builds stand, by run id; see DashChanges. */
   builds?: Readonly<Record<string, BuildRun>>;
+  /** A finished change drawn as one quiet line, name the link and Undo at the end (plan #2854.2.2). */
+  line?: boolean;
 }) {
   const [change, setChange] = useState(given);
   const [error, setError] = useState<string | null>(null);
@@ -190,6 +209,38 @@ export function DashChangeRow({
   const settled = change.status === 'declined' || change.status === 'undone';
   // The run a confirmed build started, when the thread is following builds.
   const following = builds ? buildRunId(change) : null;
+
+  if (line && change.status === 'done' && !following) {
+    return (
+      <div>
+        <p className="flex min-w-0 items-center gap-1 text-small text-ink-muted">
+          <span className="min-w-0 truncate">
+            {words.verb}{' '}
+            <Link href={changeHref(change)} className={`${linkVariants({ tone: 'inline' })} font-medium`}>
+              {words.what}
+            </Link>
+            {words.rest}
+          </span>
+          {/* A started build cannot be taken back (plan #2106.1). */}
+          {change.kind !== 'start_build' && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="-my-1 shrink-0"
+              pending={pressing === 'undo'}
+              disabled={pressing !== null}
+              onClick={() => press('undo')}
+            >
+              <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+              {pressing === 'undo' ? 'Undoing…' : 'Undo'}
+            </Button>
+          )}
+        </p>
+        <FieldError>{error}</FieldError>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5">
