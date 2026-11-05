@@ -179,12 +179,13 @@ function MetricRow({
  * the goal's closed steps and Dash's files. It posts `source` and
  * `collectionId` through hidden inputs, which parseMetricForm reads.
  */
-type Counted = 'steps' | 'files' | 'hours' | `list:${string}`;
+type Counted = 'steps' | 'files' | 'hours' | 'applications' | `list:${string}`;
 
 const SOURCE_LABELS: Record<Exclude<MetricSource, 'list'>, string> = {
   steps: 'Steps closed',
   files: 'Dash files',
   hours: 'Hours logged',
+  applications: 'Job applications sent',
 };
 
 const PLACEHOLDERS: Record<MetricSource, string> = {
@@ -192,6 +193,7 @@ const PLACEHOLDERS: Record<MetricSource, string> = {
   steps: 'Steps done each week',
   files: 'Drafts from Dash',
   hours: 'Hours applying',
+  applications: 'Applications sent',
 };
 
 function countedOf(metric: Metric | undefined, lists: MetricList[]): Counted {

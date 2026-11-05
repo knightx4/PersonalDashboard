@@ -14,10 +14,13 @@ type Answer = {
 function fakeClient(answers: Record<string, Answer>) {
   const calls: Call[] = [];
   const client = {
+    schema() {
+      return client;
+    },
     from(table: string) {
       const result = answers[table] ?? { data: null, error: null };
       const query: Record<string, unknown> = {};
-      for (const op of ['select', 'insert', 'update', 'eq', 'is', 'in', 'order']) {
+      for (const op of ['select', 'insert', 'update', 'eq', 'is', 'in', 'not', 'order', 'limit']) {
         query[op] = (...args: unknown[]) => {
           calls.push({ table, op, args });
           return query;
@@ -217,6 +220,42 @@ describe('loadMetricCounts for steps and files', () => {
     expect(calls).toContainEqual({ table: 'links', op: 'in', args: ['item_id', ['g1', 's1', 's2', 's3', 's4']] });
     expect(calls).toContainEqual({ table: 'links', op: 'eq', args: ['kind', 'file'] });
     expect(coreCalls).toContainEqual({ table: 'files', op: 'in', args: ['id', ['f1', 'f2', 'f3']] });
+  });
+});
+
+describe('loadMetricCounts for applications', () => {
+  it('counts the owner’s sent applications by week, without reading the goal’s tree', async () => {
+    const sent = { ...row, user_id: 'u1', id: 'm4', source: 'applications', collection_id: null, date_field: null };
+    const { client, calls } = fakeClient({
+      metrics: { data: [sent], error: null },
+      applications: {
+        data: [
+          { submitted_at: '2026-10-11T23:00:00Z', status: 'submitted', outcome: null },
+          { submitted_at: '2026-10-12T09:00:00Z', status: 'rejected', outcome: 'rejected' },
+          { submitted_at: '2026-10-13T09:00:00Z', status: 'withdrawn', outcome: 'withdrawn' },
+        ],
+        error: null,
+      },
+    });
+    const [metric] = await loadMetricCounts(
+      client,
+      { id: 'g1', createdAt: '2026-10-06T09:00:00Z' },
+      'UTC',
+      { core: fakeClient({}).client as never, now: new Date('2026-10-15T12:00:00Z') },
+    );
+    expect(metric.counts.map((p) => [p.startsOn, p.count])).toEqual([
+      ['2026-10-05', 1],
+      ['2026-10-12', 1],
+    ]);
+    expect(calls).toContainEqual({ table: 'applications', op: 'eq', args: ['user_id', 'u1'] });
+    expect(calls).toContainEqual({ table: 'applications', op: 'not', args: ['submitted_at', 'is', null] });
+    expect(calls.some((c) => c.table === 'items' || c.table === 'progress_entries')).toBe(false);
+  });
+
+  it('reads no applications for a goal without an applications metric', async () => {
+    const { client, calls } = fakeClient({ metrics: { data: [row], error: null }, records: { data: [], error: null } });
+    await loadMetricCounts(client, { id: 'g1', createdAt: null }, 'UTC', { core: fakeClient({}).client as never });
+    expect(calls.some((c) => c.table === 'applications')).toBe(false);
   });
 });
 

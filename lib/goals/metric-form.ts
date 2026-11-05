@@ -115,7 +115,7 @@ export function parseMetricForm(
 export function metricLine(metric: Metric, lists: MetricList[]): string {
   if (metric.source !== 'list') {
     return [
-      { steps: 'Steps closed', files: 'Dash files', hours: 'Hours logged' }[metric.source],
+      { steps: 'Steps closed', files: 'Dash files', hours: 'Hours logged', applications: 'Job applications sent' }[metric.source],
       metric.period === 'week' ? 'weekly' : 'monthly',
       aimLine(metric),
     ]
