@@ -25,7 +25,7 @@ export function MessageInput({ className, onKeyDown, ...props }: React.Component
         }
       }}
       className={cn(
-        'min-h-(--control-h) max-h-40 flex-1 rounded-[calc(var(--control-h)/2)] border-border bg-sunken px-3.5 leading-snug max-sm:min-h-11',
+        'min-h-(--control-h) max-h-40 flex-1 resize-none rounded-[calc(var(--control-h)/2)] border-border bg-sunken px-3.5 leading-snug max-sm:min-h-11 max-sm:py-[0.6875rem]',
         className,
       )}
       {...props}

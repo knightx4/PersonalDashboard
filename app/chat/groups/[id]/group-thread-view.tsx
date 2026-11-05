@@ -272,7 +272,7 @@ export function GroupThreadView({
             onChange={(e) => setDraft(e.target.value)}
           />
           <Tooltip label="Send">
-            <Button type="submit" aria-label="Send" disabled={!canSend || !draft.trim()} className="size-(--control-h) rounded-pill px-0">
+            <Button type="submit" aria-label="Send" disabled={!canSend || !draft.trim()} className="size-(--control-h) shrink-0 rounded-pill px-0 max-sm:mb-[calc((2.75rem-var(--control-h))/2)]">
               <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
             </Button>
           </Tooltip>
