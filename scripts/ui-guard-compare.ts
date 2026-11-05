@@ -51,13 +51,24 @@ function git(cwd: string, args: string[]): string {
   return run.stdout.trim();
 }
 
+/**
+ * NODE_OPTIONS with the 8 GB heap CI and the gate give a build, added to what
+ * it already holds (cloud sessions set --use-openssl-ca). Without it the
+ * build's type check runs out of memory on this repository.
+ */
+export function withHeap(options: string | undefined): string {
+  const held = (options ?? '').trim();
+  if (/(^|\s)--max-old-space-size=/.test(held)) return held;
+  return held ? `${held} --max-old-space-size=8192` : '--max-old-space-size=8192';
+}
+
 /** Builds the preview in `dir`, its output in a log beside the shots. */
 function build(dir: string, log: string): void {
   console.log(`Building the preview in ${dir} (log: ${log}).`);
   const fd = openSync(log, 'w');
   const run = spawnSync('npx', ['next', 'build'], {
     cwd: dir,
-    env: { ...process.env, ...PREVIEW_ENV },
+    env: { ...process.env, ...PREVIEW_ENV, NODE_OPTIONS: withHeap(process.env.NODE_OPTIONS) },
     stdio: ['ignore', fd, fd],
   });
   if (run.status !== 0) throw new Error(`The preview build in ${dir} failed; ${log} has why.`);
