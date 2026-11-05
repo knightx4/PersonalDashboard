@@ -1,4 +1,5 @@
 import { parentBy, parentByFirst, type ModuleSources, type Section } from '@/lib/sources/types';
+import { INTERVIEWS_HREF } from '@/lib/jobs/pipeline-view';
 
 /** The sections of the job search's nav its rows sit under (app/jobs/(app)/layout.tsx). */
 const INBOX: Section = { href: '/jobs/inbox', label: 'Inbox' };
@@ -83,7 +84,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['notes', 'prep_notes', 'questions_asked'],
       title: 'notes',
-      href: () => '/jobs/interviews',
+      href: () => INTERVIEWS_HREF,
       section: PIPELINE,
       parent: parentBy('application_id', 'job_search.applications'),
       note: 'Name one by its application’s role (application_id → applications.role_id → roles.title).',

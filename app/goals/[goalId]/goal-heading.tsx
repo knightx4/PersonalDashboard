@@ -33,7 +33,7 @@ export function GoalHeadingField({
   const [pending, startTransition] = useTransition();
   const isTitle = field === 'title';
   const face = isTitle
-    ? 'font-display text-title tracking-tight text-ink sm:text-title'
+    ? 'font-display text-headline font-bold tracking-tight text-ink sm:text-headline-lg'
     : 'text-body text-ink-muted sm:text-body';
 
   if (!editing) {

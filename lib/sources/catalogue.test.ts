@@ -13,6 +13,9 @@ import {
   sourceModule,
 } from './catalogue';
 
+// Sections whose page is out of the nav but still opens.
+const TUCKED_AWAY = new Set(['/shopping/share', '/vault/map', '/vault/maya', '/news/saved']);
+
 describe('the catalogue of sources', () => {
   it('names every table once, as a source or not', () => {
     const tables = [...SOURCES.map((s) => s.table), ...NOT_SOURCES.map((n) => n.table)];
@@ -62,6 +65,11 @@ describe('the catalogue of sources', () => {
       const workspace = MODULES.find((m) => section.href === m.prefix || section.href.startsWith(`${m.prefix}/`));
       if (!workspace) {
         // The app's own pages, outside every workspace: the page has to exist.
+        expect(existsSync(join(root, 'app', section.href, 'page.tsx')), `${table}: ${section.href}`).toBe(true);
+        continue;
+      }
+      // Pages tucked away (plan #1496.8): out of the tab bar, route and rows kept.
+      if (TUCKED_AWAY.has(section.href)) {
         expect(existsSync(join(root, 'app', section.href, 'page.tsx')), `${table}: ${section.href}`).toBe(true);
         continue;
       }

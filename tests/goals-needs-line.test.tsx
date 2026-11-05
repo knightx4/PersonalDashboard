@@ -90,9 +90,9 @@ describe('the Needs line on a goal step', () => {
     expect(html).toContain(`Needs: </span>${REVIEW_ASK}`);
   });
 
-  it('says what a ready step of yours waits on you for', () => {
+  it('leaves the Needs line off a ready step of yours, which only says it is yours', () => {
     const html = render([step('a', { title: 'Call the bank' })]);
-    expect(html).toContain(`Needs: </span>${YOURS_ASK}`);
+    expect(html).not.toContain(YOURS_ASK);
   });
 
   it('leaves a ready Claude step with its detail', () => {

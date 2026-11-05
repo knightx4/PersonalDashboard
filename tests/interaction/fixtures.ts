@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe } from 'vitest';
 import { chromePath, launch, type Browser } from './browser';
 import { checkPage, type Findings } from './checks';
 
-export const FIXTURES = ['clean', 'sideways', 'small-target', 'under-dock', 'faint-text'] as const;
+export const FIXTURES = ['clean', 'sideways', 'small-target', 'under-dock', 'faint-text', 'scrolling-pane'] as const;
 
 export function fixtureUrl(name: (typeof FIXTURES)[number]): string {
   return new URL(`./fixtures/${name}.html`, import.meta.url).href;

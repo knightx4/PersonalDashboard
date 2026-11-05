@@ -127,6 +127,7 @@ export const vaultSources: ModuleSources = {
     { table: 'obsidian.position_link_scans', reason: 'Map upkeep.' },
     { table: 'obsidian.position_pair_scans', reason: 'Map upkeep.' },
     { table: 'obsidian.position_pairs', reason: 'Map upkeep: candidate merges.' },
+    { table: 'obsidian.position_scores', reason: 'A judgement derived from positions, which are already the source: the idea type and usefulness and novelty scores Jev gave each.' },
     { table: 'obsidian.position_sources', reason: 'Quotes behind each position; read through positions.' },
     { table: 'obsidian.sync_runs', reason: 'Sync bookkeeping.' },
     { table: 'obsidian.theme_notes', reason: 'Join rows; read through themes.' },

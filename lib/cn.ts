@@ -19,6 +19,8 @@ const TEXT_SIZES = [
   'body',
   'lead',
   'title',
+  'headline',
+  'headline-lg',
   'figure',
   'figure-lg',
   'figure-xl',

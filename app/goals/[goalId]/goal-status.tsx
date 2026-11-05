@@ -30,7 +30,23 @@ export type GoalStatusCardProps = {
   work?: React.ReactNode;
   /** Ask Dash on the whole goal, while it has nothing to approve. */
   ask?: React.ReactNode;
+  /**
+   * The step on the Dashboard's Now card. When Dash's next move is that step,
+   * the sentence is left out, so the step is named once on the page (plan
+   * #2778.11).
+   */
+  now?: { id: string; title: string } | null;
 };
+
+/** Whether the status's next move is the step the Now card already shows. */
+export function nextMoveIsNow(
+  review: Pick<GoalReview, 'stepId' | 'nextMove'>,
+  now: { id: string; title: string } | null | undefined,
+): boolean {
+  if (!now) return false;
+  if (review.stepId) return review.stepId === now.id;
+  return Boolean(review.nextMove && now.title && review.nextMove.includes(now.title));
+}
 
 export function GoalStatusCard({
   line,
@@ -41,6 +57,7 @@ export function GoalStatusCard({
   briefWhen,
   work,
   ask,
+  now,
 }: GoalStatusCardProps) {
   return (
     <section aria-labelledby="status-heading">
@@ -53,12 +70,14 @@ export function GoalStatusCard({
           <span className="tabular">{line}</span>
         </p>
         {review ? (
-          <p className="text-ui text-ink">
-            {review.nextMove}
-            {review.nextOn && (
-              <span className="tabular text-ink-muted"> · {formatDay(review.nextOn)}</span>
-            )}
-          </p>
+          !nextMoveIsNow(review, now) && (
+            <p className="text-ui text-ink">
+              {review.nextMove}
+              {review.nextOn && (
+                <span className="tabular text-ink-muted"> · {formatDay(review.nextOn)}</span>
+              )}
+            </p>
+          )
         ) : (
           <p className="text-ui text-ink-muted">Dash has not checked this goal yet.</p>
         )}

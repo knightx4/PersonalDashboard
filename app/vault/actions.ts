@@ -69,7 +69,6 @@ export async function addQuickNote(text: string): Promise<{ error: string | null
   const result = await fileVaultNote(user.id, trimmed);
   if (!result.ok) return { error: result.error };
   revalidatePath('/vault');
-  revalidatePath('/vault/triage');
   return { error: null };
 }
 

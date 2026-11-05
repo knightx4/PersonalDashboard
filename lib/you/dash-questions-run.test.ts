@@ -65,6 +65,12 @@ describe('dashQuestionsBrief', () => {
       'Follow .claude/skills/dash-questions/SKILL.md\nQuestion run r1\nuser_id u1',
     );
   });
+
+  it('ends with a line saying so when the weekly check started it', () => {
+    expect(dashQuestionsBrief({ runId: 'r1', userId: 'u1', weekly: true }).split('\n').at(-1)).toBe(
+      'started by the weekly check',
+    );
+  });
 });
 
 describe('questionRunState', () => {
@@ -157,6 +163,14 @@ describe('the dash-questions skill', () => {
     const writes = skill.match(/^(update|insert into) [^\n]+(\n(?!```)[^\n]*)*/gm) ?? [];
     expect(writes.length).toBeGreaterThanOrEqual(4);
     for (const statement of writes) expect(statement).toContain("'<user_id>'");
+  });
+
+  it('aims at the thinnest areas and the hunches, saves each question\'s area and caps an area at two', () => {
+    expect(skill).toContain("confidence = 'hunch'");
+    expect(skill).toContain('from goals.areas a');
+    expect(skill).toContain('from you.insight_runs');
+    expect(skill).toContain('no more than\ntwo questions in one area');
+    expect(skill).toContain('insert into you.dash_questions (user_id, run_id, question, why, area_id)');
   });
 
   it('names Dash, never Claude, in what the person reads', () => {

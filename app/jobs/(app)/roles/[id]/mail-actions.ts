@@ -47,7 +47,7 @@ export async function unlinkMessage(
   if (!unlinked) return { error };
 
   revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
   revalidatePath('/jobs/pipeline');
   return { error: null };
 }

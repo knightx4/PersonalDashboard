@@ -296,6 +296,28 @@ const shareReadBoundaries = {
   },
 };
 
+/**
+ * Nothing in Learn calls the global fetch except the providers, which guard
+ * every hop against private addresses, and the prepare kick, which calls this
+ * app's own route. A dependency that takes a fetch as a parameter is fine; the
+ * call itself is what this closes. Nothing else in this config sets
+ * `no-restricted-syntax` for lib/learn, so there is nothing to repeat here.
+ */
+const learnDirectFetchBoundary = {
+  files: ["lib/learn/**/*.{ts,tsx}"],
+  ignores: ["lib/learn/providers/**", "lib/learn/prepare/kick.ts", "lib/learn/**/*.test.{ts,tsx}"],
+  rules: {
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector: "CallExpression[callee.name='fetch']",
+        message:
+          "A request to an outside address in Learn goes through fetchDocument in lib/learn/providers/fetch.ts, which refuses private addresses on every redirect hop. Only lib/learn/prepare/kick.ts calls the app itself.",
+      },
+    ],
+  },
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -308,6 +330,7 @@ const eslintConfig = defineConfig([
   // Must come after renderBoundaries too: it widens what that rule forbids,
   // and repeats its groups so nothing is lost in the replacement.
   shareReadBoundaries,
+  learnDirectFetchBoundary,
   // Override default ignores of eslint-config-next.
   // Agent worktrees are whole checkouts of this repository.
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", ".claude/worktrees/**"]),

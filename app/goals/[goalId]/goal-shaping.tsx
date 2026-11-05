@@ -8,11 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { Card } from '@/components/ui/card';
 import type { GoalRunRow } from '@/lib/goals/runs';
-import {
-  approveGoalAction,
-  workOnGoalAction,
-  type ShapingActionState,
-} from './shaping-actions';
+import { approveGoalAction, workOnGoalAction, type ShapingActionState } from './shaping-actions';
 import { LinkedText } from '@/components/ui/linked-text';
 
 const initial: ShapingActionState = {};
@@ -37,6 +33,7 @@ export function GoalShaping({
   canRun,
   workLabel = 'Ask Dash',
   quiet = false,
+  inCard = false,
 }: {
   goalId: string;
   approval: { text: string; approve: string | null };
@@ -55,6 +52,8 @@ export function GoalShaping({
   workLabel?: string;
   /** Leave out the approval line while there is nothing to approve, and the run history always. */
   quiet?: boolean;
+  /** Drawn inside Dash's card on the Dashboard, with no heading or card of its own. */
+  inCard?: boolean;
 }) {
   const running = progress !== null;
   useRunRefresh(running);
@@ -102,7 +101,7 @@ export function GoalShaping({
   if (!approval.approve) {
     if (!text && !status && !history && !workButton && !feedback) return null;
     return (
-      <div className="space-y-1 px-1">
+      <div className={inCard ? 'space-y-1' : 'space-y-1 px-1'}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* A basis, so on a phone the button drops under the lines instead
               of squeezing them into a column beside it. */}
@@ -110,6 +109,29 @@ export function GoalShaping({
             {text && <p className="text-ui text-ink">{text}</p>}
             {status}
           </div>
+          {workButton}
+        </div>
+        {feedback}
+        {history}
+      </div>
+    );
+  }
+
+  // Inside Dash's card on the Dashboard (plan #2778.4), which has its own
+  // heading: the approval on that card's edge, keeping the anchor the
+  // Approve links in Waiting on you go to.
+  if (inCard) {
+    return (
+      <div id="claude-heading" className="space-y-2">
+        <p className="text-ui text-ink">{approval.text}</p>
+        {status}
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={approve}>
+            <input type="hidden" name="goalId" value={goalId} />
+            <Button type="submit" pending={approving}>
+              {approval.approve}
+            </Button>
+          </form>
           {workButton}
         </div>
         {feedback}
@@ -155,10 +177,7 @@ export function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }
         {runs.map((run) => (
           <li key={run.id} className="space-y-0.5 py-1.5">
             <p className="text-small break-words">
-              <Link
-                href={`/goals/runs/${run.id}`}
-                className="font-medium text-ink hover:underline"
-              >
+              <Link href={`/goals/runs/${run.id}`} className="font-medium text-ink hover:underline">
                 {run.label}
               </Link>
               <span className={run.failed ? 'text-danger' : 'text-ink-muted'}> · {run.meta}</span>

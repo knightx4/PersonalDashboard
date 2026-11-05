@@ -28,7 +28,7 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
       // The Inbox badge, from the same read the Home and Inbox pages draw from
       // (cached for the request). A failed read leaves the badge off, not the page.
       const inbox = await loadHomeForRequest(user.id, todayIn(settings.timezone))
-        .then((home) => goalInboxCount(home.onYou, home.dash, home.waitingRuns))
+        .then((home) => goalInboxCount(home.onYou, home.dash, home.waitingRuns, home.sessionQuestions))
         .catch(() => undefined);
       return withBadges(tabsFor('goals', owner), { '/goals/inbox': inbox });
     },

@@ -19,7 +19,7 @@ describe('parseTheme', () => {
   });
 
   it('still reads the written themes', () => {
-    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'aurora', 'dawn', 'poster', 'poster-dark'] as const) {
+    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'aurora', 'dawn'] as const) {
       expect(parseTheme(id)).toEqual({ kind: 'written', id });
     }
   });
@@ -29,10 +29,11 @@ describe('parseTheme', () => {
     expect(parseTheme('dark')).toEqual({ kind: 'generated', mode: 'dark', hue: null });
   });
 
-  it('reads every stored Lightbox as the poster, which is what Lightbox is now', () => {
-    for (const value of ['lightbox', 'lightbox:155', 'lightbox:midnight', 'lightbox:pink']) {
-      expect(parseTheme(value)).toEqual({ kind: 'written', id: 'poster' });
+  it('reads every stored Lightbox, and the poster it last was, as Solid in its polarity', () => {
+    for (const value of ['lightbox', 'lightbox:155', 'lightbox:midnight', 'poster', 'poster:slate']) {
+      expect(parseTheme(value)).toEqual({ kind: 'generated', mode: 'light', hue: null });
     }
+    expect(parseTheme('poster-dark:primary')).toEqual({ kind: 'generated', mode: 'dark', hue: null });
   });
 
   it('reads a mode and a colour', () => {
@@ -62,8 +63,8 @@ describe('formatTheme', () => {
       'ink',
       'darkroom',
       'dusk',
-      'poster',
-      'poster:slate',
+      'aurora:alpine',
+      'dawn:coast',
       'light',
       'dark',
       'dark:284',
@@ -85,7 +86,7 @@ describe('putting a theme on the document', () => {
   });
 
   it('renders a written theme exactly as it did before, with no tokens of its own', () => {
-    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'poster'] as const) {
+    for (const id of ['paper', 'ink', 'darkroom', 'dusk'] as const) {
       const theme = parseTheme(id);
       expect(themeAttribute(theme)).toBe(id);
       expect(themeStyle(theme)).toBeUndefined();

@@ -44,12 +44,17 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import { codeDeps } from '@/lib/dash/think-code';
+import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
+import type { PeopleDash } from '@/lib/you/people-actions';
 import {
   attachProposals,
   discardProposals,
   insertMadeChange,
+  insertPeopleChange,
+  insertPeopleProposal,
   insertProposal,
   insertThreadProposal,
   loadChanges,
@@ -76,6 +81,8 @@ import { RECALL_OPERATION } from '@/lib/memory/search';
 import type { TalkCitation, TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
+import { markAnswered, markAnswering, markFailed, readReply, requestStop, stopRequested } from './reply-state-store';
+import { replyStateOf, type ReplyState } from './reply-state';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -116,6 +123,10 @@ export async function askDashInRequest(input: {
   mentions?: readonly AskMention[];
   /** The workspace the lookups are kept to, already checked; null for every one. */
   scope?: ModuleId | null;
+  /** "Think it through" was on (plan #2789.10). */
+  think?: boolean;
+  /** Try again (plan #2854.4): answer the chat's last question, which has none, instead of adding one. */
+  retry?: boolean;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -139,10 +150,40 @@ export async function askDashInRequest(input: {
   const scope = input.scope && settings.enabledModules.includes(input.scope) ? input.scope : null;
   const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
 
-  return askDash(
+  // Where the reply stands is kept on the chat (plan #2854.4), so a thread
+  // opened after the page that asked has gone shows Dash still writing, or
+  // the reply failed with Try again. Stop is read from the chat too: leaving
+  // the page no longer ends the answer, and Stop may reach another function.
+  const stopping = new AbortController();
+  if (input.signal?.aborted) stopping.abort();
+  else input.signal?.addEventListener('abort', () => stopping.abort(), { once: true });
+  let started: Promise<{ ref: string; at: string } | null> = Promise.resolve(null);
+  let watch: ReturnType<typeof setInterval> | null = null;
+  const onAsked: NonNullable<typeof input.onAsked> = (asked) => {
+    const ref = asked.conversation.ref;
+    started = markAnswering(core, user.id, ref).then(
+      (at) => ({ ref, at }),
+      (error: unknown) => {
+        console.error('the reply was not marked as being written', error);
+        return null;
+      },
+    );
+    void started.then((mark) => {
+      if (!mark || stopping.signal.aborted) return;
+      watch = setInterval(() => {
+        void stopRequested(core, user.id, ref, mark.at).then((stop) => {
+          if (stop) stopping.abort();
+        });
+      }, STOP_POLL_MS);
+    });
+    input.onAsked?.(asked);
+  };
+
+  const result = await askDash(
     {
       question: input.question,
       conversationRef: input.conversationRef,
+      retry: input.retry,
       files: input.files,
       page,
       today,
@@ -153,7 +194,7 @@ export async function askDashInRequest(input: {
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
-      write: (tool, args, seen) =>
+      write: (tool, args, seen, conversationId) =>
         tool.apply(
           {
             ...ctx,
@@ -162,6 +203,7 @@ export async function askDashInRequest(input: {
             createTask,
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
+            origin: { kind: 'ask_dash', ref: conversationId },
           },
           args,
         ),
@@ -171,11 +213,13 @@ export async function askDashInRequest(input: {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
-      onAsked: input.onAsked,
-      signal: input.signal,
+      onAsked,
+      signal: stopping.signal,
       mentions: mentionCitations(input.mentions ?? []),
       scope,
       model: await choosing,
+      // The code is read as the owner, as Dev is (plan #2789.10).
+      think: input.think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -194,7 +238,7 @@ export async function askDashInRequest(input: {
           const supabase = await createClient();
           const { error } = await supabase
             .from('feedback_items')
-            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/chat/dash/${conversationRef}` });
           if (error) console.error('the gap note was not filed', error.message);
         } catch (error) {
           console.error('the gap note was not filed', error);
@@ -219,7 +263,21 @@ export async function askDashInRequest(input: {
         : {}),
     },
   );
+  if (watch) clearInterval(watch);
+  const mark = await started;
+  if (mark) {
+    try {
+      if (result.error) await markFailed(core, user.id, mark.ref, result.error);
+      else await markAnswered(core, user.id, mark.ref);
+    } catch (error) {
+      console.error('where the reply stands was not kept', error);
+    }
+  }
+  return result;
 }
+
+/** How often a reply being written checks whether Stop was pressed (plan #2854.4). */
+const STOP_POLL_MS = 1_000;
 
 /** The rows added with @ as the question keeps them: an answer's citation shape, by search's tables. */
 export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[] {
@@ -256,6 +314,8 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a thread is answered on the page it was asked on.
+          origin: { kind: 'goal_page', ref: null },
           thread: acts,
         },
         args,
@@ -263,6 +323,39 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
     queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
     saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
+  };
+}
+
+/**
+ * What the people on People act with (plan #2854.2): Ask's lookups, writes,
+ * proposals and paid presses as the signed-in person, each kept in
+ * core.dash_actions naming the person on People who made it and the thread.
+ * Only inside a request, or `after` one, while its cookies are still read.
+ */
+export async function peopleDashInRequest(userId: string): Promise<PeopleDash & Pick<ThreadDash, 'today' | 'execute'>> {
+  const [settings, core] = await Promise.all([loadAccountSettings(userId), createCoreClient()]);
+  const ctx = askContext(userId, settings);
+  return {
+    today: todayInTimezone(settings.timezone),
+    execute: (name, args) => executeAskTool(name, args, ctx),
+    apply: (tool, args, seen) =>
+      tool.apply(
+        {
+          ...ctx,
+          seen,
+          goals: (history) => createGoalsClient(history),
+          createTask,
+          quickNotePorts: () => sessionInboxPorts(userId),
+          goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a People thread is answered from Chat.
+          origin: { kind: 'chat', ref: null },
+        },
+        args,
+      ),
+    saveChange: (made, cause) => insertPeopleChange(core, userId, cause, made),
+    propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
+    queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
+    saveProposal: (change, cause) => insertPeopleProposal(core, userId, cause, change),
   };
 }
 
@@ -553,4 +646,24 @@ export async function rateAskAnswer(
     rating,
     note,
   );
+}
+
+/**
+ * Stop pressed on the reply being written in one of the person's chats (plan
+ * #2854.4). The run writing it reads the mark within a second and keeps what
+ * it had written; false when nothing was being written.
+ */
+export async function stopAskReply(ref: string): Promise<boolean> {
+  const user = await requireUser();
+  return requestStop(await createCoreClient(), user.id, ref);
+}
+
+/**
+ * Where the reply to a chat's last question stands (plan #2854.4), given its
+ * turns as just read: still being written, failed, or nothing waiting.
+ */
+export async function loadAskReply(ref: string, turns: readonly TalkTurn[]): Promise<ReplyState> {
+  const user = await requireUser();
+  const row = await readReply(await createCoreClient(), user.id, ref);
+  return replyStateOf(row, turns.at(-1)?.role ?? null, Date.now());
 }

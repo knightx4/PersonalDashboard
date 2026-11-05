@@ -38,7 +38,7 @@ describe('asking by voice', () => {
     expect(d.ask).toHaveBeenCalledWith('u1', 'how many jobs did I apply to today');
     expect(reply).toMatchObject({
       status: 200,
-      body: { ok: true, spoken: 'You applied to 3 jobs today.', answer: 'You applied to **3 jobs** today.', href: '/ask/c1' },
+      body: { ok: true, spoken: 'You applied to 3 jobs today.', answer: 'You applied to **3 jobs** today.', href: '/chat/dash/c1' },
     });
   });
 

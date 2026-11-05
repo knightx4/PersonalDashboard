@@ -21,6 +21,7 @@ import type { Tab } from '@/lib/tabs';
 import { stepRef } from '@/lib/plan/ref';
 import { OpenTab } from './open-tab';
 import { ConversationPatternSurface } from './conversation-pattern';
+import { MessagingPatternSurface } from './messaging-pattern';
 import { PageColumn } from '@/components/shell/page-width';
 
 /**
@@ -49,7 +50,7 @@ export type PatternSurface = {
 
 export type PagePattern = {
   /** The fragment on /dev/ui. */
-  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail' | 'main-rail' | 'tabbed-sections' | 'conversation';
+  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail' | 'main-rail' | 'tabbed-sections' | 'conversation' | 'messaging';
   /** What a step's "Pattern:" line says, lower case. */
   name: string;
   /** The heading on /dev/ui. */
@@ -690,5 +691,17 @@ export const PATTERNS: readonly PagePattern[] = [
     rule: 'From laptop width a list of chats sits on the left and can be hidden to a thin strip holding New chat and the button to show it, the open chat sits at reading width with the box at its foot, and a glance column on the right can be hidden too. Hidden or shown is kept on that device. On a phone the list is the page and a chat opens over it, with the way back above its title.',
     component: { path: 'components/patterns/conversation.tsx', exports: ['Conversation'] },
     surfaces: [{ id: 'pattern-conversation', label: 'Chats beside the open chat', render: () => <ConversationPatternSurface /> }],
+  },
+  {
+    id: 'messaging',
+    name: 'messaging',
+    label: 'Messaging',
+    when: 'Ongoing texts with people, such as a mentor: a list of people beside the open thread, as a texting app draws it. Talking to Dash at length stays the conversation pattern.',
+    rule: 'From laptop width the list of people sits on the left and the open thread on the right, each a pane as tall as the window; on a phone one pane is drawn at a time, with the way back above the name of the person. Bubbles are yours on the right and theirs on the left, grouped by sender, oldest at the top, and the box stays fixed at the foot while the messages scroll.',
+    component: { path: 'components/patterns/messaging.tsx', exports: ['Messaging'] },
+    surfaces: [
+      { id: 'pattern-messaging', label: 'People beside an open thread', render: () => <MessagingPatternSurface /> },
+      { id: 'pattern-messaging-list', label: 'People only, as a phone shows them', render: () => <MessagingPatternSurface open={false} /> },
+    ],
   },
 ];

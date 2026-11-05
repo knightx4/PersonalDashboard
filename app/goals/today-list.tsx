@@ -21,7 +21,7 @@ import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
 import { snoozeInboxRowAction, unsnoozeInboxRowAction } from './inbox/actions';
 import { askDashStepAction } from './[goalId]/shaping-actions';
 import { restoreAsideAction, setAsideAction } from './home-actions';
-import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
+import { archiveStepAction, countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
 import { settleGoalAction } from './actions';
 import { answerFlagAction } from './[goalId]/flag-actions';
@@ -270,6 +270,7 @@ export function TodayRow({
             {item.kind === 'suggestion' && (
               <DeclineSuggestion id={item.id} title={item.title} onAside={onAside} />
             )}
+            {item.kind === 'step' && <DropStep id={item.id} title={item.title} onAside={onAside} />}
             {second && (
               <Button
                 type="submit"
@@ -332,6 +333,50 @@ function DeclineSuggestion({
             undo: async () => {
               const back = await undoDeclineAction(id);
               if (back.error) throw new Error(back.error);
+              onAside(false);
+            },
+          });
+        })
+      }
+    />
+  );
+}
+
+/**
+ * Drop on a step (note 2648499f): a step you do not want to do leaves every
+ * list, as Drop in the step's menu on its goal does, and the toast's Undo
+ * brings it back.
+ */
+function DropStep({
+  id,
+  title,
+  onAside,
+}: {
+  id: string;
+  title: string;
+  onAside: (hidden: boolean) => void;
+}) {
+  const [pending, start] = useTransition();
+  const toast = useToast();
+  return (
+    <CloseButton
+      lifecycle="dropped"
+      pending={pending}
+      onClick={() =>
+        start(async () => {
+          const form = new FormData();
+          form.set('id', id);
+          const result = await archiveStepAction(form);
+          if (result.error) return toast({ text: result.error });
+          onAside(true);
+          toast({
+            text: closedToast('dropped', title),
+            undo: async () => {
+              const back = new FormData();
+              back.set('id', id);
+              back.set('restore', 'true');
+              const restored = await archiveStepAction(back);
+              if (restored.error) throw new Error(restored.error);
               onAside(false);
             },
           });

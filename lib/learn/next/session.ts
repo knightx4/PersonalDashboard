@@ -20,6 +20,17 @@ import type { DueReview } from '@/lib/learn/lessons/review';
 import type { LevelLesson } from '@/lib/learn/levels/level-lesson-store';
 import type { NextItem, NextItemKind } from './choose';
 
+/**
+ * What a session plays: everything the chooser picks (`chooseNext`), or
+ * lessons only (`chooseLesson`), for Quick learn on Now.
+ */
+export type SessionMode = 'all' | 'lessons';
+
+/** The session's address for a mode. */
+export function sessionHref(mode: SessionMode): string {
+  return mode === 'lessons' ? '/learn/go?only=lessons' : '/learn/go';
+}
+
 /** Where a lesson, check or task sits, for its presses. */
 export type SessionPiece = { subjectId: string; pieceId: string };
 

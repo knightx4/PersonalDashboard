@@ -51,7 +51,7 @@ describe('parseMinutes', () => {
               receipts: [{ label: 'note', link: '/vault/n/a.md' }, { label: '' }],
             },
             { seat: 'landlord', text: 'Not a seat.' },
-            { seat: 'skeptic', stance: 'against the board', text: 'Wait.' },
+            { seat: 'skeptic', stance: 'against the council', text: 'Wait.' },
           ],
         },
         { key: 'Not A Key', point: 'Kept, but not votable', positions: [] },
@@ -85,7 +85,7 @@ describe('parseMinutes', () => {
     expect(minutes.disagreements[0].positions[0].receipts).toEqual([
       { label: 'note', link: '/vault/n/a.md' },
     ]);
-    expect(minutes.disagreements[0].positions[1].stance).toBe('against the board');
+    expect(minutes.disagreements[0].positions[1].stance).toBe('against the council');
     expect(minutes.disagreements[1].key).toBeNull();
     expect(minutes.resolutions[0]).toEqual({
       key: 'r1',
@@ -180,11 +180,11 @@ describe('meetingState', () => {
 
 describe('meetingTitle and plainText', () => {
   it('names a weekly meeting by its day and a called one by its decision', () => {
-    expect(meetingTitle(meeting())).toBe('Board meeting 25 Oct 2026');
+    expect(meetingTitle(meeting())).toBe('Council meeting 25 Oct 2026');
     expect(meetingTitle(meeting({ kind: 'called', decision: 'Take the Mercor contract?' }))).toBe(
       'Take the Mercor contract?',
     );
-    expect(meetingTitle(meeting({ heldOn: null, status: 'queued' }))).toBe('Board meeting');
+    expect(meetingTitle(meeting({ heldOn: null, status: 'queued' }))).toBe('Council meeting');
   });
   it('takes the links and emphasis out of a resolution for a todo title', () => {
     expect(plainText('Publish [AI Systems Series 1](/vault/n/a.md) by **Tuesday**.')).toBe(

@@ -1,5 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { BOX_COMMANDS, boxTrigger, commandsFor, replaceTrigger } from './box-commands';
+import { BOX_COMMANDS, boxTrigger, commandsFor, replaceTrigger, scopeWorkspaces, workspacesNamed } from './box-commands';
+
+describe('@ and a workspace (plan #2748.1)', () => {
+  const all = scopeWorkspaces(['chat', 'jobs', 'learn', 'todo']);
+
+  it('never offers Chat, where the question is being asked', () => {
+    expect(all).toEqual(['jobs', 'learn', 'todo']);
+    expect(scopeWorkspaces(undefined)).toEqual([]);
+  });
+
+  it('offers every workspace for a bare @', () => {
+    expect(workspacesNamed('', all)).toEqual(['jobs', 'learn', 'todo']);
+  });
+
+  it('matches the start of the name or of a word in it', () => {
+    expect(workspacesNamed('Le', all)).toEqual(['learn']);
+    expect(workspacesNamed('jo', all)).toEqual(['jobs']);
+    expect(workspacesNamed('search', all)).toEqual(['jobs']);
+    expect(workspacesNamed('job search', all)).toEqual(['jobs']);
+  });
+
+  it('offers none for a row name, so the rows have the menu', () => {
+    expect(workspacesNamed('catan', all)).toEqual([]);
+  });
+});
 import { parseAskInput, parseAskMentions, MAX_MENTIONS } from './ask-input';
 import { ASK_VOICE, scopedVoice } from '@/lib/dash/ask';
 import { lookupInScope } from '@/lib/ask/tools';

@@ -507,6 +507,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // You: a personality result, its trait themes and up to fifteen cut notes
   // in, a few points out.
   'read-personality': run(SONNET, 7_000, 1_200),
+  // The advisor's brain, memory and the person's decisions and goals, about
+  // 6,000 tokens cached, resent over three or four rounds with the lookups;
+  // a short reply out (plan #2581.6).
+  'talk-to-advisor': run(SONNET, 30_000, 700),
+  // Two messages and up to sixty memories in, at most four lines out.
+  'remember-advisor-talk': run(HAIKU, 3_000, 250),
   // Every result with its themes, a dozen record lines and up to fifteen cut
   // notes in, the analysis out.
   'personality-profile': run(SONNET, 12_000, 2_000),
@@ -517,6 +523,19 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-syllabus-weeks': run(HAIKU, 12_000, 700),
   // Up to twenty files' summaries and points in, a paragraph and eight ideas out (plan #2401.7).
   'collect-course-overview': run(HAIKU, 6_000, 900),
+  // Dash's lookups (about 16,000 tokens) and the persona (about 3,000) read
+  // from the cache, the memory, the day and the recent thread (about 4,000)
+  // fresh, two or three short bubbles out (plan #2748.4).
+  'mentor-reply': run(SONNET, 23_000, 250),
+  // The persona and the last few messages in, one line out (plan #2748.4).
+  'mentor-ack': background(run(HAIKU, 3_500, 30)),
+  // The cast's cards and the last thirty messages in, a short plan out (plan #2879.1.2).
+  'group-director': background(run(HAIKU, 3_000, 120)),
+  // The bot's persona, memory and the last thirty messages in, one text out (plan #2879.1.2).
+  'group-speaker': run(SONNET, 5_000, 120),
+  // The rules, the form and for a redraft the current card in; a card of
+  // about 2,500 characters out (plan #2748.11).
+  'draft-persona': run(SONNET, 1_800, 700),
   // The digest, note extracts, signals, earlier insights and five or six
   // notes in; thinking at high effort, then three to five cards and a new
   // digest out (plan #2413.9).

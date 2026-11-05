@@ -151,7 +151,7 @@ export async function answerVoiceAsk(request: VoiceAskRequest, deps: VoiceAskDep
   }
 
   const answer = [...result.turns].reverse().find((turn) => turn.role === 'assistant')?.body.trim() ?? '';
-  const href = result.conversation ? `/ask/${result.conversation.ref}` : null;
+  const href = result.conversation ? `/chat/dash/${result.conversation.ref}` : null;
   if (!answer) {
     const why = result.error ?? 'Dash did not answer that.';
     return refuse(502, 'not_answered', /[.!?]$/.test(why) ? why : `${why}.`);

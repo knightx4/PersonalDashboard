@@ -89,7 +89,7 @@ export async function saveInterview(
   const { error } = await saveInterviewEdit(supabase, user.id, interviewId, update);
 
   if (error) return { error };
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
   return { error: null };
@@ -166,7 +166,7 @@ export async function addInterview(input: {
   });
 
   if (error) return { error };
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
   return { error: null };
@@ -210,7 +210,7 @@ export async function addInterviewer(input: {
   const { error } = await addInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
   if (error) return { error };
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -268,7 +268,7 @@ export async function addInterviewerByName(input: {
 
   if (error) return { error };
 
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/contacts');
   return { error: null };
@@ -288,7 +288,7 @@ export async function removeInterviewer(input: {
   const { error } = await removeInterviewerRow(supabase, parsed.data.interviewId, parsed.data.contactId);
 
   if (error) return { error };
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -598,7 +598,7 @@ export async function deleteInterview(interviewId: string): Promise<{ error: str
     .eq('user_id', user.id);
 
   if (error) return { error: error.message };
-  revalidatePath('/jobs/interviews');
+  revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs');
   return { error: null };

@@ -34,7 +34,7 @@ import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
  * naming a row can only name a row a lookup returned, as citations do.
  *
  * Three limits stop the looking, and when one is reached the next call is
- * made to answer with what it has: eight lookups, an input token budget, and
+ * made to answer with what it has: MAX_LOOKUPS lookups, an input token budget, and
  * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
  *
@@ -192,6 +192,13 @@ export type DashVoice = {
   acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
+  /**
+   * How hard the model thinks, sent as `output_config.effort` (plan
+   * #2789.10, Ask's "Think it through"). Absent: the model's own default.
+   */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** Time spent looking before it must answer; TIME_BUDGET_MS when absent. */
+  timeBudgetMs?: number;
 };
 
 /** Where the conversation is happening. */
@@ -727,6 +734,12 @@ export type DashRun = {
   files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
+  /**
+   * System text that changes from one answer to the next, sent after the
+   * date and outside the cache: a mentor's memory and the person's day
+   * (plan #2748.4), while the voice's system holds what stays the same.
+   */
+  contextBlocks?: readonly string[];
   execute: DashExecutor;
   /** Absent: every proposal is refused. */
   propose?: DashProposer;
@@ -780,6 +793,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const tools = voiceTools(voice);
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
+  const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
+  // Widened: the installed SDK's types predate output_config.
+  const effort = (voice.effort ? { output_config: { effort: voice.effort } } : {}) as Record<string, never>;
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
   // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
@@ -903,6 +919,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const onPage = pageLine(context.page);
   if (onPage) system.push({ type: 'text', text: onPage });
   if (context.scope) system.push({ type: 'text', text: scopeLine(context.scope) });
+  for (const text of input.contextBlocks ?? []) if (text.trim()) system.push({ type: 'text', text });
 
   /** Runs one call by its tool's kind in the voice's registry. */
   const run = (name: string, args: unknown): Promise<AskToolResult> => {
@@ -960,7 +977,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         ? 'lookups'
         : inputTokens >= INPUT_BUDGET
           ? 'budget'
-          : now() - started >= TIME_BUDGET_MS
+          : now() - started >= timeBudget
             ? 'time'
             : null;
     const mustAnswer = limit !== null || asked || round === MAX_LOOKUPS + 1;
@@ -972,6 +989,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         {
           model,
           max_tokens: maxTokens,
+          ...effort,
           system,
           tools,
           tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
@@ -1162,6 +1180,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
               {
                 model,
                 max_tokens: maxTokens,
+                ...effort,
                 system,
                 tools,
                 tool_choice: { type: 'none' },

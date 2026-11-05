@@ -20,7 +20,7 @@ import { ModuleMark } from '@/components/ui/module-mark';
 import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
-import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
+import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
@@ -44,6 +44,7 @@ import type { SearchHit } from '@/lib/search/sources';
 import { useAskBox, type AskBoxStart } from '@/components/talk/ask-box';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
+import type { ReplyState } from '@/lib/talk/reply-state';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
@@ -61,9 +62,10 @@ import {
   rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
-} from '@/app/ask/actions';
+} from '@/app/chat/dash/actions';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
+import { ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
 import type { DashChoiceId } from '@/lib/core/models';
 
@@ -91,10 +93,18 @@ import type { DashChoiceId } from '@/lib/core/models';
  * What else goes with a question (plan #1899.5): the signal that stops it,
  * the rows added with @, and the workspace its lookups are kept to.
  */
-export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+export type AskMore = {
+  signal?: AbortSignal;
+  rows?: AskMention[];
+  scope?: ModuleId | null;
+  /** "Think it through" is on (plan #2789.10). */
+  think?: boolean;
+  /** Try again (plan #2854.4): answer the chat's last question instead of adding one. */
+  retry?: boolean;
+};
 
 /**
- * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
@@ -149,20 +159,49 @@ async function askLive(
   onText?: (piece: string) => void,
   more: AskMore = {},
 ): Promise<AskDashResult> {
-  const { signal, rows, scope } = more;
+  const { signal, rows, scope, think, retry } = more;
   // The question as the route kept it, heard before Dash answers: what a
   // stopped answer is found again by (plan #1899.5).
   let asked: AskedWire | null = null;
+  // Stop is its own press (plan #2854.4): leaving the page no longer ends the
+  // answer, so the request is not cut. The chat is marked, the run ends the
+  // answer, and the stream brings back what was kept. Pressed before the
+  // question was kept, the mark goes as soon as its chat is known.
+  let stopPressed = false;
+  const sendStop = () => {
+    if (!asked) return;
+    void fetch('/api/ask/stop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationRef: asked.conversation.ref }),
+    }).catch(() => {});
+  };
+  signal?.addEventListener(
+    'abort',
+    () => {
+      stopPressed = true;
+      sendStop();
+    },
+    { once: true },
+  );
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
-      signal,
+      body: JSON.stringify({
+        question,
+        conversationRef,
+        page,
+        files,
+        list,
+        rows,
+        scope,
+        ...(think ? { think: true } : {}),
+        ...(retry ? { retry: true } : {}),
+      }),
     });
   } catch {
-    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   if (response.status === 401) return { turns: [], error: 'You are signed out. Sign in again to ask Dash.' };
@@ -176,12 +215,13 @@ async function askLive(
       (piece) => onText?.(piece),
       (heard) => {
         asked = heard;
+        if (stopPressed) sendStop();
       },
     );
-    if (signal?.aborted && result.error === STREAM_CUT) return keptWhenStopped(asked);
+    if (result.error === STREAM_CUT && asked) return keptWhenStopped(asked);
     return result;
   } catch {
-    if (signal?.aborted) return keptWhenStopped(asked);
+    if (asked) return keptWhenStopped(asked);
     return { turns: [], error: STREAM_CUT };
   }
 }
@@ -191,11 +231,11 @@ const STOPPED_LOOKS = 10;
 const STOPPED_LOOK_MS = 400;
 
 /**
- * The question and its answer as the route kept them after Stop (plan
- * #1899.5). Stopping cuts the stream, so the result line never arrives; the
- * conversation the `asked` line named is read back until the answer is in
- * it. A question stopped before it was kept comes back with no turns, which
- * puts the words back in the box.
+ * The question and its answer as the route kept them when the stream was
+ * cut before its result line (plan #1899.5): the conversation the `asked`
+ * line named is read back until the answer is in it. Since plan #2854.4 the
+ * answer carries on on the server when the stream goes, so one not in yet
+ * is said to be on its way, and reopening the chat shows it.
  */
 async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> {
   if (!asked) return { turns: [], error: 'Stopped before Dash had your question.' };
@@ -218,7 +258,7 @@ async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> 
   return {
     conversation: asked.conversation,
     turns: asked.turns,
-    error: 'Stopped. What Dash had written is being kept; reopen this chat in a moment to read it.',
+    error: 'The connection dropped, but Dash is still answering. Reopen this chat in a moment to read the reply.',
   };
 }
 
@@ -468,7 +508,8 @@ export function useAskSend(
   useEffect(() => {
     heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more };
   });
-  return useCallback<TalkSend>(async (body, files) => {
+  return useCallback<TalkSend>(async (body, files, options) => {
+    const more = heard.current.more?.();
     const result = await source.ask(
       body,
       ref.current,
@@ -477,7 +518,7 @@ export function useAskSend(
       files,
       heard.current.list,
       (piece) => heard.current.onText?.(piece),
-      heard.current.more?.(),
+      options?.retry ? { ...more, retry: true } : more,
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -511,16 +552,20 @@ export function AskThread({
   turns,
   changes: initialChanges = [],
   openHandoffs = 0,
+  reply: initialReply = null,
   onConversation,
   onSend,
   onAnswered,
   boxStart,
+  bubbles = false,
   ...thread
 }: {
   id: string;
   conversationRef: string | null;
   /** Requests already with the backup routine and not yet replied to (plan #1402). */
   openHandoffs?: number;
+  /** The reply to the last question as the server held it when the chat was read (plan #2854.4). */
+  reply?: ReplyState;
   /** The app address each question is asked from; null tells Dash no page. */
   page?: string | null;
   /** The filter of a list sent with each question (plan #1658); null sends none. */
@@ -548,6 +593,11 @@ export function AskThread({
   pendingQuestion?: string;
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
+  /**
+   * Drawn as Chat's Dash tab draws it (plan #2748.12): questions in bubbles,
+   * and what Dash looked up folded under his name, above the answer.
+   */
+  bubbles?: boolean;
 }) {
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
@@ -563,10 +613,16 @@ export function AskThread({
     fixtureHits: handle?.searchHits,
     start: boxStart,
   });
+  // "Think it through" (plan #2789.10): on until pressed again.
+  const [think, setThink] = useState(boxStart?.think ?? false);
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
-  const incoming = useHandoffReplies(source, ref, open > 0, setOpen);
+  const handedBack = useHandoffReplies(source, ref, open > 0, setOpen);
+  // A reply still being written by a run this page did not start (plan #2854.4).
+  const [reply, setReply] = useState<ServerReply>(() => serverReplyOf(initialReply));
+  const answeredElsewhere = useReplyArrival(source, ref, reply?.state === 'answering', setReply);
+  const incoming = answeredElsewhere ?? handedBack;
   // What Dash is looking up for the answer on its way (plan #1438), emptied
   // on each question; the answer once landed shows its own, folded.
   const [live, setLive] = useState<LookupLine[]>([]);
@@ -589,7 +645,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
-    () => ({ ...box.take(), signal: running.current?.signal }),
+    () => ({ ...box.take(), signal: running.current?.signal, think }),
   );
   const onChanged = useCallback(
     (next: DashChange) => {
@@ -654,33 +710,46 @@ export function AskThread({
         )
       }
       boxStart={
-        handle?.model && handle.chooseModel ? (
-          <>
-            {box.thread.boxStart}
-            <ModelChip
-              model={handle.model}
-              onModel={handle.chooseModel}
-              initialOpen={handle.modelOpen}
-            />
-          </>
-        ) : (
-          box.thread.boxStart
-        )
+        <>
+          {box.thread.boxStart}
+          {/* On Chat's Dash tab they sit under the box as quiet words (plan #2863). */}
+          <ThinkSwitch on={think} onChange={setThink} quiet={bubbles} />
+          {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
+          {!think && handle?.model && handle.chooseModel ? (
+            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} quiet={bubbles} />
+          ) : null}
+        </>
       }
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}
       activity="searching"
       incoming={incoming}
+      serverReply={reply}
+      canRetry={Boolean(ref)}
+      bubbles={bubbles}
+      lead={bubbles ? (turn) => (turn.role === 'assistant' ? <LookupFold calls={turn.toolCalls} quiet /> : null) : undefined}
       below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
-            <LookupFold calls={turn.toolCalls} />
+            {!bubbles && <LookupFold calls={turn.toolCalls} />}
+            {/* What a thought-through answer cost (plan #2789.10). */}
+            <ThoughtLine calls={turn.toolCalls} />
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
-                A todo or a note comes back as a change, drawn above with Undo. */}
+                A todo or a note comes back as a change, drawn above with Undo.
+                In a chat on the page they rest under every answer but the
+                latest until it is pointed at, from laptop width; a touch
+                screen, with nothing to point with, keeps them (plan #2748.12). */}
+            <div
+              className={
+                bubbles && !thread.latest
+                  ? 'min-[720px]:opacity-0 min-[720px]:transition-opacity min-[720px]:group-hover:opacity-100 min-[720px]:group-focus-within:opacity-100 pointer-coarse:opacity-100'
+                  : undefined
+              }
+            >
             <AnswerActions
               body={turn.body}
               question={thread.question}
@@ -695,6 +764,7 @@ export function AskThread({
               rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
               rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
             />
+            </div>
           </>
         );
       }}
@@ -745,6 +815,58 @@ function useHandoffReplies(
     };
   }, [source, ref, waiting, setOpen]);
   return incoming;
+}
+
+/** The server's reply state as the thread draws it: when it started is the server's to know. */
+function serverReplyOf(reply: ReplyState | undefined): ServerReply {
+  if (!reply) return null;
+  return reply.state === 'answering' ? { state: 'answering' } : reply;
+}
+
+/** How often a thread whose reply is being written elsewhere checks for it (plan #2854.4). */
+const REPLY_POLL_MS = 3_000;
+/** A reply is read as failed by the server after REPLY_LOST_AFTER_MS, so checking stops a little after. */
+const REPLY_POLL_FOR_MS = 6 * 60_000;
+
+/**
+ * While the reply to the last question is being written by a run this page
+ * did not start (plan #2854.4: the page that asked was left, and this one
+ * opened the chat), reads the chat every three seconds and hands back its
+ * turns once the reply is in, or the failure once it has failed.
+ */
+function useReplyArrival(
+  source: AskSource,
+  ref: string | null,
+  waiting: boolean,
+  setReply: (reply: ServerReply) => void,
+): readonly TalkTurn[] | undefined {
+  const [arrived, setArrived] = useState<readonly TalkTurn[]>();
+  useEffect(() => {
+    if (!ref || !waiting) return;
+    const until = Date.now() + REPLY_POLL_FOR_MS;
+    let live = true;
+    const timer = setInterval(() => {
+      if (Date.now() > until) {
+        clearInterval(timer);
+        return;
+      }
+      source
+        .poll(ref)
+        .then((found) => {
+          if (!live || found.turns.length === 0) return;
+          const next = serverReplyOf(found.reply);
+          if (next?.state === 'answering') return;
+          setArrived(found.turns);
+          setReply(next);
+        })
+        .catch(() => {});
+    }, REPLY_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [source, ref, waiting, setReply]);
+  return arrived;
 }
 
 /**
@@ -909,7 +1031,7 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               <Tooltip label="Open on Dash's page" align="end">
                 <Link
-                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
+                  href={chatRef ? `/chat/dash/${chatRef}` : '/chat/dash'}
                   aria-label="Open on Dash's page"
                   className={iconButtonVariants()}
                 >
@@ -1077,7 +1199,7 @@ function Earlier({
         id="ask-dash-earlier"
         title="Earlier questions"
         action={
-          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
             All of them
           </Link>
         }
@@ -1150,6 +1272,7 @@ function EarlierQuestion({
           turns={loaded.turns}
           changes={loaded.changes}
           openHandoffs={loaded.openHandoffs}
+          reply={loaded.reply}
           label="Ask a follow-up"
           placeholder="Ask more about this"
           above={lookingAt}
