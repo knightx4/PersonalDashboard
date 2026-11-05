@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   noteChainPayloadSchema,
@@ -145,66 +145,63 @@ export async function conceptsFromNote(input: {
       model: MODEL,
       max_tokens: 4096,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the concepts this note introduced.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              subject: { type: 'string' },
-              goal_concept: { type: 'string', description: 'A short concept name of a few words, never a sentence.' },
-              too_vague: { type: 'boolean' },
-              concepts: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    claim: { type: 'string' },
-                    basis: { type: 'string' },
-                    separating_question: {
-                      type: 'string',
-                      description:
-                        'A question somebody who holds this answers differently from somebody who does not.',
-                    },
-                    cost_if_wrong: {
-                      type: 'string',
-                      description:
-                        'What being wrong about this would cost, concretely. Leave the concept out if there is none.',
-                    },
-                    mastery: MASTERY_TOOL_FIELD,
-                    kind: KIND_TOOL_FIELD,
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the concepts this note introduced.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string' },
+            goal_concept: { type: 'string', description: 'A short concept name of a few words, never a sentence.' },
+            too_vague: { type: 'boolean' },
+            concepts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  claim: { type: 'string' },
+                  basis: { type: 'string' },
+                  separating_question: {
+                    type: 'string',
+                    description:
+                      'A question somebody who holds this answers differently from somebody who does not.',
                   },
-                  required: [
-                    'name',
-                    'claim',
-                    'basis',
-                    'separating_question',
-                    'cost_if_wrong',
-                    'mastery',
-                    'kind',
-                  ],
-                },
-              },
-              edges: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    prerequisite: { type: 'string' },
-                    dependent: { type: 'string' },
-                    basis: { type: 'string' },
+                  cost_if_wrong: {
+                    type: 'string',
+                    description:
+                      'What being wrong about this would cost, concretely. Leave the concept out if there is none.',
                   },
-                  required: ['prerequisite', 'dependent', 'basis'],
+                  mastery: MASTERY_TOOL_FIELD,
+                  kind: KIND_TOOL_FIELD,
                 },
+                required: [
+                  'name',
+                  'claim',
+                  'basis',
+                  'separating_question',
+                  'cost_if_wrong',
+                  'mastery',
+                  'kind',
+                ],
               },
             },
-            required: ['subject', 'concepts', 'edges'],
+            edges: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  prerequisite: { type: 'string' },
+                  dependent: { type: 'string' },
+                  basis: { type: 'string' },
+                },
+                required: ['prerequisite', 'dependent', 'basis'],
+              },
+            },
           },
+          required: ['subject', 'concepts', 'edges'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -217,12 +214,12 @@ export async function conceptsFromNote(input: {
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = noteChainPayloadSchema.safeParse(block.input);
+  const safe = noteChainPayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
