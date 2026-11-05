@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { FoldDetails } from '@/components/ui/fold-details';
-import { SectionHeading } from '@/components/ui/section-heading';
+import { SectionHeading, countShown } from '@/components/ui/section-heading';
 
 /**
  * The container.
@@ -130,7 +130,7 @@ export function CardSection({
                 className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-quick group-open/section:rotate-90"
               />
               {title}
-              {meta !== undefined && meta !== null && (
+              {countShown(meta) && (
                 <span className="tabular text-small font-normal text-ink-muted">{meta}</span>
               )}
             </h2>
