@@ -27,8 +27,9 @@ import {
  * The reads and writes behind the session thread screen in Chat (plan
  * #2789.7). Every call takes the core client on the person's own session, so
  * RLS keeps each account to its own threads, and each query names the person
- * as well. Sending writes the message only: the broker that wakes a session
- * and hands it the message (#2789.1) reads the undelivered ones itself.
+ * as well. Sending writes the message only; the action then wakes the
+ * broker (lib/threads/broker-wake.ts), which reads the undelivered rows
+ * itself and hands them to the thread's session (#2789.6).
  */
 
 type ThreadRow = {
@@ -351,12 +352,13 @@ export async function commentOnMockup(
   core: CoreSupabaseClient,
   userId: string,
   input: { messageId: string; text: string },
-): Promise<SessionMessage> {
+): Promise<{ message: SessionMessage; threadId: string }> {
   const note = input.text.trim();
   if (!note) throw new SessionThreadError('Write a note on the mockup.');
   if (note.length > MOCKUP_COMMENT_MAX) throw new SessionThreadError('That note is too long to send.');
   const mockup = await mockupOf(core, userId, input.messageId);
-  return insertAbout(core, userId, mockup, commentBody(mockup.title, note));
+  const message = await insertAbout(core, userId, mockup, commentBody(mockup.title, note));
+  return { message, threadId: mockup.threadId };
 }
 
 /**
@@ -372,7 +374,7 @@ export async function pickMockup(
   pub: SchemaClient,
   userId: string,
   input: { messageId: string },
-): Promise<{ message: SessionMessage; step: string | null }> {
+): Promise<{ message: SessionMessage; step: string | null; threadId: string }> {
   const mockup = await mockupOf(core, userId, input.messageId);
   const { data: already } = await core
     .from('session_messages')
@@ -419,5 +421,5 @@ export async function pickMockup(
     }
   }
   const message = await insertAbout(core, userId, mockup, pickBody(mockup.title));
-  return { message, step };
+  return { message, step, threadId: mockup.threadId };
 }
