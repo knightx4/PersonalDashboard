@@ -30,7 +30,7 @@ import { briefStarter } from '@/lib/learn/briefs/start';
 import { TODO_WRITES, runTodoWrite } from '@/lib/dash/todo-writes';
 import { NEWS_WRITES, runNewsWrite, switchedOff } from '@/lib/dash/news-writes';
 import { GOALS_WRITES, runGoalsWrite } from '@/lib/dash/goals-writes';
-import { YOU_WRITES, runYouWrite } from '@/lib/dash/you-writes';
+import { YOU_WRITES, reachOutRules, runYouWrite } from '@/lib/dash/you-writes';
 import { SHOPPING_OFF, SHOPPING_WRITES, runShoppingWrite, shoppingOn } from '@/lib/dash/shopping-writes';
 import { VAULT_WRITES, runVaultWrite, vaultNotePorts, vaultSwitchedOff } from '@/lib/dash/vault-writes';
 import { JOBS_OFF, JOBS_WRITES, jobsEnv, runJobsWrite } from '@/lib/dash/jobs-writes';
@@ -521,7 +521,15 @@ const YOU_TOOLS: readonly ConnectorWriteTool[] = YOU_WRITES.map((write) => ({
     if (!ctx.account.enabledModules.includes('you')) {
       throw new AskInputError('The You workspace is switched off, so nothing can be changed there.');
     }
-    const made = await runYouWrite(write, { userId: ctx.userId, you: await ctx.db('you') }, input);
+    const made = await runYouWrite(
+      write,
+      {
+        userId: ctx.userId,
+        you: await ctx.db('you'),
+        rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db) : undefined,
+      },
+      input,
+    );
     if ('ok' in made) throw new AskInputError(made.error);
     await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
     return { ok: true, rows: [made.row], note: made.summary };
