@@ -1,5 +1,6 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
+import { loadBotPhotos } from '@/lib/you/bot-photos';
 import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   mentorColour,
@@ -117,11 +118,19 @@ async function personRow(
 
 /** Everyone on the council, as the People list draws them, newest thread first. */
 export async function loadPeople(client: YouSupabaseClient, userId: string): Promise<PersonRow[]> {
-  const [roster, { chats, colours }] = await Promise.all([listRoster(client, userId), readChats(client, userId)]);
+  const [roster, { chats, colours }, photos] = await Promise.all([
+    listRoster(client, userId),
+    readChats(client, userId),
+    loadBotPhotos(client, userId).catch((error: unknown) => {
+      // A picture that cannot be read draws the initials; the list still opens.
+      console.error('bot pictures were not read', error);
+      return new Map<string, string>();
+    }),
+  ]);
   const people = await Promise.all(
     roster
       .filter((a) => a.active)
-      .map((a) => personRow(client, userId, a, chats.get(a.id), colours.get(a.id) ?? null)),
+      .map(async (a) => ({ ...(await personRow(client, userId, a, chats.get(a.id), colours.get(a.id) ?? null)), photo: photos.get(a.id) ?? null })),
   );
   return sortPeople(people);
 }

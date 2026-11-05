@@ -9202,6 +9202,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface />,
   },
   {
+    /* The same form once the person has uploaded a picture for the bot (plan #2955): the picture in the header, the Picture row with Change picture and Remove, and the bot's row in the list wearing it. */
+    id: 'chat-person-edit-photo',
+    label: 'Chat · Editing a bot, with their picture',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo" />,
+  },
+  {
+    /* A chosen picture on its way (plan #2955): the initials dimmed and the button saying Uploading, so the press shows it was taken. */
+    id: 'chat-person-edit-photo-uploading',
+    label: 'Chat · Editing a bot, a picture uploading',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo-uploading" />,
+  },
+  {
+    /* A picture that could not be kept: the initials stay, and the Picture row says why under its buttons. */
+    id: 'chat-person-edit-photo-failed',
+    label: 'Chat · Editing a bot, a picture that was not kept',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="photo-failed" />,
+  },
+  {
     /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
     id: 'chat-person-edit-versions',
     label: 'Chat · Editing a bot, their card and earlier cards',
