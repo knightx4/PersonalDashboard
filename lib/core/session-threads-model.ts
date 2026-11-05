@@ -42,6 +42,10 @@ export type SessionThread = {
   state: SessionThreadState;
   /** When anything last happened in it, for the list's order and its time. */
   lastAt: string;
+  /** When its row was last written, to tell a state heard over Realtime from an older one (plan #2789.12). */
+  updatedAt?: string;
+  /** Something happened in it while the list was open and it has not been opened since (plan #2789.12). */
+  moved?: boolean;
 };
 
 /** The name a thread on this app carries where a project's would go. */
