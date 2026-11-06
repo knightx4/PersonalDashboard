@@ -39,6 +39,7 @@ export const coreActions: ModuleActions = {
   'app/chat/dash/actions.ts': {
     askDashPageLabel: none('page'),
     recentAskQuestions: none('page'),
+    askDashBots: none('page'),
     openAskQuestion: none(
       'spends',
       'Asks Dash a question; an agent asking is already the one asking.',
