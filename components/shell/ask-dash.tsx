@@ -23,6 +23,7 @@ import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
 import { SpeakSwitch } from '@/components/talk/speak-reply';
+import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
@@ -749,6 +750,8 @@ export function AskThread({
       // answer landed, and the waiting line drew the last answer again
       // beneath your question (plan #2262.1).
       onSubmit={() => {
+        // Called inside the send press, so iPhone Safari lets the answer play aloud when it lands (plan #3036).
+        unlockSpeechOutput();
         setLive([]);
         setWritten('');
         onSend?.();
