@@ -521,7 +521,7 @@ import {
   ChatTypingMomentSurface,
 } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
+import { TalkThreadFilesSurface, TalkThreadHeldSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
   FinancesSpendingCategoriesSurface,
@@ -8819,6 +8819,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadWaitingSurface />,
+  },
+  {
+    /* A question sent while Dash answers (plan #2988.2): the follow-up on
+     * its way with the loading line under it, the next text held below that
+     * until the answer lands, and a third being typed, with Stop and Send
+     * side by side in the box. */
+    id: 'ask-dash-held',
+    label: 'Ask Dash · A question sent while Dash answers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadHeldSurface />,
   },
   {
     /* Dash's page (plan #1899.2), the conversation pattern: the chats on the

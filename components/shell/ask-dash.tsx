@@ -40,9 +40,10 @@ import {
   type LookupWire,
 } from '@/lib/talk/lookups';
 import type { AskMention } from '@/lib/talk/ask-input';
+import { heldTogether } from '@/lib/talk/held';
 import type { ModuleId } from '@/lib/modules';
 import type { SearchHit } from '@/lib/search/sources';
-import { useAskBox, type AskBoxStart } from '@/components/talk/ask-box';
+import { useAskBox, type AskBoxSent, type AskBoxStart } from '@/components/talk/ask-box';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import type { ReplyState } from '@/lib/talk/reply-state';
@@ -612,6 +613,8 @@ export function AskThread({
   initialDraft?: string;
   /** For the preview gallery: the thread drawn with this question on its way (plan #2262.1). */
   pendingQuestion?: string;
+  /** For the preview gallery: texts sent while the pending question is answered, held under it (plan #2988.2). */
+  heldQuestions?: readonly string[];
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
   /**
@@ -634,6 +637,13 @@ export function AskThread({
     fixtureHits: handle?.searchHits,
     start: boxStart,
   });
+  // What each held text took off the box (plan #2988.2): the rows go with
+  // the question the held texts become, and the newest scope with them.
+  const heldRows = useRef<AskBoxSent[]>([]);
+  const takeRows = (): AskBoxSent => {
+    const taken = heldRows.current.splice(0);
+    return taken.length > 0 ? heldTogether(taken) : box.take();
+  };
   // "Think it through" (plan #2789.10): on until pressed again.
   const [think, setThink] = useState(boxStart?.think ?? false);
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
@@ -666,7 +676,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
-    () => ({ ...box.take(), signal: running.current?.signal, think }),
+    () => ({ ...takeRows(), signal: running.current?.signal, think }),
   );
   const onChanged = useCallback(
     (next: DashChange) => {
@@ -721,6 +731,13 @@ export function AskThread({
         return result;
       }}
       onStop={() => running.current?.abort()}
+      // Questions sent in a row, or while an answer is written, go as one (plan #2988.2).
+      together
+      // The sheet's opening message goes with the press, as a question sent at once does.
+      onHold={() => {
+        heldRows.current.push(box.take());
+        onSend?.();
+      }}
       {...box.thread}
       // A model pick that could not be saved: said in the box, above the words,
       // where the foot has no room for it (plan #2458.3).

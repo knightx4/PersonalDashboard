@@ -353,3 +353,37 @@ export function TalkThreadWaitingSurface() {
     </AskDashProvider>
   );
 }
+
+/**
+ * A question sent while Dash answers (plan #2988.2): the follow-up on its
+ * way, the next text held under the loading line until the answer lands,
+ * and a third typed in the box, where Stop and Send sit side by side.
+ */
+export function TalkThreadHeldSurface() {
+  return (
+    <AskDashProvider source={WAITING_SOURCE}>
+      <PageColumn className="py-4">
+        <Card padding="standard">
+          <AskThread
+            id="talk-thread-held-preview"
+            conversationRef="00000000-0000-4000-8000-000000000063"
+            turns={[
+              { id: 'q1', role: 'user', body: 'What did I spend on food delivery in July?', createdAt: at(11) },
+              {
+                id: 'a1',
+                role: 'assistant',
+                body: 'You spent $299.40 on food delivery in July across 14 orders, which is close to your usual $300 a month.',
+                createdAt: at(11),
+              },
+            ]}
+            label="Ask a follow-up"
+            pendingQuestion="And in August?"
+            heldQuestions={['Which restaurant did I order from most?']}
+            startWriting
+            initialDraft="And was any of it on the work card?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
