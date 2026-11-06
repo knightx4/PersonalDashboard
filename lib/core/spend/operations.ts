@@ -111,6 +111,10 @@ export const SPEND_OPERATIONS = {
     // calling read tools until it answers: up to nine calls, each sending
     // the conversation and the lookups so far.
     'ask-dash',
+    // A chat reply from Dash or a mentor read aloud (plan #3006). Fish Audio
+    // S2.1 Pro, one call per reply, up to 600 characters, billed by the byte
+    // and capped at 330,000 bytes a month (core.speech_usage).
+    'speak-reply',
     // The weekly observations across the modules (plan #1119). Sonnet, one
     // call per person a week, from the observations cron; background.
     'write-observations',

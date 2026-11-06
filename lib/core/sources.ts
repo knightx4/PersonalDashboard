@@ -163,6 +163,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.memory_chunks', reason: 'Vectors of passages from other tables, for search by meaning; read through the rows they point at.' },
     { table: 'core.memory_documents', reason: 'Copies of the spec files in docs/, so the memory sweep can embed them; the specs are read from the repository.' },
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
+    { table: 'core.speech_usage', reason: 'Bookkeeping: bytes of chat replies read aloud this month, for the voice cap.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.run_activities', reason: 'What each Dash run did, line by line, for its run page; the rows a run wrote are sources in their own modules.' },
