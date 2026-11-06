@@ -60,6 +60,7 @@ import {
   type SessionHandoff,
 } from './handoffs';
 import { canHandToSession } from './session-handoff-store';
+import { botPasser } from './hand-to-bot-store';
 import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { keepSlip } from '@/lib/dash/slips';
@@ -180,6 +181,8 @@ export async function askDashInRequest(input: {
   // the broker reads the owner's threads alone, so another account is
   // answered here as before, with nothing said.
   const sessions = think ? await thinkInSession(core, user.id, input.question) : null;
+  // Passing a request to a bot on People (plan #3003.2), for the owner alone, as People offers it.
+  const passToBot = (await isOwner()) ? botPasser(await createYouClient(), core, user.id) : null;
 
   // Where the reply stands is kept on the chat (plan #2854.4), so a thread
   // opened after the page that asked has gone shows Dash still writing, or
@@ -265,6 +268,7 @@ export async function askDashInRequest(input: {
       recordFailure: (failure) => keepFailure(core, user.id, failure),
       recordSlip: (slip) => keepSlip(core, user.id, slip),
       ...(sessions?.toSession ? { toSession: sessions.toSession } : {}),
+      ...(passToBot ? { passToBot } : {}),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),

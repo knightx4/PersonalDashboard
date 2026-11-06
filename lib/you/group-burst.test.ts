@@ -5,6 +5,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
+import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
@@ -408,6 +409,20 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
     expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'h1', content: 'Handed on. Say you are on it.' });
     expect(said).toBe("On it, I'll post it here.");
+  });
+
+  it('offers hand_to_bot when the speaker can pass things on, and hands the result back before the bot texts (plan #3003.2)', async () => {
+    const passCall = { content: [{ type: 'tool_use', id: 'p1', name: 'hand_to_bot', input: { to: 'Maya', summary: 'The plan.' } }], usage: USAGE };
+    const { anthropic, sent } = scripted([passCall, text('Passed to Maya.')]);
+    const passToBot = vi.fn(async () => ({ ok: true as const, rows: [], note: passedNote('Maya') }));
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, passToBot }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['hand_to_bot']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(BOT_HANDOFF_RULES);
+    expect(passToBot).toHaveBeenCalledWith({ to: 'Maya', summary: 'The plan.' });
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'p1', content: passedNote('Maya') });
+    expect(said).toBe('Passed to Maya.');
   });
 
   it('sends no tools when there is no way to look places up', async () => {

@@ -21,6 +21,7 @@ import { notifyPerson } from '@/lib/talk/reply-state-store';
 import { isOwner } from '@/lib/dev/owner';
 import { botPageStarter } from '@/lib/you/bot-pages-store';
 import { sessionStarter } from '@/lib/talk/session-handoff-store';
+import { botPasser } from '@/lib/talk/hand-to-bot-store';
 
 /**
  * Texting a mentor from a request (plan #2748.4): the Council's send and
@@ -94,6 +95,8 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       makePage: owner ? (botPageStarter(core, userId) ?? undefined) : undefined,
       // Heavy work handed to a session (plan #3005.2), for the owner alone for the same reason.
       handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
+      // A request passed to another bot (plan #3003.2), for the owner alone, as hand_off is.
+      passToBot: owner ? botPasser(client, core, userId) : undefined,
     });
   } catch (error) {
     // replyToMentor never throws, so this is the setup before it: let go of the claim and say so.

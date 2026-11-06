@@ -12,6 +12,7 @@ import type { ContextMessage } from '@/lib/you/chat-context-model';
 import { loadCarryOver } from '@/lib/you/carry-over';
 import { MAKE_PAGE, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } from '@/lib/you/bot-pages';
 import { HAND_OFF, SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
+import { BOT_HANDOFF_RULES, HAND_TO_BOT, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
 import {
   peopleActionRules,
   PEOPLE_TOOLS,
@@ -103,6 +104,11 @@ export type MentorReplyInput = {
    * the mentor as hand_off. Absent: the mentor has no hand_off.
    */
   handOn?: SessionStarter;
+  /**
+   * Passes a request to another bot on People (plan #3003.2), offered to the
+   * mentor as hand_to_bot. Absent: the mentor cannot pass things on.
+   */
+  passToBot?: BotPasser;
   /** For tests. */
   anthropic?: Anthropic;
   now?: () => number;
@@ -372,11 +378,26 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     : null;
   // A page is made in a session, not in this turn (plan #2997): the tool keeps it and the mentor says it is on it.
   // Heavy work goes to a session the same way (plan #3005.2): hand_off keeps it and the mentor says it is on it.
+  // A request for another bot is kept for that bot (plan #3003.2): the mentor says it is passed on.
   const makePage = input.makePage;
   const handOn = input.handOn;
+  const passBot = input.passToBot;
   const handOff =
-    makePage || handOn
+    makePage || handOn || passBot
       ? (args: unknown, seen: (table: string, ref: string) => boolean, tool: { name: string }) => {
+          if (tool.name === HAND_TO_BOT_TOOL_NAME && passBot) {
+            const unanswered = new Set(unansweredFromPerson(ctx.messages));
+            return passBot(
+              {
+                fromBot: ctx.mentor.id,
+                source: { kind: 'direct', chatId, botKey: ctx.mentor.key },
+                messageId: answering.id,
+                asked: personWords(ctx.messages.filter((m) => unanswered.has(m.id)).map((m) => m.text)) || answering.text,
+              },
+              args,
+              seen,
+            );
+          }
           if (tool.name === MAKE_PAGE_TOOL_NAME && makePage) {
             return makePage(
               {
@@ -414,8 +435,14 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
       ...(makePage ? [PAGE_RULES] : []),
       ...(handOn ? [SESSION_RULES] : []),
+      ...(passBot ? [BOT_HANDOFF_RULES] : []),
     ].join('\n\n'),
-    tools: [...(acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS), ...(makePage ? [MAKE_PAGE] : []), ...(handOn ? [HAND_OFF] : [])],
+    tools: [
+      ...(acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS),
+      ...(makePage ? [MAKE_PAGE] : []),
+      ...(handOn ? [HAND_OFF] : []),
+      ...(passBot ? [HAND_TO_BOT] : []),
+    ],
     serverTools: peopleServerTools(input.model),
     // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
     maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,

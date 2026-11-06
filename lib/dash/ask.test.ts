@@ -898,6 +898,36 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
     expect(written.flatMap((w) => w.turns.map((t) => t.role))).toEqual(['user', 'assistant']);
   });
 
+  it('passes a request to a bot on People with hand_to_bot, from Ask Dash in this conversation (plan #3003.2)', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'hand_to_bot', { to: 'Bob', summary: 'They want the export built.' })]),
+      reply([use('a', 'answer', { answer: 'Passed to Bob.', cited: [] })]),
+    ]);
+    const { stores, handoffs } = handoffStores(() => ({ status: 'fired' }));
+    const passToBot = vi.fn(async () => ({ ok: true as const, rows: [], note: 'Passed on. Reply with exactly "Passed to Bob."' }));
+    const result = await askDash(
+      { question: 'Tell Bob to build the export', today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      { ...stores, passToBot },
+    );
+    expect(sent[0].tools.map((t) => t.name)).toEqual(expect.arrayContaining(['hand_off', 'hand_to_bot']));
+    expect(sent[0].system[0].text).toContain('YOU CAN PASS A REQUEST TO ANOTHER BOT');
+    expect(passToBot).toHaveBeenCalledTimes(1);
+    const [asker, input] = passToBot.mock.calls[0] as unknown as [Record<string, unknown>, unknown];
+    expect(asker).toMatchObject({ fromBot: null, source: { kind: 'ask', conversationId: 'conv-new' }, asked: 'Tell Bob to build the export' });
+    expect(input).toEqual({ to: 'Bob', summary: 'They want the export built.' });
+    // No session row: the bot does it.
+    expect(handoffs).toHaveLength(0);
+    expect(result.turns.at(-1)?.body).toBe('Passed to Bob.');
+  });
+
+  it('offers no hand_to_bot without a passer', async () => {
+    const { client, sent } = stubClient([reply([use('a', 'answer', { answer: 'Hi.', cited: [] })])]);
+    const { stores } = handoffStores(() => ({ status: 'fired' }));
+    await askDash({ question: 'Hello', today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client }, stores);
+    expect(sent[0].tools.map((t) => t.name)).not.toContain('hand_to_bot');
+    expect(sent[0].system[0].text).not.toContain('YOU CAN PASS A REQUEST TO ANOTHER BOT');
+  });
+
   it('records the row the request is about when the page shows it (plan #1568)', async () => {
     const about = { table: 'job_search.applications', ref: 'a1' };
     const { client } = stubClient([

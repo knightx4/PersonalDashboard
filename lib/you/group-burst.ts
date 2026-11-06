@@ -42,6 +42,7 @@ import type { AskToolResult } from '@/lib/ask/db';
 import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } from '@/lib/you/bot-pages';
 import { HAND_OFF_TOOL, HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
 import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
+import { BOT_HANDOFF_RULES, HAND_TO_BOT_TOOL, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -76,6 +77,8 @@ export type SpeakerInput = {
   page?: (input: unknown) => Promise<AskToolResult>;
   /** Hands heavy work to a session for this speaker (plan #3005.2). Absent: no hand_off. */
   handOn?: (input: unknown) => Promise<AskToolResult>;
+  /** Passes a request to another bot for this speaker (plan #3003.2). Absent: no hand_to_bot. */
+  passToBot?: (input: unknown) => Promise<AskToolResult>;
 };
 
 export type GroupBurstInput = {
@@ -104,6 +107,12 @@ export type GroupBurstInput = {
    * whichever bot calls it. Absent: no bot in the group can hand on.
    */
   handOn?: SessionStarter;
+  /**
+   * Passes a request to another bot on People (plan #3003.2), offered to
+   * each speaker as hand_to_bot. One row per request, whichever bot calls
+   * it. Absent: no bot in the group can pass things on.
+   */
+  passToBot?: BotPasser;
   /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
   timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
@@ -333,7 +342,7 @@ async function placesCall(findPlaces: PlacesFinder | undefined, block: Anthropic
   return { type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) };
 }
 
-/** One make_page (plan #2997) or hand_off (plan #3005.2) call run for a speaker, as the tool_result the model reads. */
+/** One make_page (plan #2997), hand_off (plan #3005.2) or hand_to_bot (plan #3003.2) call run for a speaker, as the tool_result the model reads. */
 async function handOffCall(
   start: (input: unknown) => Promise<AskToolResult>,
   block: Anthropic.ToolUseBlock,
@@ -354,6 +363,9 @@ function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, 
   if (call.name === MAKE_PAGE_TOOL_NAME && input.page) return handOffCall(input.page, call, 'The page could not be started. Say so plainly.');
   if (call.name === HAND_OFF_TOOL_NAME && input.handOn) {
     return handOffCall(input.handOn, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
+  }
+  if (call.name === HAND_TO_BOT_TOOL_NAME && input.passToBot) {
+    return handOffCall(input.passToBot, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
   }
   return placesCall(findPlaces, call);
 }
@@ -377,12 +389,14 @@ export async function speakWithModel(
     ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
     ...(input.page ? [PAGE_RULES] : []),
     ...(input.handOn ? [SESSION_RULES] : []),
+    ...(input.passToBot ? [BOT_HANDOFF_RULES] : []),
     `In this group with the person: ${others.join(', ')}.`,
   ].join('\n\n');
   const tools: Anthropic.Tool[] = [
     ...(findPlaces ? [FIND_PLACES_DEFINITION] : []),
     ...(input.page ? [MAKE_PAGE_TOOL] : []),
     ...(input.handOn ? [HAND_OFF_TOOL] : []),
+    ...(input.passToBot ? [HAND_TO_BOT_TOOL] : []),
   ];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
@@ -532,6 +546,20 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                     args,
                   )
               : undefined;
+            // The person's texts in this turn are the request, so two bots passing the same one keep one row.
+            const passBot = input.passToBot;
+            const passToBot = passBot
+              ? (args: unknown) =>
+                  passBot(
+                    {
+                      fromBot: advisorId,
+                      source: { kind: 'group', chatId },
+                      messageId: anchor.id,
+                      asked: personWords(said.split('\n')) || anchor.text,
+                    },
+                    args,
+                  )
+              : undefined;
             text = await speak(
               {
                 speaker: { ...member, system: persona.system },
@@ -539,6 +567,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                 transcript: transcriptOf(thread, members, formerNames),
                 ...(page ? { page } : {}),
                 ...(handOn ? { handOn } : {}),
+                ...(passToBot ? { passToBot } : {}),
               },
               spent['group-speaker'],
             );
