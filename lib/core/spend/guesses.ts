@@ -10,6 +10,7 @@ import type {
 import type { LearnOperation } from '@/lib/learn/spend';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { GOOGLE_GEOCODING, GOOGLE_PLACES_TEXT_SEARCH } from '@/lib/core/spend/pricing';
+import { FISH_S2_1_PRO } from '@/lib/talk/speech/budget';
 
 /**
  * A written best guess at what each paid operation costs, for when the ledger
@@ -406,6 +407,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Four or five rounds, each resending the tools (about 3,000 tokens, most
   // of it cached) and the lookups so far; a short answer out.
   'ask-dash': run(SONNET, 30_000, 1_000),
+  // One reply of about 500 characters, as bytes; nothing comes back to bill.
+  'speak-reply': run(FISH_S2_1_PRO, 500, 0),
   // Twelve weeks of the timeline, 381 events to 21 September 2026 at about
   // 30 tokens each, and the weekly lines; up to three sentences with their
   // ids out.
