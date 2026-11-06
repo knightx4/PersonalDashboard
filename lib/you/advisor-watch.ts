@@ -8,6 +8,7 @@ import { QUERY_OPS, queryRowsLookup } from '@/lib/ask/query';
 import { listableShapes, type TableShape } from '@/lib/ask/table-info';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { replyJson } from '@/lib/you/reach-out-make';
+import { cadenceWords } from '@/lib/you/advisor-watch-words';
 
 /**
  * A watch Dash writes itself when someone on People is asked to text about
@@ -329,14 +330,7 @@ export async function draftAdvisorWatch(
   }
 }
 
-/** "every day", "every week", "every 3 days". */
-export function cadenceWords(everyDays: number): string {
-  if (everyDays === 1) return 'every day';
-  if (everyDays === 7) return 'every week';
-  if (everyDays === 14) return 'every two weeks';
-  if (everyDays === 30) return 'every month';
-  return `every ${everyDays} days`;
-}
+export { cadenceWords };
 
 /** What set_reach_out says back for a proposed watch. */
 export function watchSummary(name: string, draft: WatchDraft, matched: number): string {

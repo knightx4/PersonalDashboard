@@ -5,7 +5,7 @@ import { CouncilView } from '@/app/you/council/council-view';
 import { MentorView, type MentorActions } from '@/app/you/council/mentors/[key]/mentor-view';
 import type { NoteActions } from '@/app/you/council/note-card';
 import type { Brain } from '@/lib/you/board-brain';
-import type { CouncilMemory, CouncilMessage, CouncilNote, Mentor } from '@/lib/you/council-model';
+import type { CouncilMemory, CouncilMessage, CouncilNote, Mentor, MentorWatch } from '@/lib/you/council-model';
 
 /**
  * The Council in the gallery (you 0037): the home with three unread texts in
@@ -30,6 +30,7 @@ const mentorActions: MentorActions = {
   send: async () => ({ error: null, saved: true }),
   commitment: async () => ({ error: null }),
   forget: async () => ({ error: null }),
+  stopWatch: async () => ({ error: null }),
 };
 
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -191,6 +192,13 @@ const MEMORY: CouncilMemory[] = [
   { id: id(305), kind: 'open_thread', text: 'Whether to study cities and land in the economics programme', dueOn: null, doneAt: null, createdAt: ago(46) },
 ];
 
+const WATCHES: MentorWatch[] = [
+  { id: id(351), about: 'Vault notes that mention your sister', sendsWhen: 'A new note names her', everyDays: 1, status: 'active', lastRunAt: ago(20), lastError: null },
+  { id: id(352), about: 'Job posts saved for a company with no cold email sent to anyone there', sendsWhen: 'A saved post has gone a week with no email', everyDays: 7, status: 'active', lastRunAt: null, lastError: null },
+  { id: id(353), about: 'Receipts over 200 dollars with no category', sendsWhen: 'A new one appears', everyDays: 3, status: 'paused', lastRunAt: ago(70), lastError: 'The last three checks could not read your receipts.' },
+  { id: id(354), about: 'Events in your calendar with no travel time', sendsWhen: 'One is added', everyDays: 14, status: 'stopped', lastRunAt: ago(400), lastError: null },
+];
+
 export function YouCouncilMentorPreview({ state = 'talk' }: { state?: 'talk' | 'waiting' | 'about' }) {
   const all = mentors(WITH_NOTES);
   const mentor = { ...all[1], waiting: state === 'waiting' };
@@ -216,6 +224,7 @@ export function YouCouncilMentorPreview({ state = 'talk' }: { state?: 'talk' | '
       chat={chat}
       messages={messages}
       memory={MEMORY}
+      watches={WATCHES}
       about={state === 'about' ? notes[0] : null}
       timezone={ZONE}
       now={NOW}
