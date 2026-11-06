@@ -13,7 +13,7 @@
 import { SETTLE_MAX_MS, SETTLE_QUIET_MS } from '@/lib/you/reply-turn';
 import { ATTACHMENTS_PER_ITEM, type UploadedAttachment } from '@/lib/attachments/rules';
 import { MAX_TURN, type TalkCitation } from '@/lib/talk/talk';
-import { MAX_MENTIONS, type AskMention } from '@/lib/talk/ask-input';
+import type { AskMention } from '@/lib/talk/ask-input';
 import type { ModuleId } from '@/lib/modules';
 
 /** A text sent from the box that has not gone to Dash yet. `at` is when it was sent, in ms. */
@@ -78,8 +78,8 @@ export function nextBatch(
 
 /**
  * The rows each held text took off the box, as the one question's: each row
- * once, as many as a question takes, and the newest workspace to keep the
- * lookups to.
+ * once, and the newest workspace to keep the lookups to. The route keeps a
+ * question to MAX_MENTIONS rows (lib/talk/ask-input.ts) as it reads them.
  */
 export function heldTogether(taken: readonly { rows: readonly AskMention[]; scope: ModuleId | null }[]): {
   rows: AskMention[];
@@ -87,7 +87,6 @@ export function heldTogether(taken: readonly { rows: readonly AskMention[]; scop
 } {
   const rows: AskMention[] = [];
   for (const row of taken.flatMap((sent) => sent.rows)) {
-    if (rows.length >= MAX_MENTIONS) break;
     if (!rows.some((r) => r.kind === row.kind && r.id === row.id)) rows.push(row);
   }
   return { rows, scope: taken.at(-1)?.scope ?? null };

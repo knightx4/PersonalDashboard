@@ -502,6 +502,7 @@ import {
   AskAnswerActionsSurface,
   AskToSessionSurface,
   AskBoxSurface,
+  AskHeldSurface,
   AskThinkSurface,
   AskThinkSessionSurface,
   FAILING_QUESTION,
@@ -521,7 +522,7 @@ import {
   ChatTypingMomentSurface,
 } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
-import { TalkThreadFilesSurface, TalkThreadHeldSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
+import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
   FinancesSpendingCategoriesSurface,
@@ -8829,7 +8830,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'Ask Dash · A question sent while Dash answers',
     module: 'jobs',
     width: 'page',
-    render: () => <TalkThreadHeldSurface />,
+    render: () => <AskHeldSurface />,
   },
   {
     /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
