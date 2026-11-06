@@ -26,6 +26,8 @@ import type { DigestNight } from '@/lib/digest/night';
 import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
+import { BotHandoffsPanel } from '@/app/dev/raised/bot-handoffs-panel';
+import type { FlaggedLine } from '@/lib/talk/bot-handoff-flags';
 import { AccountView } from '@/app/account/view';
 import { FinishNoticeRow } from '@/app/account/notifications';
 import { Banner } from '@/components/ui/banner';
@@ -934,6 +936,44 @@ const STATUS_FIXTURE: ScopeStatuses = {
   ],
 };
 
+/** Bot hand-offs the watch flagged (plan #3003.4): one never picked up, one started, one Ask Dash refused. */
+const FLAGGED_HANDOFFS: FlaggedLine[] = [
+  {
+    id: 'bh1',
+    request:
+      'Tell Bob to build the voice chat update this way: Fish Audio for the voices, ElevenLabs only as the fallback, and keep the per-minute cost under what we pay today',
+    route: 'Zena to Bob',
+    why: "Bob didn't pick it up within 10 minutes.",
+    at: '2026-10-06T07:40:00Z',
+    threadHref: '/chat/people/zena',
+    receiverHref: null,
+    receiverName: 'Bob',
+    canResend: true,
+  },
+  {
+    id: 'bh2',
+    request: 'Hand this to Maya so she can add it to the March budget',
+    route: 'Dash to Maya',
+    why: "Maya started but didn't finish within 10 minutes.",
+    at: '2026-10-06T05:15:00Z',
+    threadHref: '/chat/dash/c1',
+    receiverHref: '/chat/people/maya',
+    receiverName: 'Maya',
+    canResend: false,
+  },
+  {
+    id: 'bh3',
+    request: 'Pass the shortlist to Dash',
+    route: 'Zena to Dash',
+    why: 'Ask Dash does not take requests from the bots yet.',
+    at: '2026-10-05T18:00:00Z',
+    threadHref: '/chat/groups/g1',
+    receiverHref: null,
+    receiverName: 'Dash',
+    canResend: false,
+  },
+];
+
 export function DevRaisedSurface() {
   return column(
     <>
@@ -962,6 +1002,7 @@ export function DevRaisedSurface() {
         />
         <AskBox />
       </div>
+      <BotHandoffsPanel lines={FLAGGED_HANDOFFS} now={NOW} timeZone="UTC" />
       {/* The runner's card, moved here from /dev/plan (plan #578.12): resting,
           with work ready and the features the next ticks would fire. */}
       <OvernightControl

@@ -2,6 +2,8 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadSlipCount } from '@/lib/dash/slips';
 import { loadOpenSessionCount } from '@/lib/talk/handoff-count';
+import { loadFlaggedLines } from '@/lib/talk/bot-handoff-flags-load';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
@@ -29,6 +31,7 @@ import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom, placeCheckBacks } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
+import { BotHandoffsPanel } from './bot-handoffs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
 import { AskBox } from './ask-box';
@@ -92,6 +95,8 @@ export default async function DevRaisedPage() {
     snoozes,
     slips,
     sessions,
+    flagged,
+    settings,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -137,6 +142,9 @@ export default async function DevRaisedPage() {
     createCoreClient()
       .then((core) => loadOpenSessionCount(core, user.id))
       .catch(() => null),
+    // Bot-to-bot hand-offs that failed or went unanswered (plan #3003.4).
+    loadFlaggedLines(user.id, now),
+    loadAccountSettings(user.id).catch(() => null),
   ]);
 
   // The tree once, for the two things below that read it: how much is
@@ -208,6 +216,7 @@ export default async function DevRaisedPage() {
         />
         <AskBox />
       </div>
+      <BotHandoffsPanel lines={flagged} now={now} timeZone={settings?.timezone ?? 'UTC'} />
       <OvernightControl
         run={overnight}
         canSend={Boolean(planRoutine().token)}
