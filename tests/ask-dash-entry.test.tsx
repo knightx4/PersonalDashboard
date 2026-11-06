@@ -180,3 +180,15 @@ describe('the page the sheet will tell Dash', () => {
     ]);
   });
 });
+
+describe('the sheet under its heading (plans #2976, #2981)', () => {
+  it('offers no starter questions under the box', () => {
+    const html = renderToStaticMarkup(
+      <AskDashProvider source={SOURCE}>
+        <AskDashPanel page={null} source={SOURCE} onClose={() => {}} />
+      </AskDashProvider>,
+    );
+    expect(html).not.toContain('Questions to start from');
+    expect(html).not.toContain('Which applications have not heard back');
+  });
+});

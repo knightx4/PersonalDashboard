@@ -3,6 +3,7 @@ import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
 import { jobBoardLookup } from './job-board';
+import { FIND_PLACES_DEFINITION, placesLookup } from './places';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -79,6 +80,7 @@ export const ASK_TOOL_NAMES = [
   'search_mail',
   'read_mail',
   'read_job_board',
+  'find_places',
   'show_chart',
 ] as const;
 
@@ -88,9 +90,17 @@ export const ASK_TOOL_NAMES = [
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
  * The model Dash answers with is the app's own setting (plan #2458.4), and a
- * connector client is not Dash.
+ * connector client is not Dash. A places lookup spends the app's own daily
+ * allowance of Google calls (plan #2987.3), which stays with the app's chats.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart', 'dash_model'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = [
+  'search_mail',
+  'read_mail',
+  'read_job_board',
+  'find_places',
+  'show_chart',
+  'dash_model',
+];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -625,6 +635,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  FIND_PLACES_DEFINITION,
   CHART_TOOL_DEFINITION,
 ];
 
@@ -668,6 +679,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
   read_job_board: { run: jobBoardLookup, module: 'jobs' },
+  // Places near home belong to no workspace (lib/ask/places.ts).
+  find_places: { run: placesLookup, module: null },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
 };

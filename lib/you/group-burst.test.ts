@@ -1,10 +1,16 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
+import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
   MAX_PER_BOT,
   runGroupBurst,
+  SPEAKER_MAX_LOOKUPS,
+  SPEAKER_PLACES_RULES,
+  speakWithModel,
   type DirectorInput,
   type DirectorPlan,
   type SpeakerInput,
@@ -68,6 +74,8 @@ function memoryDb(tables: Record<string, Row[]>) {
         in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), chain),
         is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), chain),
         gt: (c: string, v: string) => (filters.push((r) => String(r[c]) > v), chain),
+        gte: (c: string, v: string) => (filters.push((r) => String(r[c]) >= v), chain),
+        not: (c: string, op: string, v: unknown) => (filters.push((r) => (op === 'is' ? (r[c] ?? null) !== v : r[c] !== v)), chain),
         or: () => chain,
         order: (c: string, o?: { ascending?: boolean }) => ((orders = [...orders, [c, o?.ascending !== false]]), chain),
         limit: (n: number) => ((limit = n), chain),
@@ -182,6 +190,35 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
   });
 
+  it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
+    const { client, tables, stamp } = group('@cy quick one');
+    let clock = Date.parse('2026-11-04T09:59:00Z');
+    let more = 0;
+    const plans: string[][] = [];
+    await runGroupBurst({
+      ...base(client),
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+        // Two more texts while the burst waits.
+        if (more < 2) {
+          more += 1;
+          tables.advisor_messages.push({ id: `p-more-${more}`, user_id: USER, chat_id: CHAT, role: 'person', speaker_id: null, text: `and ${more}`, created_at: new Date(clock).toISOString() });
+          stamp();
+        }
+      },
+      director: async (input) => {
+        plans.push(input.lines.filter((l) => l.speakerId === null).map((l) => l.text));
+        return { wait: true, picks: [], reactions: [] };
+      },
+      speak: async () => 'One answer to all three.',
+    });
+    // The director planned once, with all three, and the bot named in the first text answered.
+    expect(plans[0]).toEqual(['@cy quick one', 'and 1', 'and 2']);
+    expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
+    expect(tables.advisor_chats[0].typing_until).toBeNull();
+  });
+
   it('ends the burst when a bot asks the person something', async () => {
     const { client, tables } = group('What should I do?');
     await runGroupBurst({
@@ -254,5 +291,124 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
       speak: async () => null,
     });
     expect(kept).toEqual(['group-director:1']);
+  });
+});
+
+describe('a speaker looking places up (plan #2987.3)', () => {
+  const USAGE = { input_tokens: 500, output_tokens: 40 };
+  const speaker: SpeakerInput = {
+    speaker: { id: 'a1', key: 'food', name: 'Mia', system: 'You love food.' },
+    members: [
+      { id: 'a1', key: 'food', name: 'Mia' },
+      { id: 'a2', key: 'money', name: 'Sam' },
+    ],
+    transcript: '[1] The person: Find me a Thai place near my house',
+  };
+  const found: PlacesLookupResult = {
+    status: 'ok',
+    places: [
+      {
+        name: 'Kin Khao',
+        address: '55 Cyril Magnin St',
+        lat: 37.785,
+        lng: -122.409,
+        rating: 4.5,
+        ratingCount: 2210,
+        priceLevel: 2,
+        openNow: true,
+        todayHours: '5:00 – 9:30 PM',
+        mapsUrl: 'https://maps.google.com/?cid=111',
+        distanceMeters: 850,
+        distanceFromNearMeters: null,
+      },
+    ],
+    center: { lat: 37.78, lng: -122.41, label: 'home', isHome: true },
+    radiusMeters: 2000,
+    widened: false,
+    cached: true,
+    fetchedAt: '2026-11-06T19:00:00.000Z',
+  };
+  type Sent = { tools?: { name: string }[]; tool_choice?: { type: string }; system: { text: string }[]; messages: Anthropic.MessageParam[] };
+
+  function scripted(replies: unknown[]) {
+    const sent: Sent[] = [];
+    const anthropic = {
+      messages: {
+        create: async (params: Sent) => {
+          sent.push(structuredClone(params));
+          return replies[sent.length - 1];
+        },
+      },
+    } as unknown as Anthropic;
+    return { anthropic, sent };
+  }
+  const lookup = (id: string) => ({ content: [{ type: 'tool_use', id, name: 'find_places', input: { query: 'thai restaurant' } }], usage: USAGE });
+  const text = (t: string) => ({ content: [{ type: 'text', text: t }], usage: USAGE });
+
+  it('offers find_places, runs it, and hands the places back before the bot texts', async () => {
+    const { anthropic, sent } = scripted([lookup('p1'), text('Kin Khao, ten minutes away: https://maps.google.com/?cid=111')]);
+    const asked: PlacesLookupInput[] = [];
+    const spent: SpendReport[] = [];
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, spent, async (input) => {
+      asked.push(input);
+      return found;
+    });
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['find_places']);
+    expect(sent[0].tool_choice).toEqual({ type: 'auto' });
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(SPEAKER_PLACES_RULES);
+    expect(asked).toEqual([{ query: 'thai restaurant', near: null, radiusMeters: null, openNow: false }]);
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'p1' });
+    expect(back[0].is_error).toBeUndefined();
+    expect(back[0].content).toContain('https://maps.google.com/?cid=111');
+    expect(back[0].content).toContain('850 m');
+    expect(said).toBe('Kin Khao, ten minutes away: https://maps.google.com/?cid=111');
+    expect(spent).toHaveLength(2);
+  });
+
+  it("passes the lookup's refusal back in its own words, and stops offering it after the last lookup", async () => {
+    const cap = "Dash has made today's 50 place lookups, the daily limit. Ask again tomorrow.";
+    const replies = [...Array.from({ length: SPEAKER_MAX_LOOKUPS }, (_, i) => lookup(`p${i}`)), text('No more lookups today, sorry.')];
+    const { anthropic, sent } = scripted(replies);
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [], async () => ({ status: 'refused', reason: 'cap_reached', message: cap }));
+
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ content: cap, is_error: true });
+    expect(sent).toHaveLength(SPEAKER_MAX_LOOKUPS + 1);
+    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
+    expect(said).toBe('No more lookups today, sorry.');
+  });
+
+  it('sends no tools when there is no way to look places up', async () => {
+    const { anthropic, sent } = scripted([text('Try the noodle place.')]);
+    expect(await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [])).toBe('Try the noodle place.');
+    expect(sent[0].tools).toBeUndefined();
+  });
+});
+
+describe('what a bot heard in its other chats (plan #2983)', () => {
+  it("gives each speaker its memory page and its own one-on-one since the nightly run, and never another bot's", async () => {
+    const { client, tables } = group('Ada, what do you think I should cook on Saturday?', 2);
+    tables.advisor_chats.push(
+      { id: 'd-ada', user_id: USER, kind: 'direct', advisor_id: 'id-ada', title: null },
+      { id: 'd-ben', user_id: USER, kind: 'direct', advisor_id: 'id-ben', title: null },
+    );
+    tables.advisor_memory.push({ id: 'mem1', user_id: USER, advisor_id: 'id-ada', kind: 'fact', text: 'Keeps a sourdough starter.', retired_at: null, created_at: '2026-10-01T00:00:00Z' });
+    tables.advisor_messages.push(
+      { id: 'x1', user_id: USER, chat_id: 'd-ada', role: 'person', speaker_id: null, text: 'I have gone vegetarian this week.', created_at: '2026-11-04T09:50:00Z' },
+      { id: 'x2', user_id: USER, chat_id: 'd-ben', role: 'person', speaker_id: null, text: 'Ben, keep this between us.', created_at: '2026-11-04T09:51:00Z' },
+    );
+    const heard: SpeakerInput[] = [];
+    const director = async (input: DirectorInput): Promise<DirectorPlan> =>
+      input.state.round === 0 ? { wait: false, picks: [{ key: 'ada', why: 'answer' }], reactions: [] } : { wait: true, picks: [], reactions: [] };
+    const speak = async (input: SpeakerInput) => (heard.push(input), 'A mushroom risotto.');
+    await runGroupBurst({ ...base(client), director, speak, timeZone: 'UTC' });
+    const system = heard[0].speaker.system;
+    expect(heard[0].speaker.id).toBe('id-ada');
+    expect(system).toContain('Keeps a sourdough starter.');
+    expect(system).toContain('[one-on-one with them, Wed 4 Nov 09:50] They: I have gone vegetarian this week.');
+    expect(system).not.toContain('keep this between us');
+    expect(system).not.toContain('what do you think I should cook');
   });
 });

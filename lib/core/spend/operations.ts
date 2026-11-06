@@ -314,6 +314,14 @@ export const SPEND_OPERATIONS = {
     // One Haiku call after each reply, reading the two messages and what
     // the advisor already remembers.
     'remember-advisor-talk',
+    // A places lookup near home from a chat (plan #2987.2,
+    // lib/you/places-lookup.ts). One Google Places Text Search per lookup,
+    // none when the day's cache has the answer, at most 50 a day.
+    'find-places',
+    // Turning an address into a point with Google Geocoding (plan #2987.2):
+    // home's mailing address once until it changes, and an address a lookup
+    // searches near instead of home, once a day per address.
+    'geocode-address',
   ],
   finances: [
     // The monthly money review of the month before (plan #2593.8.2). Sonnet,

@@ -2,7 +2,15 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { claimTyping, MENTOR_LOOKUPS, REPLY_RULES, replyToMentor, type MentorSpendOperation } from './mentor-reply';
+import {
+  ACTING_MAX_TOKENS,
+  claimTyping,
+  MENTOR_LOOKUPS,
+  REPLY_MAX_TOKENS,
+  REPLY_RULES,
+  replyToMentor,
+  type MentorSpendOperation,
+} from './mentor-reply';
 import { sendMentorText } from './mentor-send';
 import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 
@@ -59,6 +67,8 @@ function fakeClient(tables: Tables, onInsert?: (table: string, row: Row) => void
       not: (col: string) => (filters.push((r) => r[col] != null), chain),
       lt: (col: string, value: string) => (filters.push((r) => String(r[col]) < value), chain),
       gt: (col: string, value: string) => (filters.push((r) => String(r[col]) > value), chain),
+      gte: (col: string, value: string) => (filters.push((r) => String(r[col]) >= value), chain),
+      in: (col: string, values: unknown[]) => (filters.push((r) => values.includes(r[col])), chain),
       or: (expr: string) => {
         const before = /typing_until\.lt\.(\S+)$/.exec(expr)?.[1];
         if (before) filters.push((r) => r.typing_until == null || String(r.typing_until) < before);
@@ -89,7 +99,7 @@ const ADVISOR = 'a1';
 
 function world(): Tables {
   return {
-    'you.advisor_chats': [{ id: CHAT, user_id: USER, advisor_id: ADVISOR, typing_until: null, reply_status: 'idle', last_message_at: iso() }],
+    'you.advisor_chats': [{ id: CHAT, user_id: USER, kind: 'direct', advisor_id: ADVISOR, typing_until: null, reply_status: 'idle', last_message_at: iso() }],
     'you.board_advisors': [
       { id: ADVISOR, user_id: USER, key: 'money', name: 'Money', kind: 'seat', question: 'Can you afford it?', focus: null, persona: 'You talk plainly about cash.', brain: null, made_by_you: false },
     ],
@@ -227,6 +237,9 @@ describe('replyToMentor', () => {
     expect(tools[0]).toBe('web_search');
     expect(lookupsOnly[0]).toBe('web_search');
     expect(system).toContain(PEOPLE_WEB_RULES);
+    // Room for a change's input, which at the texts' cap was cut off (plan #2999).
+    expect(acting.streamed[0].max_tokens).toBe(ACTING_MAX_TOKENS);
+    expect(looking.streamed[0].max_tokens).toBe(REPLY_MAX_TOKENS);
   });
 
   it('saves the first bubble while the rest is still being written', async () => {
@@ -300,6 +313,97 @@ describe('replyToMentor', () => {
     expect(JSON.stringify(lastTurn)).toContain('the start date');
   });
 
+  it('answers a message sent before the reply in hand had written anything (plan #2988)', async () => {
+    // The person sent a second text while the mentor was still thinking: it
+    // lands before the reply's bubbles, so the thread ends on the mentor and
+    // the second text was never answered until a third was sent.
+    const tables = world();
+    let sentMore = false;
+    const { stub, streamed } = anthropicStub(['Answer to the first.'], {
+      onPiece: () => {
+        if (sentMore) return;
+        sentMore = true;
+        tables['you.advisor_messages'].push({ id: 'm2', user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: 'try again', created_at: iso() });
+        clock += 50;
+      },
+    });
+    const outcome = await run(tables, stub).promise;
+    expect(outcome.rounds).toHaveLength(2);
+    expect(streamed).toHaveLength(2);
+    const turns = streamed[1].messages as { role: string; content: string }[];
+    expect(turns.at(-1)?.role).toBe('user');
+    expect(turns.at(-1)?.content).toContain('try again');
+    const second = tables['you.advisor_messages'].find((m) => m.id === 'm2');
+    expect(second?.delivered_at).toBeTruthy();
+  });
+
+  it('marks delivered only the messages the reply read, so one sent as it starts is answered next (plan #2988)', async () => {
+    const tables = world();
+    const client = fakeClient(tables);
+    const spy = client as unknown as { from: (t: string) => unknown };
+    const real = spy.from;
+    let pushed = false;
+    // A text lands between the reply reading the thread and marking it delivered.
+    spy.from = (t: string) => {
+      const chain = real(t) as { update: (v: Row) => unknown };
+      if (t === 'advisor_messages' && !pushed) {
+        const update = chain.update;
+        chain.update = (v: Row) => {
+          if ('delivered_at' in v && !pushed) {
+            pushed = true;
+            tables['you.advisor_messages'].push({ id: 'm3', user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: 'and the bonus?', created_at: iso() });
+            clock += 50;
+          }
+          return update(v);
+        };
+      }
+      return chain;
+    };
+    const { stub, streamed } = anthropicStub(['Answer.']);
+    await replyToMentor({
+      client,
+      userId: USER,
+      chatId: CHAT,
+      timeZone: 'Europe/London',
+      model: 'claude-sonnet-5-5',
+      anthropicApiKey: 'k',
+      anthropic: stub,
+      execute: vi.fn(),
+      recordSpend: async () => undefined,
+      claimed: true,
+      now: () => clock,
+      sleep: async () => undefined,
+    });
+    expect(streamed).toHaveLength(2);
+    expect(JSON.stringify((streamed[1].messages as unknown[]).at(-1))).toContain('the bonus');
+  });
+
+  it('waits for the person to stop sending before it reads the thread (plan #2988)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].created_at = iso();
+    const slept: number[] = [];
+    let more = 0;
+    const { stub, streamed } = anthropicStub(['One answer to all three.']);
+    const outcome = await run(tables, stub, {
+      sleep: async (ms) => {
+        slept.push(ms);
+        clock += ms;
+        // Two more texts arrive during the first two waits.
+        if (more < 2) {
+          more += 1;
+          tables['you.advisor_messages'].push({ id: `m-more-${more}`, user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: `and ${more}`, created_at: iso() });
+          clock += 1;
+        }
+      },
+    }).promise;
+    expect(slept.length).toBeGreaterThanOrEqual(3);
+    expect(streamed).toHaveLength(1);
+    expect(outcome.rounds).toHaveLength(1);
+    const last = JSON.stringify((streamed[0].messages as unknown[]).at(-1));
+    expect(last).toContain('Should I take the offer?');
+    expect(last).toContain('and 2');
+  });
+
   it('sends the pictures and PDFs of the messages it answers before their words (plan #2974)', async () => {
     const tables = world();
     tables['you.advisor_messages'].push({
@@ -334,6 +438,50 @@ describe('replyToMentor', () => {
     const outcome = await run(tables, stub, { readFiles }).promise;
     expect(outcome.rounds[0]?.ok).toBe(true);
     expect(mentorRows(tables).map((m) => m.text)).toEqual(['Tell me what it says.']);
+  });
+
+  it('looks places up with find_places and hands the result back before it texts (plan #2987.3)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].text = 'Find me a Thai place near my house';
+    const streamed: { tools: { name: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const lookup = {
+      content: [{ type: 'tool_use', id: 'p1', name: 'find_places', input: { query: 'thai restaurant' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = 'Kin Khao, ten minutes on foot and open now: https://maps.google.com/?cid=111';
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? lookup : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const execute = vi.fn(async (name: string) =>
+      name === 'find_places'
+        ? { ok: true as const, rows: [], found: [{ name: 'Kin Khao', distance_from_home: '850 m', maps_url: 'https://maps.google.com/?cid=111' }] }
+        : { ok: false as const, error: 'no' },
+    );
+
+    const outcome = await run(tables, stub, { ackAfterMs: 60_000, execute }).promise;
+
+    expect(streamed[0].tools.map((t) => t.name)).toContain('find_places');
+    expect(execute).toHaveBeenCalledWith('find_places', { query: 'thai restaurant' });
+    const back = streamed[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'p1' });
+    expect(back[0].content).toContain('https://maps.google.com/?cid=111');
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
   });
 
   it('offers every lookup but the chart, and nothing that writes', () => {
@@ -401,5 +549,28 @@ describe('sendMentorText with files (plan #2974)', () => {
       now: clock,
     });
     expect(sent).toMatchObject({ saved: false });
+  });
+});
+
+describe('what a mentor heard in its groups (plan #2983)', () => {
+  it("reads a group's newest messages straight away, and not a group it is not in", async () => {
+    const tables = world();
+    tables['you.advisor_chats'].push(
+      { id: 'g1', user_id: USER, kind: 'group', advisor_id: null, title: 'Flat hunt' },
+      { id: 'g2', user_id: USER, kind: 'group', advisor_id: null, title: 'Not theirs' },
+    );
+    tables['you.advisor_chat_members'] = [
+      { chat_id: 'g1', advisor_id: ADVISOR, user_id: USER, joined_at: '2026-11-01T00:00:00Z', left_at: null },
+      { chat_id: 'g2', advisor_id: 'a2', user_id: USER, joined_at: '2026-11-01T00:00:00Z', left_at: null },
+    ];
+    tables['you.advisor_messages'].push(
+      { id: 'g1m', user_id: USER, chat_id: 'g1', role: 'person', kind: 'reply', speaker_id: null, text: 'The rent went up by 200 a month.', created_at: '2026-11-03T14:55:00Z' },
+      { id: 'g2m', user_id: USER, chat_id: 'g2', role: 'person', kind: 'reply', speaker_id: null, text: 'A secret for the other group.', created_at: '2026-11-03T14:56:00Z' },
+    );
+    const { stub, streamed } = anthropicStub(['Then wait.']);
+    await run(tables, stub).promise;
+    const sent = JSON.stringify(streamed[0]);
+    expect(sent).toContain('[group: Flat hunt, Tue 3 Nov 14:55] They: The rent went up by 200 a month.');
+    expect(sent).not.toContain('A secret for the other group.');
   });
 });

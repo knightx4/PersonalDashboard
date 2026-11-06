@@ -20,6 +20,16 @@ export const ACK_AFTER_MS = 3_000;
 export const MAX_BUBBLES = 5;
 /** Output tokens for one call of the reply: texts are short. */
 export const REPLY_MAX_TOKENS = 1_200;
+/**
+ * Output tokens for one call of a reply that can change things (plan #2999).
+ * A plan step's detail runs to 4,000 characters, about a thousand tokens,
+ * and the model thinks first, inside the same cap. At 1,200 a call can be
+ * cut off part-way through add_plan_step's input, which leaves the title
+ * and drops the detail: the likeliest way nine steps went in with a title
+ * alone on 5 November 2026, with detail optional in the schema as the other.
+ * The texts are kept short by the rules, not by this cap.
+ */
+export const ACTING_MAX_TOKENS = 4_000;
 /** Output tokens for the first text. */
 export const ACK_MAX_TOKENS = 60;
 /** The longest first text kept, in characters. */

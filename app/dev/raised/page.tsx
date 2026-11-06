@@ -1,4 +1,6 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadSlipCount } from '@/lib/dash/slips';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
@@ -87,6 +89,7 @@ export default async function DevRaisedPage() {
     mainCheck,
     recentScreens,
     snoozes,
+    slips,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -124,6 +127,10 @@ export default async function DevRaisedPage() {
     loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
     // Snoozed rows are out of the chip as they are out of the Inbox (plan #1843).
     loadSnoozeState(supabase, user.id),
+    // How often a chat with Dash slipped in the last seven days (plan #2999).
+    createCoreClient()
+      .then((core) => loadSlipCount(core, user.id, now))
+      .catch(() => null),
   ]);
 
   // The tree once, for the two things below that read it: how much is
@@ -190,6 +197,7 @@ export default async function DevRaisedPage() {
           openNotes={openNotes.count ?? 0}
           mainCheck={mainCheck}
           inbox={onYou}
+          slips={slips}
         />
         <AskBox />
       </div>

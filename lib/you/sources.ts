@@ -308,6 +308,8 @@ export const youSources: ModuleSources = {
     { table: 'you.insights', reason: 'Insights Dash wrote about them; Goals reading them would cite Dash to itself.' },
     { table: 'you.insight_verdicts', reason: 'Their marks on Dash\'s insights, read by the insights run, not by Goals.' },
     { table: 'you.insight_runs', reason: 'Bookkeeping for the runs that write insights.' },
+    { table: 'you.places_calls', reason: 'Bookkeeping: one row per Google Places call, counted against the daily cap of 50.' },
+    { table: 'you.places_cache', reason: "Google's answers to a places lookup, kept a day so the same search is not paid for twice." },
     { table: 'you.dash_question_runs', reason: 'Bookkeeping for the runs that write Dash\'s questions on the Ask tab.' },
     { table: 'you.board_meetings', reason: 'Minutes Dash wrote for the board meetings; Goals reading them would cite Dash to itself.' },
     { table: 'you.board_marks', reason: 'Their votes, answers and ticks on the board\'s minutes, read by the next board meeting, not by Goals.' },

@@ -7,6 +7,7 @@ import { readBrain } from '@/lib/you/board-brain';
 import { memoryLayer, personaLayer, READ_LIMITS, type ContextMentor } from '@/lib/you/chat-context-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { loadGroup } from '@/lib/you/group-chats';
+import { loadCarryOver } from '@/lib/you/carry-over';
 import {
   asksPerson,
   BURST_REQUEST_MS,
@@ -33,6 +34,10 @@ import {
   type DirectorPlan,
 } from '@/lib/you/group-burst-model';
 import { claimTyping, TYPING_LEASE_MS, TYPING_RENEW_MS } from '@/lib/you/mentor-reply';
+import { keepRenewing, waitForQuiet } from '@/lib/you/reply-turn';
+import { AskInputError } from '@/lib/ask/db';
+import { FIND_PLACES_DEFINITION, FIND_PLACES_TOOL, placesInput, placesToolResult } from '@/lib/ask/places';
+import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -70,6 +75,14 @@ export type GroupBurstInput = {
   anthropicApiKey: string | null | undefined;
   /** Keeps what the calls cost; never throws. */
   recordSpend: (operation: GroupSpendOperation, reports: SpendReport[]) => Promise<void>;
+  /**
+   * Looks places up near home (lib/you/places-lookup.ts, bound to the person,
+   * plan #2987.3), offered to each speaker as find_places. Absent: the
+   * speakers write with no tools at all.
+   */
+  findPlaces?: PlacesFinder;
+  /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
+  timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
   claimed?: boolean;
   /** The round a chained request carries on from. */
@@ -125,13 +138,25 @@ async function readLines(client: YouSupabaseClient, userId: string, chatId: stri
     .reverse();
 }
 
-/** The thread from the person's newest message: that message, and the bots who have spoken since, in order. */
-function sinceAnchor(lines: readonly Line[]): { anchor: Line | null; spoken: string[]; lastBot: Line | null } {
+/**
+ * The thread from the person's newest message: that message, and the bots
+ * who have spoken since, in order. `said` is what the person sent in a row
+ * up to it, read as one message (plan #2988), so a bot named in the first of
+ * three texts is still the one asked.
+ */
+function sinceAnchor(lines: readonly Line[]): { anchor: Line | null; spoken: string[]; lastBot: Line | null; said: string } {
   let i = lines.length - 1;
   while (i >= 0 && lines[i].speakerId !== null) i--;
-  if (i < 0) return { anchor: null, spoken: [], lastBot: null };
+  if (i < 0) return { anchor: null, spoken: [], lastBot: null, said: '' };
+  let first = i;
+  while (first > 0 && lines[first - 1].speakerId === null) first--;
   const after = lines.slice(i + 1);
-  return { anchor: lines[i], spoken: after.map((l) => l.speakerId ?? '').filter(Boolean), lastBot: after[after.length - 1] ?? null };
+  return {
+    anchor: lines[i],
+    spoken: after.map((l) => l.speakerId ?? '').filter(Boolean),
+    lastBot: after[after.length - 1] ?? null,
+    said: lines.slice(first, i + 1).map((l) => l.text).join('\n'),
+  };
 }
 
 async function setMemberTyping(client: YouSupabaseClient, userId: string, chatId: string, advisorId: string, until: number | null) {
@@ -143,12 +168,14 @@ async function setMemberTyping(client: YouSupabaseClient, userId: string, chatId
     .eq('advisor_id', advisorId);
 }
 
+/** Renew the lease while it is held: a renewal never puts back a lease already let go (plan #2988). */
 async function renewLease(client: YouSupabaseClient, userId: string, chatId: string, now: number) {
   await client
     .from('advisor_chats')
     .update({ typing_until: new Date(now + TYPING_LEASE_MS).toISOString() })
     .eq('user_id', userId)
-    .eq('id', chatId);
+    .eq('id', chatId)
+    .not('typing_until', 'is', null);
 }
 
 async function releaseLease(client: YouSupabaseClient, userId: string, chatId: string, error: string | null) {
@@ -162,12 +189,24 @@ async function releaseLease(client: YouSupabaseClient, userId: string, chatId: s
   ]);
 }
 
-/** Each member's persona and memory, as a speaker's system prompt, and a one-line card for the director. */
+/**
+ * Each member's persona, memory and what it heard in its other chats since
+ * the nightly run (plan #2983), as a speaker's system prompt, and a one-line
+ * card for the director. The memory is the same page a one-on-one reply
+ * reads, cut to its layer's budget.
+ */
 async function loadCast(
   client: YouSupabaseClient,
   userId: string,
+  chatId: string,
   memberIds: readonly string[],
+  timeZone: string,
+  now: Date,
 ): Promise<Map<string, { system: string; card: string }>> {
+  const carried = loadCarryOver(client, userId, memberIds, chatId, { where: 'group', now, timeZone }).catch((error) => {
+    console.error('a group could not read its bots\' other chats', error);
+    return new Map<string, string>();
+  });
   const [advisors, memory] = await Promise.all([
     client
       .from('board_advisors')
@@ -194,6 +233,7 @@ async function loadCast(
     if (list.length < READ_LIMITS.memory) list.push(m);
     memoryBy.set(id, list);
   }
+  const elsewhere = await carried;
   const out = new Map<string, { system: string; card: string }>();
   for (const row of (advisors.data ?? []) as Record<string, unknown>[]) {
     const mentor: ContextMentor = {
@@ -209,7 +249,7 @@ async function loadCast(
     };
     const remembered = memoryLayer(memoryBy.get(mentor.id) ?? []).text;
     const card = (mentor.focus ?? mentor.question ?? '').replace(/\s+/g, ' ').slice(0, 200);
-    out.set(mentor.id, { system: [personaLayer(mentor).text, remembered].filter(Boolean).join('\n\n'), card });
+    out.set(mentor.id, { system: [personaLayer(mentor).text, remembered, elsewhere.get(mentor.id) ?? ''].filter(Boolean).join('\n\n'), card });
   }
   return out;
 }
@@ -233,21 +273,83 @@ async function directWithModel(anthropic: Anthropic, input: DirectorInput, spent
   }
 }
 
-/** One bot's text, with no lookups, so a turn stays short. */
-async function speakWithModel(anthropic: Anthropic, model: string, input: SpeakerInput, spent: SpendReport[]): Promise<string | null> {
+export type PlacesFinder = (input: PlacesLookupInput) => Promise<PlacesLookupResult>;
+
+/**
+ * The most places lookups one bot's turn makes (plan #2987.3). A group text
+ * is short, so one search, and one more when the first was refused for its
+ * input or found nothing, is plenty.
+ */
+export const SPEAKER_MAX_LOOKUPS = 2;
+
+/** What a speaker is told about find_places, after the texting rules. */
+export const SPEAKER_PLACES_RULES = `When the person asks for a place nearby, such as somewhere to eat near home, look it up with find_places before you suggest one. Name only places it found, say in your own voice why one fits, and put its Maps link in your text. If it comes back with an error, say that plainly.`;
+
+/** One find_places call run for a speaker, as the tool_result the model reads. */
+async function placesCall(findPlaces: PlacesFinder, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  const args = block.input && typeof block.input === 'object' ? (block.input as Record<string, unknown>) : {};
+  let content: string;
+  let isError = false;
+  if (block.name !== FIND_PLACES_TOOL) {
+    content = `There is no tool called ${block.name}.`;
+    isError = true;
+  } else {
+    try {
+      const result = placesToolResult(await findPlaces(placesInput(args)));
+      if (result.ok) content = JSON.stringify({ places: result.found ?? [], totals: result.totals, note: result.note });
+      else {
+        content = result.error;
+        isError = true;
+      }
+    } catch (error) {
+      if (!(error instanceof AskInputError)) console.error('group places lookup failed', error);
+      content = error instanceof AskInputError ? error.message : 'That places lookup failed.';
+      isError = true;
+    }
+  }
+  return { type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) };
+}
+
+/**
+ * One bot's text. With a places finder it is offered find_places, and may
+ * call it up to SPEAKER_MAX_LOOKUPS times before it writes; with none, it
+ * writes straight away, so a turn stays short.
+ */
+export async function speakWithModel(
+  anthropic: Anthropic,
+  model: string,
+  input: SpeakerInput,
+  spent: SpendReport[],
+  findPlaces?: PlacesFinder,
+): Promise<string | null> {
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: SPEAKER_MAX_TOKENS,
-    system: [
-      { type: 'text', text: input.speaker.system },
-      { type: 'text', text: `${SPEAKER_RULES}\n\nIn this group with the person: ${others.join(', ')}.` },
-    ],
-    messages: [{ role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` }],
-  });
-  spent.push({ model, usage: usageFrom(response.usage) });
-  const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
-  return cleanSpeech(text, input.speaker.name);
+  const rules = `${SPEAKER_RULES}${findPlaces ? `\n\n${SPEAKER_PLACES_RULES}` : ''}\n\nIn this group with the person: ${others.join(', ')}.`;
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
+  ];
+  for (let lookups = 0; ; lookups++) {
+    const offer = findPlaces && lookups < SPEAKER_MAX_LOOKUPS;
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: SPEAKER_MAX_TOKENS,
+      system: [
+        { type: 'text', text: input.speaker.system },
+        { type: 'text', text: rules },
+      ],
+      // Past the last lookup the tool is still sent, so the turns that used it
+      // read, but the model is told to write.
+      ...(findPlaces ? { tools: [FIND_PLACES_DEFINITION], tool_choice: offer ? { type: 'auto' as const } : { type: 'none' as const } } : {}),
+      messages,
+    });
+    spent.push({ model, usage: usageFrom(response.usage) });
+    const calls = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
+    if (!findPlaces || !offer || calls.length === 0) {
+      const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
+      return cleanSpeech(text, input.speaker.name);
+    }
+    messages.push({ role: 'assistant', content: response.content });
+    messages.push({ role: 'user', content: await Promise.all(calls.map((call) => placesCall(findPlaces, call))) });
+  }
 }
 
 /**
@@ -278,11 +380,10 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
   const anthropic = input.anthropic ?? (input.anthropicApiKey ? new Anthropic({ apiKey: input.anthropicApiKey }) : null);
   const direct = input.director ?? ((d: DirectorInput, s: SpendReport[]) => (anthropic ? directWithModel(anthropic, d, s) : Promise.resolve(WAIT)));
   const speak =
-    input.speak ?? ((d: SpeakerInput, s: SpendReport[]) => (anthropic ? speakWithModel(anthropic, input.model, d, s) : Promise.resolve(null)));
+    input.speak ??
+    ((d: SpeakerInput, s: SpendReport[]) => (anthropic ? speakWithModel(anthropic, input.model, d, s, input.findPlaces) : Promise.resolve(null)));
 
-  const renewing = setInterval(() => {
-    renewLease(client, userId, chatId, now()).catch(() => undefined);
-  }, TYPING_RENEW_MS);
+  const renewing = keepRenewing(() => renewLease(client, userId, chatId, now()), TYPING_RENEW_MS);
   let failure: string | null = null;
   let lastAnchorAt: string | null = null;
   const loop = async (): Promise<void> => {
@@ -290,14 +391,18 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     if (!group || group.members.length === 0) return;
     const members: BurstMember[] = group.members.map((m) => ({ id: m.id, key: m.key, name: m.name }));
     const formerNames = new Map(group.former.map((m) => [m.id, m.name]));
-    const cast = await loadCast(client, userId, members.map((m) => m.id));
+    const cast = await loadCast(client, userId, chatId, members.map((m) => m.id), input.timeZone ?? 'UTC', new Date(now()));
     const withCards = members.map((m) => ({ ...m, card: cast.get(m.id)?.card ?? '' }));
 
     let carriedRound = input.round ?? null;
     let answered: string | null = null;
     for (let burst = 0; burst <= MAX_REPLANS; burst++) {
+      // Texts sent in a row are one turn: wait, the lease held, until the person stops (plan #2988).
+      if (input.round === undefined || burst > 0) {
+        await waitForQuiet(async () => (await readLines(client, userId, chatId)).findLast((l) => l.speakerId === null)?.createdAt ?? null, { now, sleep });
+      }
       const lines = await readLines(client, userId, chatId);
-      const { anchor, spoken, lastBot } = sinceAnchor(lines);
+      const { anchor, spoken, lastBot, said } = sinceAnchor(lines);
       if (!anchor || anchor.id === answered) break;
       if (lastBot && carriedRound === null && asksPerson(lastBot.text, lastBot.speakerId ?? '', members)) break;
       outcome.bursts += 1;
@@ -306,7 +411,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
       const spent: Record<GroupSpendOperation, SpendReport[]> = { 'group-director': [], 'group-speaker': [] };
       const state: BurstState = { round: carriedRound ?? (spoken.length > 0 ? 1 : 0), spoken: [...spoken] };
       carriedRound = null;
-      const mentioned = mentionedIn(anchor.text, members);
+      const mentioned = mentionedIn(said, members);
       const thread = [...lines];
       let interrupted = false;
       let over = false;
@@ -334,9 +439,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
           if (!member || !persona) continue;
           const turnStarted = now();
           await setMemberTyping(client, userId, chatId, advisorId, turnStarted + TYPING_LEASE_MS).catch(() => undefined);
-          const keepTyping = setInterval(() => {
-            setMemberTyping(client, userId, chatId, advisorId, now() + TYPING_LEASE_MS).catch(() => undefined);
-          }, TYPING_RENEW_MS);
+          const keepTyping = keepRenewing(() => setMemberTyping(client, userId, chatId, advisorId, now() + TYPING_LEASE_MS), TYPING_RENEW_MS);
           let text: string | null = null;
           try {
             text = await speak({ speaker: { ...member, system: persona.system }, members, transcript: transcriptOf(thread, members, formerNames) }, spent['group-speaker']);
@@ -354,7 +457,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
               outcome.messages += 1;
             }
           } finally {
-            clearInterval(keepTyping);
+            await keepTyping.stop();
             await setMemberTyping(client, userId, chatId, advisorId, null).catch(() => undefined);
           }
           if (await personWroteSince(client, userId, chatId, anchor.createdAt)) {
@@ -393,7 +496,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     failure = error instanceof Error ? error.message : 'The group could not reply.';
     console.error('group burst failed', error);
   } finally {
-    clearInterval(renewing);
+    await renewing.stop();
   }
   if (outcome.chained) return outcome;
   await releaseLease(client, userId, chatId, failure).catch((error) => console.error('group burst could not let go', error));

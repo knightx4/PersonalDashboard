@@ -17,6 +17,8 @@ import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/go
 import { readMail } from '@/lib/inbox/read-mail';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readJobBoard } from '@/lib/jobs/discover/read-board';
+import { lookUpPlaces } from '@/lib/you/places-lookup';
+import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
@@ -94,6 +96,8 @@ export function voiceAskDeps(): VoiceAskDeps {
           searchMail: (search) => searchMail(core, userId, search),
           readMail: (message) => readMail(core, userId, message),
           readJobBoard,
+          findPlaces: async (search) =>
+            lookUpPlaces({ you: (await db('you')) as unknown as YouSupabaseClient, core, userId }, search),
         };
         const writeWith: Omit<DashWriteContext, keyof AskContext | 'seen'> = {
           goals: async (history) => goalsClient(session.accessToken, history),

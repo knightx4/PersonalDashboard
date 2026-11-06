@@ -10,6 +10,7 @@ import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { UNFINISHED_REASON, type DashFailure } from './failures';
+import { budgetSlip, type DashSlip } from './slips';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
@@ -134,7 +135,9 @@ email says, find it with search_mail, then open it with read_mail and answer
 from its text. Open only the messages the question is about, and quote no
 more of the text than the answer needs. When they give a company's careers
 page or site and ask about its roles, read them with read_job_board, and give
-the link with each role you suggest.
+the link with each role you suggest. When they ask for a place nearby, such
+as somewhere to eat near home, look it up with find_places and give the Maps
+link with each place you name.
 
 A NUMBER CAN BE DRAWN, AND SO CAN WHAT IT IS MADE OF. Call show_chart with
 figures exactly as a lookup gave them, then answer; the chart is drawn under
@@ -455,6 +458,11 @@ export type AskStores = {
    * Absent: not kept.
    */
   recordFailure?: (failure: DashFailure) => Promise<void>;
+  /**
+   * Keeps an answer that reached a limit as a slip, for Dev Home's count
+   * (plan #2999, lib/dash/slips.ts). Never throws. Absent: not kept.
+   */
+  recordSlip?: (slip: DashSlip) => Promise<void>;
   /**
    * Think it through in a session thread (plan #2789.11): starts a thread on
    * this app whose first message is the conversation so far, ending with the
@@ -829,6 +837,10 @@ export async function askDash(
     return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
   }
   if (answer.stop === 'unfinished') await failed('unfinished', UNFINISHED_REASON);
+  const slip = budgetSlip(answer, 'Ask Dash');
+  if (slip) {
+    await stores.recordSlip?.({ ...slip, surface: 'ask', conversation: `ask:${subject.ref}`, href: `/chat/dash/${subject.ref}` });
+  }
 
   let answered: TalkTurn[];
   try {

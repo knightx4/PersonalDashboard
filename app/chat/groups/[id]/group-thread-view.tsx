@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   MessageBubble,
   MessageDay,
@@ -124,9 +125,14 @@ export function GroupThreadView({
     act.current = actions;
   }, [actions]);
 
+  // Realtime does not replay what it missed while the phone slept or the
+  // socket dropped, so the page is read again when the channel joins again or
+  // the tab comes back (plan #2988).
+  const router = useRouter();
   useEffect(() => {
     if (!live) return;
     const supabase = createClient();
+    let joined = 0;
     const channel = supabase
       .channel(`chat-group:${chatId}:${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_messages', filter: `chat_id=eq.${chatId}` }, (event) => {
@@ -148,11 +154,22 @@ export function GroupThreadView({
         const reacted: Reacted = { advisorId: next.advisor_id, reaction: next.reaction };
         setReactions((r) => ({ ...r, [messageId]: [...(r[messageId] ?? page.reactions[messageId] ?? []).filter((x) => x.advisorId !== reacted.advisorId), reacted] }));
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') return;
+        joined += 1;
+        if (joined > 1) router.refresh();
+      });
+    const back = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('online', back);
     return () => {
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('online', back);
       void supabase.removeChannel(channel);
     };
-  }, [live, chatId, page.reactions]);
+  }, [live, chatId, page.reactions, router]);
 
   useEffect(() => {
     if (live) void act.current.read(chatId);
