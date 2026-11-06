@@ -503,6 +503,7 @@ import {
   AskAnswerActionsSurface,
   AskToSessionSurface,
   AskBoxSurface,
+  AskHeldSurface,
   AskThinkSurface,
   AskThinkSessionSurface,
   FAILING_QUESTION,
@@ -8672,7 +8673,7 @@ export const SURFACES: readonly Surface[] = [
       target: 'button[type="submit"][title="Send"]',
       submits: true,
       shows:
-        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+        'Send puts the question in the chat at once with the mark working under it; after the short pause for more texts (plan #2988.2) the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
     render: () => (
       <AskDashSurface open draft={AT_WORK_QUESTION}>
@@ -8870,6 +8871,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TalkThreadWaitingSurface />,
   },
   {
+    /* A question sent while Dash answers (plan #2988.2): the follow-up on
+     * its way with the loading line under it, the next text held below that
+     * until the answer lands, and a third being typed, with Stop and Send
+     * side by side in the box. */
+    id: 'ask-dash-held',
+    label: 'Ask Dash · A question sent while Dash answers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <AskHeldSurface />,
+  },
+  {
     /* Dash's page (plan #1899.2), the conversation pattern: the chats on the
      * left, grouped by day with the workspaces each used and chips to narrow
      * them, and the open chat beside them. On a phone the chat is drawn over
@@ -8913,7 +8925,7 @@ export const SURFACES: readonly Surface[] = [
       target: 'button[type="submit"][title="Send"]',
       submits: true,
       shows:
-        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+        'Send puts the question in the chat at once with the mark working under it; after the short pause for more texts (plan #2988.2) the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
     render: () => <DashPageSurface usedOpen={false} draft={AT_WORK_QUESTION} />,
   },

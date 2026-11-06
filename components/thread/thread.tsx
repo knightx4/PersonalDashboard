@@ -37,6 +37,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
 import { answersEvery, threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
 import { turnBody, MAX_TURN, type TalkCitation, type TalkTurn } from '@/lib/talk/talk';
+import { HELD_JOIN, heldWaitMs, nextBatch, type HeldQuestion } from '@/lib/talk/held';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
@@ -418,6 +419,20 @@ function Composer({
 
 /** The id a turn not yet written carries, so it can be told apart. */
 const PENDING = 'pending';
+/** A held question on its way (plan #2988.2) carries PENDING and its own number. */
+const isPending = (id: string) => id === PENDING || id.startsWith(`${PENDING}:`);
+
+/** A held text drawn as the question it will be part of. */
+function heldTurn(question: HeldQuestion): TalkTurn {
+  return {
+    id: question.id,
+    role: 'user',
+    body: question.body,
+    createdAt: new Date(question.at).toISOString(),
+    ...(question.citations.length > 0 ? { citations: [...question.citations] } : {}),
+    ...(question.files.length > 0 ? { files: question.files.map((file) => ({ ...file, id: file.path, href: '' })) } : {}),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // A row's thread.
@@ -1185,6 +1200,18 @@ type TalkThreadProps = {
    * only for the seconds an answer takes, too short to photograph (plan #2262).
    */
   pendingQuestion?: string;
+  /**
+   * Questions sent in a row go as one (plan #2988.2): the box takes a text
+   * while an answer is written, holds each in the thread as sent, and sends
+   * the held texts together once nothing is being answered and the person
+   * has paused for SETTLE_QUIET_MS. Stop stays beside Send while an answer
+   * is written. Ask Dash.
+   */
+  together?: boolean;
+  /** Heard as each text is held, before it goes: what the caller takes off the box goes with it. */
+  onHold?: () => void;
+  /** For the gallery: texts held under the answer on its way, as sent while it is written. */
+  heldQuestions?: readonly string[];
   /** Offer "Add a file" beside Send; the files go to `send` (plan #1715). */
   withFiles?: boolean;
   /** For the preview gallery: the box opens with these words in it. */
@@ -1259,6 +1286,9 @@ function TalkThread({
   dock = false,
   bubbles = false,
   lead,
+  together = false,
+  onHold,
+  heldQuestions,
 }: TalkThreadProps) {
   const [own, setTurns] = useState<TalkTurn[]>(() =>
     pendingQuestion ? [...initial, { id: PENDING, role: 'user', body: pendingQuestion, createdAt: '' }] : [...initial],
@@ -1272,6 +1302,10 @@ function TalkThread({
   const [localFailed, setFailed] = useState<string | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
   const [inFlight, startSend] = useTransition();
+  // Texts sent from the box that have not gone to Dash yet (plan #2988.2).
+  const [held, setHeld] = useState<HeldQuestion[]>(() =>
+    (heldQuestions ?? []).map((body, index) => ({ id: `${PENDING}:gallery-${index}`, body, at: Date.now(), files: [], citations: [] })),
+  );
   // The server's word on the reply counts until a send from here takes over (plan #2854.4).
   const [overtaken, setOvertaken] = useState<ServerReply>(null);
   const fromServer = serverReply && serverReply !== overtaken ? serverReply : null;
@@ -1280,6 +1314,10 @@ function TalkThread({
   const sending = inFlight || (Boolean(pendingQuestion) && own.some((turn) => turn.id === PENDING));
   // A reply this page did not start, still being written: drawn with the waiting line.
   const elsewhere = !inFlight && fromServer?.state === 'answering';
+  // Held texts wait for the answer being written, then for the person's pause.
+  const queued = held.length > 0;
+  const answering = sending || elsewhere;
+  const busy = sending || queued;
   const form = useRef<HTMLFormElement>(null);
   // Keep the box, and with it Stop, in view while the answer is written
   // beneath the question: a phone's screen is shorter than the lookups and
@@ -1291,7 +1329,7 @@ function TalkThread({
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const box = end.current?.offsetParent ? end.current : form.current;
-    if (!sending || !box) return;
+    if (!busy || !box) return;
     const keep = () => box.scrollIntoView({ block: 'nearest' });
     keep();
     // Again once the question and the working line have been laid out.
@@ -1302,7 +1340,7 @@ function TalkThread({
       cancelAnimationFrame(frame);
       watch?.disconnect();
     };
-  }, [sending]);
+  }, [busy]);
   // A docked thread opens on its latest turn, the way a chat app does.
   useEffect(() => {
     if (!dock) return;
@@ -1354,9 +1392,10 @@ function TalkThread({
     });
   };
   const now = useClockNow();
-  const ended = sending ? null : (closed?.(turns) ?? null);
+  const ended = busy ? null : (closed?.(turns) ?? null);
   const fresh = sending ? replyOnItsWay(written, turns) : '';
   const stopping = sending && Boolean(onStop);
+  const canSend = (Boolean(draft.trim()) || files.length > 0) && !uploading;
 
   /**
    * Send a question. From the box, the box empties and its files go with it;
@@ -1373,6 +1412,19 @@ function TalkThread({
     }
     const sentFiles = withFiles && fromBox ? files : [];
     const added = fromBox && questionCitations?.length ? [...questionCitations] : [];
+    if (together && fromBox) {
+      setError(null);
+      setDraft('');
+      setFiles([]);
+      setTrigger(null);
+      onTrigger?.(null);
+      setHeld((current) => [
+        ...current,
+        { id: `${PENDING}:${crypto.randomUUID()}`, body: checked.body, at: Date.now(), files: sentFiles, citations: added },
+      ]);
+      onHold?.();
+      return;
+    }
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
@@ -1418,6 +1470,49 @@ function TalkThread({
     });
   };
 
+  /**
+   * Send the held texts as one question (plan #2988.2): they move into the
+   * thread as questions on their way, and the turns the send kept take
+   * their place. Not kept, their words go back in the box.
+   */
+  const flush = () => {
+    const { batch, rest, body, files: batchFiles } = nextBatch(held);
+    if (batch.length === 0) return;
+    const ids = new Set(batch.map((question) => question.id));
+    setHeld(rest);
+    setError(null);
+    setFailed(null);
+    setLanded(null);
+    setOvertaken(serverReply);
+    setTurns((current) => [...current, ...batch.map(heldTurn)]);
+    onSubmit?.();
+    startSend(async () => {
+      const result = await send(body, batchFiles.length > 0 ? batchFiles : undefined).catch(() => ({
+        turns: undefined,
+        error: 'That was not sent. Check your connection.',
+      }));
+      const kept = result.turns ?? [];
+      startSend(() => {
+        setTurns((current) => [...current.filter((turn) => !ids.has(turn.id)), ...kept]);
+        if (result.error) setFailed(result.error);
+        else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
+        if (kept.length === 0) {
+          setDraft((current) => [body, current].filter((text) => text.trim()).join(HELD_JOIN));
+          setFiles((current) => [...batchFiles, ...current]);
+          setWriting(true);
+        }
+      });
+    });
+  };
+  // Once nothing is being answered, the held texts go after the person's pause.
+  useEffect(() => {
+    const wait = heldWaitMs(held, Date.now(), answering);
+    if (wait === null) return;
+    const timer = setTimeout(flush, wait);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush reads the held texts this run saw
+  }, [held, answering]);
+
   useEffect(() => {
     if (!landed) return;
     const timer = setTimeout(() => setLanded(null), DONE_FOR_MS);
@@ -1425,12 +1520,12 @@ function TalkThread({
   }, [landed]);
 
   const resend = (body: string) => {
-    if (sending) return;
+    if (busy) return;
     submit(body, false);
   };
   // Try again (plan #2854.4): the question is kept already, so only the answer is asked for.
   const lastTurn = turns[turns.length - 1];
-  const retryable = canRetry && Boolean(failed) && !sending && !elsewhere && lastTurn?.role === 'user' && lastTurn.id !== PENDING;
+  const retryable = canRetry && Boolean(failed) && !busy && !elsewhere && lastTurn?.role === 'user' && !isPending(lastTurn.id);
   const retry = () => {
     if (!retryable || !lastTurn) return;
     setError(null);
@@ -1528,7 +1623,54 @@ function TalkThread({
     });
 
   // A new chat keeps its box in the middle of the pane until the first question is out.
-  const held = bubbles && dock && (turns.length > 0 || sending || elsewhere || Boolean(failed));
+  const docked = bubbles && dock && (turns.length > 0 || busy || elsewhere || Boolean(failed));
+
+  // The line under the question while Dash answers: under the answer's
+  // question while it is written, under the held texts in the pause before
+  // they go (plan #2988.2).
+  const waitingWords = !fresh && (
+    <p className="text-body text-ink-muted">
+      {elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}
+    </p>
+  );
+  // Under the last held text while the answer above is written: Dash has it.
+  const heldNote = (index: number) =>
+    answering && index === held.length - 1 ? (
+      <p className="text-small text-ink-muted">
+        {held.length > 1
+          ? `${assistant.name} answers these together once the answer above is in.`
+          : `${assistant.name} answers this once the answer above is in.`}
+      </p>
+    ) : null;
+  const waitingBubble = (
+    <ChatTurn
+      mine={false}
+      head
+      muted={!fresh}
+      aria-live="polite"
+      aria-busy={fresh ? true : undefined}
+      mark={mark('working', fresh ? 'writing' : activity)}
+    >
+      {waitingWords}
+      {working}
+      {fresh && <Words body={fresh} refs="outlines" />}
+    </ChatTurn>
+  );
+  const waitingTurn = (
+    <ThreadTurn
+      voice="dash"
+      name={assistant.name}
+      muted={!fresh}
+      now={now}
+      aria-live="polite"
+      aria-busy={fresh ? true : undefined}
+      mark={mark('working', fresh ? 'writing' : activity)}
+    >
+      {waitingWords}
+      {working}
+      {fresh && <Words body={fresh} refs="outlines" />}
+    </ThreadTurn>
+  );
 
   const chatTurns = bubbles && (
     <ul className="space-y-6">
@@ -1557,32 +1699,36 @@ function TalkThread({
             {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
             {!mine && <ReplyCharts calls={turn.toolCalls} />}
             {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
-            {turn.id === PENDING
+            {isPending(turn.id)
               ? undefined
               : below?.(turn, {
                   question: questionBefore(index),
-                  busy: sending,
+                  busy,
                   resend,
                   edit,
-                  latest: index === turns.length - 1 && !sending,
+                  latest: index === turns.length - 1 && !busy,
                 })}
           </ChatTurn>
         );
       })}
-      {(sending || elsewhere) && (
-        <ChatTurn
-          mine={false}
-          head
-          muted={!fresh}
-          aria-live="polite"
-          aria-busy={fresh ? true : undefined}
-          mark={mark('working', fresh ? 'writing' : activity)}
-        >
-          {!fresh && <p className="text-body text-ink-muted">{elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}</p>}
-          {working}
-          {fresh && <Words body={fresh} refs="outlines" />}
-        </ChatTurn>
-      )}
+      {answering && waitingBubble}
+      {/* Sent while the answer above is written, or in the pause after (plan #2988.2). */}
+      {held.map((question, index) => {
+        const turn = heldTurn(question);
+        return (
+          <ChatTurn key={question.id} mine head={index === 0 && (answering || turns.at(-1)?.role !== 'user')}>
+            {!onlyFiles(turn) && (
+              <p className="text-body whitespace-pre-wrap">
+                <LinkedText text={turn.body} />
+              </p>
+            )}
+            {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+            {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
+            {heldNote(index)}
+          </ChatTurn>
+        );
+      })}
+      {queued && !answering && waitingBubble}
       {!sending && failed && (
         <ChatTurn mine={false} head role="alert" mark={mark('failed')}>
           <p className="text-body text-danger">{failed}</p>
@@ -1594,14 +1740,14 @@ function TalkThread({
 
   return (
     <div className={dock ? 'flex flex-1 flex-col gap-2' : 'space-y-2'}>
-      {bubbles && (turns.length > 0 || failed || sending) && chatTurns}
+      {bubbles && (turns.length > 0 || failed || busy) && chatTurns}
       {/* Room under the last turn for the box held over the phone's tab bar. */}
-      {held && <div
+      {docked && <div
           ref={end}
           aria-hidden
           className="h-40 scroll-mb-[calc(var(--dock-h)+env(safe-area-inset-bottom))] min-[720px]:hidden"
         />}
-      {!bubbles && (turns.length > 0 || failed || opening) && (
+      {!bubbles && (turns.length > 0 || failed || opening || queued) && (
         <ul className="space-y-2.5">
           {opening && (
             <ThreadTurn voice="dash" name={assistant.name} now={now} mark={mark()}>
@@ -1637,27 +1783,30 @@ function TalkThread({
                 {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
                 {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}
-                {turn.id === PENDING
+                {isPending(turn.id)
                   ? undefined
-                  : below?.(turn, { question: questionBefore(index), busy: sending, resend, edit })}
+                  : below?.(turn, { question: questionBefore(index), busy, resend, edit })}
               </ThreadTurn>
             );
           })}
-          {(sending || elsewhere) && (
-            <ThreadTurn
-              voice="dash"
-              name={assistant.name}
-              muted={!fresh}
-              now={now}
-              aria-live="polite"
-              aria-busy={fresh ? true : undefined}
-              mark={mark('working', fresh ? 'writing' : activity)}
-            >
-              {!fresh && <p className="text-body text-ink-muted">{elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}</p>}
-              {working}
-              {fresh && <Words body={fresh} refs="outlines" />}
-            </ThreadTurn>
-          )}
+          {answering && waitingTurn}
+          {held.map((question, index) => {
+            const turn = heldTurn(question);
+            const head = index === 0 && (answering || turns.at(-1)?.role !== 'user');
+            return (
+              <ThreadTurn key={question.id} voice="you" name={head ? 'You' : undefined} now={now}>
+                {!onlyFiles(turn) && (
+                  <p className="text-body whitespace-pre-wrap">
+                    <LinkedText text={turn.body} />
+                  </p>
+                )}
+                {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+                {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
+                {heldNote(index)}
+              </ThreadTurn>
+            );
+          })}
+          {queued && !answering && waitingTurn}
           {!sending && failed && (
             <ThreadTurn voice="dash" name={assistant.name} now={now} role="alert" mark={mark('failed')}>
               <p className="text-body text-danger">{failed}</p>
@@ -1702,18 +1851,18 @@ function TalkThread({
             dock && bubbles && 'pb-3 min-[720px]:bg-surface',
             // The Dash tab of Chat holds it right above the phone's tab bar
             // as well, so the box never scrolls away with the thread (plan #2748.12).
-            held &&
+            docked &&
               'max-[719px]:fixed max-[719px]:inset-x-0 max-[719px]:bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] max-[719px]:z-over-link max-[719px]:bg-page max-[719px]:px-8 max-[719px]:pb-2 max-[719px]:pt-2',
           )}
           onSubmit={(event) => {
             event.preventDefault();
-            if (stopping) return;
+            if (stopping && !together) return;
             submit();
           }}
           onClose={() => {
             if (!dock) setWriting(false);
           }}
-          holdSend={stopping}
+          holdSend={stopping && !together}
           attached={attached}
           onCaret={onTrigger ? noteCaret : undefined}
           boxProps={
@@ -1791,18 +1940,29 @@ function TalkThread({
           }
           send={
             stopping ? (
-              // Send turns into Stop while Dash answers (plan #1899.5).
-              <Tooltip label="Stop the answer and keep what Dash has written">
-                <Button
-                  type="button"
-                  size="sm"
-                  className="size-7 shrink-0 px-0 active:brightness-90"
-                  aria-label="Stop"
-                  onClick={onStop}
-                >
-                  <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
-                </Button>
-              </Tooltip>
+              <>
+                {/* Send turns into Stop while Dash answers (plan #1899.5); held
+                    together, Send comes back beside it once words are typed (plan #2988.2). */}
+                <Tooltip label="Stop the answer and keep what Dash has written">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={together && canSend ? 'secondary' : undefined}
+                    // On a phone the row has room for one: Send while words are typed, Stop once the box is empty.
+                    className={cn('size-7 shrink-0 px-0 active:brightness-90', together && canSend && 'max-sm:hidden')}
+                    aria-label="Stop"
+                    onClick={onStop}
+                  >
+                    <Square className="size-3 fill-current" strokeWidth={1.75} aria-hidden />
+                  </Button>
+                </Tooltip>
+                {together && canSend && (
+                  <Button type="submit" size="sm" className="size-7 shrink-0 px-0 active:brightness-90" title="Send">
+                    <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
+                    <span className="sr-only">Send</span>
+                  </Button>
+                )}
+              </>
             ) : undefined
           }
           draft={draft}
@@ -1828,7 +1988,7 @@ function TalkThread({
                     ref={adder}
                     value={files}
                     onChange={setFiles}
-                    disabled={sending}
+                    disabled={sending && !together}
                     onUploadingChange={setUploading}
                     iconOnPhone={Boolean(boxStart)}
                     plus={bubbles}
@@ -1851,7 +2011,7 @@ function TalkThread({
                 )
           }
           sendLabel="Send"
-          sendDisabled={(!draft.trim() && files.length === 0) || sending || uploading}
+          sendDisabled={!canSend || (sending && !together)}
         />
       )}
 

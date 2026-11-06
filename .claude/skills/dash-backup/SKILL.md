@@ -230,25 +230,47 @@ skill's. Record each row you write with `core.record_dash_action`, as step 3
 says. No note is filed: a session hand-off is the bot using a session as
 meant, not a gap in its tools.
 
-**Reply in the thread.** For an Ask Dash conversation, write the reply as
-step 4 says and keep its turn id. In a People chat the bot posts the result
-in its own voice; that post is plan #3005.4 and not built yet, so put what
-you did, with links, in your report until it is.
+**Reply in the thread.** The person is waiting there, and the close below
+refuses a done that leaves them without the result.
+
+- **An Ask Dash conversation** (`conversation_id` set): write the reply as
+  step 4 says, with what you did, a citation linking each row, and how to
+  put it back. Keep its turn id for `--reply-turn`.
+- **A People chat** (`advisor_chat_id` set, one-on-one or group): the bot
+  posts the result, so give `close` the text in the bot's voice, as its
+  persona would text it: what you did, in a sentence or two, with no
+  "Claude", no session and no routine. Each row you made or changed goes in
+  as `--link "<label>=<path in the app>"`, which the thread shows under the
+  text. Add `--undo` when you recorded any change with
+  `core.record_dash_action`: it adds a link to Home, where each one has its
+  Undo. In a group the message is posted with the bot as its speaker.
 
 **Close it through the script, never with an update.** Closing counts the
 session's cost toward spend: one `core.model_spend` row per model under
 `core / hand-off-session`, read from this session's transcripts, and the
-total on `cost_micros`. An update through `scripts/sql.ts` would skip that.
+total on `cost_micros`. It also tells the thread. An update through
+`scripts/sql.ts` would skip both.
 
 ```sh
 npx tsx scripts/handoff-session.ts close <id> --done --reply-turn <turn id>
+npx tsx scripts/handoff-session.ts close <id> --done \
+  --reply "Done. Your 10k goal is up, with a plan for the eight weeks to race day." \
+  --link "Run a 10k=/goals/<goal id>" --undo
 npx tsx scripts/handoff-session.ts close <id> --failed "The vault note was refused: its folder does not exist."
 ```
 
-The failure reason is read by the person in the thread, so write it as one
-plain sentence on what stopped you. Run `close` as the last thing you do, so
-the cost it counts is the whole session's. A session hand-off is never left
-running, whatever happened.
+A failure is told in the thread for you: "That didn't work, sorry. <your
+reason> Ask me again and I'll have another go." So write the reason as one
+plain sentence on what stopped you, read by the person. In an Ask Dash
+conversation you may write your own reply turn first and pass `--reply-turn`
+with `--failed`; then nothing more is posted. Run `close` as the last thing
+you do, so the cost it counts is the whole session's. A session hand-off is
+never left running, whatever happened.
+
+If you go quiet, the thread hears it anyway (`you.watch_bot_pages`, every two
+minutes): 20 minutes with no `seen` posts that it is taking longer than it
+should, and 90 fails the hand-off and says so. One closed done with nothing
+posted is reported after 10 minutes with a link to Home.
 
 ## Report
 

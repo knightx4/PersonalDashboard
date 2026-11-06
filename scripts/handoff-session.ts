@@ -4,7 +4,9 @@
  * cost.
  *
  *   npx tsx scripts/handoff-session.ts seen <hand-off id>
- *   npx tsx scripts/handoff-session.ts close <hand-off id> --done [--reply-turn <id>] [--note <id>]
+ *   npx tsx scripts/handoff-session.ts close <hand-off id> --done --reply-turn <id>          # Ask Dash
+ *   npx tsx scripts/handoff-session.ts close <hand-off id> --done --reply "<text>" \
+ *       [--link "<label>=<path>"]… [--undo]                                                 # People
  *   npx tsx scripts/handoff-session.ts close <hand-off id> --failed "<the reason, in a sentence>"
  *   npx tsx scripts/handoff-session.ts cost              # what this session has cost so far
  *
@@ -15,6 +17,14 @@
  * (lib/talk/handoff-session.ts), and the total on the hand-off's
  * cost_micros. A hand-off already closed is left as it is, and the cost is
  * written only by the call that closed it, so it is never counted twice.
+ *
+ * Closing also tells the thread (plan #3005.4). Done in an Ask Dash
+ * conversation needs the reply turn the session wrote; done in a People chat
+ * needs --reply, which the bot posts with each --link as a receipt and, with
+ * --undo, a link to Home where the recorded changes have their Undo. Failed
+ * tells the thread the reason, unless an Ask reply turn already did. A close
+ * that would leave the thread without its result is refused before anything
+ * is written.
  *
  * Only the owner's hand-offs (CLAUDE.md, "Only the owner's account is
  * touched"). Connects as scripts/sql.ts does.
@@ -28,9 +38,14 @@ import { requireSupabaseProjectUrl } from '../lib/db/project';
 import {
   CLOSE_SQL,
   closeParameters,
+  closeRefusal,
   SEEN_SQL,
+  sessionReceipts,
   SPEND_SQL,
   spendParameter,
+  TELL_DONE_SQL,
+  TELL_FAILED_SQL,
+  THREAD_SQL,
   totalSessionMicros,
   transcriptSpend,
   type SessionClose,
@@ -91,6 +106,18 @@ function flag(args: string[], name: string): string | null {
   return value;
 }
 
+/** Every value given for a flag that may repeat. */
+function flags(args: string[], name: string): string[] {
+  const values: string[] = [];
+  args.forEach((arg, at) => {
+    if (arg !== name) return;
+    const value = args[at + 1];
+    if (!value || value.startsWith('--')) fail(`${name} needs a value.`);
+    values.push(value);
+  });
+  return values;
+}
+
 async function seen(sql: Sql, owner: string, id: string) {
   const rows = await sql.unsafe(SEEN_SQL, [id, owner]);
   if (rows.length === 0) fail(`No open session hand-off ${id} in the owner's account. It may be closed already.`);
@@ -104,17 +131,38 @@ async function close(sql: Sql, owner: string, id: string, args: string[]) {
   const replyTurnId = flag(args, '--reply-turn');
   const noteId = flag(args, '--note');
   for (const value of [replyTurnId, noteId]) if (value && !UUID.test(value)) fail(`${value} is not a uuid.`);
+  const reply = flag(args, '--reply');
+  const receipts = sessionReceipts(flags(args, '--link'), args.includes('--undo'));
+  if (!receipts.ok) fail(receipts.error);
+
+  const [row] = await sql.unsafe(THREAD_SQL, [id, owner]);
+  if (!row) fail(`No session hand-off ${id} in the owner's account.`);
+  const thread = {
+    conversationId: (row.conversation_id as string | null) ?? null,
+    advisorChatId: (row.advisor_chat_id as string | null) ?? null,
+  };
 
   const spend = transcriptSpend(sessionTranscripts());
   if (spend.length === 0) console.error('No transcript was found for this session, so no cost is counted.');
   const ending: SessionClose = reason
     ? { outcome: 'failed', reason, replyTurnId, noteId }
     : { outcome: 'done', replyTurnId, noteId };
+  const refused = closeRefusal(thread, ending, reply);
+  if (refused) fail(refused);
   const [handoff] = await sql.unsafe(CLOSE_SQL, closeParameters(id, owner, ending, spend));
   if (!handoff) fail(`No open session hand-off ${id} in the owner's account. It may be closed already.`);
   // Only the call that closed it gets here, so the cost is counted once.
   const spent = spend.length > 0 ? await sql.unsafe(SPEND_SQL, [owner, spendParameter(spend)]) : [];
-  console.log(JSON.stringify({ handoff, spend_rows: spent.length }, null, 2));
+  // The thread hears it now; the watch says it for any telling that fails here.
+  const [told] =
+    ending.outcome === 'failed'
+      ? await sql.unsafe(TELL_FAILED_SQL, [id])
+      : thread.advisorChatId
+        ? await sql.unsafe(TELL_DONE_SQL, [id, owner, reply, JSON.stringify(receipts.receipts)])
+        : [];
+  console.log(
+    JSON.stringify({ handoff, spend_rows: spent.length, told_message: told?.message_id ?? null }, null, 2),
+  );
 }
 
 async function main() {
@@ -125,7 +173,9 @@ async function main() {
     return;
   }
   if ((command !== 'seen' && command !== 'close') || !id || !UUID.test(id)) {
-    fail('Usage: handoff-session.ts seen <id> | close <id> --done|--failed "<reason>" | cost');
+    fail(
+      'Usage: handoff-session.ts seen <id> | close <id> --done --reply-turn <id> | close <id> --done --reply "<text>" [--link "<label>=<path>"]… [--undo] | close <id> --failed "<reason>" | cost',
+    );
   }
   const { sql, end } = connect();
   try {
