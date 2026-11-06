@@ -29,8 +29,26 @@ describe('speakReply', () => {
     const d = deps();
     const out = await speakReply('**Done.** See [the list](https://x.y).', d);
     expect(out).toMatchObject({ ok: true, bytes: 19, monthBytes: 19, cap: MONTHLY_BYTE_CAP, trimmed: false });
-    expect(d.synthesize).toHaveBeenCalledWith('Done. See the list.');
+    expect(d.synthesize).toHaveBeenCalledWith('Done. See the list.', null);
     expect(d.recordSpend).toHaveBeenCalledWith(19);
+  });
+
+  it("speaks in the bot's own voice when it has one", async () => {
+    const d = deps({ voice: 'zena-voice' });
+    expect((await speakReply('Hello there.', d)).ok).toBe(true);
+    expect(d.synthesize).toHaveBeenCalledWith('Hello there.', 'zena-voice');
+  });
+
+  it('speaks in the default voice when Fish turns the bot’s voice down, counting the reply once', async () => {
+    const synthesize = vi.fn(
+      async (_text: string, voice: string | null): Promise<FishResult> =>
+        voice ? { ok: false, why: 'voice', detail: '404' } : { ok: true, audio: AUDIO },
+    );
+    const d = deps({ voice: 'deleted-voice', synthesize });
+    const out = await speakReply('Hello there.', d);
+    expect(out).toMatchObject({ ok: true, monthBytes: 12 });
+    expect(synthesize.mock.calls.map((c) => c[1])).toEqual(['deleted-voice', null]);
+    expect(d.recordSpend).toHaveBeenCalledTimes(1);
   });
 
   it('sends nothing to Fish once the month would pass the cap, and says voice is paused', async () => {

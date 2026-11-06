@@ -9,6 +9,9 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { setBotPhoto } from '@/lib/you/bot-photos';
+import { setBotVoice } from '@/lib/you/bot-voices';
+import { fishEnv, fishVoice, fishVoices } from '@/lib/talk/speech/fish';
+import { VOICE_ID, type VoiceList } from '@/lib/talk/speech/voices-model';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadPeople, loadThreadPage, markThreadRead, startChat, threadHref, withChats, type ThreadPage } from '@/lib/you/chat-threads';
 import { withMessageFiles } from '@/lib/you/chat-message-files';
@@ -406,6 +409,55 @@ export async function saveBotPhoto(advisorId: string, path: string | null): Prom
   } catch (error) {
     console.error('bot picture not saved', error);
     return { error: path ? 'That picture was not saved. Try again.' : 'The picture was not taken off. Try again.' };
+  }
+}
+
+/**
+ * The voices a bot's form offers (plan #3006.5): the person's own Fish
+ * voices first, then the public library searched by name. `configured` is
+ * false when the deployment has no Fish key, and the form says so.
+ */
+// latency: pending
+export async function listBotVoices(search: string): Promise<({ configured: true } & VoiceList) | { configured: false } | { error: string }> {
+  await requireUser();
+  const fish = fishEnv();
+  if (!fish) return { configured: false };
+  try {
+    return { configured: true, ...(await fishVoices(fish, typeof search === 'string' ? search : '')) };
+  } catch (error) {
+    console.error('voices not listed', error);
+    return { error: 'The voices could not be listed. Try again in a moment.' };
+  }
+}
+
+/**
+ * A bot's voice (plan #3006.5): the voice its replies are read in, or the
+ * default with null. A pasted id is looked up on Fish for its name, and
+ * refused when Fish has no voice by it.
+ */
+// latency: pending
+export async function saveBotVoice(advisorId: string, voice: { id: string; name: string | null } | null): Promise<{ voice: { id: string; name: string | null } | null } | { error: string }> {
+  const user = await requireUser();
+  if (!UUID.test(advisorId)) return { error: 'They are not on your list.' };
+  let chosen: { id: string; name: string | null } | null = null;
+  if (voice !== null) {
+    if (!voice || typeof voice.id !== 'string' || !VOICE_ID.test(voice.id)) return { error: 'That is not a Fish voice id.' };
+    chosen = { id: voice.id, name: typeof voice.name === 'string' ? voice.name : null };
+    if (!chosen.name) {
+      const fish = fishEnv();
+      const found = fish ? await fishVoice(fish, chosen.id) : 'unknown';
+      if (found === 'gone') return { error: 'Fish has no voice by that id that this account can use.' };
+      if (found !== 'unknown') chosen.name = found.name;
+    }
+  }
+  try {
+    const saved = await setBotVoice(await createYouClient(), user.id, advisorId, chosen);
+    if (!saved) return { error: 'They are not on your list.' };
+    revalidatePath('/chat', 'layout');
+    return { voice: chosen };
+  } catch (error) {
+    console.error('bot voice not saved', error);
+    return { error: 'The voice was not saved. Try again.' };
   }
 }
 

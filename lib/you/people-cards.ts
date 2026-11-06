@@ -6,6 +6,7 @@ import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { advisorKey, placeholderQuestion } from '@/lib/you/board-advisors';
 import { removeBotPhotos, signBotPhotos } from '@/lib/you/bot-photos';
+import { voiceOfRow } from '@/lib/you/bot-voices';
 import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
@@ -41,7 +42,7 @@ export * from '@/lib/you/people-cards-model';
 const MODEL = MODELS.personaDraft;
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-const CARD_COLUMNS = `id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when, photo_path, ${REACH_OUT_COLUMNS}`;
+const CARD_COLUMNS = `id, key, name, kind, focus, colour, persona, persona_brief, made_by_you, joins_meetings, text_when, photo_path, voice_id, voice_name, ${REACH_OUT_COLUMNS}`;
 
 /** One person's form, their earlier cards and what they remember, or null when they are not on the council. */
 export async function loadPersonCard(
@@ -91,6 +92,7 @@ export async function loadPersonCard(
     texts: textsOf(str(row.key), row.text_when),
     reachOut: reachOutViewOf(row, sent, now),
     photo: photos.get(photoPath) ?? null,
+    voice: voiceOfRow(row),
   };
 }
 

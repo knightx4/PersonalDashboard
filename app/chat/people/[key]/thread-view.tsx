@@ -538,9 +538,9 @@ export function ThreadView({
     () =>
       messages.flatMap((m) => {
         const words = m.role === 'advisor' && !openingIds.has(m.id) && !olderIds.has(m.id) ? bubbleText(m) : null;
-        return words ? [{ id: m.id, text: words }] : [];
+        return words ? [{ id: m.id, text: words, bot: person.id }] : [];
       }),
-    [messages, openingIds, olderIds],
+    [messages, openingIds, olderIds, person.id],
   );
   useSpeakArrivals(arrived);
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
@@ -688,7 +688,7 @@ export function ThreadView({
               );
             })}
             {receipt && block.messages.at(-1)?.id === receipt.id && <MessageNote>{receipt.label}</MessageNote>}
-            {block.from === 'them' && <SpeakRun messages={block.messages} />}
+            {block.from === 'them' && <SpeakRun messages={block.messages} bot={person.id} />}
           </MessageGroup>
         ),
       )}
@@ -742,9 +742,10 @@ export function ThreadView({
  * Read aloud under a run of their messages (plan #3006.1): the press reads
  * the run together, and shows Stop while any of it plays, including a
  * message playing by itself as it arrived. Why it was not read is said under
- * it.
+ * it. The run is read in `bot`'s own voice when it has one (plan #3006.5).
+ * A group's thread draws it too, under each bot's run.
  */
-function SpeakRun({ messages }: { messages: readonly ThreadMessage[] }) {
+export function SpeakRun({ messages, bot }: { messages: readonly ThreadMessage[]; bot: string | null }) {
   const said = messages.flatMap((m) => {
     const words = m.role === 'advisor' ? bubbleText(m) : null;
     return words ? [{ id: m.id, text: words }] : [];
@@ -754,7 +755,7 @@ function SpeakRun({ messages }: { messages: readonly ThreadMessage[] }) {
   const ids = said.map((m) => m.id);
   return (
     <div className="flex flex-col items-start">
-      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} />
+      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} bot={bot} />
       <SpeakNote ids={ids} className="px-1" />
     </div>
   );

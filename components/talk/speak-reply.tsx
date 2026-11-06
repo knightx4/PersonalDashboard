@@ -55,6 +55,13 @@ function thePlayer() {
       element.onerror = () => audio.onerror?.();
       return { audio, release: () => URL.revokeObjectURL(url) };
     },
+    audioUrl: (url) => {
+      const element = new Audio(url);
+      const audio: SpeechAudio = { play: () => element.play(), pause: () => element.pause(), onended: null, onerror: null };
+      element.onended = () => audio.onended?.();
+      element.onerror = () => audio.onerror?.();
+      return { audio, release: () => element.removeAttribute('src') };
+    },
   });
   return player;
 }
@@ -101,13 +108,40 @@ function useSpeech(): SpeechState {
  * Plays each of these replies once, in order, while speaking is on: the
  * mentors' thread hands in the messages that arrived while it was open.
  */
-export function useSpeakArrivals(replies: readonly { id: string; text: string }[]) {
+export function useSpeakArrivals(replies: readonly { id: string; text: string; bot?: string | null }[]) {
   const speaking = useSpeaking();
   const fixture = useContext(SpeechFixture);
   useEffect(() => {
     if (!speaking || fixture) return;
-    for (const reply of replies) thePlayer().speakOnce(reply.id, reply.text);
+    for (const reply of replies) thePlayer().speakOnce(reply.id, reply.text, { bot: reply.bot });
   }, [speaking, fixture, replies]);
+}
+
+/**
+ * A voice's sample on a bot's form (plan #3006.5), through the same player,
+ * so a sample stops a reply playing and a reply stops a sample. A recording
+ * Fish keeps (`url`) is played as it is; without one, `line` is spoken in the
+ * voice through /api/speak and counts against the month. Returns whether the
+ * sample `key` is loading or playing, and a toggle.
+ */
+export function useVoiceSample(key: string): { busy: boolean; toggle: (sample: { url: string | null; line: string; voice: string }) => void } {
+  const speech = useSpeech();
+  const fixture = useContext(SpeechFixture);
+  const busy = speech.key === key && speech.phase !== 'idle';
+  return {
+    busy,
+    toggle: (sample) => {
+      if (fixture) return;
+      if (busy) thePlayer().stop();
+      else if (sample.url) thePlayer().playUrl(key, sample.url);
+      else thePlayer().play(key, sample.line, { voice: sample.voice });
+    },
+  };
+}
+
+/** Why a sample did not play, in the route's words; null when it did. */
+export function useSpeechNote(key: string): string | null {
+  return useSpeech().notes[key] ?? null;
 }
 
 const SWITCH_TIP_ON = 'New replies are read aloud. Press to stop reading them.';
@@ -154,18 +188,21 @@ export function SpeakSwitch({ look }: { look: 'quiet' | 'icon' }) {
  * `also` names other keys that count as this reply playing (a mentor's
  * messages queued one by one while the press reads them together).
  * `fresh` marks a reply that arrived while the chat was open: it plays once
- * by itself while speaking is on.
+ * by itself while speaking is on. `bot` is the id of the bot that wrote it,
+ * whose own voice it is read in (plan #3006.5); absent, the default voice.
  */
 export function SpeakPress({
   id,
   text,
   also,
   fresh = false,
+  bot = null,
 }: {
   id: string;
   text: string;
   also?: readonly string[];
   fresh?: boolean;
+  bot?: string | null;
 }) {
   const speech = useSpeech();
   const speaking = useSpeaking();
@@ -174,8 +211,8 @@ export function SpeakPress({
   const busy = mine && speech.phase !== 'idle';
 
   useEffect(() => {
-    if (fresh && speaking && !fixture && text.trim()) thePlayer().speakOnce(id, text);
-  }, [fresh, speaking, fixture, id, text]);
+    if (fresh && speaking && !fixture && text.trim()) thePlayer().speakOnce(id, text, { bot });
+  }, [fresh, speaking, fixture, id, text, bot]);
 
   if (!text.trim()) return null;
   const label = busy ? (speech.phase === 'loading' ? 'Stop (getting the voice ready)' : 'Stop reading') : 'Read aloud';
@@ -189,7 +226,7 @@ export function SpeakPress({
         onClick={() => {
           if (fixture) return;
           if (busy) thePlayer().stop();
-          else thePlayer().play(id, text);
+          else thePlayer().play(id, text, { bot });
         }}
       >
         {busy ? <Square strokeWidth={1.75} fill="currentColor" aria-hidden /> : <Play strokeWidth={1.75} aria-hidden />}

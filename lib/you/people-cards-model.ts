@@ -238,6 +238,11 @@ export type PersonCard = {
    * drawn in place of their initials; null or absent for none.
    */
   photo?: string | null;
+  /**
+   * Their own Fish voice (plan #3006.5): its id and its name as Fish lists
+   * it (null when not known); null or absent speaks in the default voice.
+   */
+  voice?: { id: string; name: string | null } | null;
 };
 
 /** A new person's form before anything is typed: the first palette colour nobody uses yet. */

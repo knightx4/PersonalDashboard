@@ -40,6 +40,8 @@ import {
 } from '@/lib/you/people-cards-model';
 import { ReachOutSection } from './reach-out-section';
 import { BotPhotoField, type BotPhotoActions } from './bot-photo-field';
+import { BotVoiceField, type BotVoiceActions, type VoiceStatus } from './bot-voice-field';
+import type { VoiceList } from '@/lib/talk/speech/voices-model';
 
 /**
  * Adding a bot, or editing one already there (plan #2748.11), on Chat's Bots
@@ -77,6 +79,14 @@ export type PersonFormActions = {
   turnOffReachOut?: (advisorId: string) => Promise<{ view: ReachOutView } | { error: string }>;
   /** Save the bot's picture after the form has uploaded it, or take it off with null (plan #2955). */
   photo?: (advisorId: string, path: string | null) => Promise<{ error: string | null }>;
+  /** List Fish voices and save the bot's (plan #3006.5). */
+  voice?: BotVoiceActions;
+};
+
+/** The gallery's voice presses: nothing is listed or saved. */
+const NO_VOICE_ACTIONS: BotVoiceActions = {
+  list: async () => ({ error: 'The gallery lists no voices.' }),
+  save: async () => ({ error: 'The gallery saves nothing.' }),
 };
 
 /** The gallery's picture presses: nothing is uploaded or saved. */
@@ -116,6 +126,9 @@ export function PersonForm({
   settingReachOut = false,
   photoBusy = false,
   photoError = null,
+  voiceStatus = 'ok',
+  voiceOpen = false,
+  voiceList = null,
 }: {
   card: PersonCard;
   timezone: string;
@@ -139,6 +152,12 @@ export function PersonForm({
   photoBusy?: boolean;
   /** For the gallery: a picture that could not be uploaded. */
   photoError?: string | null;
+  /** Whether Fish still offers the bot's voice, and whether its key is set (plan #3006.5). */
+  voiceStatus?: VoiceStatus;
+  /** For the gallery: the voice picker open. */
+  voiceOpen?: boolean;
+  /** For the gallery: the voices the picker lists. */
+  voiceList?: VoiceList | null;
 }) {
   const router = useRouter();
   const adding = !card.id;
@@ -229,6 +248,15 @@ export function PersonForm({
             actions={photoActions}
             busy={photoBusy}
             error={photoError}
+          />
+          <BotVoiceField
+            advisorId={card.id}
+            botName={name}
+            voice={card.voice ?? null}
+            status={voiceStatus}
+            actions={actions.voice ?? NO_VOICE_ACTIONS}
+            open={voiceOpen}
+            list={voiceList}
           />
           <Field id="person-name" label="Name">
             <Input id="person-name" value={name} maxLength={PERSON_NAME_MAX} onChange={(e) => setName(e.target.value)} autoComplete="off" />

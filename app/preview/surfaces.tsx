@@ -9484,6 +9484,38 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="photo-failed" />,
   },
   {
+    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture names it, with a sample to hear, Change voice and Use default. */
+    id: 'chat-person-edit-voice',
+    label: 'Chat · Editing a bot, with their own voice',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice" />,
+  },
+  {
+    /* The voice picker open: a search over Fish voices, the person's own voices first, then the library, each with a sample and Use; the voice in use says so; a pasted ID or link at the foot. */
+    id: 'chat-person-edit-voice-picker',
+    label: 'Chat · Editing a bot, choosing a voice',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-picker" />,
+  },
+  {
+    /* A saved voice Fish no longer offers: the row says Voice unavailable, using default. */
+    id: 'chat-person-edit-voice-gone',
+    label: 'Chat · Editing a bot, their voice unavailable',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-gone" />,
+  },
+  {
+    /* No Fish key on the deployment: the Voice row links to where it is added instead of a picker. */
+    id: 'chat-person-edit-voice-no-key',
+    label: 'Chat · Editing a bot, voices not set up',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-no-key" />,
+  },
+  {
     /* Scrolled to the card: the box to edit it, the sentence to redraft it from, and the earlier cards with Use this card. */
     id: 'chat-person-edit-versions',
     label: 'Chat · Editing a bot, their card and earlier cards',

@@ -43,6 +43,29 @@ describe('the speech player', () => {
     expect(released).toEqual([1]);
   });
 
+  it('names the bot that wrote a queued reply, or the voice of a sample, to the route', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const player = createSpeechPlayer({
+      fetch: (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(audioResponse());
+      },
+      audio: () => ({ audio: { play: async () => {}, pause: () => {}, onended: null, onerror: null }, release: () => {} }),
+    });
+    player.queue('a', 'From Zena.', { bot: 'zena-id' });
+    player.queue('b', 'From Jerwyn.', { bot: 'jerwyn-id' });
+    await settle();
+    player.stop();
+    player.play('c', 'A sample.', { voice: 'v1', bot: 'ignored' });
+    player.play('d', 'Dash.');
+    await settle();
+    expect(bodies).toEqual([
+      { text: 'From Zena.', bot: 'zena-id' },
+      { text: 'A sample.', voice: 'v1' },
+      { text: 'Dash.' },
+    ]);
+  });
+
   it("keeps the route's message under the reply when voice is paused or not set up", async () => {
     const paused = "Voice is paused until next month: this month's 330,000 characters have been spoken.";
     const { player } = setup([

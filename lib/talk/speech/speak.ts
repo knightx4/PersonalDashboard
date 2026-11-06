@@ -11,8 +11,10 @@
  *    reply that would pass it is not sent, and the answer says voice is
  *    paused until next month. The reply is never shortened to fit what is
  *    left: half a sentence read aloud is worse than none.
- * 4. Fish is asked for the audio. When it sends none, the reservation is
- *    taken back, so the month counts only what was spoken.
+ * 4. Fish is asked for the audio, in the replying bot's own voice when it has
+ *    one (plan #3006.5). A voice Fish turns down is asked again in the
+ *    default. When it sends none, the reservation is taken back, so the
+ *    month counts only what was spoken.
  * 5. What was spoken is written to the spend ledger, which the spend page
  *    reads.
  */
@@ -39,7 +41,10 @@ export type SpeakDeps = {
   reserve: (month: string, bytes: number, cap: number) => Promise<number | null>;
   /** core.release_speech_bytes. Never throws. */
   release: (month: string, bytes: number) => Promise<void>;
-  synthesize: (text: string) => Promise<FishResult>;
+  /** The words in this voice; null speaks in the default voice. */
+  synthesize: (text: string, voice: string | null) => Promise<FishResult>;
+  /** The replying bot's own Fish voice (plan #3006.5); null or absent for the default. */
+  voice?: string | null;
   /** Writes the ledger row. Never throws. */
   recordSpend: (bytes: number) => Promise<void>;
   cap?: number;
@@ -74,7 +79,12 @@ export async function speakReply(reply: string, deps: SpeakDeps): Promise<SpeakO
   }
   if (monthBytes === null) return refused('paused', 429);
 
-  const result = await deps.synthesize(speech.text);
+  let result = await deps.synthesize(speech.text, deps.voice ?? null);
+  if (!result.ok && result.why === 'voice' && deps.voice) {
+    // The bot's own voice is gone from Fish: the reply goes again in the default.
+    console.error('[speech] voice refused, using the default', deps.voice, result.detail);
+    result = await deps.synthesize(speech.text, null);
+  }
   if (!result.ok) {
     await deps.release(deps.month, speech.bytes);
     console.error('[speech] Fish refused', result.why, result.detail);

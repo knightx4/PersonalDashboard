@@ -9,6 +9,7 @@ import { BotsView } from '@/app/chat/bots-view';
 import { PersonForm } from '@/app/chat/people/person-form';
 import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
 import type { ReachOutView } from '@/lib/you/reach-out-card-model';
+import type { VoiceList } from '@/lib/talk/speech/voices-model';
 import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
 /**
@@ -29,6 +30,23 @@ export const BOT_PHOTO = '/gallery/bot-photo.svg';
 /** Everyone, with Franklin wearing his picture. */
 const WITH_PHOTO = EVERYONE.map((row) => (row.key === 'benjamin-franklin' ? { ...row, photo: BOT_PHOTO } : row));
 const ZONE = 'Europe/London';
+
+/** The Fish voice chosen for Franklin (plan #3006.5). */
+const FRANKLIN_VOICE = { id: 'b1f2c3d4e5f60718293a4b5c6d7e8f90', name: 'Elder statesman, warm and unhurried' };
+
+/** What the voice picker lists: two voices of the person's own, then the library, one with no sample recording and one with the longest name. */
+const VOICE_LIST: VoiceList = {
+  mine: [
+    { id: 'a1', name: 'My voice (cloned)', author: '', sample: 'https://example.invalid/a1.mp3' },
+    { id: 'a2', name: 'Grandad reading', author: '', sample: null },
+  ],
+  library: [
+    { id: FRANKLIN_VOICE.id, name: FRANKLIN_VOICE.name, author: 'Philadelphia Voices', sample: 'https://example.invalid/b1.mp3' },
+    { id: 'c1', name: 'Calm British narrator', author: 'storyteller', sample: 'https://example.invalid/c1.mp3' },
+    { id: 'c2', name: 'Energetic coach with a slight Texan drawl, great for pep talks and morning briefings', author: 'coachvoices_official', sample: null },
+    { id: 'c3', name: 'Soft-spoken librarian', author: 'quietshelf', sample: 'https://example.invalid/c3.mp3' },
+  ],
+};
 
 const FRANKLIN_CARD = `Who you are
 You are Benjamin Franklin: printer, writer, inventor and diplomat, who rose from a runaway apprentice by keeping accounts of his days as carefully as of his money.
@@ -229,6 +247,10 @@ export function ChatPersonEditSurface({
     | 'photo'
     | 'photo-uploading'
     | 'photo-failed'
+    | 'voice'
+    | 'voice-picker'
+    | 'voice-gone'
+    | 'voice-no-key'
     | 'card'
     | 'redrafting'
     | 'memory'
@@ -250,7 +272,9 @@ export function ChatPersonEditSurface({
             ? { ...FRANKLIN_PERSON, reachOut: { ...FRANKLIN_REACH_OUT, summary: null, cannotWatch: [], next: null } }
             : state === 'reach-out-failed'
               ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_FAILED }
-              : FRANKLIN_PERSON;
+              : state === 'voice' || state === 'voice-picker' || state === 'voice-gone'
+                ? { ...FRANKLIN_PERSON, voice: FRANKLIN_VOICE }
+                : FRANKLIN_PERSON;
   return (
     <Shell path={`/chat/bots/${card.key}`}>
       <BotsView rows={state === 'photo' ? WITH_PHOTO : EVERYONE} current={card.key}>
@@ -261,6 +285,9 @@ export function ChatPersonEditSurface({
           now={NOW}
           photoBusy={state === 'photo-uploading'}
           photoError={state === 'photo-failed' ? 'Choose an image under 5 MB.' : null}
+          voiceStatus={state === 'voice-gone' ? 'gone' : state === 'voice-no-key' ? 'not-set' : 'ok'}
+          voiceOpen={state === 'voice-picker'}
+          voiceList={state === 'voice-picker' ? VOICE_LIST : null}
           drafting={state === 'redrafting'}
           removing={state === 'memory' ? 'mem2' : null}
           editing={state === 'memory' ? 'mem1' : null}
