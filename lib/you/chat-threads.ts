@@ -116,6 +116,51 @@ async function personRow(
   };
 }
 
+/**
+ * How many chats on the Messages list have a message from a bot you have not
+ * read, for the badge on the Messages tab and Chat's count in the switcher
+ * (note b31eae56). A chat counts as the list draws it: every group, and each
+ * bot's newest one-to-one chat. Unread is what personRow and loadGroupRows
+ * mean by it: a bot's message with no read_at, newer than the chat was last
+ * opened.
+ */
+export async function countUnreadChats(client: YouSupabaseClient, userId: string): Promise<number> {
+  const [chats, waiting] = await Promise.all([
+    client
+      .from('advisor_chats')
+      .select('id, kind, advisor_id, last_read_at, last_message_at')
+      .eq('user_id', userId)
+      .order('last_message_at', { ascending: false, nullsFirst: false }),
+    client
+      .from('advisor_messages')
+      .select('chat_id, created_at')
+      .eq('user_id', userId)
+      .eq('role', 'advisor')
+      .is('read_at', null)
+      .order('created_at', { ascending: false })
+      .limit(500),
+  ]);
+  const listed = new Map<string, string | null>();
+  const seenAdvisors = new Set<string>();
+  for (const row of rows<Record<string, unknown>>(chats, 'your chats')) {
+    if (typeof row.id !== 'string') continue;
+    if (row.kind !== 'group') {
+      const advisorId = str(row.advisor_id);
+      if (!advisorId || seenAdvisors.has(advisorId)) continue;
+      seenAdvisors.add(advisorId);
+    }
+    listed.set(row.id, strOrNull(row.last_read_at));
+  }
+  const unread = new Set<string>();
+  for (const row of rows<Record<string, unknown>>(waiting, 'your unread messages')) {
+    const chatId = str(row.chat_id);
+    if (!listed.has(chatId)) continue;
+    const lastReadAt = listed.get(chatId);
+    if (!lastReadAt || Date.parse(str(row.created_at)) > Date.parse(lastReadAt)) unread.add(chatId);
+  }
+  return unread.size;
+}
+
 /** Everyone on the council, as the People list draws them, newest thread first. */
 export async function loadPeople(client: YouSupabaseClient, userId: string): Promise<PersonRow[]> {
   const [roster, { chats, colours }, photos] = await Promise.all([
