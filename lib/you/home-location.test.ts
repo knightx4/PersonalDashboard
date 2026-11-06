@@ -103,10 +103,15 @@ describe('readGeocodeReply', () => {
 });
 
 describe('mapsApiKey', () => {
-  it('is null when GOOGLE_MAPS_API_KEY is unset or blank', () => {
+  it('is null when GOOGLE_API_KEY is unset or blank', () => {
     expect(mapsApiKey({})).toBeNull();
-    expect(mapsApiKey({ GOOGLE_MAPS_API_KEY: '  ' })).toBeNull();
-    expect(mapsApiKey({ GOOGLE_MAPS_API_KEY: 'abc' })).toBe('abc');
+    expect(mapsApiKey({ GOOGLE_API_KEY: '  ' })).toBeNull();
+    expect(mapsApiKey({ GOOGLE_API_KEY: 'abc' })).toBe('abc');
+  });
+
+  it('falls back to GOOGLE_MAPS_API_KEY only when GOOGLE_API_KEY is unset', () => {
+    expect(mapsApiKey({ GOOGLE_API_KEY: 'new', GOOGLE_MAPS_API_KEY: 'old' })).toBe('new');
+    expect(mapsApiKey({ GOOGLE_MAPS_API_KEY: 'old' })).toBe('old');
   });
 });
 

@@ -245,7 +245,14 @@ describe('withinRadius', () => {
 });
 
 describe('lookUpPlaces', () => {
-  it('refuses politely when GOOGLE_MAPS_API_KEY is unset, asking nobody', async () => {
+  it('says plainly when Google refuses the key for the API', async () => {
+    const t = setup();
+    const fetcher = vi.fn(async () => new Response('{"error":{"status":"PERMISSION_DENIED"}}', { status: 403 }));
+    const result = await lookUpPlaces({ ...t.deps, fetcher: fetcher as never }, { query: 'coffee' });
+    expect(result.status === 'failed' && result.message).toMatch(/API restrictions/);
+  });
+
+  it('refuses politely when GOOGLE_API_KEY is unset, asking nobody', async () => {
     const t = setup();
     const result = await lookUpPlaces({ ...t.deps, apiKey: null }, { query: 'coffee' });
     expect(result).toMatchObject({ status: 'refused', reason: 'not_set_up' });
@@ -345,9 +352,9 @@ describe('lookUpPlaces', () => {
     expect(t.fetcher).not.toHaveBeenCalled();
   });
 
-  it('fails politely when Google refuses, without caching', async () => {
+  it('fails politely when Google is down, without caching', async () => {
     const t = setup();
-    const fetcher = vi.fn(async () => new Response('denied', { status: 403 })) as unknown as typeof fetch;
+    const fetcher = vi.fn(async () => new Response('denied', { status: 500 })) as unknown as typeof fetch;
     const result = await lookUpPlaces({ ...t.deps, fetcher }, { query: 'coffee' });
     expect(result).toMatchObject({ status: 'failed', message: expect.stringMatching(/Dash couldn't reach Google Places/) });
     expect(t.cache.size).toBe(0);

@@ -106,7 +106,7 @@ export type FoundPlace = {
 };
 
 export type PlacesRefusal =
-  /** GOOGLE_MAPS_API_KEY is unset. */
+  /** GOOGLE_API_KEY is unset. */
   | 'not_set_up'
   /** No query given. */
   | 'empty_query'
@@ -142,14 +142,14 @@ export type PlacesLookupDeps = {
   /** A core client for core.model_spend. */
   core: SpendClient;
   userId: string;
-  /** Defaults to GOOGLE_MAPS_API_KEY. */
+  /** Defaults to GOOGLE_API_KEY. */
   apiKey?: string | null;
   fetcher?: typeof fetch;
   now?: () => Date;
 };
 
 const MESSAGES: Record<PlacesRefusal, string> = {
-  not_set_up: "Dash can't look places up yet: the Google Maps key hasn't been set up for this app.",
+  not_set_up: "Dash can't look places up yet: the Google key (GOOGLE_API_KEY) hasn't been set up for this app.",
   empty_query: 'Say what kind of place to look for, such as coffee or a pharmacy.',
   no_home:
     "Dash doesn't know where home is. Add your mailing address on You > Details, or name a place to search near.",
@@ -161,7 +161,16 @@ function refuse(reason: PlacesRefusal): PlacesLookupResult {
   return { status: 'refused', reason, message: MESSAGES[reason] };
 }
 
+const DENIED_MESSAGE =
+  "Google refused the request: the Google key (GOOGLE_API_KEY) isn't allowed to use Places API (New) or Geocoding API. Add both to the key's API restrictions in Google Cloud.";
+
+/** A 403 or a denied request means the key's API restrictions leave the API out. */
+function isDenied(detail: string): boolean {
+  return /answered 403|PERMISSION_DENIED|REQUEST_DENIED|API_KEY_SERVICE_BLOCKED/.test(detail);
+}
+
 function fail(detail: string): PlacesLookupResult {
+  if (isDenied(detail)) return { status: 'failed', message: DENIED_MESSAGE, detail };
   return { status: 'failed', message: "Dash couldn't reach Google Places just now. Try again in a minute.", detail };
 }
 
