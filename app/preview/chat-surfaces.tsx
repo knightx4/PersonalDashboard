@@ -12,6 +12,8 @@ import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moment
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
 import { GroupThreadView } from '@/app/chat/groups/[id]/group-thread-view';
 import { groupTitleOf, type GroupMember, type GroupRow, type Reacted } from '@/lib/you/group-chats-model';
+import type { PaneChats } from '@/components/shell/ask-dash-chats';
+import type { PaneThread } from '@/lib/you/pane-threads-model';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -778,3 +780,39 @@ export function ChatBuilderTextSurface() {
     </ChatShell>
   );
 }
+
+/**
+ * The Ask Dash sheet's chats (plan #2981): the Messages rows and groups for
+ * its row, and each thread as it opens in the sheet, from the fixtures above.
+ */
+export const PANE_CHATS: PaneChats = {
+  list: async () => ({ rows: MESSAGE_ROWS, groups: MESSAGE_GROUPS }),
+  open: async (pick): Promise<PaneThread> => {
+    if (pick.kind === 'group') {
+      const group = MESSAGE_GROUPS.find((g) => g.id === pick.id);
+      if (!group) return { kind: 'error', error: 'That chat is not there any more.' };
+      return {
+        kind: 'group',
+        chatId: group.id,
+        title: group.title,
+        members: group.members,
+        former: [],
+        page: { messages: group.id === GROUP_ID ? GROUP_THREAD : [], hasOlder: false, reactions: GROUP_REACTIONS },
+        timezone: ZONE,
+        now: NOW,
+      };
+    }
+    const row = MESSAGE_ROWS.find((r) => pick.kind === 'person' && r.key === pick.key);
+    if (!row) return { kind: 'error', error: 'That chat is not there any more.' };
+    return {
+      kind: 'person',
+      person: { ...row, unread: false },
+      page: { messages: row.id === FRANKLIN.id ? THREAD : [], hasOlder: false },
+      changes: [],
+      builds: {},
+      timezone: ZONE,
+      now: NOW,
+      today: '2026-11-03',
+    };
+  },
+};

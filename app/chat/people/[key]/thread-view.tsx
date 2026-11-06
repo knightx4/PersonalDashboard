@@ -170,6 +170,9 @@ export function ThreadView({
   nextText = null,
   draftFiles,
   draftFileErrors,
+  bare = false,
+  initialDraft = '',
+  onDraftChange,
 }: {
   person: PersonRow;
   chatId: string | null;
@@ -198,6 +201,12 @@ export function ThreadView({
   /** Files already added to the box, and why one was refused, for the gallery. */
   draftFiles?: UploadedAttachment[];
   draftFileErrors?: string[];
+  /** Drawn in the Ask Dash pane (plan #2981), which names the thread in its own header. */
+  bare?: boolean;
+  /** What the box opens with, unsent: the pane keeps each thread's words while another is open. */
+  initialDraft?: string;
+  /** Told each change to the box's words, so the pane can keep them. */
+  onDraftChange?: (text: string) => void;
 }) {
   const [startedChatId, setChatId] = useState<string | null>(null);
   const chatId = initialChatId ?? startedChatId;
@@ -245,7 +254,11 @@ export function ThreadView({
     setBuilds(initialBuilds);
   }
   const onChanged = useCallback((change: DashChange) => setChanges((list) => withItem(list, change)), []);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftText] = useState(initialDraft);
+  const setDraft = (text: string) => {
+    setDraftText(text);
+    onDraftChange?.(text);
+  };
   // The files added to the box and not yet sent (plan #2974).
   const [files, setFiles] = useState<UploadedAttachment[]>(draftFiles ?? []);
   const [uploading, setUploading] = useState(false);
@@ -545,6 +558,7 @@ export function ThreadView({
       }
       scrollRef={scroller}
       onScroll={onScroll}
+      bare={bare}
       box={
         <form
           onSubmit={submit}

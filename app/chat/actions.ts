@@ -10,12 +10,14 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { setBotPhoto } from '@/lib/you/bot-photos';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
-import { loadThreadPage, markThreadRead, startChat, threadHref, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadPeople, loadThreadPage, markThreadRead, startChat, threadHref, withChats, type ThreadPage } from '@/lib/you/chat-threads';
 import { withMessageFiles } from '@/lib/you/chat-message-files';
 import {
   createGroup,
   deleteGroup,
   groupHref,
+  loadGroup,
+  loadGroupRows,
   loadGroupThreadPage,
   renameGroup,
   setGroupMembers,
@@ -44,6 +46,10 @@ import { loadReachOutView, turnOffReachOut } from '@/lib/you/reach-out-card';
 import type { ReachOutView } from '@/lib/you/reach-out-card-model';
 import { makeReachOutRule, saveReachOut, type MadeReachOut } from '@/lib/you/reach-out-make';
 import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
+import type { PanePick, PaneThread, PaneThreads } from '@/lib/you/pane-threads-model';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { todayInTimezone } from '@/lib/money';
+import { loadThreadParts } from './thread-data';
 
 /**
  * The People tab's presses that are not a send (plan #2748.6): reading the
@@ -102,6 +108,61 @@ export async function threadBuilds(runIds: string[]): Promise<Record<string, Bui
   } catch (error) {
     console.error('thread builds not read', error);
     return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The Ask Dash pane's row of chats (plan #2981).
+// ---------------------------------------------------------------------------
+
+/** Every chat the Messages tab lists, direct and group, for the pane's row. */
+// latency: instant
+export async function paneThreads(): Promise<PaneThreads> {
+  const user = await requireUser();
+  try {
+    const client = await createYouClient();
+    const [everyone, groups] = await Promise.all([loadPeople(client, user.id), loadGroupRows(client, user.id)]);
+    return { rows: withChats(everyone), groups };
+  } catch (error) {
+    console.error('pane threads not read', error);
+    return { error: 'Your chats could not be read.' };
+  }
+}
+
+/** One chat for the pane, read as its page on the Messages tab reads it. */
+// latency: pending
+export async function paneThread(pick: PanePick): Promise<PaneThread> {
+  const user = await requireUser();
+  const gone: PaneThread = { kind: 'error', error: 'That chat is not there any more.' };
+  if (pick.kind === 'person' && !KEY.test(pick.key)) return gone;
+  if (pick.kind === 'group' && !UUID.test(pick.id)) return gone;
+  if (pick.kind === 'dash') return gone;
+  try {
+    const client = await createYouClient();
+    const now = Date.now();
+    const settings = await loadAccountSettings(user.id);
+    if (pick.kind === 'group') {
+      const group = await loadGroup(client, user.id, pick.id);
+      if (!group) return gone;
+      const page = await loadGroupThreadPage(client, user.id, pick.id);
+      return {
+        kind: 'group',
+        chatId: pick.id,
+        title: group.title,
+        members: group.members,
+        former: group.former,
+        page,
+        timezone: settings.timezone,
+        now,
+      };
+    }
+    const person = (await loadPeople(client, user.id)).find((r) => r.key === pick.key);
+    if (!person) return gone;
+    const parts = await loadThreadParts(client, user.id, person.chatId);
+    return { kind: 'person', person, ...parts, timezone: settings.timezone, now, today: todayInTimezone(settings.timezone) };
+  } catch (error) {
+    console.error('pane thread not read', error);
+    return { kind: 'error', error: 'That chat could not be read. Try again.' };
   }
 }
 
