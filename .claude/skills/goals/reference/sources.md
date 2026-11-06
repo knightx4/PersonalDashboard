@@ -704,11 +704,11 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 
 ### `core.dash_handoffs` (Home)
 
-What they asked Dash that it handed to the backup routine, and how far that has got.
+What they asked Dash or another bot that was handed to the backup routine or a Claude Code session, and how far that has got.
 
-- Search: `request`
+- Search: `request`, `asked`
 - Name a row by `request`; link it by `id`
-- status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.
+- kind is 'request' for Ask Dash handing to the backup routine, 'page' for a bot on People asking for a page, and 'session' for any bot handing work to a Claude Code session (plan #3005). state is queued, running, done or failed, read from status ('pending', 'fired', 'done', 'failed'); error says why one failed. conversation_id joins core.conversations for Ask Dash; advisor_chat_id is the People chat (you.advisor_chats) and advisor_id the bot (you.board_advisors) for the others. asked is the person's own words, request the bot's version, summary the thread so far and refs the rows it pointed the session at. cost_micros is what the session cost in millionths of a dollar. The rows the routine wrote are sources in their own modules.
 
 ### `core.attachments` (Home)
 
