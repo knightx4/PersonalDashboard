@@ -33,6 +33,9 @@ import {
   type DirectorPlan,
 } from '@/lib/you/group-burst-model';
 import { claimTyping, TYPING_LEASE_MS, TYPING_RENEW_MS } from '@/lib/you/mentor-reply';
+import { AskInputError } from '@/lib/ask/db';
+import { FIND_PLACES_DEFINITION, FIND_PLACES_TOOL, placesInput, placesToolResult } from '@/lib/ask/places';
+import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -70,6 +73,12 @@ export type GroupBurstInput = {
   anthropicApiKey: string | null | undefined;
   /** Keeps what the calls cost; never throws. */
   recordSpend: (operation: GroupSpendOperation, reports: SpendReport[]) => Promise<void>;
+  /**
+   * Looks places up near home (lib/you/places-lookup.ts, bound to the person,
+   * plan #2987.3), offered to each speaker as find_places. Absent: the
+   * speakers write with no tools at all.
+   */
+  findPlaces?: PlacesFinder;
   /** True when the send (or the request that chained here) already holds the lease. */
   claimed?: boolean;
   /** The round a chained request carries on from. */
@@ -233,21 +242,83 @@ async function directWithModel(anthropic: Anthropic, input: DirectorInput, spent
   }
 }
 
-/** One bot's text, with no lookups, so a turn stays short. */
-async function speakWithModel(anthropic: Anthropic, model: string, input: SpeakerInput, spent: SpendReport[]): Promise<string | null> {
+export type PlacesFinder = (input: PlacesLookupInput) => Promise<PlacesLookupResult>;
+
+/**
+ * The most places lookups one bot's turn makes (plan #2987.3). A group text
+ * is short, so one search, and one more when the first was refused for its
+ * input or found nothing, is plenty.
+ */
+export const SPEAKER_MAX_LOOKUPS = 2;
+
+/** What a speaker is told about find_places, after the texting rules. */
+export const SPEAKER_PLACES_RULES = `When the person asks for a place nearby, such as somewhere to eat near home, look it up with find_places before you suggest one. Name only places it found, say in your own voice why one fits, and put its Maps link in your text. If it comes back with an error, say that plainly.`;
+
+/** One find_places call run for a speaker, as the tool_result the model reads. */
+async function placesCall(findPlaces: PlacesFinder, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  const args = block.input && typeof block.input === 'object' ? (block.input as Record<string, unknown>) : {};
+  let content: string;
+  let isError = false;
+  if (block.name !== FIND_PLACES_TOOL) {
+    content = `There is no tool called ${block.name}.`;
+    isError = true;
+  } else {
+    try {
+      const result = placesToolResult(await findPlaces(placesInput(args)));
+      if (result.ok) content = JSON.stringify({ places: result.found ?? [], totals: result.totals, note: result.note });
+      else {
+        content = result.error;
+        isError = true;
+      }
+    } catch (error) {
+      if (!(error instanceof AskInputError)) console.error('group places lookup failed', error);
+      content = error instanceof AskInputError ? error.message : 'That places lookup failed.';
+      isError = true;
+    }
+  }
+  return { type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) };
+}
+
+/**
+ * One bot's text. With a places finder it is offered find_places, and may
+ * call it up to SPEAKER_MAX_LOOKUPS times before it writes; with none, it
+ * writes straight away, so a turn stays short.
+ */
+export async function speakWithModel(
+  anthropic: Anthropic,
+  model: string,
+  input: SpeakerInput,
+  spent: SpendReport[],
+  findPlaces?: PlacesFinder,
+): Promise<string | null> {
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: SPEAKER_MAX_TOKENS,
-    system: [
-      { type: 'text', text: input.speaker.system },
-      { type: 'text', text: `${SPEAKER_RULES}\n\nIn this group with the person: ${others.join(', ')}.` },
-    ],
-    messages: [{ role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` }],
-  });
-  spent.push({ model, usage: usageFrom(response.usage) });
-  const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
-  return cleanSpeech(text, input.speaker.name);
+  const rules = `${SPEAKER_RULES}${findPlaces ? `\n\n${SPEAKER_PLACES_RULES}` : ''}\n\nIn this group with the person: ${others.join(', ')}.`;
+  const messages: Anthropic.MessageParam[] = [
+    { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
+  ];
+  for (let lookups = 0; ; lookups++) {
+    const offer = findPlaces && lookups < SPEAKER_MAX_LOOKUPS;
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: SPEAKER_MAX_TOKENS,
+      system: [
+        { type: 'text', text: input.speaker.system },
+        { type: 'text', text: rules },
+      ],
+      // Past the last lookup the tool is still sent, so the turns that used it
+      // read, but the model is told to write.
+      ...(findPlaces ? { tools: [FIND_PLACES_DEFINITION], tool_choice: offer ? { type: 'auto' as const } : { type: 'none' as const } } : {}),
+      messages,
+    });
+    spent.push({ model, usage: usageFrom(response.usage) });
+    const calls = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
+    if (!findPlaces || !offer || calls.length === 0) {
+      const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
+      return cleanSpeech(text, input.speaker.name);
+    }
+    messages.push({ role: 'assistant', content: response.content });
+    messages.push({ role: 'user', content: await Promise.all(calls.map((call) => placesCall(findPlaces, call))) });
+  }
 }
 
 /**
@@ -278,7 +349,8 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
   const anthropic = input.anthropic ?? (input.anthropicApiKey ? new Anthropic({ apiKey: input.anthropicApiKey }) : null);
   const direct = input.director ?? ((d: DirectorInput, s: SpendReport[]) => (anthropic ? directWithModel(anthropic, d, s) : Promise.resolve(WAIT)));
   const speak =
-    input.speak ?? ((d: SpeakerInput, s: SpendReport[]) => (anthropic ? speakWithModel(anthropic, input.model, d, s) : Promise.resolve(null)));
+    input.speak ??
+    ((d: SpeakerInput, s: SpendReport[]) => (anthropic ? speakWithModel(anthropic, input.model, d, s, input.findPlaces) : Promise.resolve(null)));
 
   const renewing = setInterval(() => {
     renewLease(client, userId, chatId, now()).catch(() => undefined);
