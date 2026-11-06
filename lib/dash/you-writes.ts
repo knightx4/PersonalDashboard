@@ -28,8 +28,8 @@ import {
 } from '@/lib/you/places';
 import { putQuestionToBoard } from '@/lib/you/board-ask';
 import { CONTEXT_MAX, LEAN_MAX, OPTION_MAX, OPTIONS_MAX, QUESTION_MAX } from '@/lib/you/board-questions';
-import { makeReachOutRule, saveReachOut } from '@/lib/you/reach-out-make';
-import { draftAdvisorWatch, saveProposedWatch, watchRow, watchSummary } from '@/lib/you/advisor-watch';
+import { makeReachOutRule, saveReachOut, type MadeReachOut } from '@/lib/you/reach-out-make';
+import { draftAdvisorWatch, saveProposedWatch, watchAskFor, watchRow, watchSummary } from '@/lib/you/advisor-watch';
 import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
 import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
@@ -516,6 +516,9 @@ async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
     if (!made.ok) throw new YouRefused(`${made.error} Their words are not saved. Tell them in plain words.`);
   }
   await saveReachOut(client, env.userId, person.id, brief, made);
+  // What no fixed kind covers gets a watch Dash writes itself, waiting for
+  // their OK, as the People form does (plan #3030.2).
+  const extra = made?.ok && env.rules?.ask ? await proposePartWatch(env, { ...env.rules, ask: env.rules.ask }, person, brief, made) : null;
 
   const { data: afterRow, error: afterError } = await client
     .from('board_advisors')
@@ -527,7 +530,7 @@ async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
   const after = afterRow as Row;
 
   const href = `/chat/people/${person.key}`;
-  const said = made?.ok ? made.summary : '';
+  const said = made?.ok ? `${made.summary}${extra ? ` ${extra}` : ''}` : '';
   return {
     kind: 'set_reach_out',
     input: {
@@ -551,6 +554,37 @@ async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
       detail: { brief: brief || null, summary: said || null },
     },
   };
+}
+
+/**
+ * For a rule that left part of the brief uncovered, a watch Dash writes for
+ * that part alone, kept as proposed. The sentence to add to the summary, or
+ * null when nothing was left over or no watch could be written; the rule is
+ * saved either way.
+ */
+async function proposePartWatch(
+  env: YouWriteEnv,
+  rules: NonNullable<YouWriteEnv['rules']> & { ask: AskContext },
+  person: { id: string; key: string; name: string },
+  brief: string,
+  made: MadeReachOut,
+): Promise<string | null> {
+  const part = watchAskFor(made);
+  if (!part?.only?.length) return null;
+  const reports: SpendReport[] = [];
+  const drafted = await draftAdvisorWatch(
+    { name: person.name, brief, only: part.only },
+    { ask: rules.ask, apiKey: rules.apiKey, client: rules.client, onSpend: (report) => reports.push(report), suffix: rules.watchSuffix },
+  );
+  if (rules.core) {
+    await recordSpendReports(rules.core, env.userId, { module: 'you', operation: 'write-advisor-watch' }, reports).catch(
+      (error) => console.error('[spend] you/write-advisor-watch', error instanceof Error ? error.message : error),
+    );
+  }
+  if (!drafted.ok) return null;
+  const client = env.you as unknown as YouSupabaseClient;
+  await saveProposedWatch(client, watchRow(env.userId, person.id, brief, drafted));
+  return `For the rest: ${watchSummary(person.name, drafted.draft, drafted.matched)}`;
 }
 
 /**
@@ -745,7 +779,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   {
     name: 'set_reach_out',
     runs: sameAs(['app/chat/actions.ts#setReachOut', 'lib/you/reach-out-make.ts#saveReachOut']),
-    description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends"). Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. When nothing they asked for is in a table a fixed watch reads, Dash writes a watch of its own over their rows and keeps it waiting for their OK: repeat what it checks, how often and the sample text it returns, and say nothing runs until they approve it. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
+    description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends", "Newt should text me the news each morning", "tell me about any charge over £500"). Fixed watches cover news and stories on a topic, charges over an amount, balances under one, statements due, new or dearer subscriptions, today's or tomorrow's schedule, overdue todos, new appointments, return windows, deliveries, mail from a sender or on a subject, new Learn videos, review questions and stalled goals, as well as new rows in jobs, insights, notes, readings, goals and the plan. Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. When what they asked for, or part of it, is something no fixed watch reads, Dash writes a watch of its own over their rows and keeps it waiting for their OK: repeat what it checks, how often and the sample text it returns, and say nothing runs until they approve it. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
     input_schema: {
       type: 'object',
       properties: {

@@ -184,6 +184,36 @@ describe('set_reach_out', () => {
       expect(draft).not.toHaveBeenCalled();
     });
 
+    it('saves the rule and writes a watch for the part no fixed kind covers (plan #3030.3)', async () => {
+      make.mockResolvedValue({
+        ok: true,
+        rule: { version: 1, watches: [], cannot_watch: ['notes that mention your sister'] },
+        summary: 'Seneca will text you the news each morning.',
+      });
+      const t = withWatches();
+      const result = await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'news each morning, and notes about my sister' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(draft).toHaveBeenCalledWith(
+        { name: 'Seneca', brief: 'news each morning, and notes about my sister', only: ['notes that mention your sister'] },
+        expect.objectContaining({ ask: ASK }),
+      );
+      expect(rowOf(t, 'b').reach_out_summary).toBe('Seneca will text you the news each morning.');
+      expect(t['you.advisor_watches']).toHaveLength(1);
+      expect(result).toMatchObject({ op: 'update', subjectRef: `you.board_advisors:b` });
+      expect(result.summary).toContain('For the rest: Dash wrote Seneca a watch');
+    });
+
+    it('keeps the rule when the watch for the rest cannot be written', async () => {
+      make.mockResolvedValue({ ok: true, rule: { version: 1, watches: [], cannot_watch: ['the weather'] }, summary: 'Seneca will text you the news.' });
+      draft.mockResolvedValue({ ok: false, error: 'nothing holds the weather' });
+      const t = withWatches();
+      const result = await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'news and the weather' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(rowOf(t, 'b').reach_out_summary).toBe('Seneca will text you the news.');
+      expect(t['you.advisor_watches']).toHaveLength(0);
+      expect(result.summary).not.toContain('For the rest');
+    });
+
     it('does not write a watch for any other refusal', async () => {
       make.mockResolvedValue({ ok: false, error: 'Dash is busy.' });
       const t = withWatches();
