@@ -34,6 +34,7 @@ import {
 import { GroupMark, Reactions } from '../../group-parts';
 import { SpeakRun } from '../../people/[key]/thread-view';
 import { useSpeakArrivals } from '@/components/talk/speak-reply';
+import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 
 /**
  * A group chat on the Messages tab (plan #2879.1.3): the person and two to
@@ -301,6 +302,8 @@ export function GroupThreadView({
   const canSend = members.length > 0;
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    // Inside the send press or Enter, before any await, so iPhone Safari lets the replies play (plan #3036).
+    unlockSpeechOutput();
     const text = draft.trim();
     if (!text || !canSend) return;
     const item = newPending(text);

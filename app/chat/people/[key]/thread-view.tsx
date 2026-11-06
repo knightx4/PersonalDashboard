@@ -48,6 +48,7 @@ import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
 import { SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import type { DashChange } from '@/lib/talk/changes';
 import { followedRuns, workingCard, type BuildRun } from '@/lib/you/live-cards';
 
@@ -435,6 +436,8 @@ export function ThreadView({
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
+    // Inside the send press or Enter, before any await, so iPhone Safari lets the replies play (plan #3036).
+    unlockSpeechOutput();
     const text = draft.trim();
     if ((!text && files.length === 0) || !person.canTalk || uploading) return;
     const item = newPending(text, files);
