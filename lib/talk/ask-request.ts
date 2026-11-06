@@ -49,8 +49,8 @@ import { lookUpPlaces } from '@/lib/you/places-lookup';
 import { createYouClient } from '@/lib/you/auth/server';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
-import { handoffBrief } from './handoff';
-import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
+import { handoffBrief, type SessionHandoffInput } from './handoff';
+import { askHandoffOf, attachHandoffs, discardHandoffs, keepSessionHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { keepSlip } from '@/lib/dash/slips';
@@ -272,8 +272,11 @@ export async function askDashInRequest(input: {
       },
       ...(canHandOff
         ? {
-            saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>
-              insertHandoff(core, user.id, conversationId, request, subjectRef),
+            // One session row per question (plan #3005.2), read as Ask's hand-off.
+            saveHandoff: async (handoff: SessionHandoffInput) => {
+              const kept = await keepSessionHandoff(core, user.id, handoff);
+              return kept.ok ? { ok: true as const, handoff: askHandoffOf(kept.handoff), created: kept.created } : kept;
+            },
             attachHandoffs: (ids: readonly string[], turnId: string) => attachHandoffs(core, ids, turnId),
             discardHandoffs: (ids: readonly string[]) => discardHandoffs(core, ids),
             fireHandoff: async (handoff) => {

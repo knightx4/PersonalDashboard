@@ -11,6 +11,9 @@ import { BURST_REQUEST_MS, MAX_REPLY_ROUNDS, runGroupBurst } from '@/lib/you/gro
 import { loadGroup } from '@/lib/you/group-chats';
 import { lookUpPlaces } from '@/lib/you/places-lookup';
 import { claimTyping } from '@/lib/you/mentor-reply';
+import { isOwner } from '@/lib/dev/owner';
+import { botPageStarter } from '@/lib/you/bot-pages-store';
+import { sessionStarter } from '@/lib/talk/session-handoff-store';
 
 /**
  * Writing in a group from a request (plan #2879.1.2): POST
@@ -56,7 +59,7 @@ export async function continueBurstInRequest(userId: string, chatId: string, rou
 async function burstInRequest(userId: string, chatId: string, from: { claimed: boolean; round: number | undefined }, chainTo: ChainTo): Promise<void> {
   const client = await createYouClient();
   try {
-    const [core, settings] = await Promise.all([createCoreClient(), loadAccountSettings(userId)]);
+    const [core, settings, owner] = await Promise.all([createCoreClient(), loadAccountSettings(userId), isOwner()]);
     await runGroupBurst({
       client,
       userId,
@@ -67,6 +70,10 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
       // Places near home for any speaker, under the app's daily cap (plan #2987.3).
       findPlaces: (search) => lookUpPlaces({ you: client, core, userId }, search),
+      // Pages made in a session (plan #2997), for the owner, as in a direct chat.
+      makePage: owner ? (botPageStarter(core, userId) ?? undefined) : undefined,
+      // Heavy work handed to a session (plan #3005.2), for the owner, as in a direct chat.
+      handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
       claimed: from.claimed,
       round: from.round,
       deadline: Date.now() + BURST_REQUEST_MS,

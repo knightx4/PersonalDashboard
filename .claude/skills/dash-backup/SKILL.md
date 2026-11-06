@@ -5,6 +5,10 @@ description: Carry out a request Ask Dash handed on because none of its own tool
 
 # Doing what Ask Dash handed on
 
+**A brief that names `Bot page <id>` is not Ask's.** A bot on People asked this
+routine to make a page (plan #2997). Follow `.claude/skills/bot-pages/SKILL.md`
+for it instead of this file.
+
 Ask Dash answers questions and makes eight kinds of change itself, with an
 Undo: adding a todo, a goal or a goal step, renaming, moving or ticking off a
 todo, closing a goal step, marking an item returned, and adding a note on a
@@ -41,7 +45,7 @@ then the request. Read the row and the conversation so far:
 
 ```sql
 select id, request, status, conversation_id, turn_id
-from core.dash_handoffs where id = '<id>' and user_id = '<user_id>';
+from core.dash_handoffs where id = '<id>' and user_id = '<user_id>' and kind = 'request';
 
 select role, body, citations, created_at from core.conversation_turns
 where conversation_id = '<conversation>' and user_id = '<user_id>'
@@ -52,8 +56,9 @@ If the row is not there, or its status is `done` or `failed`, stop: it has been
 handled. If its `kind` is `session`, or the brief's second line is `kind
 session`, follow **A session hand-off** below instead of the steps here. With
 no id in the brief, work every row for that user whose `kind` is `request` and
-whose status is `pending` or `fired`, oldest first. Rows of kind `page` and
-`session` are left alone there: each is started with its own id.
+whose status is `pending` or `fired`, oldest first. A row of kind `page` is a
+bot's page, and goes by `.claude/skills/bot-pages/SKILL.md`. Rows of kind
+`page` and `session` are left alone there: each is started with its own id.
 
 ## 2. Decide whether you may do it
 

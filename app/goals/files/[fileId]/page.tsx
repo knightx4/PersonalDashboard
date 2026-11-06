@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { cn } from '@/lib/cn';
 import { Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
+import { PageFrame } from '@/components/files/page-frame';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { authorLine, fileHref, fileVersionHref, parseVersion } from '@/lib/files/files';
+import { authorLine, fileHref, fileVersionHref, fileViewHref, parseVersion } from '@/lib/files/files';
 import { loadFile, loadFileThread, loadVersionBody, loadVersions } from '@/lib/files/store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatInstant } from '@/lib/goals/dates';
@@ -107,6 +108,9 @@ export default async function FilePage({
               Open the file
             </a>
           </Card>
+        ) : file.format === 'html' ? (
+          // A page a bot had made (plan #2997), served sandboxed and framed here.
+          <PageFrame title={shown.title} src={fileViewHref(file.id, older ? asked : null)} />
         ) : (
           <Card padding="standard">
             <FileBody markdown={shown.body} />

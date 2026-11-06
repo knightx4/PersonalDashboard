@@ -13,6 +13,8 @@ import {
 } from './mentor-reply';
 import { sendMentorText } from './mentor-send';
 import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
+import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
+import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -482,6 +484,115 @@ describe('replyToMentor', () => {
     expect(back[0].content).toContain('https://maps.google.com/?cid=111');
     expect(outcome.rounds[0]?.ok).toBe(true);
     expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it('starts a page with make_page, as this mentor answering this message, and texts that it is on it (plan #2997)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].text = 'Prepare me something to practise my accounting for tomorrow';
+    const streamed: { tools: { name: string }[]; system: { text: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const call = {
+      content: [{ type: 'tool_use', id: 'g1', name: 'make_page', input: { request: 'An accounting drill.', title: 'Accounting drill' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = "OK, I'm on it. The link will land here.";
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? call : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const makePage = vi.fn(async () => ({ ok: true as const, rows: [], note: PAGE_STARTED }));
+
+    const outcome = await run(tables, stub, { ackAfterMs: 60_000, makePage }).promise;
+
+    expect(streamed[0].tools.map((t) => t.name)).toContain('make_page');
+    expect(streamed[0].system.map((b) => b.text).join('\n')).toContain(PAGE_RULES);
+    expect(makePage).toHaveBeenCalledTimes(1);
+    const [asker, input] = makePage.mock.calls[0] as unknown as [Record<string, unknown>, unknown];
+    expect(asker).toMatchObject({
+      chatId: CHAT,
+      messageId: tables['you.advisor_messages'][0].id,
+      asked: 'Prepare me something to practise my accounting for tomorrow',
+    });
+    expect(String(asker.persona)).toContain('You talk plainly about cash.');
+    expect(input).toEqual({ request: 'An accounting drill.', title: 'Accounting drill' });
+    const back = streamed[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(JSON.stringify(back[0].content)).toContain('on it');
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it('hands heavy work on with hand_off, as this mentor in this thread, and texts that it is on it (plan #3005.2)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].text = 'Write up the plan step for the export with its full detail';
+    const streamed: { tools: { name: string }[]; system: { text: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const call = {
+      content: [
+        { type: 'tool_use', id: 'h1', name: 'hand_off', input: { request: 'Add a plan step for the export, in full.', summary: 'They want the export.' } },
+      ],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = "OK, I'm on it.";
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? call : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const handOn = vi.fn(async () => ({ ok: true as const, rows: [], note: ON_IT }));
+
+    const outcome = await run(tables, stub, { ackAfterMs: 60_000, handOn }).promise;
+
+    expect(streamed[0].tools.map((t) => t.name)).toContain('hand_off');
+    expect(streamed[0].system.map((b) => b.text).join('\n')).toContain(SESSION_RULES);
+    expect(handOn).toHaveBeenCalledTimes(1);
+    const [asker, input] = handOn.mock.calls[0] as unknown as [Record<string, unknown>, unknown];
+    expect(asker).toMatchObject({
+      thread: { kind: 'chat', chatId: CHAT },
+      messageId: tables['you.advisor_messages'][0].id,
+      asked: 'Write up the plan step for the export with its full detail',
+    });
+    expect(input).toEqual({ request: 'Add a plan step for the export, in full.', summary: 'They want the export.' });
+    const back = streamed[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(JSON.stringify(back[0].content)).toContain('on it');
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it('offers no hand_off without a way to start a session', async () => {
+    const { stub, streamed } = anthropicStub(['Sure.']);
+    await run(world(), stub).promise;
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('hand_off');
+  });
+
+  it('offers no make_page without a way to start one', async () => {
+    const { stub, streamed } = anthropicStub(['Sure.']);
+    await run(world(), stub).promise;
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('make_page');
   });
 
   it('offers every lookup but the chart, and nothing that writes', () => {
