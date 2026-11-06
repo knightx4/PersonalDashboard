@@ -35,10 +35,18 @@ export type FileListing = {
 /** Where a file the person added is kept, in the goals-documents bucket (migration 0290). */
 export type StoredFile = { path: string; contentType: string; sizeBytes: number };
 
+/**
+ * What a file's body is (core migration 0305): markdown, a piece of writing;
+ * or html, a self-contained page a bot had made (plan #2997), which opens in
+ * a sandbox at fileViewHref.
+ */
+export type FileFormat = 'markdown' | 'html';
+
 /** One file as its page shows it. */
 export type FileDoc = FileListing & {
   body: string;
   changeNote: string | null;
+  format: FileFormat;
 };
 
 /** An earlier version, as the history under a file lists it. */
@@ -72,7 +80,7 @@ export type LinkedFile = {
 
 export const LISTING_COLUMNS =
   'id, title, summary, made_by, version, origin, created_at, updated_at, read_at, storage_path, content_type, size_bytes, pinned_at';
-export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note`;
+export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note, format`;
 export const VERSION_COLUMNS = 'version, title, made_by, change_note, created_at';
 
 export type ListingRow = {
@@ -91,7 +99,7 @@ export type ListingRow = {
   pinned_at?: string | null;
 };
 
-export type DocRow = ListingRow & { body: string; change_note: string | null };
+export type DocRow = ListingRow & { body: string; change_note: string | null; format?: string | null };
 
 export type VersionRow = {
   version: number;
@@ -125,7 +133,7 @@ export function toListing(row: ListingRow): FileListing {
 }
 
 export function toDoc(row: DocRow): FileDoc {
-  return { ...toListing(row), body: row.body, changeNote: row.change_note };
+  return { ...toListing(row), body: row.body, changeNote: row.change_note, format: row.format === 'html' ? 'html' : 'markdown' };
 }
 
 export function toVersion(row: VersionRow): FileVersion {
@@ -151,6 +159,42 @@ export function isUnread(file: { madeBy?: FileAuthor; readAt?: string | null }):
 export function fileHref(id: string): string {
   return `/goals/files/${id}`;
 }
+
+/**
+ * Where an html file's page itself is served (plan #2997), sandboxed, for its
+ * file page to frame and for a link to open full screen. With a version, that
+ * version's page.
+ */
+export function fileViewHref(id: string, version?: number | null): string {
+  return version ? `${fileHref(id)}/view?v=${version}` : `${fileHref(id)}/view`;
+}
+
+/**
+ * The headers an html file is served with (plan #2997). The page runs its own
+ * scripts and styles in a sandbox with an origin of its own, so it cannot
+ * read the app's cookies or pages, and every request it might make is
+ * refused: it is self-contained by rule, not only by request. Only the app
+ * may frame it.
+ */
+export const PAGE_VIEW_HEADERS: Readonly<Record<string, string>> = {
+  'Content-Type': 'text/html; charset=utf-8',
+  'Content-Security-Policy': [
+    'sandbox allow-scripts allow-forms allow-modals',
+    "default-src 'none'",
+    "script-src 'unsafe-inline'",
+    "style-src 'unsafe-inline'",
+    'img-src data: blob:',
+    'font-src data:',
+    'media-src data: blob:',
+    "connect-src 'none'",
+    "form-action 'none'",
+    "base-uri 'none'",
+    "frame-ancestors 'self'",
+  ].join('; '),
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'Cache-Control': 'private, no-store',
+};
 
 /** Where one earlier version of a file opens. */
 export function fileVersionHref(id: string, version: number): string {

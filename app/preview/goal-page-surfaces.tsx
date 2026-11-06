@@ -12,6 +12,8 @@ import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
 import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
+import { PageFrame } from '@/components/files/page-frame';
+import { DRILL_PAGE } from './bot-page-fixture';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
@@ -874,6 +876,26 @@ export function FileSurface() {
         <Card padding="standard">
           <FileBody markdown={FILE_BODY} />
         </Card>
+      </div>
+    </PageColumn>
+  );
+}
+
+/** A page a bot had made (plan #2997): an html file, framed, with the link to open it full screen. */
+export function FilePageSurface() {
+  return (
+    <PageColumn>
+      <PageHeader
+        title="Accounting practice drill"
+        description={
+          <>
+            <DashCredit />
+            Written by Dash · updated Wed 4 Nov, 18:40
+          </>
+        }
+      />
+      <div className="space-y-6">
+        <PageFrame title="Accounting practice drill" src="/goals/files/f-drill/view" srcDoc={DRILL_PAGE} />
       </div>
     </PageColumn>
   );

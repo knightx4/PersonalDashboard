@@ -601,6 +601,7 @@ import {
   GoalFilesTabSurface,
   GoalPageLoadingSurface,
   FileSurface,
+  FilePageSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
   GoalsHomeSurface,
@@ -6266,6 +6267,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <FileSurface />,
+  },
+  {
+    /* A page a bot had made (plan #2997): an html file framed on its page,
+     * with the link to open it full screen. */
+    id: 'goals-file-page',
+    label: 'Goals · a page a bot made',
+    module: 'goals',
+    width: 'page',
+    render: () => <FilePageSurface />,
   },
   {
     /* A goal just added: the Claude line and the row of add lines. */
