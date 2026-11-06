@@ -12,12 +12,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { TRANSCRIPT_TOOL, transcriptPrompt, transcriptTool } from '@/lib/you/transcript-read';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 export const TRANSCRIPT_MODEL = MODELS.vaultTranscript;
 
@@ -52,8 +52,7 @@ export async function askTranscriptModel(
       model: TRANSCRIPT_MODEL,
       max_tokens: 16_000,
       system: transcriptPrompt(),
-      tools: [transcriptTool() as Anthropic.Tool],
-      tool_choice: forceTool(TRANSCRIPT_TOOL, TRANSCRIPT_MODEL),
+      ...reportRequest(transcriptTool() as Anthropic.Tool, TRANSCRIPT_MODEL),
       messages: [
         {
           role: 'user',
@@ -78,9 +77,7 @@ export async function askTranscriptModel(
       error: 'That transcript is too long to read in one go. Try it a few pages at a time.',
     };
   }
-  const reported = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TRANSCRIPT_TOOL,
-  );
-  if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back.' };
-  return { ok: true, input: reported.input };
+  const reported = readReport(response, TRANSCRIPT_TOOL, TRANSCRIPT_MODEL);
+  if (!reported.ok) return { ok: false, error: 'Nothing came back.' };
+  return { ok: true, input: reported.value };
 }

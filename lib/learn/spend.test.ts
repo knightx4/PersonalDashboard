@@ -93,6 +93,7 @@ describe('the operation names', () => {
       'write-maya-thought',
       'gate-maya-note',
       'tag-note-voice',
+      'score-vault-ideas',
       'extract-note-lines',
       'reply-to-maya',
       'read-transcript',

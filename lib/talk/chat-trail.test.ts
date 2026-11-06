@@ -51,10 +51,10 @@ const turns: TalkTurn[] = [
 ];
 
 describe('chatReadRows', () => {
-  it('lists each row a lookup gave back or an answer cited once, leaving out what a write gave back', () => {
+  it('lists each row a lookup gave back or an answer cited once, cited first, leaving out what a write gave back', () => {
     const rows = chatReadRows(turns);
-    expect(rows.map((row) => row.ref)).toEqual(['o1', 'o2', 'm1']);
-    expect(rows.map((row) => row.workspace)).toEqual(['shopping', 'shopping', null]);
+    expect(rows.map((row) => row.ref)).toEqual(['o1', 'm1', 'o2']);
+    expect(rows.map((row) => row.workspace)).toEqual(['shopping', null, 'shopping']);
   });
 });
 

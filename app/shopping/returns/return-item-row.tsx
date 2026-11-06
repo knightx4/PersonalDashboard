@@ -1,4 +1,6 @@
 import Link from '@/components/ui/link';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import { LIFECYCLE_GLYPH } from '@/lib/core/lifecycle';
 import { formatMoney } from '@/lib/money';
 import { deadlineLabel } from '@/lib/returns/deadline';
 import { ReturnFuse } from '@/components/ui/return-fuse';
@@ -63,11 +65,16 @@ export function ReturnItemRow({
           <p className="flex min-w-0 items-baseline gap-2 text-ui text-ink-muted">
             {row.returnPlanned && !returned && (
               <Chip tone="accent" size="sm">
+                {/* The state carries a shape, not the tint alone (law 4). */}
+                <StatusGlyph glyph="empty" />
                 To return
               </Chip>
             )}
             {returned && (
-              <Chip size="sm">Returned</Chip>
+              <Chip size="sm">
+                <StatusGlyph glyph={LIFECYCLE_GLYPH.done} />
+                Returned
+              </Chip>
             )}
             <span className="min-w-0 truncate">
               {[nested ? null : row.merchantName, displayVariant(row.variant)]

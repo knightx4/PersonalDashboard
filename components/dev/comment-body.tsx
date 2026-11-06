@@ -1,4 +1,4 @@
-import { Markdown } from '@/components/ui/markdown';
+import { Markdown, type MarkdownProps } from '@/components/ui/markdown';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 
 /**
@@ -21,6 +21,7 @@ export function CommentBody({
   body,
   titles,
   refs = true,
+  remarkPlugins,
 }: {
   body: string;
   titles?: PlanRefTitles;
@@ -31,6 +32,8 @@ export function CommentBody({
    * (plan #1931.4). Every one previews its step on hover or hold.
    */
   refs?: boolean | 'outlines';
+  /** Run before the mentions and the step links: an answer's source marks (plan #2748.12). */
+  remarkPlugins?: MarkdownProps['remarkPlugins'];
 }) {
   return (
     <Markdown
@@ -38,6 +41,7 @@ export function CommentBody({
       className="comment-prose"
       allowedElements={ALLOWED}
       mentions
+      remarkPlugins={remarkPlugins}
       planRefs={refs ? { titles, reading: refs === 'outlines' ? 'outlines' : 'all' } : false}
     />
   );

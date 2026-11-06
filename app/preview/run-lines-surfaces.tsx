@@ -12,7 +12,8 @@ import { PageColumn } from '@/components/shell/page-width';
  * on your answer, its choices as presses (plan #1824); one waiting on a
  * question asked without choices, answered in your own words; one gone quiet with its Acknowledge press; one just
  * started with nothing written yet; one whose live connection dropped; and a
- * feature session's, folded under the feature's steps.
+ * feature session's, folded under the feature's steps; and a long run's one
+ * list, scrolled in its box to the newest line.
  * The live part (components/runs/live-run-lines.tsx) only feeds these lines
  * from Realtime, so the drawing is the same. The first card is a going run
  * whose next line arrives on a press (run-lines-demo.tsx), for the strip.
@@ -147,6 +148,9 @@ export function RunLinesSurface() {
       <RunLinesView lines={[]} state="live" />
       <RunLinesView lines={RUN_LINES.slice(0, 2)} state="live" connection="lost" />
       <RunLinesView lines={FEATURE_LINES} state="live" feature={{ ref: '#2124', steps: FEATURE_STEPS }} />
+      {/* A long run with no feature: its one list scrolls in a box of fixed
+       * height, opened at the newest line (note d89c72b0). */}
+      <RunLinesView lines={FEATURE_LINES} state="live" />
     </PageColumn>
   );
 }

@@ -327,7 +327,11 @@ function devRef(kind: DevRowKind, input: Input, outlines: OutlineIndex): { colum
   if (!ref) throw new AskInputError('Give the ref: the row\'s id, or a step\'s outline or number.');
   if (kind === 'step' && /^#?\d+(?:\.\d+)*$/.test(ref.trim())) {
     const number = numberFromRef(ref, outlines);
-    if (number === null) throw new AskInputError(`${ref} names no step on the plan.`);
+    if (number === null) {
+      const parent = ref.trim().replace(/^#/, '').split('.')[0];
+      const hint = ref.includes('.') ? ` Read #${parent} to list the steps it has, or search the words with find_dev_text.` : ' Search the words with find_dev_text.';
+      throw new AskInputError(`${ref} names no step on the plan.${hint}`);
+    }
     return { column: 'number', value: number };
   }
   const id = ref.match(UUID_IN)?.[0];

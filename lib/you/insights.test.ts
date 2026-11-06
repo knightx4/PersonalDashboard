@@ -114,9 +114,19 @@ describe('layersOf and receiptsOf', () => {
         null,
       ]),
     ).toEqual([
-      { depth: 'deeper', text: 'b' },
-      { depth: 'deeper', text: 'c' },
+      { depth: 'deeper', headline: null, text: 'b' },
+      { depth: 'deeper', headline: null, text: 'c' },
     ]);
+  });
+
+  it('keeps the headline a run wrote for a level, trimmed, and reads a blank one as none', () => {
+    expect(
+      layersOf([
+        { depth: 'saw', headline: '  You leave a city once it stops teaching you. ', text: 'a' },
+        { depth: 'deeper', headline: '   ', text: 'b' },
+        { depth: 'further', headline: 42, text: 'c' },
+      ]).map((layer) => layer.headline),
+    ).toEqual(['You leave a city once it stops teaching you.', null, null]);
   });
 
   it('keeps a receipt that names a source, with a number as its quote and an unsafe link dropped', () => {
@@ -140,6 +150,15 @@ describe('safeLink', () => {
     expect(safeLink('//evil.example')).toBeNull();
     expect(safeLink('javascript:alert(1)')).toBeNull();
     expect(safeLink(3)).toBeNull();
+  });
+});
+
+describe('insightFromRow area', () => {
+  it('carries area_id and leaves an untagged card valid', () => {
+    expect(insightFromRow(row({ area_id: 'a1' }))?.areaId).toBe('a1');
+    const plain = insightFromRow(row());
+    expect(plain?.areaId).toBeNull();
+    expect(plain?.areaName).toBeNull();
   });
 });
 

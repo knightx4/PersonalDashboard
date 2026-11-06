@@ -13,7 +13,7 @@ import { paletteHits } from '@/lib/search/rank';
 import { hitsInScope } from '@/lib/search/scope';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { moduleById, type ModuleId } from '@/lib/modules';
-import { commandsFor, type BoxTrigger } from '@/lib/talk/box-commands';
+import { commandsFor, scopeWorkspaces, workspacesNamed, type BoxTrigger } from '@/lib/talk/box-commands';
 import { MAX_MENTIONS, type AskMention } from '@/lib/talk/ask-input';
 import type { TalkCitation } from '@/lib/talk/talk';
 import type { BoxItem, BoxMenu } from '@/components/thread/thread';
@@ -22,7 +22,8 @@ import type { BoxItem, BoxMenu } from '@/components/thread/thread';
  * What Dash's box adds to the thread's own (plan #1899.5): `@` to add one of
  * your rows for Dash to read, from the search the top bar uses; `/` for the
  * things Dash can already do; and a chip that keeps Dash's lookups to one
- * workspace. AskThread spreads what this returns onto TalkThread, so the
+ * workspace, which `@` and the workspace's name also choose (plan #2748.1).
+ * AskThread spreads what this returns onto TalkThread, so the
  * sheet and /ask get the same box.
  */
 
@@ -36,7 +37,13 @@ function mentionOf(hit: SearchHit): AskMention {
 }
 
 /** How the box starts, for the gallery. */
-export type AskBoxStart = { rows?: readonly AskMention[]; scope?: ModuleId | null; scopeOpen?: boolean };
+export type AskBoxStart = {
+  rows?: readonly AskMention[];
+  scope?: ModuleId | null;
+  scopeOpen?: boolean;
+  /** "Think it through" drawn on (plan #2789.10). */
+  think?: boolean;
+};
 
 /** What a question takes from the box when it is sent. */
 export type AskBoxSent = { rows: AskMention[]; scope: ModuleId | null };
@@ -59,6 +66,7 @@ export function useAskBox({
   const [trigger, setTrigger] = useState<BoxTrigger | null>(null);
   const [mentions, setMentions] = useState<AskMention[]>(() => [...(start?.rows ?? [])]);
   const [scope, setScope] = useState<ModuleId | null>(start?.scope ?? null);
+  const scopes = useMemo(() => scopeWorkspaces(workspaces), [workspaces]);
   const taken = useRef<AskMention[]>([]);
   const searchScope = scope ?? 'everything';
   const needle = trigger?.kind === 'row' ? trigger.query.trim() : '';
@@ -89,10 +97,33 @@ export function useAskBox({
         })),
       };
     }
-    if (!account && !fixtureHits) return null;
+    // "@Learn" keeps the question to Learn: the workspaces the words name
+    // come first, then the rows (plan #2748.1).
+    const named = workspacesNamed(needle, scopes).filter((id) => id !== scope);
+    const keep = named.map<BoxItem>((id) => ({
+      key: `workspace:${id}`,
+      label: `@${moduleById(id)?.label ?? id}`,
+      hint: 'Keep this question to it',
+      mark: <ModuleMark module={id} size="xs" />,
+      insert: '',
+      onPick: () => setScope(id),
+    }));
+    if (!account && !fixtureHits) {
+      return keep.length > 0 ? { label: 'Keep the question to a workspace', empty: '', items: keep } : null;
+    }
     const full = mentions.length >= MAX_MENTIONS;
+    const rows = full
+      ? []
+      : hits.map<BoxItem>((hit) => ({
+          key: `${hit.kind}:${hit.id}`,
+          label: hit.title,
+          hint: hit.subtitle,
+          mark: <ModuleMark module={hit.module} size="xs" />,
+          insert: '',
+          onPick: () => setMentions((current) => [...current, mentionOf(hit)]),
+        }));
     return {
-      label: 'Add a row for Dash to read',
+      label: keep.length > 0 ? 'Keep to a workspace, or add a row' : 'Add a row for Dash to read',
       empty: full
         ? `A question takes ${MAX_MENTIONS} rows at most.`
         : needle.length < MIN_QUERY
@@ -100,18 +131,9 @@ export function useAskBox({
           : live.looking && !fixtureHits
             ? 'Looking…'
             : `Nothing of yours is called “${needle}”.`,
-      items: full
-        ? []
-        : hits.map<BoxItem>((hit) => ({
-            key: `${hit.kind}:${hit.id}`,
-            label: hit.title,
-            hint: hit.subtitle,
-            mark: <ModuleMark module={hit.module} size="xs" />,
-            insert: '',
-            onPick: () => setMentions((current) => [...current, mentionOf(hit)]),
-          })),
+      items: [...keep, ...rows],
     };
-  }, [trigger, workspaces, account, fixtureHits, mentions.length, needle, live.looking, hits]);
+  }, [trigger, workspaces, scopes, scope, account, fixtureHits, mentions.length, needle, live.looking, hits]);
 
   const attached =
     mentions.length > 0 ? (
@@ -135,7 +157,7 @@ export function useAskBox({
     ) : null;
 
   const boxStart =
-    workspaces && workspaces.length > 1 ? <ScopeChip scope={scope} workspaces={workspaces} onScope={setScope} initialOpen={start?.scopeOpen} /> : null;
+    scopes.length > 1 ? <ScopeChip scope={scope} workspaces={scopes} onScope={setScope} initialOpen={start?.scopeOpen} /> : null;
 
   return {
     /** For TalkThread. */

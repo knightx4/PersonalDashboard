@@ -10,7 +10,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Skeleton, PageHeaderSkeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/cn';
 import { practiceHref } from '@/lib/learn/flow/href';
-import type { StartLine } from '@/lib/learn/next/session';
+import { sessionHref, type StartLine } from '@/lib/learn/next/session';
 import type { WaitingLine } from '@/lib/learn/feed/waiting';
 
 /**
@@ -31,11 +31,16 @@ import type { WaitingLine } from '@/lib/learn/feed/waiting';
 export type PreparingRow = { subjectId: string; name: string; line: string };
 
 /** Where Start goes: the session, which plays one item after another (plan #2546.3). */
-export const START_HREF = '/learn/go';
+export const START_HREF = sessionHref('all');
+
+/** Where Quick learn goes: the same session with lessons only, no question asked first. */
+export const QUICK_LEARN_HREF = sessionHref('lessons');
 
 export function NowView({
   header,
   start,
+  quickLearn = null,
+  quickLearnSame = false,
   today,
   hasPiece,
   pieceTitle = null,
@@ -49,6 +54,10 @@ export function NowView({
   header: ReactNode;
   /** What Start opens with, or null when nothing is waiting or it could not be read. */
   start: StartLine | null;
+  /** The lesson Quick learn opens with, or null when every lesson is read. */
+  quickLearn?: StartLine | null;
+  /** Start opens on that same lesson, so its line is not said twice. */
+  quickLearnSame?: boolean;
   /** Today's piece, as `PieceFirst` draws it, or nothing when there is none. */
   today: ReactNode;
   hasPiece: boolean;
@@ -68,7 +77,7 @@ export function NowView({
   const main = (
     <>
       {header}
-      {ready && <StartCard start={start} />}
+      {ready && <StartCard start={start} quickLearn={quickLearn} quickLearnSame={quickLearnSame} />}
       {ready ? (
         <>
           {hasPiece && (
@@ -134,7 +143,15 @@ export function NowView({
  * so the press is never a surprise. Nothing waiting still starts the
  * session, which says what is next.
  */
-function StartCard({ start }: { start: StartLine | null }) {
+function StartCard({
+  start,
+  quickLearn,
+  quickLearnSame,
+}: {
+  start: StartLine | null;
+  quickLearn: StartLine | null;
+  quickLearnSame: boolean;
+}) {
   return (
     <Card padding="standard" className="mb-6">
       <Link href={START_HREF} className={cn(buttonVariants({ variant: 'primary', size: 'lg' }), 'w-full sm:w-auto')}>
@@ -150,7 +167,33 @@ function StartCard({ start }: { start: StartLine | null }) {
       ) : (
         <p className="mt-3 text-ui text-ink-muted">Nothing is due right now. Start opens the session, which says what comes next.</p>
       )}
+      {quickLearn && <QuickLearn lesson={quickLearn} same={quickLearnSame} />}
     </Card>
+  );
+}
+
+/**
+ * Quick learn: a new lesson with no question, check or review in front of
+ * it, for when reading something new is all you want. Next in that session
+ * brings another lesson, and Stop ends it. Drawn only while a lesson waits.
+ */
+function QuickLearn({ lesson, same }: { lesson: StartLine; same: boolean }) {
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <Link href={QUICK_LEARN_HREF} className={cn(buttonVariants({ variant: 'secondary' }), 'w-full sm:w-auto')}>
+        <BookOpen className="size-4" strokeWidth={1.75} aria-hidden />
+        Quick learn
+      </Link>
+      {same ? (
+        <p className="mt-2 text-ui text-ink-muted">The same lesson, with only lessons after it.</p>
+      ) : (
+        <p className="mt-2 text-body text-ink [overflow-wrap:anywhere]">
+          <span className="text-ink-muted">Lesson · </span>
+          <span className="font-medium">{lesson.title}</span>
+          <span className="block text-small text-ink-muted">{lesson.place}</span>
+        </p>
+      )}
+    </div>
   );
 }
 

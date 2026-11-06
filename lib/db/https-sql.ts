@@ -124,12 +124,39 @@ export function render(
   return { text, words };
 }
 
-/** `$1`, `$2` … in a raw statement replaced by its values, outside quoted text. */
+/**
+ * `$1`, `$2` … in a raw statement replaced by its values, outside quoted text.
+ *
+ * Quoted text is a '…' or E'…' string, a dollar-quoted one ($$…$$, $s$…$s$),
+ * a "quoted identifier" or a comment. A
+ * statement given no values is sent as written: sessions write prose such as
+ * "a $150,000 floor" inside $s$…$s$, and filling `$150` there wrote "NULL,000"
+ * into the person's rows (note 646c750c).
+ */
 export function withParameters(query: string, values: readonly unknown[]): string {
-  return query.replace(/('(?:[^']|'')*')|\$(\d+)/g, (match, quoted: string | undefined, n) =>
-    quoted !== undefined ? match : valueSql(values[Number(n) - 1]),
+  if (values.length === 0) return query;
+  return query.replace(PARAMETER_OR_QUOTED, (match, _tag, n: string | undefined) =>
+    n === undefined ? match : valueSql(values[Number(n) - 1]),
   );
 }
+
+/**
+ * Text `$n` is never filled inside, then `$n` itself. In order: an E'…'
+ * string (backslash escapes), a '…' string, a dollar-quoted string, a
+ * "quoted identifier", a -- comment and a block comment.
+ */
+const PARAMETER_OR_QUOTED = new RegExp(
+  [
+    String.raw`(?<![\w$])[Ee]'(?:[^'\\]|\\[\s\S]|'')*'`,
+    String.raw`'(?:[^']|'')*'`,
+    String.raw`\$(?<tag>[A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\k<tag>\$`,
+    String.raw`"(?:[^"]|"")*"`,
+    String.raw`--[^\n]*`,
+    String.raw`/\*[\s\S]*?\*/`,
+    String.raw`\$(\d+)`,
+  ].join('|'),
+  'g',
+);
 
 /** Whether a statement gives back rows: anything but a write without `returning`. */
 export function returnsRows(words: string): boolean {

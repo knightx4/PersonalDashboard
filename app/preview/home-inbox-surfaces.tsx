@@ -34,7 +34,7 @@ const DEV: InboxRow[] = [
   {
     ref: 'public.raised_items:r1',
     section: 'actions',
-    title: 'Set the Vercel token so the overnight runner can read deploys',
+    title: 'Set the Vercel token so the runner can read deploys',
     line: 'Asked Mon 13 Oct',
     href: '/dev/inbox#raise-r1',
     move: onYou,

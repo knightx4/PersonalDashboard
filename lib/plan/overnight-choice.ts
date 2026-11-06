@@ -29,7 +29,8 @@
  * next without firing anything.
  */
 import { overnightVerdict, type OvernightRun } from './overnight';
-import { ancestorsOf, topFeatureOf, workOrder, type PlanNode, type PlanSection } from './tree';
+import { isClosed, isDismissed } from './load';
+import { ancestorsOf, flatten, topFeatureOf, workOrder, type PlanNode, type PlanSection } from './tree';
 
 /**
  * Whether a row is an overhaul or sits beneath one.
@@ -56,8 +57,75 @@ export function isUnderOverhaul(sections: readonly PlanSection[], node: PlanNode
  */
 export function runnerOrder(sections: readonly PlanSection[]): PlanNode[] {
   return workOrder(sections, { only: 'runner' }).filter(
-    (step) => !isUnderOverhaul(sections, step),
+    (step) => !isUnderOverhaul(sections, step) && !isFinishedFeature(step),
   );
+}
+
+/**
+ * A feature whose work is all done but which nobody closed: it has steps,
+ * every one not put aside is closed, at least one of them is done, and the
+ * feature itself is still open.
+ *
+ * `isReady` counts such a feature as ready, since nothing beneath it is open,
+ * so the runner used to send it. On 1 and 2 November #2644 and #2667, both in
+ * a project whose sessions close steps one at a time, were sent again a
+ * minute after their last step closed. Each session found nothing to build
+ * and ended failed, the feature stayed open, and every feature waiting on it
+ * (#2650, #2656, #2661 and #2671) stayed waiting. Such a feature is closed by
+ * the tick (`finishedFeatures`) and never sent.
+ *
+ * A feature whose steps were all dropped is left alone: none of its work
+ * shipped, so it is not finished, and it is the person's to close or re-shape.
+ */
+export function isFinishedFeature(
+  node: Pick<PlanNode, 'status' | 'dismissedAt'> & {
+    children: readonly Pick<PlanNode, 'status' | 'dismissedAt'>[];
+  },
+): boolean {
+  if (node.status !== 'not_started' && node.status !== 'in_progress') return false;
+  if (isDismissed(node)) return false;
+  const steps = node.children.filter((child) => !isDismissed(child));
+  if (steps.length === 0) return false;
+  return steps.every((child) => isClosed(child.status)) && steps.some((child) => child.status === 'done');
+}
+
+/** A finished feature to close, with the commit its newest done step carries. */
+export type FinishedFeature = {
+  id: string;
+  number: number;
+  outline: string;
+  comment: string | null;
+  /** The commit of the step that closed last, or null when none carries one. */
+  commitSha: string | null;
+};
+
+/**
+ * Every feature in the tree that `isFinishedFeature` says is done in all but
+ * name, deepest first, so a sub-feature is closed before the feature above it
+ * is judged on the next tick.
+ */
+export function finishedFeatures(sections: readonly PlanSection[]): FinishedFeature[] {
+  const nodes = sections.flatMap((section) => flatten(section.nodes));
+  return nodes
+    .filter((node) => isFinishedFeature(node))
+    .sort((a, b) => b.depth - a.depth)
+    .map((node) => {
+      const newest = node.children
+        .filter((child) => child.status === 'done' && child.commitSha)
+        .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))[0];
+      return {
+        id: node.id,
+        number: node.number,
+        outline: node.outline,
+        comment: node.comment,
+        commitSha: newest?.commitSha ?? null,
+      };
+    });
+}
+
+/** The line a feature closed this way carries in its history. */
+export function finishedFeatureLine(day: string): string {
+  return `Done ${day}: every step beneath it is done, so the runner closed it.`;
 }
 
 /**

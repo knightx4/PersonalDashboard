@@ -73,7 +73,7 @@ describe('when it lays out a chain', () => {
 
     const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
       .messages.create;
-    const concept = create.mock.calls[0][0].tools[0].input_schema.properties.concepts.items;
+    const concept = create.mock.calls[0][0].output_config.format.schema.properties.concepts.items;
     expect(concept.required).toContain('kind');
     expect(concept.properties.kind.enum).toEqual(['threshold', 'consequence']);
 

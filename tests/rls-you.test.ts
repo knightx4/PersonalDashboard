@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chats', 'advisor_memory', 'advisor_messages', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'places_cache', 'places_calls', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -911,6 +911,69 @@ describe('advisor chats, memory and forecasts', () => {
     ]);
   });
 
+  it('keeps a group, its bots and their reactions to their owner, and holds a group to eight bots (you 0042)', async () => {
+    const bots = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      select ${userA}, 'group_bot_' || n, 'Bot ' || n, 'seat', 'Why?', ${admin.json({ style: 'notionists', seed: 'g' })}
+        from generate_series(1, 9) n
+      returning id`;
+    const [group] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_chats (user_id, kind, advisor_id) values (${userA}, 'group', null) returning id`,
+    );
+    for (const bot of bots.slice(0, 8)) {
+      await asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bot.id})`);
+    }
+    await expect(
+      asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bots[8].id})`),
+    ).rejects.toThrow();
+    await asUser(userA, (tx) => tx`update advisor_chat_members set left_at = now() where advisor_id = ${bots[0].id}`);
+    await asUser(userA, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${group.id}, ${bots[8].id})`);
+    const [said] = await asUser(
+      userA,
+      (tx) => tx`insert into advisor_messages (user_id, chat_id, role, text, speaker_id)
+                 values (${userA}, ${group.id}, 'advisor', 'Hello all', ${bots[1].id}) returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_message_reactions (user_id, message_id, advisor_id, reaction)
+                 values (${userA}, ${said.id}, ${bots[2].id}, 'thumbs_up')`,
+    );
+    expect(await asUser(userB, (tx) => tx`select chat_id from advisor_chat_members`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_message_reactions`)).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`insert into advisor_chat_members (user_id, chat_id, advisor_id) values (${userB}, ${group.id}, ${bots[3].id})`),
+    ).rejects.toThrow();
+
+    // A group never gets a text first or an ack (you 0043): its bots only answer the person.
+    await expect(
+      admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, speaker_id)
+            values (${userA}, ${group.id}, 'advisor', 'ack', 'One sec', ${bots[1].id})`,
+    ).rejects.toThrow(/replies only/);
+
+    // Deleting a bot leaves the group, takes its member row, and keeps its words without a speaker.
+    await admin`delete from you.board_advisors where id = ${bots[1].id}`;
+    const [kept] = await admin`select speaker_id from you.advisor_messages where id = ${said.id}`;
+    expect(kept.speaker_id).toBeNull();
+    const [count] = await admin`select count(*)::int as n from you.advisor_chat_members where chat_id = ${group.id}`;
+    expect(count.n).toBe(8);
+  });
+
+  it('refuses a group with a bot of its own, a direct chat with members, a person speaking as a bot, or a made-up reaction', async () => {
+    const [direct] = await admin<{ id: string }[]>`select id from you.advisor_chats where id = ${chatA}`;
+    const bad = [
+      () => admin`insert into you.advisor_chats (user_id, kind, advisor_id) values (${userA}, 'group', ${advisorA})`,
+      () => admin`insert into you.advisor_chats (user_id, kind, advisor_id) values (${userA}, 'direct', null)`,
+      () => admin`insert into you.advisor_chat_members (user_id, chat_id, advisor_id) values (${userA}, ${direct.id}, ${advisorA})`,
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, text, speaker_id) values (${userA}, ${chatA}, 'person', 'x', ${advisorA})`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+    const [message] = await admin<{ id: string }[]>`select id from you.advisor_messages where chat_id = ${chatA} limit 1`;
+    await expect(
+      admin`insert into you.advisor_message_reactions (user_id, message_id, advisor_id, reaction) values (${userA}, ${message.id}, ${advisorA}, 'shrug')`,
+    ).rejects.toThrow();
+  });
+
   it('refuses a message, a memory or an avatar of the wrong shape', async () => {
     const bad = [
       () => admin`insert into you.advisor_messages (user_id, chat_id, role, text) values (${userA}, ${chatA}, 'dash', 'x')`,
@@ -966,5 +1029,439 @@ describe('advisor chats, memory and forecasts', () => {
       () => turn(1, true, { A: 0.5 }, { A: { low: 0, high: 1 } }, { A: 99.5, B: 0.5 }),
     ];
     for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+});
+
+describe('mentor threads: episodes, receipts and recall', () => {
+  // migrations-you/0038_advisor_threads.sql (plan #2748.2).
+  let chatA = '';
+
+  beforeAll(async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, persona, colour, made_by_you)
+      values (${userA}, 'thread_mentor', 'Thread mentor', 'guest', 'What next?', 'Warm and blunt.', '#3b82f6', true)
+      returning id`;
+    const [chat] = await admin<{ id: string }[]>`
+      insert into you.advisor_chats (user_id, advisor_id) values (${userA}, ${advisor.id}) returning id`;
+    chatA = chat.id;
+  });
+
+  it('groups messages into episodes that end after three quiet hours', async () => {
+    const write = (role: string, kind: string, at: string, text: string) =>
+      asUser(
+        userA,
+        (tx) => tx`insert into advisor_messages (user_id, chat_id, role, kind, text, created_at)
+                   values (${userA}, ${chatA}, ${role}, ${kind}, ${text}, ${at}::timestamptz) returning id`,
+      );
+    const [first] = await write('person', 'reply', '2026-01-01T09:00:00Z', 'Should I take the offer?');
+    await write('advisor', 'ack', '2026-01-01T09:00:05Z', 'Hm.');
+    const [last] = await write('advisor', 'reply', '2026-01-01T11:59:00Z', 'Sleep on the salary question.');
+    const [next] = await write('advisor', 'text_first', '2026-01-01T15:00:00Z', 'Thought of you this morning.');
+
+    const episodes = await admin<
+      { started_at: Date; ended_at: Date; first_message_id: string; last_message_id: string; message_count: number }[]
+    >`select started_at, ended_at, first_message_id, last_message_id, message_count
+        from you.advisor_episodes where chat_id = ${chatA} order by started_at`;
+    expect(episodes).toHaveLength(2);
+    expect(episodes[0]).toMatchObject({ first_message_id: first.id, last_message_id: last.id, message_count: 3 });
+    expect(episodes[0].ended_at.toISOString()).toBe('2026-01-01T11:59:00.000Z');
+    expect(episodes[1]).toMatchObject({ first_message_id: next.id, last_message_id: next.id, message_count: 1 });
+  });
+
+  it('finds an old message by its words', async () => {
+    const found = await asUser(
+      userA,
+      (tx) => tx`select text from advisor_messages
+                 where chat_id = ${chatA} and search @@ websearch_to_tsquery('english', 'salaries')`,
+    );
+    expect(found).toEqual([{ text: 'Sleep on the salary question.' }]);
+  });
+
+  it("keeps episodes to their owner, and refuses another account's or a bad shape", async () => {
+    expect(await asUser(userB, (tx) => tx`select id from advisor_episodes`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_episodes (user_id, chat_id, started_at, ended_at)
+                   values (${userB}, ${chatA}, now(), now())`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update advisor_chats set typing_until = now() + interval '1 minute'`);
+    expect(await admin`select typing_until from you.advisor_chats where id = ${chatA}`).toEqual([{ typing_until: null }]);
+    const bad = [
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text) values (${userA}, ${chatA}, 'person', 'ack', 'ok')`,
+      () => admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text) values (${userA}, ${chatA}, 'advisor', 'note', 'x')`,
+      () => admin`update you.board_advisors set colour = 'blue' where user_id = ${userA} and key = 'thread_mentor'`,
+      () => admin`update you.board_advisors set colour = '#3B82F6' where user_id = ${userA} and key = 'thread_mentor'`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+});
+
+describe('council notes and runs', () => {
+  // migrations-you/0037_council.sql: notes the mentors write unasked, capped
+  // so they never pile up unread, and the runs that write them.
+  const receipts = admin.json([{ label: 'A role', link: '/jobs' }]);
+  const advisors: string[] = [];
+
+  beforeAll(async () => {
+    for (let n = 0; n < 8; n += 1) {
+      const [row] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${userA}, ${`council_${n}`}, ${`Mentor ${n}`}, 'guest', 'What now?')
+        returning id`;
+      advisors.push(row.id);
+    }
+  });
+
+  it('keeps notes and runs to their owner only', async () => {
+    const [run] = await asUser(
+      userA,
+      (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice') returning id`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into council_notes (user_id, advisor_id, run_id, text, receipts)
+                 values (${userA}, ${advisors[0]}, ${run.id}, 'Answer Brex today.', ${receipts})`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from council_notes`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from council_runs`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into council_notes (user_id, advisor_id, text, receipts)
+                   values (${userB}, ${advisors[1]}, 'Planted.', ${receipts})`,
+      ),
+    ).rejects.toThrow();
+    // A second advice round while one is open is refused.
+    await expect(
+      asUser(userA, (tx) => tx`insert into council_runs (user_id, kind) values (${userA}, 'advice')`),
+    ).rejects.toThrow();
+  });
+
+  it('refuses a note without a receipt, a second unread note from a mentor, and a fourth in a day', async () => {
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text) values (${userA}, ${advisors[1]}, 'No receipt.')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[0]}, 'Again.', ${receipts})`,
+    ).rejects.toThrow(/already has an unread note/);
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[1]}, 'Two.', ${receipts})`;
+    await admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+                values (${userA}, ${advisors[2]}, 'Three.', ${receipts})`;
+    await expect(
+      admin`insert into you.council_notes (user_id, advisor_id, text, receipts)
+            values (${userA}, ${advisors[3]}, 'Four.', ${receipts})`,
+    ).rejects.toThrow(/three notes today/);
+  });
+});
+
+describe('mentor texts: caps and quiet hours', () => {
+  // migrations-you/0039_council_texts.sql (plan #2748.7): the daily round's
+  // texts hold the caps 0037 held on notes, and none is sent at night.
+  let user = '';
+  const chats: string[] = [];
+  // A zone where it is midday now, so a text dated now() is outside quiet hours.
+  const middayZone = () => {
+    const offset = 12 - new Date().getUTCHours();
+    return offset === 0 ? 'Etc/GMT' : `Etc/GMT${offset > 0 ? '-' : '+'}${Math.abs(offset)}`;
+  };
+  const text = (n: number, at?: string) =>
+    at
+      ? admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text, created_at)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.', ${at}::timestamptz) returning id`
+      : admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+              values (${user}, ${chats[n]}, 'advisor', 'text_first', 'A thought.') returning id`;
+  const quiet = async (at: string) =>
+    (await admin<{ q: boolean }[]>`select you.quiet_hours(${user}, ${at}::timestamptz) as q`)[0].q;
+  const setZone = (zone: string) =>
+    admin`insert into core.account_settings (user_id, timezone) values (${user}, ${zone})
+          on conflict (user_id) do update set timezone = excluded.timezone`;
+
+  beforeAll(async () => {
+    user = await createUser('you-texts@example.com');
+    for (let n = 0; n < 8; n += 1) {
+      const [a] = await admin<{ id: string }[]>`
+        insert into you.board_advisors (user_id, key, name, kind, question)
+        values (${user}, ${`texter_${n}`}, ${`Texter ${n}`}, 'guest', 'What now?') returning id`;
+      const [c] = await admin<{ id: string }[]>`
+        insert into you.advisor_chats (user_id, advisor_id) values (${user}, ${a.id}) returning id`;
+      chats.push(c.id);
+    }
+  });
+
+  it("knows quiet hours in the person's zone, and refuses a text inside them", async () => {
+    await setZone('America/New_York');
+    expect(await quiet('2026-01-05T02:59:00Z')).toBe(false); // 21:59
+    expect(await quiet('2026-01-05T03:00:00Z')).toBe(true); // 22:00
+    expect(await quiet('2026-01-05T12:59:00Z')).toBe(true); // 07:59
+    expect(await quiet('2026-01-05T13:00:00Z')).toBe(false); // 08:00
+    await expect(text(7, '2026-01-05T04:00:00Z')).rejects.toThrow(/Quiet hours/);
+    await text(7, '2026-01-05T15:00:00Z');
+
+    // A zone Postgres does not know reads as UTC rather than failing.
+    await setZone('Mars/Olympus');
+    expect(await quiet('2026-01-05T23:00:00Z')).toBe(true);
+    expect(await quiet('2026-01-05T12:00:00Z')).toBe(false);
+  });
+
+  it('refuses a second unread text from a mentor until the thread is read, and a fourth in a day', async () => {
+    await setZone('America/New_York');
+    await expect(text(7, '2026-01-05T16:00:00Z')).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_chats set last_read_at = '2026-01-05T15:30:00Z' where id = ${chats[7]}`;
+    await text(7, '2026-01-05T16:00:00Z');
+
+    await setZone(middayZone());
+    await text(0);
+    await expect(text(0)).rejects.toThrow(/already has an unread text/);
+    await admin`update you.advisor_messages set read_at = now() where chat_id = ${chats[0]}`;
+    await text(1);
+    await text(2);
+    await expect(text(3)).rejects.toThrow(/three texts today/);
+  });
+
+  it('never caps a reply or an ack', async () => {
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'reply', 'Answering you.')`;
+    await admin`insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+                values (${user}, ${chats[1]}, 'advisor', 'ack', 'Hm.')`;
+  });
+});
+
+describe('earlier persona cards', () => {
+  // migrations-you/0040_people_cards.sql (plan #2748.11).
+  it('keeps a card the person replaced to its owner only', async () => {
+    const [advisor] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'cards', 'Cards', 'seat', 'Ten years on?', ${admin.json({ style: 'notionists', seed: 'cards' })})
+      returning id`;
+    await asUser(
+      userA,
+      (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                 values (${userA}, ${advisor.id}, 'Blunt and short.')`,
+    );
+    expect(await asUser(userA, (tx) => tx`select persona from advisor_persona_versions`)).toEqual([
+      { persona: 'Blunt and short.' },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_persona_versions`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into advisor_persona_versions (user_id, advisor_id, persona)
+                   values (${userA}, ${advisor.id}, 'Forged.')`,
+      ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('reach-out briefs and what was mentioned', () => {
+  // migrations-you/0044_reach_out_rules.sql (plan #2931.1).
+  const watch = {
+    key: 'new_roles',
+    about: 'New roles that fit you',
+    tables: ['job_search.roles'],
+    mode: 'each',
+    every_days: 1,
+    repeat_after_days: null,
+  };
+  const rule = { version: 1, watches: [watch], cannot_watch: ['Replies on LinkedIn'] };
+  let advisor = '';
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question, avatar)
+      values (${userA}, 'reach', 'Reach', 'seat', 'What fits?', ${admin.json({ style: 'notionists', seed: 'reach' })})
+      returning id`;
+    advisor = row.id;
+  });
+
+  const save = (r: unknown, summary: string | null = 'Texts you when a role fits.') =>
+    asUser(
+      userA,
+      (tx) => tx`update board_advisors
+                    set reach_out_brief = 'Tell me when new jobs fit.',
+                        reach_out_rule = ${tx.json(r as never)},
+                        reach_out_summary = ${summary},
+                        reach_out_set_at = now()
+                  where id = ${advisor}`,
+    );
+
+  it('saves a well-formed rule with its sentence', async () => {
+    await save(rule);
+    await save({
+      version: 1,
+      watches: [
+        { ...watch, key: 'roundup', mode: 'roundup', every_days: 7, repeat_after_days: 30, form: 'list' },
+        { ...watch, key: 'contact', mode: 'pick', tables: ['job_search.contacts'], every_days: 14 },
+      ],
+    });
+    const [row] = await admin<{ n: number }[]>`
+      select jsonb_array_length(reach_out_rule -> 'watches') as n from you.board_advisors where id = ${advisor}`;
+    expect(row.n).toBe(2);
+  });
+
+  it('refuses a malformed rule, and a rule with no sentence', async () => {
+    const bad: unknown[] = [
+      [],
+      { watches: [watch] },
+      { version: 2, watches: [watch] },
+      { version: 1, watches: [] },
+      { version: 1, watches: [watch], extra: true },
+      { version: 1, watches: [{ ...watch, colour: 'red' }] },
+      { version: 1, watches: [watch, watch] },
+      { version: 1, watches: [{ ...watch, key: 'New Roles' }] },
+      { version: 1, watches: [{ ...watch, about: ' ' }] },
+      { version: 1, watches: [{ ...watch, tables: [] }] },
+      { version: 1, watches: [{ ...watch, tables: ['roles'] }] },
+      { version: 1, watches: [{ ...watch, tables: ['job_search.roles', 'job_search.roles'] }] },
+      { version: 1, watches: [{ ...watch, mode: 'sometimes' }] },
+      { version: 1, watches: [{ ...watch, every_days: 0 }] },
+      { version: 1, watches: [{ ...watch, every_days: 1.5 }] },
+      { version: 1, watches: [{ ...watch, every_days: '7' }] },
+      { version: 1, watches: [{ key: 'x', about: 'x', tables: ['a.b'], mode: 'each', every_days: 1 }] },
+      { version: 1, watches: [{ ...watch, repeat_after_days: 0 }] },
+      { version: 1, watches: [{ ...watch, form: 'essay' }] },
+      { version: 1, watches: [watch], cannot_watch: [''] },
+      { version: 1, watches: [watch], cannot_watch: 'LinkedIn' },
+    ];
+    for (const r of bad) {
+      await expect(save(r), JSON.stringify(r)).rejects.toThrow(/reach_out_rule_ck/);
+    }
+    await expect(save(rule, null)).rejects.toThrow(/reach_out_rule_summary_ck/);
+  });
+
+  it('keeps what a text named to its owner, written by the service role only', async () => {
+    const [chat] = await admin<{ id: string }[]>`
+      insert into you.advisor_chats (user_id, advisor_id) values (${userA}, ${advisor}) returning id`;
+    const [message] = await admin<{ id: string }[]>`
+      insert into you.advisor_messages (user_id, chat_id, role, kind, text)
+      values (${userA}, ${chat.id}, 'advisor', 'reply', 'Two roles fit.') returning id`;
+    await admin`insert into you.advisor_reach_outs (user_id, advisor_id, message_id, watch_key, ref_table, ref_id)
+                values (${userA}, ${advisor}, ${message.id}, 'new_roles', 'job_search.roles', 'r1')`;
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, message_id, watch_key, ref_table, ref_id)
+            values (${userA}, ${advisor}, ${message.id}, 'new_roles', 'job_search.roles', 'r1')`,
+    ).rejects.toThrow(/advisor_reach_outs_message_ref/);
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+            values (${userA}, ${advisor}, 'new_roles', 'roles', 'r2')`,
+    ).rejects.toThrow(/ref_table_ck/);
+    await expect(
+      admin`insert into you.advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+            values (${userB}, ${advisor}, 'new_roles', 'job_search.roles', 'r2')`,
+    ).rejects.toThrow();
+
+    expect(await asUser(userA, (tx) => tx`select ref_id from advisor_reach_outs`)).toEqual([{ ref_id: 'r1' }]);
+    expect(await asUser(userB, (tx) => tx`select id from advisor_reach_outs`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into advisor_reach_outs (user_id, advisor_id, watch_key, ref_table, ref_id)
+                   values (${userA}, ${advisor}, 'new_roles', 'job_search.roles', 'r3')`,
+      ),
+    ).rejects.toThrow();
+
+    // The memory outlives the message.
+    await admin`delete from you.advisor_messages where id = ${message.id}`;
+    const [kept] = await admin<{ message_id: string | null }[]>`
+      select message_id from you.advisor_reach_outs where ref_id = 'r1'`;
+    expect(kept.message_id).toBeNull();
+  });
+});
+
+describe("a bot's picture", () => {
+  // migrations-you/0044_bot_photos.sql (plan #2955): board_advisors.photo_path
+  // points into the bot's own folder of the you-bot-photos bucket.
+  let botA = '';
+  let otherBotA = '';
+
+  beforeAll(async () => {
+    const [a, b] = await admin<{ id: string }[]>`
+      insert into you.board_advisors (user_id, key, name, kind, question)
+      values (${userA}, 'photo_bot', 'Photo Bot', 'guest', 'What would you do?'),
+             (${userA}, 'other_photo_bot', 'Other Bot', 'guest', 'What would you do?')
+      returning id`;
+    botA = a.id;
+    otherBotA = b.id;
+  });
+
+  it("keeps a path in the bot's own folder, and clears it back to none", async () => {
+    const path = `${userA}/${botA}/0b6c3f4e-1d2a-4c5b-9e8f-7a6b5c4d3e2f.png`;
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = ${path} where id = ${botA}`);
+    const [row] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(row.photo_path).toBe(path);
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    const [cleared] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(cleared.photo_path).toBeNull();
+  });
+
+  it("refuses a path in another account's folder or under another bot", async () => {
+    const bad = [
+      () => admin`update you.board_advisors set photo_path = ${`${userB}/${botA}/x.png`} where id = ${botA}`,
+      () => admin`update you.board_advisors set photo_path = ${`${userA}/${otherBotA}/x.png`} where id = ${botA}`,
+      () => admin`update you.board_advisors set photo_path = ${`${userA}/${botA}/`} where id = ${botA}`,
+    ];
+    for (const run of bad) await expect(run()).rejects.toThrow();
+  });
+
+  it("does not let another account set a bot's picture", async () => {
+    await asUser(userB, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    await asUser(userA, (tx) => tx`update you.board_advisors set photo_path = ${`${userA}/${botA}/a.png`} where id = ${botA}`);
+    await asUser(userB, (tx) => tx`update you.board_advisors set photo_path = null where id = ${botA}`);
+    const [row] = await admin<{ photo_path: string | null }[]>`select photo_path from you.board_advisors where id = ${botA}`;
+    expect(row.photo_path).toBe(`${userA}/${botA}/a.png`);
+  });
+
+  it('keeps each account to its own folder of the you-bot-photos bucket', async () => {
+    const own = (user: string, name: string) =>
+      asUser(user, (tx) => tx<{ ok: boolean }[]>`select you.bot_photo_is_own(${name}) as ok`).then(([row]) => row.ok);
+
+    expect(await own(userA, `${userA}/${botA}/p.png`)).toBe(true);
+    expect(await own(userB, `${userA}/${botA}/p.png`)).toBe(false);
+    expect(await own(userA, `${userA}/p.png`)).toBe(false);
+    expect(await own(userA, `${userA}/${botA}/`)).toBe(false);
+    expect(await own(userA, `${userA}/${botA}/deeper/p.png`)).toBe(false);
+  });
+});
+
+describe('the places lookup cap and cache', () => {
+  // migrations-you/0046_places_lookup.sql (plan #2987.2).
+  it('stops a person at 50 Places calls in a UTC day, and counts nobody else', async () => {
+    await admin`insert into you.places_calls (user_id) select ${userA}::uuid from generate_series(1, 49)`;
+    await asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`);
+    await expect(asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`)).rejects.toThrow(
+      /50 calls today/,
+    );
+    // Calls from before today do not count toward today.
+    await admin`update you.places_calls set created_at = now() - interval '2 days' where user_id = ${userA}`;
+    await asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`);
+    await asUser(userB, (tx) => tx`insert into places_calls (user_id) values (${userB})`);
+    expect(await asUser(userB, (tx) => tx`select id from places_calls`)).toHaveLength(1);
+  });
+
+  it('lets no one lower the count or write a call for someone else', async () => {
+    await asUser(userA, (tx) => tx`delete from places_calls`).catch(() => undefined);
+    await asUser(userA, (tx) => tx`update places_calls set created_at = now() - interval '2 days'`).catch(() => undefined);
+    const [row] = await admin<{ n: number }[]>`
+      select count(*)::int as n from you.places_calls
+       where user_id = ${userA} and created_at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'`;
+    expect(row.n).toBe(1);
+    await expect(asUser(userB, (tx) => tx`insert into places_calls (user_id) values (${userA})`)).rejects.toThrow();
+  });
+
+  it('keeps cached answers to their owner', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'search|coffee', ${tx.json({ places: [] })})`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from places_cache`)).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'x', '{}')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'y', '[]')`),
+    ).rejects.toThrow(/places_cache_body_ck/);
   });
 });

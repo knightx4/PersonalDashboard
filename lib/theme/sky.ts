@@ -80,12 +80,19 @@ export const SKY_IDS = [
   'silver',
   'starfield',
   'northern',
+  'alpine',
+  'lake',
+  'coast',
+  'forest',
 ] as const;
 
 export type SkyId = (typeof SKY_IDS)[number];
 
 /** The sky the theme blocks are written in. Choosing it writes no tokens. */
 export const DEFAULT_SKY: SkyId = 'borealis';
+
+/** Where Landscapes starts, and where a night-only landscape lands by day. */
+export const DEFAULT_LANDSCAPE: SkyId = 'dunes';
 
 export const SKIES: readonly Sky[] = [
   {
@@ -316,7 +323,157 @@ export const SKIES: readonly Sky[] = [
       },
     },
   },
+  {
+    id: 'alpine',
+    label: 'Alpine',
+    mood: 'Range behind range of mountains, paler as they recede',
+    night: {
+      bench: '#050817',
+      pools: { near: '#28385e', mid: '#3a4f80', far: '#6d84c4', floor: '#11182c' },
+      accent: '#a9c1ff',
+      accentHover: '#c4d4ff',
+      accentTint: '#18223e',
+      art: '/sky/alpine-night.svg',
+      peaks: ['#e8eefc', '#6d84c4', '#3a4f80', '#28385e', '#1d2c52'],
+      glass: {
+        surface: 'rgb(8 12 24 / 0.78)',
+        raised: 'rgb(14 20 36 / 0.93)',
+        canvas: 'rgb(5 8 18 / 0.72)',
+        sunken: 'rgb(3 6 14 / 0.74)',
+      },
+    },
+    dawn: {
+      bench: '#e4e2f2',
+      pools: { near: '#c7c3e4', mid: '#a9a8d6', far: '#ffd7c2', floor: '#8a8cc4' },
+      accent: '#3d3f9e',
+      accentHover: '#2f317f',
+      accentTint: '#e6e4f7',
+      art: '/sky/alpine-dawn.svg',
+      peaks: ['#9fb4e8', '#d9c2e6', '#ffd7c2', '#fff7e6', '#c7c3e4', '#8a8cc4', '#4a4f86'],
+      glass: {
+        surface: 'rgb(255 255 255 / 0.74)',
+        raised: 'rgb(255 255 255 / 0.92)',
+        canvas: 'rgb(242 244 250 / 0.78)',
+        sunken: 'rgb(230 234 245 / 0.8)',
+      },
+    },
+  },
+  {
+    id: 'lake',
+    label: 'Mountain Lake',
+    mood: 'Mountains standing in still water',
+    night: {
+      bench: '#040714',
+      pools: { near: '#1e2c4c', mid: '#1a2a4e', far: '#7088c8', floor: '#121d38' },
+      accent: '#a9c1ff',
+      accentHover: '#c4d4ff',
+      accentTint: '#18223e',
+      art: '/sky/lake-night.svg',
+      peaks: ['#eef2ff', '#c6d4f6', '#7088c8', '#1e2c4c'],
+      glass: {
+        surface: 'rgb(8 12 24 / 0.78)',
+        raised: 'rgb(14 20 36 / 0.93)',
+        canvas: 'rgb(5 8 18 / 0.72)',
+        sunken: 'rgb(3 6 14 / 0.74)',
+      },
+    },
+    dawn: {
+      bench: '#ece4ee',
+      pools: { near: '#b9b3dc', mid: '#f3c6d3', far: '#ffdcbc', floor: '#8e8cc0' },
+      accent: '#4a3a96',
+      accentHover: '#3a2d7a',
+      accentTint: '#ebe5f7',
+      art: '/sky/lake-dawn.svg',
+      peaks: ['#a8c0ee', '#f3c6d3', '#ffdcbc', '#fff8e8', '#b9b3dc', '#8e8cc0', '#5f6a8e', '#7f86b0'],
+      glass: {
+        surface: 'rgb(255 255 255 / 0.74)',
+        raised: 'rgb(255 255 255 / 0.92)',
+        canvas: 'rgb(242 244 250 / 0.78)',
+        sunken: 'rgb(230 234 245 / 0.8)',
+      },
+    },
+  },
+  {
+    id: 'coast',
+    label: 'Coast',
+    mood: 'Open sea, a headland, light across the water',
+    night: {
+      bench: '#03060f',
+      pools: { near: '#0f1c36', mid: '#152442', far: '#6f86c0', floor: '#03060d' },
+      accent: '#9fc4ff',
+      accentHover: '#bdd6ff',
+      accentTint: '#14223c',
+      art: '/sky/coast-night.svg',
+      peaks: ['#f0f3ff', '#c3d1f2', '#6f86c0', '#152442'],
+      glass: {
+        surface: 'rgb(8 12 24 / 0.78)',
+        raised: 'rgb(14 20 36 / 0.93)',
+        canvas: 'rgb(5 8 18 / 0.72)',
+        sunken: 'rgb(3 6 14 / 0.74)',
+      },
+    },
+    dawn: {
+      bench: '#efe2e4',
+      pools: { near: '#e8bfd6', mid: '#ffcfa8', far: '#93b4e6', floor: '#4f6f9a' },
+      accent: '#2f4f96',
+      accentHover: '#243e7a',
+      accentTint: '#e2e8f7',
+      art: '/sky/coast-dawn.svg',
+      peaks: ['#93b4e6', '#e8bfd6', '#ffcfa8', '#fff6dc', '#c9a9b8', '#4f6f9a', '#5a5878', '#3d3d5a'],
+      glass: {
+        surface: 'rgb(255 255 255 / 0.74)',
+        raised: 'rgb(255 255 255 / 0.92)',
+        canvas: 'rgb(242 244 250 / 0.78)',
+        sunken: 'rgb(230 234 245 / 0.8)',
+      },
+    },
+  },
+  {
+    id: 'forest',
+    label: 'Misty Pines',
+    mood: 'Rank behind rank of pines in the mist',
+    night: {
+      bench: '#040810',
+      pools: { near: '#1a2c3a', mid: '#2a4456', far: '#5f8098', floor: '#060c12' },
+      // Not green: green means saved, and the trees are already green.
+      accent: '#a9c8ff',
+      accentHover: '#c4d9ff',
+      accentTint: '#18263a',
+      art: '/sky/forest-night.svg',
+      peaks: ['#e8f0f6', '#5f8098', '#2a4456', '#1a2c3a'],
+      glass: {
+        surface: 'rgb(8 12 24 / 0.78)',
+        raised: 'rgb(14 20 36 / 0.93)',
+        canvas: 'rgb(5 8 18 / 0.72)',
+        sunken: 'rgb(3 6 14 / 0.74)',
+      },
+    },
+    dawn: {
+      bench: '#e6eae9',
+      pools: { near: '#b7c4c6', mid: '#93a8a8', far: '#f1ead9', floor: '#6b8584' },
+      accent: '#2c5592',
+      accentHover: '#21447a',
+      accentTint: '#e1e9f6',
+      art: '/sky/forest-dawn.svg',
+      peaks: ['#b7cbe0', '#dfe3e2', '#f1ead9', '#fffaf0', '#b7c4c6', '#93a8a8', '#6b8584', '#3f5958'],
+      glass: {
+        surface: 'rgb(255 255 255 / 0.74)',
+        raised: 'rgb(255 255 255 / 0.92)',
+        canvas: 'rgb(242 244 250 / 0.78)',
+        sunken: 'rgb(230 234 245 / 0.8)',
+      },
+    },
+  },
 ];
+
+/**
+ * Whether a sky is a landscape: a painted scene rather than ribbons of light.
+ * The picker offers these under Landscapes and the rest under Aurora.
+ */
+export function isLandscape(id: SkyId): boolean {
+  const sky = skyById(id);
+  return Boolean(sky?.night?.art ?? sky?.dawn?.art);
+}
 
 /** Whether a sky can be shown in a polarity. */
 export function hasSide(id: SkyId, polarity: SkyPolarity): boolean {

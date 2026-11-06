@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { attachDependencies, type DependencyRow } from './dependencies';
 import { reopenedGoal, withStepStatus } from './optimistic';
-import { YOURS_ASK, YOURS_WORD, goalRows, numberSteps, outlineSteps } from './plan-rows';
+import { YOURS_WORD, goalRows, numberSteps, outlineSteps } from './plan-rows';
 import { buildForest, type Step, type StepNode } from './steps';
 
 function step(id: string, extra: Partial<Step> = {}): Step {
@@ -65,7 +65,7 @@ describe('withStepStatus', () => {
     expect(shown.step.status).toBe('open');
     expect(shown.health.word).toBe(YOURS_WORD);
     expect(shown.health.word).toBe(served.health.word);
-    expect(shown.need).toBe(YOURS_ASK);
+    expect(shown.need).toBeNull();
   });
 
   it('reads a Dash step opened again as ready', () => {

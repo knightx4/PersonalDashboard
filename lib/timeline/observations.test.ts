@@ -266,7 +266,9 @@ describe('the model call', () => {
     expect(result).toEqual([{ sentence: 'x 1', evidence: ['E1'] }]);
     const request = (create.mock.calls[0] as unknown as [Record<string, unknown>])[0];
     expect(request.model).toBe('claude-sonnet-5-5');
-    expect(request.tool_choice).toEqual({ type: 'auto' });
+    // Sonnet reports as structured output, with no tool offered (plan #2937.5).
+    expect(request.tools).toBeUndefined();
+    expect(request.output_config).toEqual(expect.objectContaining({ format: expect.objectContaining({ type: 'json_schema' }) }));
     expect(JSON.stringify(request.messages)).toContain('Marked not useful:\\n- Old one.');
     expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5-5' }));
   });

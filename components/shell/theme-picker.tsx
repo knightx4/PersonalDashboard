@@ -16,15 +16,12 @@ import {
   THEME_POLARITIES,
   THEME_SURFACES,
   SKIES,
-  PALETTES,
   auroraFor,
   isAurora,
-  isPoster,
-  paletteOf,
-  posterFor,
   modeFor,
   partsOf,
   skyOf,
+  surfaceOfSky,
   type Polarity,
   type Surface,
   type ColourwayId,
@@ -32,9 +29,8 @@ import {
   type Theme,
   type ThemeMode,
 } from '@/lib/theme';
-import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
-import type { Sky } from '@/lib/theme/sky';
-import { sideOf, type PaletteSide as PosterPalette } from '@/lib/theme/poster';
+import { POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
+import { DEFAULT_LANDSCAPE, DEFAULT_SKY, isLandscape, type Sky, type SkyId } from '@/lib/theme/sky';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -63,13 +59,11 @@ function getDensityServerSnapshot(): Density {
 /**
  * Choosing the room, and a colour for it.
  *
- * Two choices instead of four named themes. The switch says which room --
- * light, dark, or Lightbox -- and the swatches say which colour, and every
- * combination of the two is a theme, generated from the palettes that were
- * written by hand. Lightbox is a room rather than a preset because its page
- * and its cards are opposite polarities, so it is reachable from neither of
- * the other two; it takes a colour like them, on its bench rather than on its
- * sheets.
+ * Three choices instead of a list of named themes. The switch says light or
+ * dark, the surface says Solid, Aurora or Landscapes, and the swatches say
+ * which colour (in Solid) or which sky or scene (in the other two). Every
+ * combination is a theme: Solid is generated from the palettes written by
+ * hand, and the other two are the Aurora and Dawn blocks wearing a sky.
  *
  * Nothing happens until you click. Hovering a swatch used to repaint the whole
  * app, so that you saw a theme before you moved into it; note c0cfc6ae asked
@@ -224,39 +218,33 @@ export function ThemePicker({ value }: { value: Theme }) {
    * one of them has to keep the other, which is what `partsOf` is for: read
    * the current room apart, replace one half, put it back together.
    */
-  // Aurora is the third surface, and it is a written theme rather than a mode,
-  // so it is read apart here instead of through `partsOf`.
+  // Aurora and Landscapes are written themes rather than modes, so they are
+  // read apart here instead of through `partsOf`. Which of the two a theme is
+  // depends on its sky: a painted scene is a landscape.
   const aurora = isAurora(showing);
-  // Lightbox in light is the poster, a written theme like Aurora; in dark it
-  // is still the generated glass room.
-  const poster = isPoster(showing);
-  const here: { polarity: Polarity; surface: Surface } = aurora
-    ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: 'aurora' }
-    : poster
-      ? { polarity: showing.kind === 'written' && showing.id === 'poster-dark' ? 'dark' : 'light', surface: 'lightbox' }
-      : partsOf(mode);
   const sky = skyOf(showing);
-  const palette = paletteOf(showing);
+  const here: { polarity: Polarity; surface: Surface } = aurora
+    ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: surfaceOfSky(sky) }
+    : partsOf(mode);
   // The colour survives a change of room, which means carrying the colourway
   // and not just its hue: dropping it here would turn Ember into "330 degrees"
   // the first time somebody switched to dark, and the pools would go back to
   // the turned sweep without anything having been said about colour.
   const way = colourwayOf(showing) ?? undefined;
-  // In Aurora the switch moves between Aurora and Dawn and keeps the sky.
+  // In Aurora and Landscapes the switch moves between night and dawn and keeps the sky.
   const inPolarity = (next: Polarity): Theme =>
-    here.surface === 'aurora'
-      ? auroraFor(next, sky)
-      : here.surface === 'lightbox'
-        ? posterFor(palette, next)
-        : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
-  // Into Aurora keeps the polarity and starts from the default sky, since a
-  // colourway is not a sky. Out of it keeps the polarity and drops the sky.
+    here.surface === 'solid'
+      ? { kind: 'generated', mode: modeFor(next), hue, way }
+      : auroraFor(next, sky);
+  // Into Aurora or Landscapes keeps the polarity and the sky if it belongs
+  // there, and otherwise starts from that surface's first sky, since a
+  // colourway is not a sky. Back to Solid keeps the polarity and drops the sky.
+  const skyFor = (next: Exclude<Surface, 'solid'>): SkyId =>
+    aurora && surfaceOfSky(sky) === next ? sky : next === 'landscape' ? DEFAULT_LANDSCAPE : DEFAULT_SKY;
   const inSurface = (next: Surface): Theme =>
-    next === 'aurora'
-      ? auroraFor(here.polarity, sky)
-      : next === 'lightbox'
-        ? posterFor(palette, here.polarity)
-        : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
+    next === 'solid'
+      ? { kind: 'generated', mode: modeFor(here.polarity), hue, way }
+      : auroraFor(here.polarity, skyFor(next));
   /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
   const inWay = (next: Colourway): GeneratedTheme => ({
@@ -322,24 +310,13 @@ export function ThemePicker({ value }: { value: Theme }) {
 
           <SectionLabel className="pb-1.5 pt-3">Colour</SectionLabel>
 
-          {poster ? (
+          {aurora ? (
             <div className="flex flex-wrap gap-1.5 pb-2">
-              {PALETTES.map((option) => {
-                const next = posterFor(option.id, here.polarity);
-                return (
-                  <PaletteSwatch
-                    key={option.id}
-                    palette={sideOf(option, here.polarity === 'dark' ? 'night' : 'day')}
-                    label={`${option.label} - ${option.mood}`}
-                    chosen={same(showing, next)}
-                    onChoose={() => save(next)}
-                  />
-                );
-              })}
-            </div>
-          ) : aurora ? (
-            <div className="flex flex-wrap gap-1.5 pb-2">
-              {SKIES.filter((option) => option[here.polarity === 'light' ? 'dawn' : 'night']).map((option) => {
+              {SKIES.filter(
+                (option) =>
+                  option[here.polarity === 'light' ? 'dawn' : 'night'] &&
+                  isLandscape(option.id) === (here.surface === 'landscape'),
+              ).map((option) => {
                 const next = auroraFor(here.polarity, option.id);
                 return (
                   <SkySwatch
@@ -366,7 +343,7 @@ export function ThemePicker({ value }: { value: Theme }) {
               <Swatch
                 key={colour.id}
                 theme={inWay(colour)}
-                label={`${colour.label} - ${colour.mood}`}
+                label={colour.label}
                 chosen={same(showing, inWay(colour))}
                 onChoose={save}
               />
@@ -423,30 +400,14 @@ export function ThemePicker({ value }: { value: Theme }) {
 }
 
 /**
- * One colour, shown as what it actually paints.
+ * One Solid colour, shown flat, as what it actually paints.
  *
- * A colourway draws its own wash: the four pool tokens and the lift go onto
- * the chip as inline custom properties, and `.wash-chip` draws
- * `--page-wash-image` from them. So a swatch for Ember is the Ember bench,
- * shrunk -- magenta into purple with the orange along the bottom -- and a
- * swatch for Midnight is one blue, because that is what Midnight is. It used
- * to be a single square of `--c-accent-base-lit`, which told you the link
- * colour and nothing about the room, and made the four multi-coloured
- * colourways indistinguishable from each other.
- *
- * A hue with no colourway keeps the old fill: the strip's presets are a
- * position on a circle rather than a set of pools, and the accent is the
- * clearest single colour to stand for one. "No colour" shows the page ground,
- * because that is what it is.
+ * Solid has no wash: a colour there turns the ground, the borders and the
+ * accent to its hue and nothing else. So the chip is that, flat -- the card
+ * ground of the room being edited, with a disc of the accent on it -- rather
+ * than the glass rooms' multi-colour wash, which promised gradients Solid
+ * never draws. "No colour" is the same picture in Paper or Ink.
  */
-/**
- * How loud a chip is, against the percentages in `--page-wash`.
- *
- * The largest of those is 34%, so 2.6 lands just under the 100% at which a
- * pool stops being a wash and becomes a flat fill.
- */
-const CHIP_LIFT = 2.6;
-
 function Swatch({
   theme,
   label,
@@ -458,40 +419,14 @@ function Swatch({
   chosen: boolean;
   onChoose: (theme: Theme) => void;
 }) {
-  const way = colourwayById(theme.way);
-  const style = useMemo(() => {
+  const { ground, accent, fill } = useMemo(() => {
     const palette = generatePalette(theme.mode, theme.hue, theme.way);
-    if (!way) {
-      return { background: palette[theme.hue === null ? '--c-page' : '--c-accent-base-lit'] };
-    }
-    // Always on a glass bench, whichever room is being edited. A colourway is
-    // a wash, and in Solid there is no wash to show: drawing it over Paper's
-    // near-white ground turned all seven chips into pale squares a few
-    // thousandths apart, which is the problem the chips were meant to fix.
-    // Lightbox and Darkroom share a bench, so either one stands for both.
     return {
-      backgroundColor: generatePalette('darkroom', theme.hue, theme.way)['--c-page'],
-      // Turned up, and only here. A pool reaches the bench at about a third of
-      // itself, which is right across a whole viewport and invisible across
-      // 32 pixels: at the room's own strength every chip came out a flat dark
-      // square and the multi-coloured ones were indistinguishable. The field's
-      // shape and geometry are the real ones; only how much of each pool shows
-      // through is raised, which is the one thing a thumbnail cannot afford to
-      // be faithful about.
-      //
-      // Flat rather than a multiple of the room's own strength. Multiplying
-      // took Ember to 4.7, which puts the first pool's mix over 100%: it goes
-      // opaque, covers the other three, and the chip for a four-colour
-      // colourway comes back a single flat magenta.
-      [WASH_LIFT]: String(CHIP_LIFT),
-      ...Object.fromEntries(
-        Object.entries(POOL_TOKENS).map(([slot, token]) => [
-          token,
-          way.pools[slot as keyof typeof way.pools],
-        ]),
-      ),
-    } as React.CSSProperties;
-  }, [theme.mode, theme.hue, theme.way, way]);
+      ground: palette['--c-surface'],
+      accent: palette['--c-accent-base-lit'],
+      fill: palette['--c-fill-ink'],
+    };
+  }, [theme.mode, theme.hue, theme.way]);
 
   return (
     <Tooltip label={label}>
@@ -502,14 +437,19 @@ function Swatch({
         className={cn(
           // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
           'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
-          way && 'wash-chip',
           chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
         )}
         // ui-ok: raw-hex -- this is the generated colour itself, which is the
         // one thing on the screen that cannot be a token.
-        style={style}
+        style={{ backgroundColor: ground }}
       >
-        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
+        <span
+          className="flex size-4 items-center justify-center rounded-full"
+          // ui-ok: raw-hex -- the generated accent, as above.
+          style={{ backgroundColor: accent, color: fill }}
+        >
+          {chosen && <Check className="size-3" strokeWidth={1.75} aria-hidden />}
+        </span>
         <span className="sr-only">{label}</span>
       </button>
     </Tooltip>
@@ -517,47 +457,18 @@ function Swatch({
 }
 
 /**
- * A poster palette, drawn as its three bands stacked on its paper, outlined in
- * its ink.
- */
-function PaletteSwatch({
-  palette,
-  label,
-  chosen,
-  onChoose,
-}: {
-  palette: PosterPalette;
-  label: string;
-  chosen: boolean;
-  onChoose: () => void;
-}) {
-  const [b1, b2, b3] = palette.bands;
-  return (
-    <Tooltip label={label}>
-      <button
-        type="button"
-        onClick={onChoose}
-        aria-pressed={chosen}
-        className="press flex size-8 items-center justify-center transition-transform hover:scale-105"
-        // ui-ok: raw-hex -- the palette itself, which is the one thing on the
-        // screen that cannot be a token.
-        style={{
-          background: `linear-gradient(to bottom, ${b1.fill} 0 33%, ${b2.fill} 33% 66%, ${b3.fill} 66%)`,
-          border: `2px solid ${palette.ink}`,
-          boxShadow: `2px 2px 0 ${palette.ink}`,
-        }}
-      >
-        {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
-        <span className="sr-only">{label}</span>
-      </button>
-    </Tooltip>
-  );
-}
-
-/**
- * A sky, drawn as the sky it paints: its own bench with its four pools on it.
+ * How loud a sky chip is, against the percentages in `--page-wash`.
  *
- * The same `.wash-chip` the colourways use, with the side for the polarity
+ * The largest of those is 34%, so 2.6 lands just under the 100% at which a
+ * pool stops being a wash and becomes a flat fill.
+ */
+const CHIP_LIFT = 2.6;
+
+/**
+ * A sky, drawn as the sky it paints: its own bench with its four pools on it,
+ * or its painted scene shrunk.
+ *
+ * `.wash-chip` draws the pools, with the side for the polarity
  * the person is in, so a Dawn swatch is the pale version they will get.
  */
 function SkySwatch({

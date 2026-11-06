@@ -415,7 +415,10 @@ export function goalRows(
       blocks: (step.blocks ?? []).map(ref),
       children: pairs.map(([child, childShadow]) => toRow(child, childShadow, below)),
       step,
-      need: (onYou ? shadow.blockAsk : null) ?? waits,
+      // A ready step of yours would only say on its Needs line what its
+      // health and avatar already do, so it has none; a block, a result to
+      // read or a wait still says what holds it (plan #2778.12).
+      need: (onYou && !shadow.yours ? shadow.blockAsk : null) ?? waits,
       health: goalHealth(shadow, facts),
       move: moveWordsFor(
         planMoveOf(asPlan(shadow)),

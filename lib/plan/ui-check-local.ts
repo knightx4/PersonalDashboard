@@ -23,3 +23,19 @@ export function stepScreenInputs(
   const graph = importedBy(process.cwd());
   return { files, surfaces: surfacesForFiles(files, (file) => pagesUsing(file, graph)) };
 }
+
+/**
+ * The files a whole feature branch changed and the surfaces they serve, for
+ * the land review (plan #2966.3): `git diff base...head`, which is what the
+ * branch brought in since it left `base`, whichever steps made it.
+ */
+export function branchScreenInputs(base: string, head: string): { files: string[]; surfaces: string[] } {
+  const files = localGit(['diff', '--name-only', `${base}...${head}`])
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+  if (files.length === 0) return { files, surfaces: [] };
+  const graph = importedBy(process.cwd());
+  return { files, surfaces: surfacesForFiles(files, (file) => pagesUsing(file, graph)) };
+}

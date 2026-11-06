@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { inboxReviewHead, jobsSelectionTargets, reviewRowKey, reviewRowLabel } from './bulk';
+import {
+  jobsSelectionTargets,
+  reviewRowKey,
+  reviewRowLabel,
+  reviewRowsInView,
+  reviewViewIn,
+  reviewViewsShown,
+} from './bulk';
 import type { ReviewRow } from './load';
 
 const row = (kind: ReviewRow['kind'], id: string): ReviewRow => ({ kind, id }) as ReviewRow;
@@ -45,19 +52,37 @@ describe('jobsSelectionTargets', () => {
   });
 });
 
-describe('inboxReviewHead', () => {
-  const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+describe('the Inbox views', () => {
+  const counts = { all: 7, messages: 4, applications: 2, events: 1 };
+  const kinds = [{ kind: 'message' }, { kind: 'event' }, { kind: 'application' }, { kind: 'message' }] as const;
 
-  it('lists the first five and leaves the rest for Review', () => {
-    expect(inboxReviewHead(many, 7)).toEqual({ shown: ['a', 'b', 'c', 'd', 'e'], rest: 2 });
+  it('offers All and each kind with something waiting', () => {
+    expect(reviewViewsShown(counts).map((view) => [view.id, view.count])).toEqual([
+      ['all', 7],
+      ['messages', 4],
+      ['applications', 2],
+      ['events', 1],
+    ]);
+    expect(reviewViewsShown({ ...counts, events: 0 }).map((view) => view.id)).toEqual([
+      'all',
+      'messages',
+      'applications',
+    ]);
   });
 
-  it('leaves nothing over when five or fewer wait', () => {
-    expect(inboxReviewHead(['a', 'b'], 2)).toEqual({ shown: ['a', 'b'], rest: 0 });
+  it('offers nothing when every item is one kind', () => {
+    expect(reviewViewsShown({ all: 3, messages: 3, applications: 0, events: 0 })).toEqual([]);
   });
 
-  it('counts the rest from the queue total, not the rows handed over', () => {
-    expect(inboxReviewHead(many.slice(0, 5), 9).rest).toBe(4);
+  it('falls back to All for a view that is not offered', () => {
+    expect(reviewViewIn('events', { ...counts, events: 0 })).toBe('all');
+    expect(reviewViewIn('events', counts)).toBe('events');
+    expect(reviewViewIn('messages', { all: 3, messages: 3, applications: 0, events: 0 })).toBe('all');
+  });
+
+  it('keeps the rows of the kind a view names, in order', () => {
+    expect(reviewRowsInView(kinds, 'messages')).toEqual([kinds[0], kinds[3]]);
+    expect(reviewRowsInView(kinds, 'all')).toEqual(kinds);
   });
 });
 

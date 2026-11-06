@@ -24,11 +24,11 @@ a layer above it.
 | Plan | How it gets built, in features and steps | Dash | Approved with the spec change it came from | Done-whens |
 | Code | The app | Dash | Nobody separately | The gate and tests |
 
-Today the spec row is empty in its last column. [PLAN-SPEC.md](PLAN-SPEC.md)
-says the specs "are not read at runtime and are not kept in sync: the app is
-the working copy, and the two are expected to drift." That is why a spec
-cannot be the layer the person works at: changing one changes nothing, and
-nothing says when the code has left it behind.
+This was written when the spec row was empty in its last column:
+[PLAN-SPEC.md](PLAN-SPEC.md) said the specs "are not read at runtime and are
+not kept in sync." The gate now checks each spec's rules, the weekly audit
+compares the code with every spec, and a spec change drafted from a finding
+is how the two are brought back together.
 
 ## What goes wrong without it
 

@@ -217,7 +217,9 @@ export function QuestionRow({
               <TheQuestion outline={node.outline} title={node.title} />
               <TheOptions
                 detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
-                onChoose={settled ? undefined : choose} />
+                onChoose={settled ? undefined : choose}
+                itemId={node.id}
+              />
             </>
           )}
 

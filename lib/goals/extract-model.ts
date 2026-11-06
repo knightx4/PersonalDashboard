@@ -11,12 +11,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { CollectionField, CollectionShape } from '@/lib/goals/collections';
 import type { LearnedKind } from '@/lib/goals/document-kinds';
 import { EXTRACT_TOOL, extractionPrompt, extractionTool } from '@/lib/goals/extract';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 export const EXTRACT_MODEL = MODELS.goalExtract;
 
@@ -64,8 +64,7 @@ export async function askExtractModel(
       model: EXTRACT_MODEL,
       max_tokens: 8192,
       system: extractionPrompt(collection.name, collection.shape, kinds, collection.fields),
-      tools: [tool as Anthropic.Tool],
-      tool_choice: forceTool(EXTRACT_TOOL, EXTRACT_MODEL),
+      ...reportRequest(tool as Anthropic.Tool, EXTRACT_MODEL),
       messages: [
         {
           role: 'user',
@@ -84,9 +83,7 @@ export async function askExtractModel(
   }
   options.onSpend?.({ model: EXTRACT_MODEL, usage: usageFrom(response.usage) });
 
-  const reported = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === EXTRACT_TOOL,
-  );
-  if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back.' };
-  return { ok: true, input: reported.input };
+  const reported = readReport(response, EXTRACT_TOOL, EXTRACT_MODEL);
+  if (!reported.ok) return { ok: false, error: 'Nothing came back.' };
+  return { ok: true, input: reported.value };
 }

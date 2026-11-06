@@ -86,6 +86,7 @@ describe('goalRows', () => {
     expect(row.health.word).toBe(HEALTH.blocked.word);
     expect(row.health.title).toBe('The bank letter');
     expect(row.blockAsk).toBe('The bank letter');
+    expect(row.need).toBe('The bank letter');
     expect(row.move.word).toBe('On you');
   });
 
@@ -148,7 +149,8 @@ describe('goalRows', () => {
     expect(a.health.word).toBe(YOURS_WORD);
     expect(a.health.title).toBe(YOURS_ASK);
     expect(a.move.word).toBe('On you');
-    expect(a.need).toBe(YOURS_ASK);
+    // Its health and avatar say it is yours; a Needs line would only say it again (plan #2778.12).
+    expect(a.need).toBeNull();
     expect(find(rows, 'b').move.word).toBe('');
     expect(find(rows, 'b').health.name).toBe('ready');
     expect(find(rows, 'b').need).toBeNull();

@@ -1,23 +1,36 @@
 import type { InboxRow } from '@/components/inbox/inbox-page';
 import type { MessageOpen } from '@/components/jobs/review/rows';
+import { toggleChipClass } from '@/components/ui/chip';
+import Link from '@/components/ui/link';
 import type { ReviewItems } from '@/lib/jobs/review/candidates';
-import { inboxReviewHead, reviewRowKey, reviewRowLabel } from '@/lib/jobs/review/bulk';
+import type { ReviewView } from '@/lib/jobs/review/load';
+import {
+  reviewRowKey,
+  reviewRowLabel,
+  reviewRowsInView,
+  reviewViewIn,
+  reviewViewsShown,
+} from '@/lib/jobs/review/bulk';
 import { ReviewInboxRow } from './review-row';
 
+/** Where the Jobs Inbox lists one kind of import, or every kind. */
+export function jobsInboxViewHref(view: ReviewView): string {
+  return view === 'all' ? '/jobs/inbox' : `/jobs/inbox?view=${view}`;
+}
+
 /**
- * The Jobs Inbox's To review rows (plan #2502.2): the first five items the
- * mail sync held, each drawn with its own buttons, then one row opening the
- * rest in Review. That row stands for every item it leaves out, so the
- * section's count and the page's total still count them all. Shared by the
- * page and its gallery surfaces.
+ * The Jobs Inbox's To review rows: every item the mail sync held, each drawn
+ * with its own buttons (plan #2502.2). Since plan #1496.7.3 the Inbox lists
+ * them all, narrowed by kind as the Review page was, and Review is gone.
+ * Shared by the page and its gallery surfaces.
  */
 export function reviewInboxRows(
   items: Pick<ReviewItems, 'rows' | 'counts' | 'companyNames' | 'allRoles'>,
   timezone: string,
+  view: ReviewView = 'all',
   gallery: { open?: Record<string, MessageOpen>; failed?: Record<string, string> } = {},
 ): InboxRow[] {
-  const { shown, rest } = inboxReviewHead(items.rows, items.counts.all);
-  const rows: InboxRow[] = shown.map((row) => {
+  return reviewRowsInView(items.rows, reviewViewIn(view, items.counts)).map((row) => {
     const key = reviewRowKey(row);
     return {
       ref: `review:${key}`,
@@ -37,16 +50,30 @@ export function reviewInboxRows(
       ),
     };
   });
-  if (rest > 0) {
-    rows.push({
-      ref: 'queue:jobs-review',
-      section: 'review',
-      title: `Open all ${items.counts.all} in Review`,
-      line: `${rest} more ${rest === 1 ? 'is' : 'are'} waiting after these`,
-      href: '/jobs/review',
-      move: { state: 'on_you' },
-      stands: rest,
-    });
-  }
-  return rows;
+}
+
+/**
+ * The kinds the To review rows are narrowed by, as chips that are addresses,
+ * under the section's heading. Nothing when every item is one kind.
+ */
+export function ReviewViewChips({ counts, view }: { counts: ReviewItems['counts']; view: ReviewView }) {
+  const views = reviewViewsShown(counts);
+  if (views.length === 0) return null;
+  const current = reviewViewIn(view, counts);
+  return (
+    <nav className="flex flex-wrap items-center gap-1" aria-label="Narrow by kind">
+      {views.map((entry) => (
+        <Link
+          key={entry.id}
+          href={jobsInboxViewHref(entry.id)}
+          scroll={false}
+          aria-current={entry.id === current ? 'page' : undefined}
+          className={toggleChipClass(entry.id === current)}
+        >
+          {entry.label}
+          <span className="tabular font-normal">{entry.count}</span>
+        </Link>
+      ))}
+    </nav>
+  );
 }

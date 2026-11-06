@@ -172,7 +172,7 @@ describe('askDash with files', () => {
     expect(result.error).toBeUndefined();
     expect(read).toEqual(['new-0']);
     const messages = sent[0].messages;
-    expect(messages[0].content).toContain('(Sent with this: receipt.png)');
+    expect(JSON.stringify(messages[0].content)).toContain('(Sent with this: receipt.png)');
     const last = messages[messages.length - 1].content as Anthropic.ContentBlockParam[];
     expect(last[0]).toMatchObject({ type: 'document', title: 'bill.pdf' });
     const words = last[last.length - 1];

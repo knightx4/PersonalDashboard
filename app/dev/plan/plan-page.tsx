@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadYourInitial } from '@/lib/core/account/your-initial';
 import { YourInitialProvider } from '@/components/plan-tree/assignee-cell';
@@ -9,7 +10,6 @@ import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
   endQuietRuns,
-  loadFeatureFires,
   loadLastRuns,
   loadRunRaises,
   loadStartedRuns,
@@ -20,14 +20,14 @@ import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { withMockups } from '@/lib/plan/mockup';
-import { loadOvernightRun } from '@/lib/plan/overnight';
-import { runnerCard } from '@/lib/plan/runner-card';
-import { loadRunnerGoals } from '@/lib/goals/runner-status-load';
 import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
 import { NewFeatureButton } from './feature-compose';
+import { buttonVariants } from '@/components/ui/button';
+import Link from '@/components/ui/link';
+import { newSessionThreadHref } from '@/lib/core/session-threads-model';
 import {
   applyView,
   buildPlanTree,
@@ -39,7 +39,6 @@ import {
   summarize,
   type PlanView,
 } from '@/lib/plan/tree';
-import { OvernightControl } from './overnight-control';
 import { PlanView as PlanViewComponent } from './plan-view';
 import { ScopeLabelsProvider } from './scope-labels';
 import { catalogOf } from './plan-catalog';
@@ -48,9 +47,14 @@ import { sectionSubject } from '@/lib/core/section-path';
 import { Thread } from '@/components/thread/thread';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
-import { repoKey } from '@/lib/plan/github';
-import { loadMainCheck } from '@/lib/shell/main-check';
-import { ProjectMainLine } from './project-main-line';
+import { ProjectLiveLoading } from './project-live';
+import { ProjectLiveSection } from './project-live-section';
+import { NowSection } from './now-section';
+import { loadNow } from '@/lib/plan/now-load';
+import { outlineIndex } from '@/lib/plan/ref';
+
+/** The project whose page offers "Open studio" (lib/studio/handoff.ts). */
+const STUDIO_PROJECT = 'music-pipeline';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -153,7 +157,7 @@ export async function renderPlanPage({
   // end of a run, so this is where it gets noticed.
   await endQuietRuns({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, overnight, fires, started, updateTimes] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, started, updateTimes] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
@@ -164,18 +168,8 @@ export async function renderPlanPage({
     // through `app/api/plan/checks`: asked here, it held every open of the page
     // on a walk of main's history.
     loadCommitChecks(supabase, user.id),
-    // The runner's standing intention, one row, which is about the plan as a
-    // whole rather than about any part of the tree.
-    loadOvernightRun(supabase, user.id),
-    // The presses the night made, for the control's totals. The same rows the
-    // morning digest reads, through the same loader, so the two cannot come to
-    // different answers about how many features a night got through. #633.
-    // Alongside the rest rather than behind a look at the runner's row: it is
-    // one indexed read of a table this page is already reading, and holding it
-    // back would cost every load a round trip to save this one.
-    loadFeatureFires(supabase, user.id),
-    // Every run still going, after the sweep above, so the card can name each
-    // session running in parallel rather than only the last fire (note 39576272).
+    // Every run still going, after the sweep above, for what is running now at
+    // the top of the page. The runner's card is on Home (plan #578.12).
     loadStartedRuns(supabase, user.id),
     // When each feature last had an update, for the overdue mark on its row.
     loadLatestUpdateTimes(supabase, user.id),
@@ -209,27 +203,6 @@ export async function renderPlanPage({
     : everything;
   const narrowed = applyView(whole, view);
   const summary = summarize(whole);
-
-  // The runner's card, read by the same function Dash reads it with, so the
-  // two pages say the same thing about what is running. Off the whole tree
-  // rather than the view: what is ready does not change with the filter.
-  const card = runnerCard({
-    run: overnight,
-    fires,
-    items: data.items,
-    sections: everything,
-    started,
-    lastRuns: Object.values(lastRuns),
-  });
-  // The goals half, for the Goals Dash on the card (plan #1704). Skipped on a
-  // project's page, which draws no card.
-  const goals = project
-    ? null
-    : await loadRunnerGoals({
-        userId: user.id,
-        nightStartedAt: overnight?.running ? overnight.startedAt : null,
-        now: Date.now(),
-      });
 
   // Only on Everything, which is the one view a finished feature reaches at
   // all: it goes into the fold at the foot of the page rather than sitting in
@@ -282,11 +255,20 @@ export async function renderPlanPage({
   const projectTurns = projectRef
     ? await loadThread(supabase, projectRef, { userId: user.id }).catch(() => [])
     : [];
-  // A project's own main, read from its row the tick keeps (plan #2553.2).
-  const projectMain = project
-    ? { repo: repoKey(project.repo), check: await loadMainCheck(repoKey(project.repo)) }
-    : null;
   const renderedAt = Date.now();
+  // What is running now, at the top of the page (plan #2800.3): the sessions'
+  // own reports, and the push-based reading for runs that have not reported.
+  const now = await loadNow({
+    supabase,
+    userId: user.id,
+    items: data.items,
+    outlines: outlineIndex(everything.flatMap((section) => section.nodes)),
+    lastRuns,
+    started,
+    liveness,
+    scope: project?.id ?? null,
+    now: renderedAt,
+  });
 
   return (
     <YourInitialProvider initial={initial}>
@@ -299,7 +281,30 @@ export async function renderPlanPage({
             : sectionSubject('/dev/plan', 'Plan')
         }
         title={project ? project.label : 'Plan'}
-        actions={<NewFeatureButton module={project?.id ?? null} />}
+        actions={
+          project?.id === STUDIO_PROJECT ? (
+            <div className="flex items-center gap-2">
+              {/* A route, not a page: it makes this computer's studio token and leaves Dash. */}
+              <a href="/dev/studio" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Open studio
+              </a>
+              <Link href={newSessionThreadHref(project.id)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Talk about this project
+              </Link>
+              <NewFeatureButton module={project.id} />
+            </div>
+          ) : project ? (
+            <div className="flex items-center gap-2">
+              {/* A conversation with a session on the project's code, in Chat (plan #2789.7). */}
+              <Link href={newSessionThreadHref(project.id)} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+                Talk about this project
+              </Link>
+              <NewFeatureButton module={project.id} />
+            </div>
+          ) : (
+            <NewFeatureButton module={null} />
+          )
+        }
         description={
           project
             ? // One line naming where it is built (plan #1688): the paragraph
@@ -308,8 +313,13 @@ export async function renderPlanPage({
             : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />
-      {projectMain && (
-        <ProjectMainLine check={projectMain.check} repo={projectMain.repo} now={renderedAt} />
+      <NowSection list={now} />
+      {/* Whether its latest work is live, read from GitHub and Vercel when
+          the page opens (plan #2800.6); the plan below does not wait on it. */}
+      {project && (
+        <Suspense fallback={<ProjectLiveLoading />}>
+          <ProjectLiveSection project={project} now={renderedAt} />
+        </Suspense>
       )}
       {sync.added > 0 && (
         <p className="text-small text-ink-muted">
@@ -318,20 +328,6 @@ export async function renderPlanPage({
       )}
       {sync.error && (
         <p className="text-small text-caution">Could not check for new steps: {sync.error}</p>
-      )}
-      {!project && (
-        <OvernightControl
-          run={overnight}
-          canSend={Boolean(planRoutine().token)}
-          night={card.night}
-          on={card.on}
-          sessions={card.sessions}
-          goals={goals}
-          progress={card.progress}
-          push={card.push}
-          ready={card.ready}
-          next={card.next}
-        />
       )}
       <PlanViewComponent
         basePath={basePath}

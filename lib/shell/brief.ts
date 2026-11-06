@@ -10,6 +10,7 @@ import { loadDailyView } from '@/lib/goals/steps-store';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { goalsWaitingText } from '@/lib/shell/home-model';
 import { todayInTimezone } from '@/lib/money';
+import { ACTIVITY_HREF } from '@/lib/jobs/home/now-tabs';
 import type { ModuleId } from '@/lib/modules';
 
 /**
@@ -62,7 +63,7 @@ export async function loadShoppingBrief(
       // Imports the parser was not sure of: an order whose totals did not add
       // up, or an email it could not match. "Things" said none of that.
       text: `${plural(reviewCount, 'import')} to check`,
-      href: '/shopping/review',
+      href: '/shopping/orders/review',
       tone: 'caution',
     };
   }
@@ -86,7 +87,7 @@ export async function loadShoppingBrief(
   if (closing > 0) {
     return {
       text: `${plural(closing, 'return window')} close${closing === 1 ? 's' : ''} this week`,
-      href: '/shopping/returns',
+      href: '/shopping/inventory/returns',
       tone: 'caution',
     };
   }
@@ -112,7 +113,7 @@ export async function loadJobsBrief(
   if (reviewCount > 0) {
     return {
       text: `${plural(reviewCount, 'import')} to check`,
-      href: '/jobs/review',
+      href: '/jobs/inbox',
       tone: 'caution',
     };
   }
@@ -154,7 +155,7 @@ export async function loadJobsBrief(
   );
 
   return events > 0
-    ? { text: `${plural(events, 'update')} in the last day`, href: '/jobs/activity' }
+    ? { text: `${plural(events, 'update')} in the last day`, href: ACTIVITY_HREF }
     : null;
 }
 

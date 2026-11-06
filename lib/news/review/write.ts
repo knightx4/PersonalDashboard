@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MODELS } from '@/lib/core/models';
 import { reviewPrompt, readReviewReply, type ReviewReply } from './reply';
 import type { ReviewPick } from './choose';
@@ -79,13 +80,12 @@ export async function writeReview(
     model: REVIEW_MODEL,
     max_tokens: 1_500 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME, REVIEW_MODEL),
+    ...reportRequest(TOOL, REVIEW_MODEL),
     messages: [{ role: 'user', content: `${reviewPrompt(picks)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: REVIEW_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') throw new Error('Dash wrote no review.');
-  return readReviewReply(block.input, picks);
+  const report = readReport(response, TOOL_NAME, REVIEW_MODEL);
+  if (!report.ok) throw new Error('Dash wrote no review.');
+  return readReviewReply(report.value, picks);
 }

@@ -22,7 +22,8 @@ import { answerPlanRunAction } from './run-actions';
 /**
  * The runner's four Dashes, one for each thing it can run at once (plan
  * #1704): three feature sessions and the goals seat, which a fourth feature
- * takes while goals has nothing to start.
+ * takes while goals has nothing to start. A Dev project's session adds a pill
+ * of its own below them while it works, up to four, one per project.
  *
  * They sit in a strip, one pill each. A pill shows its own Dash, with its own
  * visor shape and colour, so the eye can follow one from glance to glance, and
@@ -49,6 +50,11 @@ const RUNNERS: Record<SlotId, DashRunner> = {
   // The fourth feature sits in the goals seat, so it takes the goals Dash.
   'feature-4': 'goals',
   goals: 'goals',
+  // A Dev project's seats reuse the four Dashes, in the same order.
+  'project-1': 'feature-1',
+  'project-2': 'feature-2',
+  'project-3': 'feature-3',
+  'project-4': 'goals',
 };
 
 /**
@@ -168,6 +174,7 @@ function StepBar({
  * template built from the module id would compile to nothing.
  */
 const CAPSULE_HUES: Record<ModuleId, string> = {
+  chat: 'bg-w-chat-tint text-w-chat',
   shopping: 'bg-w-shopping-tint text-w-shopping',
   jobs: 'bg-w-jobs-tint text-w-jobs',
   todo: 'bg-w-todo-tint text-w-todo',
@@ -402,11 +409,12 @@ export function RunnerCrew({
   return (
     <div className="flex flex-col gap-3">
       <ul
-        aria-label="What each of the runner's four sessions is doing"
+        aria-label="What each of the runner's sessions is doing"
         // The four slots sit side by side, as the person asked: four across
         // from laptop width, two by two on a tablet, one column only where a
         // phone has no room. Do not redraw them as stacked rows; a design
-        // check did that once (#2074) and it undid the person's layout.
+        // check did that once (#2074) and it undid the person's layout. Project
+        // slots, when a project has a session going, wrap onto the row below.
         className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
       >
         {slots.map((slot) => (

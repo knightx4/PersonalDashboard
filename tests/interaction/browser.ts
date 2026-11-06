@@ -34,8 +34,11 @@ export function chromePath(): string | null {
     .filter((name) => /^chromium-\d+$/.test(name))
     .sort((a, b) => Number(b.split('-')[1]) - Number(a.split('-')[1]));
   for (const build of builds) {
-    const path = join(BROWSERS, build, 'chrome-linux', 'chrome');
-    if (existsSync(path)) return path;
+    // Newer Playwright builds put it in chrome-linux64.
+    for (const dir of ['chrome-linux', 'chrome-linux64']) {
+      const path = join(BROWSERS, build, dir, 'chrome');
+      if (existsSync(path)) return path;
+    }
   }
   return null;
 }

@@ -1,8 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { WeekFacts } from './facts';
 import {
   MAX_REVIEW_OBSERVATIONS,
@@ -97,33 +98,30 @@ export async function writeWeekReview(
     model: WEEK_REVIEW_MODEL,
     max_tokens: 3000 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: `Give the week's review: up to ${MAX_REVIEW_OBSERVATIONS} observations citing facts by id, one change for next week, and whether last week's change happened.`,
-        input_schema: {
-          type: 'object',
-          properties: {
-            observations: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  text: { type: 'string' },
-                  facts: { type: 'array', items: { type: 'string' } },
-                  goal: { type: 'string' },
-                },
-                required: ['text', 'facts'],
+    ...reportRequest({
+      name: TOOL_NAME,
+      description: `Give the week's review: up to ${MAX_REVIEW_OBSERVATIONS} observations citing facts by id, one change for next week, and whether last week's change happened.`,
+      input_schema: {
+        type: 'object',
+        properties: {
+          observations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: { type: 'string' },
+                facts: { type: 'array', items: { type: 'string' } },
+                goal: { type: 'string' },
               },
+              required: ['text', 'facts'],
             },
-            change: { type: 'string' },
-            last_change: { type: 'string', enum: ['kept', 'not_kept', 'unclear', 'none'] },
           },
-          required: ['observations', 'change', 'last_change'],
+          change: { type: 'string' },
+          last_change: { type: 'string', enum: ['kept', 'not_kept', 'unclear', 'none'] },
         },
+        required: ['observations', 'change', 'last_change'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, WEEK_REVIEW_MODEL),
+    }, WEEK_REVIEW_MODEL),
     messages: [
       {
         role: 'user',
@@ -133,7 +131,7 @@ export async function writeWeekReview(
   });
   options.onSpend?.({ model: WEEK_REVIEW_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return null;
-  return (block.input ?? null) as RawReview | null;
+  const report = readReport(response, TOOL_NAME, WEEK_REVIEW_MODEL);
+  if (!report.ok) return null;
+  return (report.value ?? null) as RawReview | null;
 }

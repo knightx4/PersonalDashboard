@@ -21,6 +21,7 @@ export type MomentWorkspace =
   | 'goals'
   | 'learn'
   | 'shopping'
+  | 'chat'
   | 'dash';
 
 /** The order /dev/ui lists them in, with the name it shows. */
@@ -32,6 +33,7 @@ export const MOMENT_WORKSPACES: readonly (readonly [MomentWorkspace, string])[] 
   ['goals', 'Goals'],
   ['learn', 'Learn'],
   ['shopping', 'Shopping'],
+  ['chat', 'Chat'],
   ['dash', 'Dash'],
 ];
 
@@ -152,12 +154,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'goals',
     name: 'A goal closing',
     trigger: 'Closing a goal on its page, or a step on its own page.',
-    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line when the Steps tab is open; on Overview the ring plays alone and the steps are folded when you open the tab. On a step’s page its finished sub-steps are already folded.',
+    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line when the Plan tab is open; on the Dashboard, Work & files and History tabs the ring plays alone and the steps are folded when you open the Plan tab. On a step’s page its finished sub-steps are already folded.',
     reducedMotion: 'The solid hexagon and the folded line appear at once.',
     state: {
       built: 'yes',
       where:
-        'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
+        'GoalGlyph in the title and GoalStepsFold round the Plan tab, both in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
     },
     demo: 'motion-goal-close',
   },
@@ -165,12 +167,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'goals',
     name: 'A step Dash finished',
     trigger: 'A goal step closed by a Dash run appearing on the page.',
-    sees: 'The step settles in, and Dash’s mark beside it flashes once.',
+    sees: 'The step settles in, and Dash’s mark beside it flashes once. On a goal’s page that is the step’s row in the Plan tab’s finished fold and the Last finished line in Dash’s card on the Dashboard.',
     reducedMotion: 'The step and the mark are simply there.',
     state: {
       built: 'yes',
       where:
-        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, on the goal page’s Steps tab and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
+        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row in the Plan tab (DoneRow in goal-plan.tsx, and the by-stage tree), on the Last finished line of DashOnCard (last-finished.tsx) on the Dashboard, and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
     },
   },
   {
@@ -206,7 +208,31 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the count at the foot of /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the count at the foot of /shopping/inventory/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+    },
+  },
+  {
+    workspace: 'chat',
+    name: 'A mentor typing',
+    trigger: 'A mentor starting to write back, in a thread that is open.',
+    sees: 'Three dots rise in at the foot of the thread. When the text comes, the bubble rises in from the same place, and the dots rise in again below it if another is coming.',
+    reducedMotion: 'The dots and each bubble appear and go without rising, and the dots stand still.',
+    state: {
+      built: 'yes',
+      where:
+        'TypingBubble and MessageBubble in components/patterns/messaging.tsx, drawn by ThreadView in app/chat/people/[key]/thread-view.tsx for the texts that arrive after the thread opened, with the keyframes in app/globals.css. Played in the gallery at /preview?s=chat-people-thread-typing-moment.',
+    },
+  },
+  {
+    workspace: 'chat',
+    name: 'A text that arrives first',
+    trigger: 'A mentor texting first, or replying, while the People list is open.',
+    sees: 'Their row leaves its place, the rows it passes move down one place each, and it arrives at the top of the list, the preview line changes to the new words, and the unread dot lands with a little give.',
+    reducedMotion: 'The row is at the top, with the new preview and its dot, at once.',
+    state: {
+      built: 'yes',
+      where:
+        'useRowArrival in app/chat/use-row-arrival.ts, on the list in app/chat/people-list.tsx, redrawn when Realtime hears a change. Played in the gallery at /preview?s=chat-people-arrives.',
     },
   },
   {
@@ -219,7 +245,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on the Dash page, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). The button that started a run keeps the working mark in place of its label while the run goes (components/ui/dash-action.tsx, following the run with components/runs/use-run-going.ts). On a question, AskThread in components/shell/ask-dash.tsx draws it in the sheet and in a chat on Chat’s Dash tab, the lookups as they are made and the answer’s words after them. Played in the gallery at /preview?s=run-lines and /preview?s=dash-action-run, and recorded from Send at /preview?s=ask-dash-at-work (the sheet) and /preview?s=ask-page-at-work (the page).',
     },
   },
   {
