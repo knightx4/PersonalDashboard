@@ -25,6 +25,18 @@ describe('parseReachOutRule', () => {
     ).toHaveProperty('rule');
   });
 
+  it('takes a fixed kind with its params and a summary either way (plan #3030.3)', () => {
+    expect(
+      parseReachOutRule({
+        version: 1,
+        watches: [
+          { ...watch, key: 'charges', kind: 'charge_over', tables: ['finances.transactions'], params: { amount: 2000 } },
+          { ...watch, key: 'news', kind: 'news_topics', tables: ['news.issues'], params: { words: ['AI'], days: 7, from: 'Semafor' }, always: true },
+        ],
+      }),
+    ).toHaveProperty('rule');
+  });
+
   it.each([
     [[]],
     [{ watches: [watch] }],
@@ -47,6 +59,13 @@ describe('parseReachOutRule', () => {
     [{ version: 1, watches: [{ ...watch, form: 'essay' }] }],
     [{ version: 1, watches: [watch], cannot_watch: [''] }],
     [{ version: 1, watches: [watch], cannot_watch: 'LinkedIn' }],
+    [{ version: 1, watches: [{ ...watch, kind: 'Charge Over' }] }],
+    [{ version: 1, watches: [{ ...watch, always: 'yes' }] }],
+    [{ version: 1, watches: [{ ...watch, params: { colour: 'red' } }] }],
+    [{ version: 1, watches: [{ ...watch, params: { words: [] } }] }],
+    [{ version: 1, watches: [{ ...watch, params: { amount: 0 } }] }],
+    [{ version: 1, watches: [{ ...watch, params: { days: 2.5 } }] }],
+    [{ version: 1, watches: [{ ...watch, params: { from: ' ' } }] }],
   ])('refuses %j', (rule) => {
     expect(parseReachOutRule(rule)).toHaveProperty('error');
   });

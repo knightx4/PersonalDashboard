@@ -1300,6 +1300,14 @@ describe('reach-out briefs and what was mentioned', () => {
     const [row] = await admin<{ n: number }[]>`
       select jsonb_array_length(reach_out_rule -> 'watches') as n from you.board_advisors where id = ${advisor}`;
     expect(row.n).toBe(2);
+    // A fixed kind with its params and a summary either way (you 0051, plan #3030.3).
+    await save({
+      version: 1,
+      watches: [
+        { ...watch, key: 'charges', kind: 'charge_over', tables: ['finances.transactions'], params: { amount: 2000 } },
+        { ...watch, key: 'news', kind: 'news_topics', tables: ['news.issues'], params: { words: ['AI'], days: 7, from: 'Semafor' }, always: true },
+      ],
+    });
   });
 
   it('refuses a malformed rule, and a rule with no sentence', async () => {
@@ -1325,6 +1333,13 @@ describe('reach-out briefs and what was mentioned', () => {
       { version: 1, watches: [{ ...watch, form: 'essay' }] },
       { version: 1, watches: [watch], cannot_watch: [''] },
       { version: 1, watches: [watch], cannot_watch: 'LinkedIn' },
+      { version: 1, watches: [{ ...watch, kind: 'Charge Over' }] },
+      { version: 1, watches: [{ ...watch, always: 'yes' }] },
+      { version: 1, watches: [{ ...watch, params: { colour: 'red' } }] },
+      { version: 1, watches: [{ ...watch, params: { words: [] } }] },
+      { version: 1, watches: [{ ...watch, params: { amount: 0 } }] },
+      { version: 1, watches: [{ ...watch, params: { days: 2.5 } }] },
+      { version: 1, watches: [{ ...watch, params: { from: ' ' } }] },
     ];
     for (const r of bad) {
       await expect(save(r), JSON.stringify(r)).rejects.toThrow(/reach_out_rule_ck/);

@@ -470,7 +470,11 @@ export const REACH_OUT_KINDS: readonly ReachOutKind[] = [
   {
     kind: 'mail',
     area: 'Mail',
-    sends: 'A new email in any connected inbox from a sender they name (from) or about a subject they name (words), or both.',
+    // The sync wipes the sender and subject of mail no workspace claimed
+    // (core.scrub_unclaimed_messages, migration 0029), so this reads the mail
+    // the app keeps: jobs, orders, bills, bookings and mail awaiting a reply.
+    sends:
+      'A new email in any connected inbox from a sender they name (from) or about a subject they name (words), or both. Only mail the app keeps is read: job, order, bill and booking mail and mail awaiting a reply.',
     table: 'core.ingested_messages',
     params: ['from', 'words'],
     required: ['words|from'],
