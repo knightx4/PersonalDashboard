@@ -563,6 +563,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The rules and the tables a rule may watch in, a short brief; a rule of
   // two or three watches and a sentence out, with a little thinking (plan #2931.2).
   'make-reach-out-rule': run(SONNET, 1_400, 900),
+  // Every readable table with its columns and a short brief in; one query,
+  // a few sentences and a sample text out (plan #3030.1.1).
+  'write-advisor-watch': run(SONNET, 20_000, 1_200),
   // The digest, note extracts, signals, earlier insights and five or six
   // notes in; thinking at high effort, then three to five cards and a new
   // digest out (plan #2413.9).

@@ -10,6 +10,12 @@ vi.mock('@/lib/you/reach-out-make', async (original) => ({
   makeReachOutRule: (...args: unknown[]) => make(...args),
 }));
 
+const draft = vi.fn();
+vi.mock('@/lib/you/advisor-watch', async (original) => ({
+  ...(await original<typeof import('@/lib/you/advisor-watch')>()),
+  draftAdvisorWatch: (...args: unknown[]) => draft(...args),
+}));
+
 const { runYouWrite, YOU_WRITES } = await import('./you-writes');
 
 /** set_reach_out (plan #2931.4): a sentence becomes the person's rule, saved as the form saves it. */
@@ -38,6 +44,7 @@ const env = (t: FakeTables, rules: object = { client: {} }) => ({
 const rowOf = (t: FakeTables, id: string) => t['you.board_advisors'].find((r) => r.id === id)!;
 
 beforeEach(() => {
+  draft.mockReset();
   make.mockReset();
   make.mockResolvedValue({ ok: true, rule: RULE, summary: 'The Hiring Manager will text you every Monday about good-fit jobs.' });
 });
@@ -111,5 +118,77 @@ describe('set_reach_out', () => {
     const plan = planUndo(action, rowOf(t, HM) as never, false, true);
     if (!plan.ok) throw new Error(plan.reason);
     expect(plan.plan).toMatchObject({ op: 'update', values: { reach_out_brief: 'old words', reach_out_rule: OLD_RULE } });
+  });
+
+  describe('a brief no fixed watch covers (plan #3030.1.1)', () => {
+    const ASK = { userId: ME } as never;
+    const SISTER = {
+      ok: true,
+      matched: 2,
+      draft: {
+        key: 'custom_sister_ab12cd',
+        about: 'Vault notes that mention Anna',
+        sendsWhen: 'A note in your vault mentions Anna.',
+        sample: 'Your note "Sunday call" mentions Anna.',
+        everyDays: 1,
+        mode: 'each',
+        query: { table: 'obsidian.notes', where: [{ column: 'body', op: 'contains', value: 'Anna' }], limit: 50 },
+        tables: ['obsidian.notes'],
+      },
+    };
+    const withWatches = () => ({ ...tables(), 'you.advisor_watches': [] as Record<string, unknown>[] });
+
+    beforeEach(() => {
+      make.mockResolvedValue({ ok: false, uncovered: true, error: 'Dash cannot watch anything you asked for: notes that mention your sister.' });
+      draft.mockResolvedValue(SISTER);
+    });
+
+    it('writes a proposed watch instead of refusing, and leaves the rule as it was', async () => {
+      const t = withWatches();
+      const result = await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'tell me when a vault note mentions my sister' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(draft).toHaveBeenCalledWith({ name: 'Seneca', brief: 'tell me when a vault note mentions my sister' }, expect.objectContaining({ ask: ASK }));
+      const saved = t['you.advisor_watches'];
+      expect(saved).toHaveLength(1);
+      expect(saved[0]).toMatchObject({ user_id: ME, advisor_id: 'b', status: 'proposed', key: 'custom_sister_ab12cd', tables: ['obsidian.notes'] });
+      expect(saved[0].query).toEqual(SISTER.draft.query);
+      expect(rowOf(t, 'b').reach_out_brief).toBeNull();
+      expect(result).toMatchObject({ kind: 'set_reach_out', op: 'insert', before: null, subjectRef: `you.advisor_watches:${saved[0].id}` });
+      expect(result.summary).toContain('Vault notes that mention Anna');
+      expect(result.summary).toContain('every day');
+      expect(result.summary).toContain('runs nothing until you approve it');
+    });
+
+    it('is undone by removing the proposal', async () => {
+      const t = withWatches();
+      const result = await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'my sister' });
+      if ('ok' in result) throw new Error(result.error);
+      const action = { status: 'done', surface: 'ask', kind: 'set_reach_out', op: 'insert', subjectRef: result.subjectRef, beforeValues: null, afterValues: result.after, undo: null } as never;
+      const plan = planUndo(action, t['you.advisor_watches'][0] as never, false, true);
+      if (!plan.ok) throw new Error(plan.reason);
+      expect(plan.plan).toEqual({ op: 'delete' });
+    });
+
+    it('says why and saves nothing when the watch cannot be written', async () => {
+      draft.mockResolvedValue({ ok: false, error: 'Dash cannot watch that: nothing holds the weather.' });
+      const t = withWatches();
+      const result = await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'the weather' });
+      expect(result).toMatchObject({ ok: false });
+      expect((result as { error: string }).error).toContain('nothing holds the weather');
+      expect(t['you.advisor_watches']).toHaveLength(0);
+    });
+
+    it('refuses as before where no lookups are given', async () => {
+      const t = withWatches();
+      expect(await runYouWrite(tool, env(t), { person: 'Seneca', brief: 'my sister' })).toMatchObject({ ok: false });
+      expect(draft).not.toHaveBeenCalled();
+    });
+
+    it('does not write a watch for any other refusal', async () => {
+      make.mockResolvedValue({ ok: false, error: 'Dash is busy.' });
+      const t = withWatches();
+      expect(await runYouWrite(tool, env(t, { client: {}, ask: ASK }), { person: 'Seneca', brief: 'x' })).toMatchObject({ ok: false });
+      expect(draft).not.toHaveBeenCalled();
+    });
   });
 });
