@@ -541,6 +541,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'group-director': background(run(HAIKU, 3_000, 120)),
   // The bot's persona, memory and the last thirty messages in, one text out (plan #2879.1.2).
   'group-speaker': run(SONNET, 5_000, 120),
+  // A session's run making one page (plan #2997), priced as though it were
+  // Opus on the API: the run itself is on the routine, and its ledger rows
+  // carry no tokens.
+  'make-bot-page': background(run(OPUS, 60_000, 15_000)),
   // The rules, the form and for a redraft the current card in; a card of
   // about 2,500 characters out (plan #2748.11).
   'draft-persona': run(SONNET, 1_800, 700),

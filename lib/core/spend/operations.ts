@@ -295,6 +295,10 @@ export const SPEND_OPERATIONS = {
     // One bot's text in a group chat (plan #2879.1.2): the model chosen for
     // Dash, no lookups, at most six a message from the person.
     'group-speaker',
+    // A page a bot on People had made (plan #2997): one run of the Dash
+    // backup routine, in a Claude Code session rather than on the API, so
+    // the row counts the run with no tokens and no price.
+    'make-bot-page',
     // A persona card drafted from the People form, or redrafted from a
     // sentence, on a press of Draft (plan #2748.11). One Sonnet call.
     'draft-persona',

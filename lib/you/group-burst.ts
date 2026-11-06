@@ -37,6 +37,8 @@ import { claimTyping, TYPING_LEASE_MS, TYPING_RENEW_MS } from '@/lib/you/mentor-
 import { AskInputError } from '@/lib/ask/db';
 import { FIND_PLACES_DEFINITION, FIND_PLACES_TOOL, placesInput, placesToolResult } from '@/lib/ask/places';
 import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
+import type { AskToolResult } from '@/lib/ask/db';
+import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } from '@/lib/you/bot-pages';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -63,7 +65,13 @@ export type GroupSpendOperation = 'group-director' | 'group-speaker';
 export type Speaker = BurstMember & { system: string };
 
 export type DirectorInput = { members: (BurstMember & { card: string })[]; lines: BurstLine[]; transcript: string; state: BurstState };
-export type SpeakerInput = { speaker: Speaker; members: BurstMember[]; transcript: string };
+export type SpeakerInput = {
+  speaker: Speaker;
+  members: BurstMember[];
+  transcript: string;
+  /** Starts a page for this speaker, answering the person's newest message (plan #2997). Absent: no make_page. */
+  page?: (input: unknown) => Promise<AskToolResult>;
+};
 
 export type GroupBurstInput = {
   client: YouSupabaseClient;
@@ -80,6 +88,11 @@ export type GroupBurstInput = {
    * speakers write with no tools at all.
    */
   findPlaces?: PlacesFinder;
+  /**
+   * Starts a page in a Claude Code session (plan #2997), offered to each
+   * speaker as make_page. Absent: no bot in the group can make pages.
+   */
+  makePage?: BotPageStarter;
   /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
   timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
@@ -271,11 +284,11 @@ export const SPEAKER_MAX_LOOKUPS = 2;
 export const SPEAKER_PLACES_RULES = `When the person asks for a place nearby, such as somewhere to eat near home, look it up with find_places before you suggest one. Name only places it found, say in your own voice why one fits, and put its Maps link in your text. If it comes back with an error, say that plainly.`;
 
 /** One find_places call run for a speaker, as the tool_result the model reads. */
-async function placesCall(findPlaces: PlacesFinder, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+async function placesCall(findPlaces: PlacesFinder | undefined, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
   const args = block.input && typeof block.input === 'object' ? (block.input as Record<string, unknown>) : {};
   let content: string;
   let isError = false;
-  if (block.name !== FIND_PLACES_TOOL) {
+  if (block.name !== FIND_PLACES_TOOL || !findPlaces) {
     content = `There is no tool called ${block.name}.`;
     isError = true;
   } else {
@@ -295,10 +308,23 @@ async function placesCall(findPlaces: PlacesFinder, block: Anthropic.ToolUseBloc
   return { type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) };
 }
 
+/** One make_page call run for a speaker (plan #2997), as the tool_result the model reads. */
+async function pageCall(page: NonNullable<SpeakerInput['page']>, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  try {
+    const result = await page(block.input);
+    if (result.ok) return { type: 'tool_result', tool_use_id: block.id, content: result.note ?? 'Started.' };
+    return { type: 'tool_result', tool_use_id: block.id, content: result.error, is_error: true };
+  } catch (error) {
+    console.error('group page start failed', error);
+    return { type: 'tool_result', tool_use_id: block.id, content: 'The page could not be started. Say so plainly.', is_error: true };
+  }
+}
+
 /**
- * One bot's text. With a places finder it is offered find_places, and may
- * call it up to SPEAKER_MAX_LOOKUPS times before it writes; with none, it
- * writes straight away, so a turn stays short.
+ * One bot's text. With a places finder it is offered find_places, and with
+ * a page starter make_page (plan #2997); it may call them up to
+ * SPEAKER_MAX_LOOKUPS times before it writes. With neither, it writes
+ * straight away, so a turn stays short.
  */
 export async function speakWithModel(
   anthropic: Anthropic,
@@ -308,12 +334,13 @@ export async function speakWithModel(
   findPlaces?: PlacesFinder,
 ): Promise<string | null> {
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
-  const rules = `${SPEAKER_RULES}${findPlaces ? `\n\n${SPEAKER_PLACES_RULES}` : ''}\n\nIn this group with the person: ${others.join(', ')}.`;
+  const rules = `${SPEAKER_RULES}${findPlaces ? `\n\n${SPEAKER_PLACES_RULES}` : ''}${input.page ? `\n\n${PAGE_RULES}` : ''}\n\nIn this group with the person: ${others.join(', ')}.`;
+  const tools: Anthropic.Tool[] = [...(findPlaces ? [FIND_PLACES_DEFINITION] : []), ...(input.page ? [MAKE_PAGE_TOOL] : [])];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
   ];
   for (let lookups = 0; ; lookups++) {
-    const offer = findPlaces && lookups < SPEAKER_MAX_LOOKUPS;
+    const offer = tools.length > 0 && lookups < SPEAKER_MAX_LOOKUPS;
     const response = await anthropic.messages.create({
       model,
       max_tokens: SPEAKER_MAX_TOKENS,
@@ -323,17 +350,23 @@ export async function speakWithModel(
       ],
       // Past the last lookup the tool is still sent, so the turns that used it
       // read, but the model is told to write.
-      ...(findPlaces ? { tools: [FIND_PLACES_DEFINITION], tool_choice: offer ? { type: 'auto' as const } : { type: 'none' as const } } : {}),
+      ...(tools.length > 0 ? { tools, tool_choice: offer ? { type: 'auto' as const } : { type: 'none' as const } } : {}),
       messages,
     });
     spent.push({ model, usage: usageFrom(response.usage) });
     const calls = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
-    if (!findPlaces || !offer || calls.length === 0) {
+    if (!offer || calls.length === 0) {
       const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
       return cleanSpeech(text, input.speaker.name);
     }
     messages.push({ role: 'assistant', content: response.content });
-    messages.push({ role: 'user', content: await Promise.all(calls.map((call) => placesCall(findPlaces, call))) });
+    const page = input.page;
+    messages.push({
+      role: 'user',
+      content: await Promise.all(
+        calls.map((call) => (call.name === MAKE_PAGE_TOOL_NAME && page ? pageCall(page, call) : placesCall(findPlaces, call))),
+      ),
+    });
   }
 }
 
@@ -427,7 +460,26 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
           }, TYPING_RENEW_MS);
           let text: string | null = null;
           try {
-            text = await speak({ speaker: { ...member, system: persona.system }, members, transcript: transcriptOf(thread, members, formerNames) }, spent['group-speaker']);
+            const makePage = input.makePage;
+            const page = makePage
+              ? (args: unknown) =>
+                  makePage(
+                    {
+                      advisorId,
+                      advisorName: member.name,
+                      chatId,
+                      messageId: anchor.id,
+                      asked: anchor.text,
+                      persona: persona.system,
+                      href: `/chat/groups/${chatId}`,
+                    },
+                    args,
+                  )
+              : undefined;
+            text = await speak(
+              { speaker: { ...member, system: persona.system }, members, transcript: transcriptOf(thread, members, formerNames), ...(page ? { page } : {}) },
+              spent['group-speaker'],
+            );
             if (text) {
               const wait = turnPauseMs(text) - (now() - turnStarted);
               if (wait > 0) await sleep(wait);
