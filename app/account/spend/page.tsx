@@ -17,6 +17,8 @@ import { EstimatesTable } from './estimates-table';
 import { TranscriptCredits } from '@/components/learn/transcript-credits';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadUsage, type Usage } from '@/lib/learn/youtube/load';
+import { VoiceUsage } from '@/components/talk/voice-usage';
+import { loadSpeechUsage } from '@/lib/talk/speech/usage';
 import {
   byModule,
   monthStart,
@@ -90,12 +92,15 @@ const LEDGER_START = '1970-01-01T00:00:00.000Z';
 
 async function spendContent({ user, settings, owner }: ShellFrame) {
   const supabase = await createCoreClient();
-  const [rows, ranges] = await Promise.all([
+  const [rows, ranges, voice] = await Promise.all([
     loadSpend(supabase, RECENT_CALLS),
     // One read of the ledger for every operation's thirty-day range: the same
     // figures the $ hints are drawn from. A failed read comes back empty, and
     // every row then shows its guess.
     loadCostRanges(supabase, user.id, EVERY_OPERATION),
+    // Spoken replies against the month's cap (plan #3006.2). Null when the
+    // read fails, which the card says.
+    loadSpeechUsage(supabase, user.id, settings.timezone).catch(() => null),
   ]);
   const comparison = compareEstimates(ranges);
   const estimates = (
@@ -158,6 +163,8 @@ async function spendContent({ user, settings, owner }: ShellFrame) {
           <TranscriptCredits usage={transcripts} />
         </div>
       )}
+
+      <VoiceUsage usage={voice} className="mb-6" />
 
       {rows.length === 0 && (
         <>
