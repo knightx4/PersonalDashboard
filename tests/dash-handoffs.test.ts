@@ -74,3 +74,52 @@ describe('a hand-off', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('a session hand-off (plan #3005.1)', () => {
+  const KEY = `core.conversations:${CONVERSATION}#m1`;
+
+  it('keeps the words, summary and refs, and reads its state from status', async () => {
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string; state: string; refs: unknown }[]>`
+        insert into dash_handoffs (user_id, kind, conversation_id, request, asked, summary, refs, request_key)
+        values (${userA}, 'session', ${CONVERSATION}, 'Write #3001 in full', 'flesh out 3001',
+                'Planning hand-offs.', ${tx.json([{ ref: 'public.plan_items:abc' }])}, ${KEY})
+        returning id, state, refs`,
+    );
+    expect(row.state).toBe('queued');
+    expect(row.refs).toEqual([{ ref: 'public.plan_items:abc' }]);
+    await admin`update dash_handoffs set status = 'fired', cost_micros = 120000, last_seen_at = now() where id = ${row.id}`;
+    const [after] = await admin<{ state: string }[]>`select state from dash_handoffs where id = ${row.id}`;
+    expect(after.state).toBe('running');
+  });
+
+  it('keeps one row for a retried request with the same key', async () => {
+    const again = await asUser(
+      userA,
+      (tx) => tx`
+        insert into dash_handoffs (user_id, kind, conversation_id, request, asked, request_key)
+        values (${userA}, 'session', ${CONVERSATION}, 'Write #3001 in full', 'flesh out 3001', ${KEY})
+        on conflict (user_id, request_key) do nothing
+        returning id`,
+    );
+    expect(again).toHaveLength(0);
+    const rows = await admin`select id from dash_handoffs where request_key = ${KEY}`;
+    expect(rows).toHaveLength(1);
+  });
+
+  it('needs a key, the words and one thread', async () => {
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, conversation_id, request, asked)
+            values (${userA}, 'session', ${CONVERSATION}, 'x', 'x')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, conversation_id, request, request_key)
+            values (${userA}, 'session', ${CONVERSATION}, 'x', 'k-no-words')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, request, asked, request_key)
+            values (${userA}, 'session', 'x', 'x', 'k-no-thread')`,
+    ).rejects.toThrow();
+  });
+});
