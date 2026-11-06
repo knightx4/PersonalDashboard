@@ -6,12 +6,14 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { cn } from '@/lib/cn';
+import { clipOf, listenForUnlock, unlockSpeechOutput } from '@/lib/talk/speech/output';
 import {
   createSpeechPlayer,
   readSpeaking,
   rememberSpeaking,
   SPEAKING_KEY,
   type SpeechAudio,
+  type SpeechItem,
   type SpeechState,
 } from '@/lib/talk/speech/player';
 
@@ -45,16 +47,11 @@ export function SpeechFixtureProvider({ value, children }: { value: SpeechFixtur
 let player: ReturnType<typeof createSpeechPlayer> | null = null;
 
 function thePlayer() {
+  if (!player) listenForUnlock();
   player ??= createSpeechPlayer({
     fetch: (url, init) => fetch(url, init),
-    audio: (blob) => {
-      const url = URL.createObjectURL(blob);
-      const element = new Audio(url);
-      const audio: SpeechAudio = { play: () => element.play(), pause: () => element.pause(), onended: null, onerror: null };
-      element.onended = () => audio.onended?.();
-      element.onerror = () => audio.onerror?.();
-      return { audio, release: () => URL.revokeObjectURL(url) };
-    },
+    // Decoded and played through one Web Audio context, so no word is lost off the start (plan #3028).
+    audio: clipOf,
     audioUrl: (url) => {
       const element = new Audio(url);
       const audio: SpeechAudio = { play: () => element.play(), pause: () => element.pause(), onended: null, onerror: null };
@@ -83,7 +80,9 @@ function subscribeSpeaking(listener: () => void) {
 
 function setSpeaking(on: boolean) {
   rememberSpeaking(on);
-  if (!on) thePlayer().stop();
+  // The switch is a press: the moment to open the sound for the replies that follow.
+  if (on) unlockSpeechOutput();
+  else thePlayer().stop();
   for (const listener of speakingListeners) listener();
 }
 
@@ -105,16 +104,23 @@ function useSpeech(): SpeechState {
 }
 
 /**
- * Plays each of these replies once, in order, while speaking is on: the
- * mentors' thread hands in the messages that arrived while it was open.
+ * Plays each of these replies once, in order, while speaking is on: a
+ * thread hands in the messages that arrived while it was open, and each is
+ * queued, with its audio asked for, as soon as it posts (plan #3028).
+ * Leaving the thread, for another or for elsewhere, stops what it queued;
+ * `thread` names it.
  */
-export function useSpeakArrivals(replies: readonly { id: string; text: string; bot?: string | null }[]) {
+export function useSpeakArrivals(replies: readonly { id: string; text: string; bot?: string | null }[], thread: string) {
   const speaking = useSpeaking();
   const fixture = useContext(SpeechFixture);
   useEffect(() => {
     if (!speaking || fixture) return;
     for (const reply of replies) thePlayer().speakOnce(reply.id, reply.text, { bot: reply.bot });
   }, [speaking, fixture, replies]);
+  useEffect(() => {
+    if (fixture) return;
+    return () => thePlayer().stop();
+  }, [fixture, thread]);
 }
 
 /**
@@ -186,7 +192,9 @@ export function SpeakSwitch({ look }: { look: 'quiet' | 'icon' }) {
 /**
  * Play on a reply, and Stop while it loads or plays. `id` keys the reply;
  * `also` names other keys that count as this reply playing (a mentor's
- * messages queued one by one while the press reads them together).
+ * messages queued one by one). `parts`, when given, are the bubbles the
+ * press reads one after another, each under its own key, so a run already
+ * heard as it arrived plays again without being fetched again (plan #3028).
  * `fresh` marks a reply that arrived while the chat was open: it plays once
  * by itself while speaking is on. `bot` is the id of the bot that wrote it,
  * whose own voice it is read in (plan #3006.5); absent, the default voice.
@@ -195,12 +203,14 @@ export function SpeakPress({
   id,
   text,
   also,
+  parts,
   fresh = false,
   bot = null,
 }: {
   id: string;
   text: string;
   also?: readonly string[];
+  parts?: readonly { id: string; text: string }[];
   fresh?: boolean;
   bot?: string | null;
 }) {
@@ -225,7 +235,12 @@ export function SpeakPress({
         active={busy}
         onClick={() => {
           if (fixture) return;
-          if (busy) thePlayer().stop();
+          if (busy) {
+            thePlayer().stop();
+            return;
+          }
+          unlockSpeechOutput();
+          if (parts?.length) thePlayer().playList(parts.map((part): SpeechItem => ({ key: part.id, text: part.text, voice: { bot } })));
           else thePlayer().play(id, text, { bot });
         }}
       >
