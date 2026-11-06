@@ -3,6 +3,7 @@ import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import { AskInputError, isOpenableHref, type AskContext, type AskRow, type AskToolResult } from './db';
 import { mailLookup, readMailLookup } from './mail';
 import { jobBoardLookup } from './job-board';
+import { FIND_PLACES_DEFINITION, placesLookup } from './places';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -31,6 +32,7 @@ import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, 
 import { notePositionsLookup } from './positions';
 import { postPicturesLookup } from '@/lib/dash/post-pictures';
 import { dashModelLookup } from '@/lib/dash/model-lookup';
+import { sessionHandoffsLookup } from './session-handoffs';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
@@ -76,9 +78,11 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'post_pictures',
   'dash_model',
+  'session_handoffs',
   'search_mail',
   'read_mail',
   'read_job_board',
+  'find_places',
   'show_chart',
 ] as const;
 
@@ -88,9 +92,18 @@ export const ASK_TOOL_NAMES = [
  * what it holds is not to leave the app for another client. A chart is drawn
  * in the app's own reply (plan #1655), which another client does not have.
  * The model Dash answers with is the app's own setting (plan #2458.4), and a
- * connector client is not Dash.
+ * connector client is not Dash. A places lookup spends the app's own daily
+ * allowance of Google calls (plan #2987.3), which stays with the app's chats.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'read_job_board', 'show_chart', 'dash_model'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = [
+  'search_mail',
+  'read_mail',
+  'read_job_board',
+  'find_places',
+  'show_chart',
+  'dash_model',
+  'session_handoffs',
+];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -407,7 +420,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'goal_status',
     description:
-      'Each of the person\'s open goals with its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. Each links to the goal\'s page.',
+      'Each of the person\'s open goals with its area and its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. The note lists all their areas, in order, and totals count goals per area, so this answers "what areas are my goals in". Each links to the goal\'s page.',
     input_schema: {
       type: 'object',
       properties: {
@@ -576,6 +589,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'session_handoffs',
+    description:
+      'Say how the requests handed to a Claude Code session are going, read from the hand-offs themselves. Returns the person\'s hand-offs from every chat, still-open ones first, each with who sent it, what it is for, its state (Waiting to start, Working, Done or Stopped), how long it has been in that state and a sentence saying how it is going. Use it for "how\'s it going?", "is that done yet?" or "what are the sessions doing?" and answer from the row, never from memory of what you handed on; with none, say nothing has been handed on.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'search_mail',
     description:
       'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
@@ -625,6 +644,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  FIND_PLACES_DEFINITION,
   CHART_TOOL_DEFINITION,
 ];
 
@@ -664,10 +684,14 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   post_pictures: { run: postPicturesLookup, module: null },
   // Reads the account's own setting; no workspace has to be on.
   dash_model: { run: dashModelLookup, module: null },
+  // Reads the person's own hand-offs; no workspace has to be on.
+  session_handoffs: { run: sessionHandoffsLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
   read_job_board: { run: jobBoardLookup, module: 'jobs' },
+  // Places near home belong to no workspace (lib/ask/places.ts).
+  find_places: { run: placesLookup, module: null },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
 };
@@ -732,6 +756,7 @@ export function isAskToolName(name: string): name is AskToolName {
 }
 
 const MODULE_LABELS: Record<ModuleId, string> = {
+  chat: 'Chat',
   shopping: 'Shopping',
   jobs: 'Job search',
   vault: 'Vault',

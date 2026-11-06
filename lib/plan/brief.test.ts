@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dismissedUnder, planBrief } from '@/lib/plan/brief';
+import { COMPLETE_DETAIL_RULE, dismissedUnder, planBrief } from '@/lib/plan/brief';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 
@@ -688,5 +688,13 @@ describe('a brief names steps the way the page does', () => {
     const brief = planBrief(sections, findNode(sections, 'two')!);
     expect(brief.startsWith('# Plan step #900.2 — Second\n')).toBe(true);
     expect(brief).toContain('Picks up where #900.1 left off; see PR #904 for the old attempt.');
+  });
+});
+
+describe('COMPLETE_DETAIL_RULE', () => {
+  it('tells a shaper to carry the idea and its thread into each step', () => {
+    expect(COMPLETE_DETAIL_RULE).toMatch(/without reading the idea or its comments/);
+    expect(COMPLETE_DETAIL_RULE).toMatch(/constraint, file, example, edge case and decision/);
+    expect(COMPLETE_DETAIL_RULE).toMatch(/Decided so far/);
   });
 });

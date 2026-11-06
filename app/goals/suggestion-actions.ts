@@ -8,6 +8,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { parseYourReaction } from '@/lib/goals/suggestions';
 import {
   acceptStepSuggestion,
+  acceptTileSuggestion,
   clearDecline,
   reactToSuggestion,
   recordAttended,
@@ -122,4 +123,27 @@ export async function addSuggestedStepAction(
   if (!stepId) return { error: 'That suggestion is gone. Reload to see the list.' };
   revalidatePath('/goals', 'layout');
   return { done: Date.now(), stepId };
+}
+
+/**
+ * Add to dashboard, on a question's result (plan #2778.8): the tile the run
+ * suggested goes on the end of the goal's dashboard, checked as any layout is.
+ */
+// latency: pending
+export async function addSuggestedTileAction(
+  _prev: SuggestionActionState,
+  form: FormData,
+): Promise<SuggestionActionState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which suggestion that was.' };
+  let refused: string | null;
+  try {
+    refused = await acceptTileSuggestion(await createGoalsClient(), user.id, id.data);
+  } catch {
+    return { error: 'The tile could not be added. Try again.' };
+  }
+  if (refused) return { error: refused };
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now() };
 }

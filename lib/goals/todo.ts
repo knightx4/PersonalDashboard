@@ -22,6 +22,7 @@
  * lib/goals/steps-store.ts and the agenda source that shows the result is
  * lib/todo/agenda/sources/goal-steps.ts.
  */
+import type { ShowsOutside } from '@/lib/goals/plan-order';
 import type { Step, StepNode } from '@/lib/goals/steps';
 import { toGoalActivity, type Goal } from '@/lib/goals/tree';
 
@@ -43,7 +44,16 @@ export function canShowOnTodo(step: Pick<Step, 'kind' | 'status'>): boolean {
   return step.kind === 'mine' && step.status === 'open';
 }
 
-export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoStep[] {
+/**
+ * `showsOutside` (plan #2778.6) holds back a step Dash sent that its goal's
+ * plan has under Later and that is not dated within a week. A step you sent
+ * always comes through.
+ */
+export function todoSteps(
+  goals: Goal[],
+  byGoal: Map<string, StepNode[]>,
+  showsOutside?: ShowsOutside,
+): TodoStep[] {
   const out: TodoStep[] = [];
   for (const goal of goals) {
     if (goal.status !== 'open') continue;
@@ -51,7 +61,12 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
         if (node.status !== 'open') continue;
-        if (node.onTodo && canShowOnTodo(node) && !(passive && node.onTodoBy === 'claude')) {
+        if (
+          node.onTodo &&
+          canShowOnTodo(node) &&
+          !(passive && node.onTodoBy === 'claude') &&
+          (!showsOutside || showsOutside(node))
+        ) {
           out.push({
             id: node.id,
             title: node.title,

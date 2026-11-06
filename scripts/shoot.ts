@@ -5,8 +5,11 @@
  *   UI_PREVIEW=1 PORT=3400 npm run start &
  *   npx tsx scripts/shoot.ts                    # everything
  *   npx tsx scripts/shoot.ts jobs-role-timeline # one surface
+ *   npx tsx scripts/shoot.ts a b c              # several (plan #2815.3)
  *
- * Shots land in .preview-shots/, which is gitignored. Nothing here ships.
+ * Shots land in .preview-shots/, which is gitignored, or in the folder
+ * SHOOT_OUT names: `npm run ui-guard -- <n> --compare` shoots main's into
+ * .preview-shots/before/ that way. Nothing here ships.
  *
  * With --record it films instead of photographing (docs/UI-QUALITY-SPEC.md,
  * Part 8). Each surface whose gallery entry declares an `interaction` has it
@@ -78,7 +81,9 @@ function findChrome(): string {
 
 const CHROME = findChrome();
 const PORT = process.env.PREVIEW_PORT ?? '3400';
-const OUT = join(process.cwd(), '.preview-shots');
+const OUT =
+  process.env.SHOOT_OUT?.trim() ||
+  join(process.cwd(), process.env.SHOOT_REDUCED_MOTION === '1' ? '.preview-shots/reduced' : '.preview-shots');
 const PROBE = process.env.SHOOT_PROBE_PORT ? Number(process.env.SHOOT_PROBE_PORT) : 9500;
 
 /**
@@ -105,6 +110,22 @@ const ALL_WIDTHS = [
   // than stretched to the whole page, so it lands horizontal in the timeline.
   { name: 'landscape', width: 1440, height: 810 },
 ] as const;
+
+/**
+ * Surfaces whose fixtures are written as fixed instants and read against a
+ * pinned clock, so "5m ago" is the same five minutes on every take. The
+ * clock stands still at that instant for the whole page, Date.now() and a bare
+ * new Date() both.
+ */
+const FROZEN_CLOCKS: Readonly<Record<string, string>> = {
+  'pattern-thread': '2026-03-02T12:00:00.000Z',
+};
+
+function freezeClockScript(iso: string): string {
+  return `(()=>{var T=${new Date(iso).getTime()},D=Date;
+function F(...a){if(!(this instanceof F))return new D(T).toString();return a.length?new D(...a):new D(T)}
+F.prototype=D.prototype;F.now=()=>T;F.parse=D.parse;F.UTC=D.UTC;window.Date=F;})()`;
+}
 
 /** Sizes shot as the window shows them, never grown to the page's length. */
 const WINDOW_ONLY: ReadonlySet<string> = new Set(['landscape']);
@@ -136,7 +157,21 @@ const WIDTHS = (() => {
  * should not carry it.
  */
 const HIDE_DEV_BADGE =
-  "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
+  "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});" +
+  // The status line's wall clock reads a different minute on every take, so two
+  // shoots of one commit differed in its ten pixels (plan #2879.5).
+  "(function(){var s=document.createElement('style');s.textContent='[data-wall-clock]{visibility:hidden}';document.head.appendChild(s);})();";
+
+/**
+ * Puts every CSS animation and transition at rest before a capture (plan
+ * #2815.4). Two shoots of one build differed by 0.01 to 0.02% of their pixels
+ * on ask-dash-at-work, ui-kit and dev-runner-crew, which have looping
+ * animations (a pulse, a spinner), so the compare listed them as changed when
+ * a step had not touched them. A finite animation is finished, which is where
+ * the page settles anyway; a looping one is paused at its first frame.
+ */
+const FREEZE_ANIMATIONS = `document.getAnimations().forEach(function(a){
+  try{a.finish();}catch(e){a.pause();a.currentTime=0;}});`;
 
 /** True when something visible is fixed to the bottom half of the screen, such as Quick read's Next row. */
 const HAS_PINNED_ROW = `[...document.querySelectorAll('body *')].some(function(e){
@@ -311,7 +346,7 @@ async function evaluate<T>(send: Send, expression: string): Promise<T | undefine
 }
 
 async function main() {
-  const only = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
+  const asked = new Set(process.argv.slice(2).filter((arg) => !arg.startsWith('--')));
 
   // The status, not the body. Checking the HTML for the string "404" was the
   // first version of this and it matched the framework's own markup, so a
@@ -331,10 +366,14 @@ async function main() {
   // two cannot drift.
   const index = await probe.text();
   const ids = [...index.matchAll(/\/preview\?s=([\w-]+)/g)].map((m) => m[1]!);
-  const surfaces = [...new Set(only ? ids.filter((entry) => entry === only) : ids)];
+  const surfaces = [...new Set(asked.size > 0 ? ids.filter((entry) => asked.has(entry)) : ids)];
   if (surfaces.length === 0) {
-    throw new Error(only ? `No surface named ${only}` : 'The index lists no surfaces.');
+    throw new Error(
+      asked.size > 0 ? `No surface named ${[...asked].join(', ')}` : 'The index lists no surfaces.',
+    );
   }
+  const unknown = [...asked].filter((id) => !surfaces.includes(id));
+  if (unknown.length > 0) console.log(`Not in this gallery, so not shot: ${unknown.join(', ')}`);
 
   if (RECORD) {
     await recordAll(surfaces, readInteractions(index));
@@ -354,6 +393,12 @@ async function main() {
           deviceScaleFactor: 2,
           mobile: size.name === 'phone',
         });
+        const frozen = FROZEN_CLOCKS[surfaceId];
+        const frozenScript = frozen
+          ? ((await send('Page.addScriptToEvaluateOnNewDocument', {
+              source: freezeClockScript(frozen),
+            })) as unknown as { identifier?: string })
+          : null;
         await send('Page.navigate', {
           url:
             `http://localhost:${PORT}/preview?s=${surfaceId}` +
@@ -434,9 +479,23 @@ async function main() {
           console.log(`  (${surfaceId} is cut to its top ${clipHeight}px)`);
         }
 
+        // Chrome's pointer starts in the middle of the window, so on a laptop
+        // it rested on whatever was drawn there: on pattern-conversation that
+        // is the first Dash answer, whose action row fades in on hover and
+        // was caught partway through on some takes (plan #2879.5). Park it in
+        // the top left corner, on the page's own margin, before the freeze.
+        await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
+        await wait(300);
+        await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
+        await wait(100);
+        // A capture beyond the window resizes it while it draws, and a pane
+        // scrolled to a section inside the shell could come back at its end:
+        // chat-person-edit-reach-out-failed did on more than half its laptop
+        // takes (plan #2879.4.1). A page no taller than the window has nothing
+        // beyond it, so it is captured as it stands.
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
-          captureBeyondViewport: !windowOnly,
+          captureBeyondViewport: !windowOnly && pageHeight > size.height,
           ...(clipped
             ? { clip: { x: 0, y: 0, width: size.width, height: clipHeight, scale: 1 } }
             : {}),
@@ -468,12 +527,18 @@ async function main() {
               expression: 'window.scrollTo(0, document.documentElement.scrollHeight)',
             });
             await wait(400);
+            await send('Runtime.evaluate', { expression: FREEZE_ANIMATIONS });
             const end = await send('Page.captureScreenshot', { format: 'png' });
             const endName = `${surfaceId}--${size.name}-${slug(theme)}-end.png`;
             writeFileSync(join(OUT, endName), Buffer.from(end.data, 'base64'));
             console.log(`  ${endName}`);
             shot += 1;
           }
+        }
+        if (frozenScript?.identifier) {
+          await send('Page.removeScriptToEvaluateOnNewDocument', {
+            identifier: frozenScript.identifier,
+          });
         }
       }
     }
@@ -502,6 +567,14 @@ const PLAYBACK = 0.25;
 
 /** Where strips land. */
 const STRIPS = join(OUT, 'strips');
+
+/**
+ * `SHOOT_REDUCED_MOTION=1 npm run record -- <id>` films the interaction with
+ * the browser asking for reduced motion, for a moment whose reduced version
+ * has to be judged too (plan #2778.11). Its strips go to
+ * .preview-shots/reduced/strips/ unless SHOOT_OUT names a folder.
+ */
+const REDUCED_MOTION = process.env.SHOOT_REDUCED_MOTION === '1';
 
 /**
  * Stops every form sending while recording. A gallery fixture has nothing
@@ -625,6 +698,9 @@ async function recordOne(
     mobile: true,
   });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await send('Emulation.setEmulatedMedia', {
+    features: [{ name: 'prefers-reduced-motion', value: REDUCED_MOTION ? 'reduce' : 'no-preference' }],
+  });
   await send('Page.navigate', { url: `http://localhost:${PORT}/preview?s=${surfaceId}` });
   await wait(2200);
   await send('Runtime.evaluate', {

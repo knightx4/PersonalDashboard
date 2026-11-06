@@ -2,11 +2,11 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { fetchDocument } from '@/lib/learn/providers';
 import { buildTextFragmentUrl, containsAnchor, toPlainText } from '@/lib/learn/locate/html';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Finding the paragraph, when you open the reading and not before.
@@ -130,22 +130,19 @@ export async function locatePassage(input: {
       model: MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the passage that answers the question.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              anchor: { type: ['string', 'null'] },
-              label: { type: ['string', 'null'] },
-              reason: { type: ['string', 'null'] },
-            },
-            required: ['anchor'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the passage that answers the question.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            anchor: { type: ['string', 'null'] },
+            label: { type: ['string', 'null'] },
+            reason: { type: ['string', 'null'] },
           },
+          required: ['anchor'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -163,12 +160,12 @@ export async function locatePassage(input: {
     // passage still read the document and still cost what that cost.
     input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find((c) => c.type === 'tool_use');
-    if (!block || block.type !== 'tool_use') {
+    const report = readReport(response, TOOL_NAME, MODEL);
+    if (!report.ok) {
       return unchanged('Fetched, but no passage was reported; opens at the top.');
     }
 
-    const safe = passageSchema.safeParse(block.input);
+    const safe = passageSchema.safeParse(report.value);
     if (!safe.success) {
       return unchanged('Fetched, but the passage came back malformed; opens at the top.');
     }

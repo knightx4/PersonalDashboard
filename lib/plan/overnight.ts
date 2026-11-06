@@ -55,6 +55,21 @@ export const OVERNIGHT_AT_ONCE = 3;
  */
 export const OVERNIGHT_AT_ONCE_GOALS_IDLE = 4;
 
+/**
+ * How many sessions the runner keeps going on Dev projects, the repositories
+ * it builds outside this app (lib/plan/projects.ts), on top of the seats above.
+ *
+ * A project's work never takes one of the app's seats, and the app's work
+ * never takes one of these. They stand empty unless a project has a ready
+ * step, so a night with nothing queued on any project runs as it did before.
+ * One session per project (`PROJECT_SESSIONS_EACH`), so four projects with
+ * work is the most that fills them.
+ */
+export const OVERNIGHT_PROJECTS_AT_ONCE = 4;
+
+/** The most sessions one project has going at once. */
+export const PROJECT_SESSIONS_EACH = 1;
+
 /** The feature-session limit for a tick, given whether goals had nothing to start. */
 export function featureSessionsAtOnce(goalsIdle: boolean): number {
   return goalsIdle ? OVERNIGHT_AT_ONCE_GOALS_IDLE : OVERNIGHT_AT_ONCE;
@@ -585,13 +600,13 @@ export function dashActivityLine(
 
   if (session) {
     const noun = RUN_JOB_NOUN[session.job];
-    if (standing === 'paused') return `dash · ${noun} running · overnight run held`;
-    return night ? `dash · ${noun} running · overnight, ${night}` : `dash · ${noun} running`;
+    if (standing === 'paused') return `dash · ${noun} running · runner held`;
+    return night ? `dash · ${noun} running · runner on, ${night}` : `dash · ${noun} running`;
   }
 
-  if (standing === 'paused') return 'dash · overnight run held';
+  if (standing === 'paused') return 'dash · runner held';
   // Nothing fired at this moment, but the runner is on and the next tick will.
-  if (night) return `dash · overnight run on · ${night}`;
+  if (night) return `dash · runner on · ${night}`;
   return null;
 }
 

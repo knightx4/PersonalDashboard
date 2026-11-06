@@ -1,9 +1,10 @@
 import 'server-only';
 
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import type { AnswerSignals } from '@/lib/learn/confidence';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { WRITE_LESSON_MODEL } from './write-lesson';
 import { markAgainstPoints, type MarkedPoints } from './mark-points';
 import { pieceLines, type PieceForCheck } from './piece-check';
@@ -85,33 +86,30 @@ export async function writePractice(input: {
       model: WRITE_PRACTICE_MODEL,
       max_tokens: 3000 + THINKING_ROOM,
       system: WRITE_SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the practice task, what it is marked on and a worked answer.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              task: { type: 'string' },
-              columns: { type: 'array', items: { type: 'string' } },
-              rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
-              figures: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: { label: { type: 'string' }, unit: { type: 'string' } },
-                  required: ['label'],
-                },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the practice task, what it is marked on and a worked answer.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            task: { type: 'string' },
+            columns: { type: 'array', items: { type: 'string' } },
+            rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+            figures: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { label: { type: 'string' }, unit: { type: 'string' } },
+                required: ['label'],
               },
-              points: { type: 'array', items: { type: 'string' } },
-              worked: { type: 'string' },
-              spreadsheet_note: { type: 'string' },
             },
-            required: ['task', 'points', 'worked'],
+            points: { type: 'array', items: { type: 'string' } },
+            worked: { type: 'string' },
+            spreadsheet_note: { type: 'string' },
           },
+          required: ['task', 'points', 'worked'],
         },
-      ],
-      tool_choice: forceTool(TOOL, WRITE_PRACTICE_MODEL),
+      }, WRITE_PRACTICE_MODEL),
       messages: [{ role: 'user', content: practicePrompt(input.piece, input.lessons, TOOL) }],
     });
   } catch (error) {
@@ -120,10 +118,10 @@ export async function writePractice(input: {
 
   input.onSpend?.({ model: WRITE_PRACTICE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL, WRITE_PRACTICE_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
 
-  const safe = practicePayloadSchema.safeParse(block.input);
+  const safe = practicePayloadSchema.safeParse(report.value);
   if (!safe.success) return { outcome: 'failed', detail: 'The task came back malformed.' };
 
   const checked = toWrittenPractice(safe.data);

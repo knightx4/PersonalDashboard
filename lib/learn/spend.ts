@@ -183,6 +183,10 @@ export const LEARN_OPERATIONS = [
   // call per note version that no folder rule decides, from the map sweep's
   // tick. Recorded against the note's owner.
   'tag-note-voice',
+  // Sorting and scoring a vault map idea with Jev (plan #2947.3): one Jev
+  // request per idea that is new or whose quotes or notes changed, from the
+  // ten-minute idea score clock. Recorded against the idea's owner.
+  'score-vault-ideas',
   // Pulling the lines that say who the person is out of a private note (plan
   // #2413.8): one Haiku call per private note version, from the map sweep's
   // tick after the voice tagging. Recorded against the note's owner.

@@ -48,6 +48,9 @@ const MAX_REDIRECTS = 5;
  * `text/xml` and `application/xml` likewise, read as plain text: OCW's sitemap
  * is the one listing of every course by its number, which is how a course
  * number is confirmed to exist (lib/learn/providers/ocw-structure.ts).
+ *
+ * `text/x-wiki` is what Wikipedia answers `action=raw` with, the wikitext of
+ * the Level 4 list pages (lib/learn/areas/topic-import.ts), read as plain text.
  */
 const ALLOWED_TYPES = [
   'text/html',
@@ -58,6 +61,7 @@ const ALLOWED_TYPES = [
   'text/xml',
   'application/xml',
   'application/json',
+  'text/x-wiki',
 ];
 
 export type FetchedDocument = {
@@ -95,7 +99,7 @@ function classify(contentType: string): FetchedDocument['contentType'] | null {
   const type = contentType.split(';')[0].trim().toLowerCase();
   if (type === 'application/pdf') return 'pdf';
   if (type === 'text/html' || type === 'application/xhtml+xml') return 'html';
-  if (type === 'text/plain' || type === 'text/vtt' || type === 'text/xml' || type === 'application/xml') {
+  if (type === 'text/plain' || type === 'text/x-wiki' || type === 'text/vtt' || type === 'text/xml' || type === 'application/xml') {
     return 'text';
   }
   if (type === 'application/json') return 'json';
@@ -142,7 +146,7 @@ async function readCapped(response: Response): Promise<Uint8Array | null> {
  * to run again on each hop: a public URL that 302s to 169.254.169.254 is the
  * standard way past a check that only looks at what was typed.
  */
-export async function fetchDocument(rawUrl: string): Promise<FetchResult> {
+export async function fetchDocument(rawUrl: string, options: { timeoutMs?: number } = {}): Promise<FetchResult> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -165,7 +169,7 @@ export async function fetchDocument(rawUrl: string): Promise<FetchResult> {
     try {
       response = await fetch(url, {
         redirect: 'manual',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(options.timeoutMs ?? TIMEOUT_MS),
         headers: {
           // Identify honestly, with a way to reach the operator. A source that
           // blocks this is entitled to. Wikimedia's User-Agent policy asks for

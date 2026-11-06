@@ -102,7 +102,7 @@ const COLOURS = new Set(
 );
 
 // -- The rules --------------------------------------------------------------
-type Rule = {
+export type Rule = {
   id: string;
   law: string;
   says: string;
@@ -300,7 +300,42 @@ function onlyAnIcon(children: string, lucide: Set<string>): boolean {
   return !/\b(?:aria-label|title)\s*=/.test(icon[2]!);
 }
 
-const RULES: Rule[] = [
+/**
+ * The opening tag that starts at `column` on the line after `before`, read to
+ * its `>` the way elementAt reads it, self-closing or not.
+ */
+function openingTagAt(source: string, before: string[], column: number): string {
+  const start = before.reduce((sum, line) => sum + line.length + 1, 0) + column;
+  let depth = 0;
+  let quote = '';
+  for (let at = start; at < source.length; at += 1) {
+    const ch = source[at]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+    } else if (ch === '"' || ch === "'" || (ch === '`' && depth > 0)) quote = ch;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (ch === '>' && depth === 0) return source.slice(start, at + 1);
+  }
+  return source.slice(start);
+}
+
+/** Words alone, for comparing two pieces of text: "Choose files." is "choose files". */
+function words(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The sentence an empty section is left saying: "Nothing filed yet.", "None named yet", "No notes yet". */
+const EMPTY_LINE = /^(?:Nothing|None|No)\b[^<>{}'"]{0,60}\byet\b\.?$/;
+
+/** What a heading ends in, for asking whether a paragraph sits directly under one. */
+const HEADING_END = /(?:<\/h[23]>|<(?:SectionHeading|SectionLabel)\b[^<]*\/>)\s*$/;
+
+export const RULES: Rule[] = [
   {
     id: 'hand-rolled-box',
     law: '11',
@@ -460,7 +495,9 @@ const RULES: Rule[] = [
      * what the plan view's two are. Excuse those where they stand.
      */
     find: (line, { before, source }) => {
-      if (!/<(?:Textarea|ComposeBody)\b/.test(line)) return [];
+      // `textarea` too: the raw element is the same open box, and four were
+      // written that way where the rule could not see them (plan #2966.1).
+      if (!/<(?:Textarea|ComposeBody|textarea)\b/.test(line)) return [];
       if (!/\{\s*[\w.[\]()]*\.map\(/.test(source)) return [];
       if (encloses(line, before, GATE) || before.some((l) => EARLY_RETURN.test(l))) return [];
       return ['composer open on arrival'];
@@ -774,10 +811,190 @@ const RULES: Rule[] = [
       return out;
     },
   },
+  {
+    id: 'heading-hint',
+    law: '15',
+    says: 'a sentence under a section heading, passed as CardSection hint',
+    instead:
+      'a heading that names the thing well enough alone; put the explanation in the empty state, where a first visit is',
+    /**
+     * `hint=` on a CardSection (plan #2966.1).
+     *
+     * The prop draws a muted sentence directly under the section's heading,
+     * which is the shape law 15 rules out, and the critic cited that shape more
+     * than two hundred times in sixty days ("Where orders are read from." under
+     * Sources, "Yours, in the order they are offered." under Accounts). A new
+     * hint is where the gate can stop it. The opening tag is read to its end,
+     * since the prop is often on the third line of it.
+     */
+    only: /\.tsx$/,
+    find: (line, { before, source }) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(/<CardSection\b/g)) {
+        if (/\shint=/.test(openingTagAt(source, before, match.index!))) out.push('<CardSection hint=…>');
+      }
+      return out;
+    },
+  },
+  {
+    id: 'heading-explained',
+    law: '15',
+    says: 'a muted paragraph directly under a heading, explaining it',
+    instead:
+      'name the thing in the heading; a fact the reader needs goes in the content, and the explanation in the empty state',
+    /**
+     * A `<p>` set in a muted ink as the first thing after a heading: an
+     * `</h2>`, an `</h3>` or a self-closing SectionHeading or SectionLabel.
+     *
+     * That is how the hint is written when it is not passed as a prop, and the
+     * same sentence the critic keeps finding: "Notes you wrote in the last
+     * seven days that come back to something you wrote before" under its
+     * heading, read once and skipped after. The muted ink is what makes it a
+     * caption rather than content, which is why a plain paragraph under a
+     * heading is left alone.
+     */
+    only: /\.tsx$/,
+    find: (line, { before, after }) => {
+      const open = /<p\b[^>]*\btext-ink-(?:muted|subtle|faint)\b[^>]*>(.*)$/.exec(line);
+      // A failure said in place is law 2 at work, not a caption.
+      if (!open || /\brole=["'](?:alert|status)["']/.test(line)) return [];
+      // A written sentence of four words or more. A line built from values,
+      // `{meta.join(' · ')}` under a video's title, is the subline law 18
+      // asks for, not an explanation, and starts with a brace.
+      const text = (open[1]!.trim() || after[0]?.trim() || '').replace(/<\/p>.*$/, '');
+      if (!/^[A-Z][^{<]*?(?:\s+[^\s{<]+){3}/.test(text)) return [];
+      const above: string[] = [];
+      for (let i = before.length - 1; i >= 0 && above.length < 8; i -= 1) {
+        const previous = before[i]!.trim();
+        if (!previous || isCommentLine(previous)) continue;
+        above.unshift(previous);
+        if (/^<[A-Za-z]/.test(previous)) break;
+      }
+      return HEADING_END.test(above.join(' ')) ? ['muted line under a heading'] : [];
+    },
+  },
+  {
+    id: 'caption-repeats-control',
+    law: '15',
+    says: 'a caption that says the same words as the control under it',
+    instead: 'the control alone: its placeholder or its label already says it',
+    /**
+     * A caption whose words are the next control's placeholder or label, or a
+     * field whose `label` and `placeholder` are the same words.
+     *
+     * "Choose files" over a button that says "Choose files", "Find a note by
+     * name" over a search box whose placeholder reads the same: the critic
+     * found both, and law 15 names the case outright ("Never put a caption
+     * above a box whose placeholder says the same words"). Compared as words,
+     * so a full stop or a capital does not hide a repeat. Two words or more
+     * only: a one-word caption matching a one-word button is a coincidence as
+     * often as it is a repeat.
+     */
+    only: /\.tsx$/,
+    find: (line, { after }) => {
+      const out: string[] = [];
+      const same = /\blabel=["']([^"']+)["'][^>]*\bplaceholder=["']([^"']+)["']/.exec(line);
+      if (same && words(same[1]!) === words(same[2]!)) out.push(`label and placeholder both "${same[1]}"`);
+      const below = after.join('\n');
+      for (const caption of line.matchAll(/>([^<>{}]+)</g)) {
+        const said = words(caption[1]!);
+        if (said.split(' ').length < 2) continue;
+        const repeats =
+          [...below.matchAll(/\bplaceholder=["']([^"']+)["']/g)].some((m) => words(m[1]!) === said) ||
+          [...below.matchAll(/<(?:Button|button)\b[^>]*>\s*([^<>{}]+?)\s*</g)].some((m) => words(m[1]!) === said);
+        if (repeats) out.push(`"${caption[1]!.trim()}" said twice`);
+      }
+      return out;
+    },
+  },
+  {
+    id: 'centred-reading-text',
+    law: '18',
+    says: 'a paragraph or heading set centred, so every line starts in a different place',
+    instead:
+      'text on the left edge; centre only what nobody reads, such as a mark, and use EmptyState for an empty page',
+    /**
+     * `text-center` on a `<p>` or a heading (plan #2966.1).
+     *
+     * Law 18: text starts on the left edge, and only a mark or an empty-state
+     * picture is centred. A centred paragraph was cited under laws 17 and 18
+     * alike, and it is the one alignment fault a class list shows: whether a
+     * value ends on the right edge or a row lines up with the one above it is
+     * a question about the rendered page, and stays with the critic. EmptyState
+     * is in components/ui and centres its own title, which is the case the law
+     * allows.
+     */
+    only: /\.tsx$/,
+    find: (line) =>
+      [...line.matchAll(/<(p|h[1-6])\b[^>]*\btext-center\b/g)].map((match) => `centred <${match[1]}>`),
+  },
+  {
+    id: 'empty-section-line',
+    law: '1',
+    says: 'a section drawn only to say it is empty',
+    instead:
+      'leave the section out when it has nothing ({items.length > 0 && …}); a wholly empty page gets EmptyState',
+    /**
+     * "Nothing filed yet.", "None named yet.", "No notes yet." written as a
+     * line of text or passed as a section's `empty` prop.
+     *
+     * Law 1: an empty section is not rendered. The critic found sections kept
+     * on the page to hold exactly this line, four in a row on one page
+     * ("Nothing kept for this week yet." under each empty week), and the
+     * sentence is what gives them away. An EmptyState title is left alone:
+     * that is the empty page the law allows, and whether a page is wholly
+     * empty is the critic's reading.
+     */
+    only: /\.tsx$/,
+    find: (line) => {
+      if (/<EmptyState\b/.test(line)) return [];
+      const out: string[] = [];
+      for (const match of line.matchAll(/<(?:p|span|div|li)\b[^>]*>\s*([^<>{}]+?)\s*</g)) {
+        if (EMPTY_LINE.test(match[1]!)) out.push(match[1]!);
+      }
+      for (const match of line.matchAll(/\bempty=["']([^"']+)["']/g)) {
+        if (EMPTY_LINE.test(match[1]!.trim())) out.push(match[1]!);
+      }
+      return out;
+    },
+  },
+  {
+    id: 'dash-press-unpriced',
+    law: '16',
+    says: 'a press that hands work to Dash with no cost hint beside it',
+    instead:
+      'DashAction with `paid` (the server action), `estimate`, `costText`, or `routine` for work a routine does',
+    /**
+     * A DashAction with none of `paid`, `estimate`, `costText` or `routine`,
+     * or Dash's mark drawn inside a Button by hand (plan #2966.1).
+     *
+     * Law 16: a press that costs money says so first. DashAction draws the $
+     * from whichever of the four it is given and draws nothing with none, so
+     * an unpriced one carries the mark that says Dash will work and nothing
+     * that says what it costs. That is the case the critic cited fifty-four
+     * times in sixty days ("Try again carries the Dash mark, so it sends the
+     * brief to a paid model again, but nothing beside it says what that
+     * costs"). A Button with the mark inside it is the same press built
+     * without DashAction, with no way to carry a hint at all. A spread is
+     * trusted to carry the price.
+     */
+    only: /\.tsx$/,
+    find: (line, { before, source }) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(/<DashAction\b/g)) {
+        const open = openingTagAt(source, before, match.index!);
+        if (!/\s(?:paid|estimate|costText|routine)=|\{\s*\.\.\./.test(open)) out.push('<DashAction> with no price');
+      }
+      if (/<DashMark\b/.test(line) && encloses(line, before, /<(?:Button|button)\b/)) {
+        out.push('Dash mark in a hand-built button');
+      }
+      return out;
+    },
+  },
 ];
 
 // -- The walk ---------------------------------------------------------------
-type Hit = { file: string; line: number; rule: Rule; text: string };
+export type Hit = { file: string; line: number; rule: Rule; text: string };
 
 function files(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -795,55 +1012,66 @@ function scan(target: ModuleId | null): Hit[] {
       const file = relative(ROOT, path);
       if (EXEMPT.some((prefix) => file.startsWith(prefix))) continue;
       if (target && scopeForFile(file) !== target) continue;
-      const source = readFileSync(path, 'utf8');
-      const lines = source.split('\n');
-      const excused = new Set(
-        [...source.matchAll(/ui-ok-file:\s*([\w-]+)/g)].map((match) => match[1]!),
-      );
-      lines.forEach((line, index) => {
-        // Prose, not code. A doc comment explaining why not to write
-        // `var(--color-accent)` should not be reported for writing it, and the
-        // file that documents these rules is the file most likely to quote
-        // them. Continuation lines of a block comment and whole-line `//`
-        // comments are the two shapes that carry prose; a real declaration
-        // never starts a line with `*`.
-        const trimmed = line.trimStart();
-        if (isCommentLine(trimmed)) return;
-
-        // The valve: on this line, or anywhere in the comment block directly
-        // above it.
-        //
-        // It used to read exactly one line up, which quietly made the valve
-        // unusable for the reasons this codebase actually writes. Every
-        // justification here is a paragraph -- that is the house style and the
-        // point of it -- so a four-line explanation put `ui-ok:` on its first
-        // line and the marker fell out of range. The only way to be excused
-        // was to give a one-line reason, which is the opposite of what the
-        // valve is for.
-        if (line.includes('ui-ok:')) return;
-        let above = index - 1;
-        while (above >= 0) {
-          const previous = lines[above]!.trim();
-          if (!isCommentLine(previous)) break;
-          if (previous.includes('ui-ok:')) return;
-          above -= 1;
-        }
-        for (const rule of RULES) {
-          if (excused.has(rule.id)) continue;
-          if (rule.skip?.test(file)) continue;
-          if (rule.only && !rule.only.test(file)) continue;
-          const context: RuleContext = {
-            after: lines.slice(index + 1, index + 7),
-            before: lines.slice(0, index),
-            source,
-          };
-          for (const text of rule.find(line, context)) {
-            hits.push({ file, line: index + 1, rule, text });
-          }
-        }
-      });
+      hits.push(...scanSource(file, readFileSync(path, 'utf8')));
     }
   }
+  return hits;
+}
+
+/**
+ * Every violation in one file's source, as the gate would report it.
+ *
+ * Split from the walk so tests/check-ui-rules.test.ts can hand a rule a few
+ * lines of JSX and see what it reports, without a file on disk.
+ */
+export function scanSource(file: string, source: string): Hit[] {
+  const hits: Hit[] = [];
+  const lines = source.split('\n');
+  const excused = new Set(
+    [...source.matchAll(/ui-ok-file:\s*([\w-]+)/g)].map((match) => match[1]!),
+  );
+  lines.forEach((line, index) => {
+    // Prose, not code. A doc comment explaining why not to write
+    // `var(--color-accent)` should not be reported for writing it, and the
+    // file that documents these rules is the file most likely to quote
+    // them. Continuation lines of a block comment and whole-line `//`
+    // comments are the two shapes that carry prose; a real declaration
+    // never starts a line with `*`.
+    const trimmed = line.trimStart();
+    if (isCommentLine(trimmed)) return;
+
+    // The valve: on this line, or anywhere in the comment block directly
+    // above it.
+    //
+    // It used to read exactly one line up, which quietly made the valve
+    // unusable for the reasons this codebase actually writes. Every
+    // justification here is a paragraph -- that is the house style and the
+    // point of it -- so a four-line explanation put `ui-ok:` on its first
+    // line and the marker fell out of range. The only way to be excused
+    // was to give a one-line reason, which is the opposite of what the
+    // valve is for.
+    if (line.includes('ui-ok:')) return;
+    let above = index - 1;
+    while (above >= 0) {
+      const previous = lines[above]!.trim();
+      if (!isCommentLine(previous)) break;
+      if (previous.includes('ui-ok:')) return;
+      above -= 1;
+    }
+    for (const rule of RULES) {
+      if (excused.has(rule.id)) continue;
+      if (rule.skip?.test(file)) continue;
+      if (rule.only && !rule.only.test(file)) continue;
+      const context: RuleContext = {
+        after: lines.slice(index + 1, index + 7),
+        before: lines.slice(0, index),
+        source,
+      };
+      for (const text of rule.find(line, context)) {
+        hits.push({ file, line: index + 1, rule, text });
+      }
+    }
+  });
   return hits;
 }
 
@@ -877,92 +1105,100 @@ function targetModule(): ModuleId | null {
 }
 
 // -- The report -------------------------------------------------------------
-const target = targetModule();
-const hits = scan(target);
-const counts = tally(hits);
+/**
+ * Run only as the script. The test file imports the rules and scanSource from
+ * here, and importing must not walk the tree, print the standings or exit.
+ */
+if (/check-ui\.ts$/.test(process.argv[1] ?? '')) main();
 
-if (process.argv.includes('--update')) {
-  // A narrowed run has only looked at one module, so recording it would drop
-  // every other module's entry and quietly reset the ratchet.
-  if (target) {
-    console.error('--update records the whole baseline, so it cannot be narrowed to --module.');
+function main() {
+  const target = targetModule();
+  const hits = scan(target);
+  const counts = tally(hits);
+
+  if (process.argv.includes('--update')) {
+    // A narrowed run has only looked at one module, so recording it would drop
+    // every other module's entry and quietly reset the ratchet.
+    if (target) {
+      console.error('--update records the whole baseline, so it cannot be narrowed to --module.');
+      process.exit(1);
+    }
+    const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
+    writeFileSync(BASELINE, `${JSON.stringify(ordered, null, 2)}\n`);
+    console.log(`Recorded ${hits.length} violations across ${Object.keys(ordered).length} file/rule pairs.`);
+    process.exit(0);
+  }
+
+  let baseline: Record<string, number> = {};
+  try {
+    baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, number>;
+  } catch {
+    console.error('No baseline yet. Record one with: npm run check:ui -- --update');
     process.exit(1);
   }
-  const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(BASELINE, `${JSON.stringify(ordered, null, 2)}\n`);
-  console.log(`Recorded ${hits.length} violations across ${Object.keys(ordered).length} file/rule pairs.`);
-  process.exit(0);
-}
 
-let baseline: Record<string, number> = {};
-try {
-  baseline = JSON.parse(readFileSync(BASELINE, 'utf8')) as Record<string, number>;
-} catch {
-  console.error('No baseline yet. Record one with: npm run check:ui -- --update');
-  process.exit(1);
-}
-
-if (process.argv.includes('--list')) {
-  for (const hit of hits) console.log(`${hit.file}:${hit.line}  ${hit.rule.id}  ${hit.text}`);
-  console.log('');
-}
-
-const regressions = hits.filter((hit) => {
-  const key = `${hit.rule.id} ${hit.file}`;
-  return (counts[key] ?? 0) > (baseline[key] ?? 0);
-});
-
-if (regressions.length > 0) {
-  console.error(`\n✗ ${regressions.length} new UI violation(s).\n`);
-  const explained = new Set<string>();
-  for (const hit of regressions) {
-    console.error(`  ${hit.file}:${hit.line}`);
-    console.error(`    ${hit.text}`);
-    if (!explained.has(hit.rule.id)) {
-      explained.add(hit.rule.id);
-      // The id as well as the law, because the id is what a file-wide
-      // exemption has to name and there is nowhere else to read it off.
-      console.error(`    law ${hit.rule.law} · ${hit.rule.id}: ${hit.rule.says}`);
-      console.error(`    use ${hit.rule.instead}`);
-    }
-    console.error('');
+  if (process.argv.includes('--list')) {
+    for (const hit of hits) console.log(`${hit.file}:${hit.line}  ${hit.rule.id}  ${hit.text}`);
+    console.log('');
   }
-  console.error('If it is genuinely right, say so on the line: /* ui-ok: why */');
-  console.error('The laws are at /dev/ui, and in app/dev/ui/laws.ts.\n');
-  process.exit(1);
-}
 
-/** `  ·  name`, or the count if there is one. */
-function standing(n: number, name: string): string {
-  return `  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${name}`;
-}
+  const regressions = hits.filter((hit) => {
+    const key = `${hit.rule.id} ${hit.file}`;
+    return (counts[key] ?? 0) > (baseline[key] ?? 0);
+  });
 
-// Per-rule standings, so the number that is meant to fall is visible.
-const byRule = new Map<string, number>();
-for (const hit of hits) byRule.set(hit.rule.id, (byRule.get(hit.rule.id) ?? 0) + 1);
-for (const rule of RULES) console.log(standing(byRule.get(rule.id) ?? 0, rule.id));
+  if (regressions.length > 0) {
+    console.error(`\n✗ ${regressions.length} new UI violation(s).\n`);
+    const explained = new Set<string>();
+    for (const hit of regressions) {
+      console.error(`  ${hit.file}:${hit.line}`);
+      console.error(`    ${hit.text}`);
+      if (!explained.has(hit.rule.id)) {
+        explained.add(hit.rule.id);
+        // The id as well as the law, because the id is what a file-wide
+        // exemption has to name and there is nowhere else to read it off.
+        console.error(`    law ${hit.rule.law} · ${hit.rule.id}: ${hit.rule.says}`);
+        console.error(`    use ${hit.rule.instead}`);
+      }
+      console.error('');
+    }
+    console.error('If it is genuinely right, say so on the line: /* ui-ok: why */');
+    console.error('The laws are at /dev/ui, and in app/dev/ui/laws.ts.\n');
+    process.exit(1);
+  }
 
-// Per-module standings, which is what says where the work is. Every scope is
-// listed, including the ones at zero: a module missing from the list reads as
-// a module nobody has counted.
-const byScope = new Map<string, number>();
-for (const hit of hits) {
-  const scope = scopeForFile(hit.file);
-  byScope.set(scope, (byScope.get(scope) ?? 0) + 1);
-}
-console.log('');
-for (const scope of target ? [target] : UI_SCOPES) {
-  console.log(standing(byScope.get(scope) ?? 0, scope));
-}
+  /** `  ·  name`, or the count if there is one. */
+  function standing(n: number, name: string): string {
+    return `  ${n === 0 ? '  ·' : String(n).padStart(3)}  ${name}`;
+  }
 
-// What the baseline says about the files this run actually looked at.
-const known = Object.entries(baseline)
-  .filter(([key]) => !target || scopeForFile(key.slice(key.indexOf(' ') + 1)) === target)
-  .reduce((sum, [, n]) => sum + n, 0);
-const fixed = known - hits.length;
-if (fixed > 0) {
-  console.log(`\n✓ No new violations, and ${fixed} fewer than the baseline.`);
-  console.log('  Lock the gain in: npm run check:ui -- --update\n');
-} else {
-  console.log(`\n✓ No new UI violations. ${hits.length} known, none added.\n`);
+  // Per-rule standings, so the number that is meant to fall is visible.
+  const byRule = new Map<string, number>();
+  for (const hit of hits) byRule.set(hit.rule.id, (byRule.get(hit.rule.id) ?? 0) + 1);
+  for (const rule of RULES) console.log(standing(byRule.get(rule.id) ?? 0, rule.id));
+
+  // Per-module standings, which is what says where the work is. Every scope is
+  // listed, including the ones at zero: a module missing from the list reads as
+  // a module nobody has counted.
+  const byScope = new Map<string, number>();
+  for (const hit of hits) {
+    const scope = scopeForFile(hit.file);
+    byScope.set(scope, (byScope.get(scope) ?? 0) + 1);
+  }
+  console.log('');
+  for (const scope of target ? [target] : UI_SCOPES) {
+    console.log(standing(byScope.get(scope) ?? 0, scope));
+  }
+
+  // What the baseline says about the files this run actually looked at.
+  const known = Object.entries(baseline)
+    .filter(([key]) => !target || scopeForFile(key.slice(key.indexOf(' ') + 1)) === target)
+    .reduce((sum, [, n]) => sum + n, 0);
+  const fixed = known - hits.length;
+  if (fixed > 0) {
+    console.log(`\n✓ No new violations, and ${fixed} fewer than the baseline.`);
+    console.log('  Lock the gain in: npm run check:ui -- --update\n');
+  } else {
+    console.log(`\n✓ No new UI violations. ${hits.length} known, none added.\n`);
+  }
 }

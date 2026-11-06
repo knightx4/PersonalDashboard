@@ -25,8 +25,8 @@ const WRITE = dashToolsOf('write');
 const DASH_DIR = join(REPO_ROOT, 'lib/dash');
 const KEY = /^[\w\-./()[\]]+\.tsx?#\w+$/;
 
-/** Where the person's buttons are not: Ask and the capture box run the tools themselves. */
-const NOT_A_BUTTON = /^app\/(ask\/|capture-actions\.ts#)|^app\/goals\/capture-actions\.ts#fileGoalCapture$/;
+/** Where the person's buttons are not: Ask Dash (now Chat's Dash tab) and the capture box run the tools themselves. */
+const NOT_A_BUTTON = /^app\/(ask\/|chat\/dash\/|capture-actions\.ts#)|^app\/goals\/capture-actions\.ts#fileGoalCapture$/;
 
 function fileOf(key: string): { file: string; name: string } {
   const [file, name] = key.split('#') as [string, string];

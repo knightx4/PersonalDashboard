@@ -431,6 +431,11 @@ describe('read_dev_row', () => {
     expect(await read({ kind: 'goal', ref: IDEA })).toEqual({ ok: false, error: expect.stringContaining('kind must be') });
     expect(await read({ kind: 'idea', ref: '1248' })).toEqual({ ok: false, error: expect.stringContaining('not an id') });
   });
+
+  it('tells the model where to look when an outline names no step', async () => {
+    const result = await read({ kind: 'step', ref: '#9999.9' });
+    expect(result).toEqual({ ok: false, error: expect.stringContaining('Read #9999 to list the steps it has') });
+  });
 });
 
 /**

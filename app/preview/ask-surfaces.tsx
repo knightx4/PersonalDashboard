@@ -11,22 +11,28 @@ import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
-import { SONNET } from '@/lib/core/models';
+import { OPUS, SONNET } from '@/lib/core/models';
 import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { AppShell } from '@/components/shell/app-shell';
 import { Conversation, ConversationChat } from '@/components/patterns/conversation';
-import { AskChats, type ChatEdits } from '@/app/ask/chats';
-import { ArchivedNote, CHATS_BACK, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/ask/view';
-import { ChatUsed } from '@/app/ask/used';
+import { AskChats, type ChatEdits } from '@/app/chat/dash/chats';
+import { ArchivedNote, CHATS_BACK, ChatsListSkeleton, NewDashChat, USED_LABEL, USED_SHORT } from '@/app/chat/dash/view';
+import { tabsFor } from '@/lib/shell/tabs';
+import { ChatUsed } from '@/app/chat/dash/used';
 import { chatFiles, chatLookups, chatReadRows } from '@/lib/talk/chat-trail';
 import type { AskChat } from '@/lib/talk/ask-chats';
+import type { SessionThread } from '@/lib/core/session-threads-model';
 import type { SearchHit } from '@/lib/search/sources';
 import type { ModuleId } from '@/lib/modules';
 import type { AskBoxStart } from '@/components/talk/ask-box';
 import { stoppedBody } from '@/lib/talk/talk';
+import { SESSION_OFFER } from '@/lib/talk/chat-to-session';
+import { SESSION_SENT_BODY, THINK_FALLBACK, type SessionSentState } from '@/lib/talk/thought';
+import { SessionSentFixture } from '@/components/talk/think-switch';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import { PANE_CHATS } from './chat-surfaces';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -259,7 +265,7 @@ async function writeOut(
 }
 
 /** The workspaces the box's chip offers in the gallery (plan #1899.5). */
-const BOX_WORKSPACES: readonly ModuleId[] = ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'];
+const BOX_WORKSPACES: readonly ModuleId[] = ['chat', 'shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'];
 
 /** The rows @ finds in the gallery, as the top bar's search would list them. */
 const BOX_HITS: readonly SearchHit[] = [
@@ -371,7 +377,32 @@ const FIXTURES: AskSource = {
   decline: pressed('declined'),
   undo: pressed('undone'),
   costs: async () => ASK_COSTS,
+  // The Messages chats the sheet's row switches to (plan #2981).
+  chats: PANE_CHATS,
 };
+
+/**
+ * The sheet with a Messages chat open in it (plan #2981), Earlier questions
+ * open over Dash's chat, or a mark's name showing under the row: each a
+ * state only a press or a pointer reaches.
+ */
+export function AskDashChatsSurface({ part, children }: { part: 'chat' | 'group' | 'earlier' | 'name'; children: React.ReactNode }) {
+  const label =
+    part === 'chat'
+      ? 'Benjamin Franklin, unread'
+      : part === 'group'
+        ? 'Northwind offer, unread'
+        : part === 'earlier'
+          ? 'Earlier questions'
+          : 'The Mentor';
+  return (
+    <AskDashSurface open>
+      {children}
+      {/* After the sheet has opened and read its row. */}
+      <ActOnArrival label={label} focus={part === 'name'} after={300} />
+    </AskDashSurface>
+  );
+}
 
 /** Opens the sheet as the page arrives, sending `question` when given. */
 function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }) {
@@ -429,10 +460,19 @@ export function AskDashSurface({
  * Dash's box with what plan #1899.5 adds, on the chat's card at reading
  * width: a question that carried two rows added with @, an answer stopped
  * part way and kept as far as it got, and the box open on `draft` with the
- * menu its @ or / opens, or the scope chip's menu open.
+ * menu its @ or / opens, or the scope chip's menu open. `workspaces` is @
+ * and the start of a workspace's name (plan #2748.1): the workspace it names
+ * first in the menu, to keep the question to, then the rows.
  */
-export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' }) {
-  const draft = open === 'rows' ? 'How much did the @Cat' : open === 'commands' ? '/' : '';
+export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' | 'workspaces' }) {
+  const draft =
+    open === 'rows'
+      ? 'How much did the @Cat'
+      : open === 'commands'
+        ? '/'
+        : open === 'workspaces'
+          ? 'What should I read next? @Le'
+          : '';
   const start: AskBoxStart | undefined =
     open === 'rows'
       ? { rows: [BOX_ROWS[0]], scope: 'shopping' }
@@ -471,6 +511,9 @@ export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' })
             startWriting
             initialDraft={draft}
             boxStart={start}
+            // The workspaces menu is the Chat page's box, which draws your
+            // questions as bubbles (plan #2748.12).
+            bubbles={open === 'workspaces'}
           />
         </Card>
       </PageColumn>
@@ -478,6 +521,159 @@ export function AskBoxSurface({ open }: { open: 'rows' | 'commands' | 'scope' })
   );
 }
 
+
+/** The mockup a thought-through answer drew in the gallery: the box's foot, before and after. */
+const THINK_MOCKUP_HTML = `<style>
+.w{padding:16px;display:grid;gap:12px;font:14px/1.4 system-ui,sans-serif;color:#1c1c1c} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.box{border:1px solid #d9d6d0;border-radius:12px;padding:10px 12px;background:#fff} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.q{color:#8a867f;margin-bottom:10px} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.foot{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.c{border:1px solid #d9d6d0;border-radius:999px;padding:2px 10px;font-size:12px;color:#5c5852} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.on{background:#e8eefc;border-color:#e8eefc;color:#2f55c8} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+.k{font-size:12px;color:#8a867f} /* ui-ok: the mockup's own page, drawn in its sandboxed frame where no token reaches */
+</style>
+<div class="w">
+<div class="k">Today</div>
+<div class="box"><div class="q">Ask Dash</div><div class="foot"><span class="c">Everything</span><span class="c">Sonnet</span></div></div>
+<div class="k">With the switch on</div>
+<div class="box"><div class="q">Ask Dash</div><div class="foot"><span class="c">Everything</span><span class="c on">Think it through</span></div></div>
+</div>`;
+
+const THINK_QUESTION = 'Should the model chip move into the box foot, or stay in settings?';
+
+const THINK_ANSWER = `**What the code does now.** The chip sits in the box's foot beside the scope chip (components/talk/model-chip.tsx), and the pick is saved on your account, so it already follows you from the popup to the Dash page.
+
+**The two ways.**
+- **Keep it in the foot.** One press to change it per question, which is when the choice matters. It costs a chip's width on a phone.
+- **Move it to settings.** A cleaner foot, but a question that needs Opus means leaving the chat.
+
+**What I would do.** Keep it in the foot, and let "Think it through" stand in for it when that is on, as in the mockup. The choice is made per question, so it belongs where the question is written.`;
+
+/**
+ * "Think it through" on Dash's box (plan #2789.10), on the chat's card at
+ * reading width: the switch on with a question typed, or a thought-through
+ * answer under it with the mockup it drew and the line saying what it cost,
+ * or one with no mockup and the cost line alone.
+ */
+export function AskThinkSurface({ part }: { part: 'on' | 'mockup' | 'cost' }) {
+  const at = '2026-11-04T09:00:00Z';
+  const turns: TalkTurn[] =
+    part === 'on'
+      ? [
+          { id: 'k-q', role: 'user', body: 'Which model is answering me now?', createdAt: at },
+          { id: 'k-a', role: 'assistant', body: 'Sonnet, the one picked on the chip in the box.', createdAt: at },
+        ]
+      : [
+          { id: 'k-q', role: 'user', body: THINK_QUESTION, createdAt: at },
+          {
+            id: 'k-a',
+            role: 'assistant',
+            body: THINK_ANSWER,
+            createdAt: at,
+            toolCalls: [
+              { name: 'read_spec', input: { spec: 'one-interface' }, result: { ok: true, rows: [] } },
+              { name: 'read_code', input: { path: 'components/talk/model-chip.tsx' }, result: { ok: true, rows: [] } },
+              ...(part === 'mockup'
+                ? [
+                    {
+                      name: 'show_mockup',
+                      input: {},
+                      result: { ok: true, mockup: { title: 'The box foot, before and after', html: THINK_MOCKUP_HTML, height: 236 } },
+                    },
+                  ]
+                : []),
+              {
+                name: 'think_it_through',
+                input: { model: OPUS, effort: 'high' },
+                result: { ok: true, costMicros: part === 'mockup' ? 418_000 : 236_000 },
+              },
+            ],
+          },
+        ];
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id={`ask-think-${part}`}
+            conversationRef="00000000-0000-4000-8000-000000000032"
+            turns={turns}
+            label="Ask a follow-up"
+            placeholder="Ask Dash. @ adds a row, / a command"
+            startWriting={part === 'on'}
+            initialDraft={part === 'on' ? 'Is it worth moving the model chip into settings?' : undefined}
+            boxStart={{ think: part !== 'cost' }}
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+const SESSION_THREAD = '00000000-0000-4000-8000-000000002789';
+
+const SESSION_QUESTION =
+  'Should the vault sync over Git, or keep the Obsidian plugin? I keep losing edits made on my phone.';
+
+/**
+ * "Think it through" sent to a session thread (plan #2789.11): Ask Dash's
+ * reply at once, with the line under it following the session. `working`
+ * shows the session's newest line and `answered` its answer landed; with the
+ * session runner not set up, `fallback` is the answer written here, its cost
+ * line saying why.
+ */
+export function AskThinkSessionSurface({ part }: { part: 'working' | 'answered' | 'fallback' }) {
+  const at = '2026-11-05T09:00:00Z';
+  const answer: TalkTurn =
+    part === 'fallback'
+      ? {
+          id: 's-a',
+          role: 'assistant',
+          body: THINK_ANSWER,
+          createdAt: at,
+          toolCalls: [
+            { name: 'read_code', input: { path: 'components/talk/model-chip.tsx' }, result: { ok: true, rows: [] } },
+            {
+              name: 'think_it_through',
+              input: { model: OPUS, effort: 'high', fallback: THINK_FALLBACK.noBroker },
+              result: { ok: true, costMicros: 236_000 },
+            },
+          ],
+        }
+      : {
+          id: 's-a',
+          role: 'assistant',
+          body: SESSION_SENT_BODY,
+          createdAt: at,
+          toolCalls: [{ name: 'think_in_session', input: { thread_id: SESSION_THREAD }, result: { ok: true } }],
+        };
+  const turns: TalkTurn[] = [
+    { id: 's-q', role: 'user', body: part === 'fallback' ? THINK_QUESTION : SESSION_QUESTION, createdAt: at },
+    answer,
+  ];
+  const state: SessionSentState =
+    part === 'answered'
+      ? { state: 'answered' }
+      : { state: 'working', line: 'Reading lib/vault/sync.ts and the vault spec, then the Obsidian Git plugin notes' };
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <SessionSentFixture.Provider value={state}>
+        <PageColumn className="py-4">
+          <Card padding="standard" className="mx-auto w-full max-w-prose">
+            <AskThread
+              id={`ask-think-session-${part}`}
+              conversationRef="00000000-0000-4000-8000-000000000033"
+              turns={turns}
+              label="Ask a follow-up"
+              placeholder="Ask Dash. @ adds a row, / a command"
+              boxStart={{ think: true }}
+            />
+          </Card>
+        </PageColumn>
+      </SessionSentFixture.Provider>
+    </AskDashProvider>
+  );
+}
 
 /**
  * A reopened question whose answers proposed changes (plan #1190), each card
@@ -507,6 +703,32 @@ export function AskChangesSurface() {
     input: { title: 'Call the dentist', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false },
   });
   const step = (turnId: string) => proposals(turnId)[1];
+  // Hours logged from Ask (plan #2906.2): a goal's day and a step's, as the
+  // log_hours write describes them, drawn by the generic written card.
+  const hours = (turnId: string, onStep: boolean): DashChange => ({
+    ...CHANGE_BASE,
+    id: `${turnId}-hours-${onStep ? 'step' : 'goal'}`,
+    turnId,
+    status: 'proposed',
+    kind: 'log_hours',
+    input: onStep
+      ? {
+          verb: 'Logged 1.5 hours on',
+          what: 'Draft the methods chapter',
+          rest: ' under Finish my thesis, on Mon 28 Sep',
+          href: '/goals/g1/steps/s1',
+          where: 'Open the step',
+          paths: [],
+        }
+      : {
+          verb: 'Logged 2 hours on',
+          what: 'Finish my thesis',
+          rest: ', on Sun 27 Sep',
+          href: '/goals/g1',
+          where: 'Open the goal',
+          paths: [],
+        },
+  } as DashChange);
   const turns: TalkTurn[] = [
     {
       id: 'pa',
@@ -521,6 +743,8 @@ export function AskChangesSurface() {
         'I can add the todo "Call the dentist" due on Friday, and a step "Book the hygienist" under your goal to get your teeth sorted. Confirm each one below and I will write it.',
       createdAt: at(9),
     },
+    { id: 'pc', role: 'user', body: 'Log 2 hours on my thesis for yesterday and 90 minutes on the methods step today', createdAt: at(8) },
+    { id: 'rc', role: 'assistant', body: 'Logged both. Undo takes either one off again.', createdAt: at(8) },
     { id: 'pb', role: 'user', body: 'Add the same again for Sam', createdAt: at(10) },
     {
       id: 'rb',
@@ -540,6 +764,8 @@ export function AskChangesSurface() {
             done(todo('ra'), 'done'),
             done(step('ra'), 'declined'),
             done(todo('rb'), 'undone'),
+            done(hours('rc', false), 'done'),
+            done(hours('rc', true), 'undone'),
             { ...step('rb'), createdAt: at(10) },
           ]}
           label="Ask a follow-up"
@@ -806,14 +1032,30 @@ export function DashPageSurface({
   list,
   draft,
   modelStart,
+  sessions,
+  session,
+  reply,
 }: {
+  /**
+   * The last question's reply as the server holds it when the chat is opened
+   * (plan #2854.4): still being written after the page that asked was left,
+   * or failed, with Try again.
+   */
+  reply?: 'answering' | 'failed';
+  /** Threads with Claude Code sessions in the list (plan #2789.7). */
+  sessions?: SessionThread[];
+  /** A session thread open beside the list in place of a chat, with its id (plan #2789.7). */
+  session?: { id: string; view: React.ReactNode };
   /** The model chip's list open, or a pick that could not be saved (plan #2458.3). */
   modelStart?: 'open' | 'failed';
   chat?: 'open' | 'new' | 'archived';
   /** Words in the open chat's box, unsent, for a strip that presses Send (plan #1899.8). */
   draft?: string;
-  /** The list's hidden parts (plan #1899.6): a search, a menu, a rename or Archived open. */
-  list?: 'search' | 'menu' | 'rename' | 'archived';
+  /**
+   * The list's hidden parts (plan #1899.6): a search, a menu, a rename or
+   * Archived open; and no chats yet, or chats that could not be read (#2748.1).
+   */
+  list?: 'search' | 'menu' | 'rename' | 'archived' | 'empty' | 'failed' | 'loading';
   listOpen?: boolean;
   /** The column of what Dash used, shown or folded. */
   usedOpen?: boolean;
@@ -832,47 +1074,59 @@ export function DashPageSurface({
             createdAt: open.lastAt,
           },
         ]
-      : dashPageTurns(open.title ?? '');
-  const opened = chat !== 'new';
+      : reply
+        ? // The second question's answer is not in yet, or did not come.
+          dashPageTurns(open.title ?? '').filter((turn) => turn.id !== 'a2')
+        : dashPageTurns(open.title ?? '');
+  const none = list === 'empty' || list === 'failed' || list === 'loading';
+  const opened = chat !== 'new' && !none && !session;
   return (
-    // The shell's cost hints, as app/ask/layout.tsx reads them for the box.
+    // The shell's cost hints, as app/chat/dash/layout.tsx reads them for the box.
     <PaidCostsProvider costs={ASK_COSTS}>
     <AskDashProvider source={FIXTURES} modelStart={modelStart}>
       <AppShell
         account="preview"
-        module={null}
-        sections={[]}
+        module="chat"
+        sections={tabsFor('chat', true)}
         displayName="Chris"
         email="chris@example.com"
         isOwner
         counts={{ jobs: '3', todo: '8', shopping: '1' }}
         theme={{ kind: 'written', id: 'paper' }}
         brief={null}
-        pathname={opened ? `/ask/${open.ref}` : '/ask'}
+        pathname={session ? `/chat/dash/session/${session.id}` : opened ? `/chat/dash/${open.ref}` : '/chat/dash'}
       >
         <Conversation
           label="Chats"
           fill
-          open={opened}
+          open={opened || Boolean(session)}
           initialListOpen={listOpen}
-          newChat={{ href: '/ask?chat=new', label: 'New chat' }}
+          newChat={{ href: '/chat/dash?chat=new', label: 'New chat' }}
           list={
+            list === 'loading' ? (
+              <ChatsListSkeleton />
+            ) : (
             <AskChats
-              chats={DASH_CHATS}
+              chats={none ? [] : DASH_CHATS}
+              failed={list === 'failed'}
               today={CHAT_TODAY}
-              made={DASH_MADE}
+              made={none ? [] : DASH_MADE}
               presses={DASH_PRESSES}
               edits={DASH_EDITS}
-              active={opened ? open.ref : null}
+              active={session ? session.id : opened ? open.ref : null}
+              sessions={sessions}
               initialQuery={list === 'search' ? 'Catan' : undefined}
               initialHits={list === 'search' ? SEARCH_HITS : undefined}
               initialMenu={list === 'menu' ? DASH_CHATS[1].ref : null}
               initialRenaming={list === 'rename' ? DASH_CHATS[1].ref : null}
               initialArchivedOpen={list === 'archived' || chat === 'archived'}
             />
+            )
           }
         >
-          {opened ? (
+          {session ? (
+            session.view
+          ) : opened ? (
             <ConversationChat
               title={open.title ?? 'A question'}
               back={CHATS_BACK}
@@ -902,15 +1156,23 @@ export function DashPageSurface({
                 id="dash-page-preview"
                 conversationRef={open.ref}
                 turns={turns}
-                changes={DASH_CHAT_CHANGES}
+                changes={reply ? [] : DASH_CHAT_CHANGES}
+                reply={
+                  reply === 'answering'
+                    ? { state: 'answering', startedAt: chatAt(CHAT_TODAY, 10) }
+                    : reply === 'failed'
+                      ? { state: 'failed', error: 'Dash stopped before the answer was written.' }
+                      : null
+                }
                 label="Ask a follow-up"
                 placeholder="Ask more about this"
                 dock
+                bubbles
                 initialDraft={draft}
               />
             </ConversationChat>
           ) : (
-            <NewDashChat />
+            <NewDashChat greeting="Good afternoon, Chris" />
           )}
         </Conversation>
       </AppShell>
@@ -975,6 +1237,63 @@ export function AskAnswerActionsSurface({ thumbs }: { thumbs?: AnswerThumbsMomen
             placeholder="Ask more about this"
             startWriting
             initialDraft="Which of them are still unsold, and for how long?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
+
+/**
+ * Taking a chat to a session thread (plan #2789.8): an answer in which Dash
+ * offers it. `offer` draws the answer with the written button, `form` has it
+ * pressed so the project list shows with the one the chat names picked, and
+ * `started` has the thread started so the link to it shows.
+ */
+export type ToSessionPart = 'offer' | 'form' | 'started';
+
+const SESSION_ASKED = 'The Budget app should show my spending by week as well as by month. Can you add that?';
+const SESSION_ANSWER = `That is a change to the Budget app's code, not something I can switch on from here: the month view groups by calendar month, and a weekly one needs a new grouping and a toggle on the page. ${SESSION_OFFER}`;
+
+const SESSION_SOURCE: AskSource = {
+  ...FIXTURES,
+  toSession: {
+    options: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return {
+        ok: true,
+        projects: [
+          { id: 'website', label: 'Personal website' },
+          { id: 'budget', label: 'Budget app' },
+        ],
+        suggested: 'budget',
+      };
+    },
+    start: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { ok: true, id: '00000000-0000-4000-8000-0000000000a1' };
+    },
+  },
+};
+
+export function AskToSessionSurface({ part }: { part: ToSessionPart }) {
+  const at = '2026-10-14T09:00:00Z';
+  const turns: TalkTurn[] = [
+    { id: 'ts-q', role: 'user', body: SESSION_ASKED, createdAt: at },
+    { id: 'ts-a', role: 'assistant', body: SESSION_ANSWER, createdAt: at },
+  ];
+  return (
+    <AskDashProvider source={SESSION_SOURCE}>
+      {part !== 'offer' && <ActOnArrival label="Take this to a session" />}
+      {part === 'started' && <ActOnArrival label="Start the thread" after={600} />}
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id={`ask-to-session-${part}`}
+            conversationRef="00000000-0000-4000-8000-000000000041"
+            turns={turns}
+            label="Ask a follow-up"
+            placeholder="Ask more about this"
           />
         </Card>
       </PageColumn>
@@ -1262,16 +1581,54 @@ function PressOnArrival({ label }: { label: string }) {
  * Presses, or with `focus` rests the mouse on, the last button named
  * `label` once the surface has drawn: the thumbs under the newest answer.
  */
-function ActOnArrival({ label, focus = false }: { label: string; focus?: boolean }) {
+function ActOnArrival({ label, focus = false, after = 0 }: { label: string; focus?: boolean; after?: number }) {
   useEffect(() => {
     const timer = setTimeout(() => {
-      const named = Array.from(document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${label}"]`));
+      // A button with a written name is found by its words, an icon's by its label.
+      const named = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).filter(
+        (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label,
+      );
       const button = named[named.length - 1];
       // A mouse resting on it, which is what opens a tooltip.
       if (focus) button?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }));
       else button?.click();
-    }, 0);
+    }, after);
     return () => clearTimeout(timer);
-  }, [label, focus]);
+  }, [label, focus, after]);
   return null;
+}
+
+/**
+ * A question sent while Dash answers (plan #2988.2): the follow-up on its
+ * way, the next text held under the loading line until the answer lands,
+ * and a third typed in the box, where Stop and Send sit side by side.
+ */
+export function AskHeldSurface() {
+  const at = '2026-10-14T09:00:00Z';
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id="ask-held-preview"
+            conversationRef="00000000-0000-4000-8000-000000000063"
+            turns={[
+              { id: 'h-q', role: 'user', body: 'What did I spend on food delivery in July?', createdAt: at },
+              {
+                id: 'h-a',
+                role: 'assistant',
+                body: 'You spent $299.40 on food delivery in July across 14 orders, which is close to your usual $300 a month.',
+                createdAt: at,
+              },
+            ]}
+            label="Ask a follow-up"
+            pendingQuestion="And in August?"
+            heldQuestions={['Which restaurant did I order from most?']}
+            startWriting
+            initialDraft="And was any of it on the work card?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
 }

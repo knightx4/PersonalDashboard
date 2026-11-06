@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import { figureQuestionOffers, figureQuestionWriterLines, type WrittenFigureQuestion } from '@/lib/learn/figures/question';
@@ -85,24 +85,21 @@ export async function writeFigureQuestion(input: {
       model: LEVEL_FIGURE_MODEL,
       max_tokens: 1_500,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the figure question, or none when no form fits the level.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              none: { type: 'boolean', description: 'True when no form would test these checks.' },
-              kind: { type: 'string', enum: [...new Set(offers.map((offer) => offer.kind.id))] },
-              form: { type: 'string', enum: [...new Set(offers.map((offer) => offer.form.id))] },
-              caption: { type: 'string', description: 'One sentence on what the figure is about, without the answer.' },
-              spec: { type: 'object', description: "The figure's spec, in its kind's shape." },
-              ask: { type: 'object', description: "The form's ask, in its shape." },
-            },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the figure question, or none when no form fits the level.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            none: { type: 'boolean', description: 'True when no form would test these checks.' },
+            kind: { type: 'string', enum: [...new Set(offers.map((offer) => offer.kind.id))] },
+            form: { type: 'string', enum: [...new Set(offers.map((offer) => offer.form.id))] },
+            caption: { type: 'string', description: 'One sentence on what the figure is about, without the answer.' },
+            spec: { type: 'object', description: "The figure's spec, in its kind's shape." },
+            ask: { type: 'object', description: "The form's ask, in its shape." },
           },
         },
-      ],
-      tool_choice: forceTool(TOOL, LEVEL_FIGURE_MODEL),
+      }, LEVEL_FIGURE_MODEL),
       messages: [{ role: 'user', content: figureQuestionPrompt({ ...input, asked: input.asked ?? [] }) }],
     });
   } catch (error) {
@@ -110,9 +107,9 @@ export async function writeFigureQuestion(input: {
   }
   input.onSpend?.({ model: LEVEL_FIGURE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const parsed = reportSchema.safeParse(block.input);
+  const reportRead = readReport(response, TOOL, LEVEL_FIGURE_MODEL);
+  if (!reportRead.ok) return { ok: false, detail: reportRead.reason };
+  const parsed = reportSchema.safeParse(reportRead.value);
   if (!parsed.success) return { ok: false, detail: 'The figure question came back malformed.' };
   const report = parsed.data;
   if (report.none || !report.kind || !report.form) return { ok: true, written: null };

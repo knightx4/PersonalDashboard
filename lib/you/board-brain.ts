@@ -158,7 +158,7 @@ export function checkBrain(value: unknown, input: { key: string; roster: readonl
   const others = new Set(input.roster.filter((k) => k !== input.key));
   brain.disagreements.forEach((d, i) => {
     if (d.advisor === input.key) problems.push(`disagreement ${i + 1} is with this advisor itself.`);
-    else if (!others.has(d.advisor)) problems.push(`disagreement ${i + 1} names ${d.advisor}, who is not on the board.`);
+    else if (!others.has(d.advisor)) problems.push(`disagreement ${i + 1} names ${d.advisor}, who is not on the council.`);
   });
   if (!isSeat && brain.disagreements.length > 0 && !brain.disagreements.some((d) => (SEAT_KEYS as readonly string[]).includes(d.advisor))) {
     problems.push('no disagreement is with a seat; a guest needs at least one.');

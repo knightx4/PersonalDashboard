@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import { roleSituation, type RoleLine } from '@/lib/learn/levels/role-line';
@@ -96,21 +96,18 @@ export async function writeLevelCase(input: {
       model: LEVEL_CASE_MODEL,
       max_tokens: 900,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the case to work and the answer it expects.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              question: { type: 'string', description: 'The situation and the task, as the person will read it.' },
-              expected: { type: 'string', description: 'The expected result and working. Never shown to the person.' },
-            },
-            required: ['question', 'expected'],
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the case to work and the answer it expects.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string', description: 'The situation and the task, as the person will read it.' },
+            expected: { type: 'string', description: 'The expected result and working. Never shown to the person.' },
           },
+          required: ['question', 'expected'],
         },
-      ],
-      tool_choice: forceTool(TOOL, LEVEL_CASE_MODEL),
+      }, LEVEL_CASE_MODEL),
       messages: [{ role: 'user', content: casePrompt({ ...input, asked: input.asked ?? [] }) }],
     });
   } catch (error) {
@@ -118,9 +115,9 @@ export async function writeLevelCase(input: {
   }
   input.onSpend?.({ model: LEVEL_CASE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const parsed = caseSchema.safeParse(block.input);
+  const report = readReport(response, TOOL, LEVEL_CASE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const parsed = caseSchema.safeParse(report.value);
   if (!parsed.success) return { ok: false, detail: 'The case came back malformed.' };
   return { ok: true, case: parsed.data };
 }

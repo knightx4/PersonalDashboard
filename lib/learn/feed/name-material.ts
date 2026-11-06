@@ -2,8 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type DepthContext } from './depth';
 import type { FeedTarget } from './targets';
 import { MODELS } from '@/lib/core/models';
@@ -199,31 +199,28 @@ export async function nameMaterial(input: {
       model: NAME_MATERIAL_MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the Wikipedia sections this person should read next.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              picks: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    article: { type: 'string' },
-                    section: { type: ['string', 'null'] },
-                    basis: { type: 'string' },
-                  },
-                  required: ['article', 'section', 'basis'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the Wikipedia sections this person should read next.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            picks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  article: { type: 'string' },
+                  section: { type: ['string', 'null'] },
+                  basis: { type: 'string' },
                 },
+                required: ['article', 'section', 'basis'],
               },
             },
-            required: ['picks'],
           },
+          required: ['picks'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, NAME_MATERIAL_MODEL),
+      }, NAME_MATERIAL_MODEL),
       messages: [
         {
           role: 'user',
@@ -249,8 +246,8 @@ export async function nameMaterial(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: NAME_MATERIAL_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, NAME_MATERIAL_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  return readNamed(block.input, new Set(input.avoid.map(articleKey)));
+  return readNamed(report.value, new Set(input.avoid.map(articleKey)));
 }

@@ -142,6 +142,12 @@ beforeAll(async () => {
     returning id`;
   proposalA = proposal.id;
 
+  // A scored idea (plan #2947.1).
+  await admin`
+    insert into position_scores (user_id, position_id, idea_type, usefulness, novelty,
+                                 model, rubric_version, input_hash)
+    values (${userA}, ${positionA}, 'own_idea', 50, 40, 'jev', 'test', 'hash')`;
+
   // A kept position pair and the search that found it (plan #836).
   await admin`
     insert into position_pairs (user_id, a_id, b_id, similarity, trigram)
@@ -290,6 +296,7 @@ describe('RLS coverage', () => {
       'position_link_scans',
       'position_pair_scans',
       'position_pairs',
+      'position_scores',
       'position_sources',
       'positions',
       'sync_runs',
@@ -812,6 +819,24 @@ describe('merge proposals, across users', () => {
                                              verdict, reason, confidence, model)
             values (${userA}, 'theme', ${row.a_id}, ${row.b_id}, 'x', 'y', 'trigram',
                     'different', 'r', 0.5, 'm')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('position scores, across users', () => {
+  it('shows the owner their scores and another user none', async () => {
+    const own = await asUser(userA, async (tx) => (await tx`select id from position_scores`).length);
+    const other = await asUser(userB, async (tx) => (await tx`select id from position_scores`).length);
+    expect([own, other]).toEqual([1, 0]);
+  });
+
+  it('does not let another user write a score as you', async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into position_scores (user_id, position_id, idea_type, usefulness, novelty, model, rubric_version, input_hash)
+                   values (${userA}, ${positionA}, 'own_idea', 1, 1, 'x', 'x', 'x')`,
+      ),
     ).rejects.toThrow();
   });
 });

@@ -63,7 +63,7 @@ export function SpendHeadline({
         { value: orderCount, label: orderCount === 1 ? 'order in the period' : 'orders in the period' },
         {
           value: (
-            <Link href="/shopping/returns" className="hover:text-accent">
+            <Link href="/shopping/inventory/returns" className="hover:text-accent">
               {returnableCount}
             </Link>
           ),

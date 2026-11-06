@@ -48,6 +48,10 @@ describe('parseMetricForm', () => {
       ok: true,
       value: { source: 'files', collectionId: null, dateField: null },
     });
+    expect(parseMetricForm(form({ ...good, source: 'applications', collectionId: 'jobs' }), lists)).toMatchObject({
+      ok: true,
+      value: { source: 'applications', collectionId: null, dateField: null },
+    });
     expect(parseMetricForm(form({ ...good, source: 'notes' }), lists)).toMatchObject({ field: 'source' });
   });
 
@@ -95,6 +99,7 @@ describe('metricLine', () => {
     const counted = { ...metric, collectionId: null, dateField: null };
     expect(metricLine({ ...counted, source: 'steps', target: 3 }, lists)).toBe('Steps closed · weekly · aim 3');
     expect(metricLine({ ...counted, source: 'files', period: 'month', target: null, targetHigh: null }, lists)).toBe('Dash files · monthly');
+    expect(metricLine({ ...counted, source: 'applications', target: 5 }, lists)).toBe('Job applications sent · weekly · aim 5');
   });
 
   it('says when the list or its date is gone', () => {

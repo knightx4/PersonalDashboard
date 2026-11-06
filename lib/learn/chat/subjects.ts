@@ -2,10 +2,10 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import { prepareSubjectAfterResponse } from '@/lib/learn/prepare/kick';
 
 /**
@@ -115,8 +115,7 @@ async function matchByModel(
       model: MODEL,
       max_tokens: 1_000,
       system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      ...reportRequest(TOOL, MODEL),
       messages: [
         {
           role: 'user',
@@ -126,9 +125,9 @@ async function matchByModel(
     });
     options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    if (!block || block.type !== 'tool_use') return found;
-    const parsed = matchSchema.safeParse(block.input);
+    const report = readReport(response, TOOL_NAME, MODEL);
+    if (!report.ok) return found;
+    const parsed = matchSchema.safeParse(report.value);
     if (!parsed.success) return found;
 
     const wanted = new Map(names.map((name) => [name.toLowerCase(), name]));

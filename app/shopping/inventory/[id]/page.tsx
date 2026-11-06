@@ -518,7 +518,7 @@ export default async function InventoryItemPage({
         >
           <p className="text-ui text-ink-muted">
             Marks this unit on the{' '}
-            <Link href="/shopping/returns?view=marked" className={linkVariants()}>
+            <Link href="/shopping/inventory/returns?view=marked" className={linkVariants()}>
               returns tracker
             </Link>{' '}
             without recording a refund yet.

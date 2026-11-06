@@ -1,10 +1,10 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { decideWithJev } from '@/lib/jev/decide';
 import type { JevState } from '@/lib/jev/client';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import { learnerState } from '@/lib/learn/youtube/judge-jev-question';
 import { JUDGE_VIDEO_MODEL, profileText, type LearnerProfile } from '@/lib/learn/youtube/judge-video';
 
@@ -191,16 +191,15 @@ async function haikuScores(
       model: CLIP_SCORE_MODEL,
       max_tokens: 2_000,
       system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: forceTool(TOOL_NAME, CLIP_SCORE_MODEL),
+      ...reportRequest(TOOL, CLIP_SCORE_MODEL),
       messages: [{ role: 'user', content: haikuPrompt(profile, clips) }],
     },
     timeoutMs !== undefined ? { timeout: Math.max(1_000, timeoutMs), maxRetries: 0 } : undefined,
   );
   onSpend?.({ model: CLIP_SCORE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') throw new Error('The model reported no scores.');
-  const levels = readHaikuReply(block.input, clips.length);
+  const report = readReport(response, TOOL_NAME, CLIP_SCORE_MODEL);
+  if (!report.ok) throw new Error('The model reported no scores.');
+  const levels = readHaikuReply(report.value, clips.length);
   return [...levels].map(([number, level]) => ({
     id: clips[number - 1].id,
     score: scoreFromLevel(level),

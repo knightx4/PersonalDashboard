@@ -15,12 +15,13 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Requirement } from '../jd/requirements';
 import { parseMatchPayload, type MatchResult } from './match-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 
 /**
  * Judgment, and low volume: a few dozen roles you are actually deciding about,
@@ -138,32 +139,29 @@ export async function matchRequirements(
           cache_control: { type: 'ephemeral' },
         },
       ],
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the verdict for every requirement.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              matches: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    requirement_index: { type: 'integer', minimum: 0 },
-                    verdict: { type: 'string', enum: ['strong', 'partial', 'gap'] },
-                    evidence_item_id: { type: ['string', 'null'] },
-                    why: { type: 'string' },
-                  },
-                  required: ['requirement_index', 'verdict', 'why'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the verdict for every requirement.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            matches: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  requirement_index: { type: 'integer', minimum: 0 },
+                  verdict: { type: 'string', enum: ['strong', 'partial', 'gap'] },
+                  evidence_item_id: { type: ['string', 'null'] },
+                  why: { type: 'string' },
                 },
+                required: ['requirement_index', 'verdict', 'why'],
               },
             },
-            required: ['matches'],
           },
+          required: ['matches'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -182,15 +180,13 @@ export async function matchRequirements(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TOOL_NAME,
-  );
-  if (!report || report.type !== 'tool_use') {
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
     return { ok: false, error: 'No match came back.' };
   }
 
   const parsed = parseMatchPayload(
-    report.input,
+    report.value,
     input.requirements,
     input.bank.map((item) => item.id),
   );

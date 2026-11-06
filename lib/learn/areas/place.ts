@@ -2,7 +2,8 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Level3Article } from '@/lib/learn/areas/level3';
 import { MODELS } from '@/lib/core/models';
@@ -232,34 +233,31 @@ async function placeItems(
       model: PLACE_MODEL,
       max_tokens: 8192 + THINKING_ROOM,
       system: `${input.intro}\n\n${SHARED_RULES}`,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the field each item in the batch belongs in.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              placements: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    kind: { type: 'string', enum: ['topic', 'person', 'place', 'work'] },
-                    field: { type: 'string' },
-                    runner_up: { type: ['string', 'null'] },
-                    confidence: { type: 'string', enum: ['clear', 'close', 'none'] },
-                    basis: { type: 'string' },
-                  },
-                  required: ['title', 'kind', 'field', 'confidence', 'basis'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the field each item in the batch belongs in.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            placements: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  kind: { type: 'string', enum: ['topic', 'person', 'place', 'work'] },
+                  field: { type: 'string' },
+                  runner_up: { type: ['string', 'null'] },
+                  confidence: { type: 'string', enum: ['clear', 'close', 'none'] },
+                  basis: { type: 'string' },
                 },
+                required: ['title', 'kind', 'field', 'confidence', 'basis'],
               },
             },
-            required: ['placements'],
           },
+          required: ['placements'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, PLACE_MODEL),
+      }, PLACE_MODEL),
       messages: [
         {
           role: 'user',
@@ -287,10 +285,10 @@ async function placeItems(
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: PLACE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, PLACE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
 
-  return readPlacements(block.input, input.items, slugs, domainSlugs, input.allowUnplaced);
+  return readPlacements(report.value, input.items, slugs, domainSlugs, input.allowUnplaced);
 }
 
 /** The check: Level 3 articles, each always placed somewhere. */

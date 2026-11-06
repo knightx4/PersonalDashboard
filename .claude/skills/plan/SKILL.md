@@ -49,6 +49,13 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                # --proposed: a new feature, or a step
                                                # that acts outside the repository.
                                                # --from: whose answer made this
+                                               # or a built step under the same
+                                               # feature, with --because "what it found"
+npx tsx scripts/plan.ts revise <n> --from <built step> --because "what it found" \
+              [--title "…"] [--detail "…"] [--done-when "…"]
+              # rewrite a step nobody has started, from what building an
+              # earlier step under the same feature found. Not a feature's own
+              # done-when; the old wording stays in the step's comment
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
@@ -254,14 +261,34 @@ thousand tokens, and gets to the end.
      `npm run lint`, and `npx vitest run` on the test files beside the files
      it touched. A step that breaks these goes back to its builder before the
      next one merges on top of it.
-   - Run `npm run ui-guard -- <outline> --commit <the branch's head>` for a step
-     that changed a screen, and send a step it refuses back to the critic.
+   - Run `npm run ui-guard -- <outline> --commit <the step's own commit>` for
+     a step that changed a screen, and send a step it refuses back to the
+     critic. The step's own commit is the one whose subject ends
+     `(plan #<outline>)`, not the branch's head: on #2879 three steps were
+     checked against a later step's commit and six runs went into critic
+     rounds for screens they never touched. These are the builder's working
+     checks; the rounds that close the step come from the land review below.
    - `built <n> --note "…"`, with the note the subagent wrote. The step stays
-     in progress and records the commit and the branch; `done` would refuse it,
-     because the commit is not on main yet.
+     in progress and records its commit and the branch; `done` would refuse
+     it, because the commit is not on main yet. Without `--commit`, `built`
+     records the newest commit on the branch whose subject names the step,
+     and refuses a commit that names a different one. So commit each step
+     under its own `(plan #<outline>)` subject, and mark it built as soon as
+     it merges rather than all at the end.
+   - **Fix the plan ahead of the builders.** Read the report's **What this
+     means for the steps still to come** against the steps not yet sent, and
+     bring the plan in line with it before the next round goes out (below,
+     **When building shows the plan was wrong**).
    - `git push -u origin plan/<feature number>`. Every step pushed is a step
      that outlives this session, which is what decision #674 asked of the
      arrangement this one replaces.
+   - **Land at four.** Once the feature holds four built steps (`built`
+     says so when it marks the fourth), send nothing more: let the steps
+     still out report, then land what is built, below, if the app works
+     with the rest of the feature missing. Then carry on the batch from the
+     new main on the same branch. A long feature ships in pieces rather
+     than all at the end; on 4 November 2026, 12 open features held about
+     45 built steps that never reached main (plan #2815).
 
    **When the feature's steps are built:**
 
@@ -277,12 +304,26 @@ thousand tokens, and gets to the end.
      broke it: fix it with a commit against that step's outline. That includes
      a failure another session merged, because main is what you are about to
      push.
+   - **Review the screens once, at the head** (plan #2966.3), when any built
+     step changed a screen. `npm run ui-guard -- <feature> --feature
+     --compare` settles what looks the same as main; `--sheets` groups the
+     rest by page, and the critic judges each page in one round, its main
+     state at four shots and its other states as a strip, recorded under the
+     feature with `npm run ui-check -- <feature> <surface> <round> --commit
+     <head> --states …`. `screen.md`, **The land review**, has the loop. Do
+     it before the merge to main: afterwards main already has the feature
+     and every screen compares the same. A fix the critic asks for is a commit
+     against the step that drew the screen, and the gate runs again if it
+     changed code.
    - Merge the feature branch into `main` with `--no-ff`, subject `Merge plan
      feature #<outline>: <title>`, list the steps it carries in the body, and
      push.
    - `land <feature>`. It closes every step marked built under the feature,
-     each against its own commit and with the same checks `done` makes, and
-     names any it could not close and why.
+     each against its own commit, and names any it could not close and why.
+     The screens are checked once for the whole feature: a screen step closes
+     when every surface it reaches has passed in the feature's rounds, taken
+     at a commit that holds every built step's commit. Rounds recorded on the
+     steps themselves do not close them.
 
    A step sent on its own ("do #1073.4") is not a batch: it merges to main by
    itself, after the gate, with subject `Merge plan step #<outline>: <title>`,
@@ -292,7 +333,16 @@ thousand tokens, and gets to the end.
    or running short): the built steps stay on the pushed feature branch, in
    progress, with their Built lines. Land what is built only if the app works
    with the rest of the feature missing, and say in the report which you did.
-   Otherwise leave the branch for the next session, which continues it. The
+   Otherwise leave the branch for the next session, which continues it.
+
+   **A land run** (a session sent with "Land plan feature #n") does only
+   this part: no step is claimed or built. The overnight runner sends one
+   at a feature with built steps and no session going, ahead of features
+   with steps ready to build. Check first that the app works with the
+   unbuilt steps missing: nothing on the branch (a page, a link, a
+   migration, a test) may need one. If something does, land nothing and
+   end with `stopped <feature> --reason "…"` naming what needs which step.
+   Otherwise do the steps above, from the fetch to `land <feature>`. The
    rule against leaving a step in progress does not apply to a built step: its
    Built line says where it is.
 
@@ -304,6 +354,40 @@ thousand tokens, and gets to the end.
    that broke it on that one (`block <n> --ask "…" --on <the merge step>`).
    The ask never names the branch: `block` refuses one that does. Stop the
    batch there. Decisions #685 and #695 are why.
+
+   **When building shows the plan was wrong.** Shaping wrote every step
+   before anything was built, and building the first steps often shows that
+   a later one was written against a guess: the data has another shape, a
+   helper already exists, a step is no longer needed, or a piece nobody
+   planned turns out to be required. Passing that along in the carry-forward
+   is not enough. The next builder would still be handed a done-when the
+   batch knows is wrong, and the page would go on showing a plan that is no
+   longer the one being built. You are the one who sees every report, so you
+   change the plan, and the builders do not:
+
+   - **A step not yet started whose detail or done-when is now wrong:**
+     `revise <it> --from <the built step> --because "<what it found>"` with
+     the new `--detail`, `--done-when` or `--title`. The step keeps its
+     place, number and dependencies; its old wording goes into its comment
+     under a line naming the step that caused the change.
+   - **Work nobody planned that the feature now needs:** `add "…" --parent
+     <the feature> --done-when "…" --size s|m|l --from <the built step>
+     --because "…"`, and `depends` it where it belongs.
+   - **A step the build made pointless:** `drop <it> --note "<the built step>
+     showed …"`. Drop only when you are sure; when you are not, leave it and
+     say so in the report.
+   - **Anything that changes where the feature ends up** (its own done-when,
+     what you get when it is finished, or a choice between real options) is
+     the person's. Write it as a decision under the feature and block the
+     steps it affects on it. `revise` refuses a feature for this reason.
+   - **A step that acts outside the repository** stays a proposal, as
+     always.
+
+   Change only what a report gives a reason for. Most reports change nothing
+   ahead, and a step rewritten without a finding behind it is worse than one
+   left alone. Never revise a step that is in progress, blocked or closed.
+   Name every revise, add and drop in the feature's update (step 7) and in the
+   report (step 8), by outline, so the person can see the plan moved and why.
 
 5. **Keep the carry-forward.** Each subagent reports what the next step needs
    to know. Append it to a running list and pass it into the next prompt. That
@@ -330,10 +414,12 @@ thousand tokens, and gets to the end.
    critic stop, a failing merge, a step that keeps growing), `blocked` when it
    cannot move until the person answers or sets something up. The body is
    for the person: what closed, what is next, and what is waiting on them,
-   by outline and title, in the writing guide's terms. One update per feature
-   per batch, not one per step.
+   by outline and title, in the writing guide's terms, including any step
+   the batch revised, added or dropped because of what it built. One update
+   per feature per batch, not one per step.
 8. **Report when the batch ends**: every step closed **by outline and title**,
-   what became ready, what is blocked and on what, and anything raised on
+   what became ready, what is blocked and on what, every step revised, added
+   or dropped along the way and which build caused it, and anything raised on
    `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say whether the feature reached main. A closed step is
    on main already; a built step, or one blocked on a failed merge, is on the

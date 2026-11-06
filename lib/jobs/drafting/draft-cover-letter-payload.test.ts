@@ -45,7 +45,7 @@ describe('parseCoverLetterPayload', () => {
       ['passionate about', '—', 'leverage', 'synergy'],
     );
     if (!result.ok) throw new Error(result.error);
-    expect(result.draft.bannedFound).toEqual(['passionate about', '—', 'leverage']);
+    expect(result.draft.bannedFound).toEqual(['passionate about', '—', 'leverage', 'passionate']);
   });
 
   it('drops an evidence id that was not offered and says so', () => {
@@ -235,16 +235,16 @@ describe('aiWeight', () => {
 describe('renderLetterRequest and how much the role is about AI', () => {
   const base = { questions: [], letterComments: [] };
 
-  it('asks for two AI paragraphs only when AI is central', () => {
+  it('gives AI a paragraph only when AI is central', () => {
     const central = renderLetterRequest({
       material: { ...base, role: { requirements: [], posting: 'AI AI LLM generative AI' } } as unknown as GatheredMaterial,
     });
-    expect(central).toContain('Paragraphs 2 and 3 are both about building with AI');
+    expect(central).toContain('Paragraph 3 may be about building with AI');
 
     const none = renderLetterRequest({
       material: { ...base, role: { requirements: [], posting: 'Own the forecast.' } } as unknown as GatheredMaterial,
     });
-    expect(none).toContain('Paragraphs 2 and 3 are about the work the posting describes');
+    expect(none).toContain('AI gets one sentence near the end of paragraph 3 at most');
     expect(none).not.toContain('ask them for one');
   });
 });

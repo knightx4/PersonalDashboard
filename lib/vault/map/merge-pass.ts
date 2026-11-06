@@ -2,13 +2,13 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { sumByModel, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpend } from '@/lib/core/spend/record';
 import { JEV_MODEL, type JevState } from '@/lib/jev/client';
 import { decideWithJev } from '@/lib/jev/decide';
 import { jevEnabledFor } from '@/lib/jev/enabled';
-import { forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import {
@@ -407,43 +407,40 @@ export async function judgePairs(input: {
       // About sixty tokens a verdict, with room for a longer reason.
       max_tokens: 200 + input.pairCount * 120,
       system: input.system,
-      tools: [
-        {
-          name: input.toolName,
-          description: 'Report a verdict for every pair.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              verdicts: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    pair: { type: 'integer', description: 'The pair number, from 1.' },
-                    same: { type: 'boolean' },
-                    name: { type: 'string', description: input.nameDescription },
-                    reason: { type: 'string' },
-                    confidence: { type: 'number' },
-                  },
-                  required: ['pair', 'same', 'reason', 'confidence'],
+      ...reportRequest({
+        name: input.toolName,
+        description: 'Report a verdict for every pair.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            verdicts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  pair: { type: 'integer', description: 'The pair number, from 1.' },
+                  same: { type: 'boolean' },
+                  name: { type: 'string', description: input.nameDescription },
+                  reason: { type: 'string' },
+                  confidence: { type: 'number' },
                 },
+                required: ['pair', 'same', 'reason', 'confidence'],
               },
             },
-            required: ['verdicts'],
           },
+          required: ['verdicts'],
         },
-      ],
-      tool_choice: forceTool(input.toolName, MERGE_MODEL),
+      }, MERGE_MODEL),
       messages: [{ role: 'user', content: input.rendered }],
     });
 
     input.onSpend?.({ model: MERGE_MODEL, usage: usageFrom(response.usage) });
 
-    const block = toolBlockIn(response, input.toolName);
-    if (!block || block.type !== 'tool_use') {
-      return { ok: false, reason: 'no-report', detail: whyNoReport(response) };
+    const block = readReport(response, input.toolName, MERGE_MODEL);
+    if (!block.ok) {
+      return { ok: false, reason: 'no-report', detail: block.reason };
     }
-    return { ok: true, verdicts: parseVerdicts(block.input, input.pairCount), model: MERGE_MODEL };
+    return { ok: true, verdicts: parseVerdicts(block.value, input.pairCount), model: MERGE_MODEL };
   } catch (error) {
     return {
       ok: false,

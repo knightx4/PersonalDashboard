@@ -9,7 +9,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { admin, closeDb, createUser, truncateAll } from './helpers/db';
-import { uiAcceptSql } from '@/lib/plan/ui-check-guard';
+import { uiAcceptSql, uiGuardSql, uiSettleSql } from '@/lib/plan/ui-check-guard';
 
 let userId: string;
 let step: number;
@@ -30,6 +30,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await admin`delete from ui_checks where user_id = ${userId}`;
+  await admin`delete from plan_dependencies where user_id = ${userId}`;
+  await admin`delete from plan_item_mockups where user_id = ${userId}`;
   await admin`delete from plan_items where user_id = ${userId}`;
   const [row] = await admin<{ number: number }[]>`
     insert into plan_items (user_id, module, title, status)
@@ -85,5 +87,72 @@ describe('uiAcceptSql', () => {
     await setComment('Blocked 2026-10-09: accept the pages?\n\nAnswered 2026-10-09: Accept');
     await admin.unsafe(uiAcceptSql(step, surfaces));
     expect(await admin.unsafe(uiAcceptSql(step, surfaces))).toHaveLength(0);
+  });
+});
+
+/** A round that still cites the mockup on `surface` (plan #2966.4). */
+async function heldRound(surface: string, round: number) {
+  const fixes = [
+    { shot: 'laptop-light', where: 'the list', problem: 'Not the mockup', breaks: 'reference', change: 'Match it' },
+  ];
+  await admin`
+    insert into ui_checks (user_id, step, surface, round, verdict, fixes)
+    values (${userId}, ${step}, ${surface}, ${round}, 'fix', ${admin.json(fixes)})`;
+}
+
+/** A decision with mockup pictures the step waits on, answered now. */
+async function answeredDecision(answer: string, pictures = true) {
+  const [stepRow] = await admin<{ id: string }[]>`select id from plan_items where number = ${step}`;
+  const [d] = await admin<{ id: string }[]>`
+    insert into plan_items (user_id, module, title, kind, status)
+    values (${userId}, 'dev', 'Keep /dash as built, or change it to match the mockup?', 'decision', 'not_started')
+    returning id`;
+  await admin`insert into plan_dependencies (user_id, item_id, depends_on_id) values (${userId}, ${stepRow.id}, ${d.id})`;
+  if (pictures) {
+    await admin`
+      insert into plan_item_mockups (user_id, item_id, option_letter, width, storage_path)
+      values (${userId}, ${d.id}, 'A', 390, 'u/a-390.png')`;
+  }
+  await admin`update plan_items set status = 'done', resolution = ${answer} where id = ${d.id}`;
+}
+
+describe('a screen held for the person (plan #2966.4)', () => {
+  const surfaces = ['dash-mark', 'shell-full'];
+
+  it('is never settled, while a fix of another kind is', async () => {
+    await heldRound('dash-mark', 2);
+    await admin`update ui_checks set round = 3 where step = ${step} and surface = 'shell-full'`;
+    const written = await admin.unsafe(uiSettleSql(step, surfaces, 'stopped at round 3'));
+    expect(written.map((r) => r.surface)).toEqual(['shell-full']);
+  });
+
+  it('stays in the guard past a settle written some other way', async () => {
+    await heldRound('dash-mark', 2);
+    await admin`
+      insert into ui_checks (user_id, step, surface, round, verdict, notes)
+      values (${userId}, ${step}, 'dash-mark', 3, 'accepted', 'Settled by Dash: by hand')`;
+    const rows = await admin.unsafe(uiGuardSql(step, surfaces));
+    expect(rows.map((r) => r.surface).sort()).toEqual(['dash-mark', 'shell-full']);
+  });
+
+  it('is accepted on the answer to the question with its pictures, and then passes', async () => {
+    await heldRound('dash-mark', 2);
+    await setComment('Blocked 2026-11-05: Which of the options on the question?');
+    expect(await admin.unsafe(uiAcceptSql(step, ['dash-mark']))).toHaveLength(0);
+    await answeredDecision('A, keep it');
+    const written = await admin.unsafe(uiAcceptSql(step, ['dash-mark']));
+    expect(written.map((r) => [r.surface, r.round])).toEqual([['dash-mark', 3]]);
+    const rows = await verdicts();
+    expect(rows.find((r) => r.surface === 'dash-mark' && r.round === 3)?.notes).toMatch(
+      /^Accepted by you: Answered on #\d+: A, keep it$/,
+    );
+    expect(await admin.unsafe(uiGuardSql(step, ['dash-mark']))).toHaveLength(0);
+  });
+
+  it('does not take an answered question without pictures', async () => {
+    await heldRound('dash-mark', 2);
+    await setComment('Blocked 2026-11-05: Which?');
+    await answeredDecision('A', false);
+    expect(await admin.unsafe(uiAcceptSql(step, ['dash-mark']))).toHaveLength(0);
   });
 });

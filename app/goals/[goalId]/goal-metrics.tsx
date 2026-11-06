@@ -26,6 +26,8 @@ export type MetricView = {
   /** The top of a range aim, or null. */
   targetHigh?: number | null;
   counts: PeriodCount[];
+  /** True when what it counts could not be read; the card says so instead of showing zeros. */
+  unread?: boolean;
   /** What it counts (plan #2397.1); a view without one counts a list. */
   source?: MetricSource;
   /** The list it counts, or null when that list is gone. */
@@ -72,6 +74,9 @@ export function GoalMetrics({
 function readsLine(metric: MetricView): string {
   if (metric.source === 'steps') return `Counts the steps closed on this goal, each ${metric.period}.`;
   if (metric.source === 'files') return `Counts the files Dash writes under this goal, each ${metric.period}.`;
+  if (metric.source === 'applications') {
+    return `Counts the job applications you send, each ${metric.period}.`;
+  }
   if (metric.source === 'hours') {
     return `Adds up the hours you log on this goal and its steps, each ${metric.period}. Write "applied 2h" in the capture box.`;
   }
@@ -119,6 +124,17 @@ function MetricChartCard({ metric, held }: { metric: MetricView; held?: number }
       )}
     </div>
   );
+
+  if (metric.unread) {
+    return (
+      <Card padding="standard" className="space-y-3">
+        {heading}
+        <p role="alert" className="text-small text-ink-muted">
+          Your applications could not be read just now. Reload the page to try again.
+        </p>
+      </Card>
+    );
+  }
 
   if (empty || !chart) {
     return (

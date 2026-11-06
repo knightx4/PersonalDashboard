@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MODELS } from '@/lib/core/models';
 
 /**
@@ -125,22 +125,19 @@ export async function writeVideoSummary(input: {
       model: VIDEO_SUMMARY_MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the summary and the key points.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              summary: { type: 'string' },
-              key_points: { type: 'array', items: { type: 'string' } },
-              too_little: { type: 'boolean' },
-            },
-            required: ['summary', 'key_points'],
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the summary and the key points.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            summary: { type: 'string' },
+            key_points: { type: 'array', items: { type: 'string' } },
+            too_little: { type: 'boolean' },
           },
+          required: ['summary', 'key_points'],
         },
-      ],
-      tool_choice: forceTool(TOOL, VIDEO_SUMMARY_MODEL),
+      }, VIDEO_SUMMARY_MODEL),
       messages: [{ role: 'user', content: summaryPrompt(input.video) }],
     });
   } catch (error) {
@@ -149,7 +146,7 @@ export async function writeVideoSummary(input: {
 
   input.onSpend?.({ model: VIDEO_SUMMARY_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  return readSummaryReply(block.input, from);
+  const report = readReport(response, TOOL, VIDEO_SUMMARY_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
+  return readSummaryReply(report.value, from);
 }

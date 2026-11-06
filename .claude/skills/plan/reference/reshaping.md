@@ -50,6 +50,11 @@ feature and every feature is theirs to approve.
    decision's own answer, so it cannot be paraphrased into something nobody
    said. A waiting step the answers have not settled stays exactly as it is:
    one rewritten into something vaguer is worse than one left alone.
+   Each step you write follows the rule in `shaping.md`, "Every step's detail
+   stands alone": complete enough to build from without the feature's comments
+   or the answers, carrying every constraint, file, example, edge case and
+   decision that applies, with only what is still open written out in full.
+
 3. **Say what an answer invalidated.** A step an answer made pointless is
    `drop <n> --note "…"`, naming the answer that did it and why: "#95.2's answer
    settles this on the server, so the client half is not needed." A re-shape
@@ -84,6 +89,13 @@ feature and every feature is theirs to approve.
    Report what you added (saying which went in ready and which as
    proposals), what you dropped and why, and anything you noticed and
    deliberately left alone, all **by outline and title**.
+
+A re-shape reads answers. The other thing that makes a plan go stale is what
+building turns up, and that is handled while the batch runs, not here: the
+session sending builders revises the steps not yet started from each report
+(**When building shows the plan was wrong** in `SKILL.md`), with rows
+stamped `From #<step>'s build: …`. When a re-shape finds such a stamp, the
+row was changed on purpose; leave it unless an answer since says otherwise.
 
 The contract this rests on: the person approves a feature once, and the plan
 beneath it adapts without asking again. What makes that safe is that every

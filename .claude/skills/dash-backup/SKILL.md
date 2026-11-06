@@ -5,6 +5,10 @@ description: Carry out a request Ask Dash handed on because none of its own tool
 
 # Doing what Ask Dash handed on
 
+**A brief that names `Bot page <id>` is not Ask's.** A bot on People asked this
+routine to make a page (plan #2997). Follow `.claude/skills/bot-pages/SKILL.md`
+for it instead of this file.
+
 Ask Dash answers questions and makes eight kinds of change itself, with an
 Undo: adding a todo, a goal or a goal step, renaming, moving or ticking off a
 todo, closing a goal step, marking an item returned, and adding a note on a
@@ -41,7 +45,7 @@ then the request. Read the row and the conversation so far:
 
 ```sql
 select id, request, status, conversation_id, turn_id
-from core.dash_handoffs where id = '<id>' and user_id = '<user_id>';
+from core.dash_handoffs where id = '<id>' and user_id = '<user_id>' and kind = 'request';
 
 select role, body, citations, created_at from core.conversation_turns
 where conversation_id = '<conversation>' and user_id = '<user_id>'
@@ -49,8 +53,12 @@ order by created_at;
 ```
 
 If the row is not there, or its status is `done` or `failed`, stop: it has been
-handled. With no id in the brief, work every row for that user whose status is
-`pending` or `fired`, oldest first.
+handled. If its `kind` is `session`, or the brief's second line is `kind
+session`, follow **A session hand-off** below instead of the steps here. With
+no id in the brief, work every row for that user whose `kind` is `request` and
+whose status is `pending` or `fired`, oldest first. A row of kind `page` is a
+bot's page, and goes by `.claude/skills/bot-pages/SKILL.md`. Rows of kind
+`page` and `session` are left alone there: each is started with its own id.
 
 ## 2. Decide whether you may do it
 
@@ -174,6 +182,95 @@ If something stopped you from finishing (a write refused, a table you could not
 find), still write a reply saying what went wrong in a sentence, then set
 `status = 'failed'` and `error` to the reason. A hand-off is never left
 `fired`: the thread keeps waiting on it.
+
+## A session hand-off
+
+A brief that opens `Hand-off <id>` and then `kind session` comes from a bot
+handing on work too big for a chat turn (plan #3005): Ask Dash, or a bot on
+People such as Gert, Zena, Jerwyn, Maya or the builder, in a one-on-one or a
+group chat. The work is usually long writing (a plan step with its full
+detail, a vault note, a prep doc, a cover letter), research, or changes across
+many rows. The bot has already told the person it is on it. The app started
+this run (`lib/talk/handoff-fire.ts`) and moved the row to running.
+
+The rules in step 2 hold as they are: create and edit their rows, never
+delete, send or spend, and change rows, not code. What differs:
+
+**Read the row, the thread and the refs.**
+
+```sql
+select id, kind, advisor_id, conversation_id, advisor_chat_id, request, asked,
+       summary, refs, subject_ref, state
+from core.dash_handoffs where id = '<id>' and user_id = '<user_id>' and kind = 'session';
+
+-- Ask Dash (conversation_id set): the conversation, as in step 1.
+-- A People chat (advisor_chat_id set): the last of it, and who the bot is.
+select role, speaker_id, text, created_at from you.advisor_messages
+where chat_id = '<advisor_chat_id>' and user_id = '<user_id>'
+order by created_at desc limit 40;
+select name from you.board_advisors where id = '<advisor_id>' and user_id = '<user_id>';
+```
+
+`asked` is the person's request in their own words and is what you are held
+to; `request` is the bot's version of it. Read every row in `refs` before you
+start: the bot named them because the work needs them.
+
+**Say you are at work.** Run this first, and again after each long stretch,
+about every ten minutes. It keeps `last_seen_at`, which is how a session gone
+quiet is noticed:
+
+```sh
+npx tsx scripts/handoff-session.ts seen <id>
+```
+
+**Do all of it.** You have the room the chat turn did not, so finish the
+work rather than a first part of it. A plan step goes through
+`scripts/plan.ts` and the plan skill's rules, a goal through the goals
+skill's. Record each row you write with `core.record_dash_action`, as step 3
+says. No note is filed: a session hand-off is the bot using a session as
+meant, not a gap in its tools.
+
+**Reply in the thread.** The person is waiting there, and the close below
+refuses a done that leaves them without the result.
+
+- **An Ask Dash conversation** (`conversation_id` set): write the reply as
+  step 4 says, with what you did, a citation linking each row, and how to
+  put it back. Keep its turn id for `--reply-turn`.
+- **A People chat** (`advisor_chat_id` set, one-on-one or group): the bot
+  posts the result, so give `close` the text in the bot's voice, as its
+  persona would text it: what you did, in a sentence or two, with no
+  "Claude", no session and no routine. Each row you made or changed goes in
+  as `--link "<label>=<path in the app>"`, which the thread shows under the
+  text. Add `--undo` when you recorded any change with
+  `core.record_dash_action`: it adds a link to Home, where each one has its
+  Undo. In a group the message is posted with the bot as its speaker.
+
+**Close it through the script, never with an update.** Closing counts the
+session's cost toward spend: one `core.model_spend` row per model under
+`core / hand-off-session`, read from this session's transcripts, and the
+total on `cost_micros`. It also tells the thread. An update through
+`scripts/sql.ts` would skip both.
+
+```sh
+npx tsx scripts/handoff-session.ts close <id> --done --reply-turn <turn id>
+npx tsx scripts/handoff-session.ts close <id> --done \
+  --reply "Done. Your 10k goal is up, with a plan for the eight weeks to race day." \
+  --link "Run a 10k=/goals/<goal id>" --undo
+npx tsx scripts/handoff-session.ts close <id> --failed "The vault note was refused: its folder does not exist."
+```
+
+A failure is told in the thread for you: "That didn't work, sorry. <your
+reason> Ask me again and I'll have another go." So write the reason as one
+plain sentence on what stopped you, read by the person. In an Ask Dash
+conversation you may write your own reply turn first and pass `--reply-turn`
+with `--failed`; then nothing more is posted. Run `close` as the last thing
+you do, so the cost it counts is the whole session's. A session hand-off is
+never left running, whatever happened.
+
+If you go quiet, the thread hears it anyway (`you.watch_bot_pages`, every two
+minutes): 20 minutes with no `seen` posts that it is taking longer than it
+should, and 90 fails the hand-off and says so. One closed done with nothing
+posted is reported after 10 minutes with a link to Home.
 
 ## Report
 

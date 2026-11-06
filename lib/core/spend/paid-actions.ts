@@ -181,6 +181,9 @@ export const PAID_ACTIONS = {
   // Not an action: "Import orders from Gmail" and "Sync now" in Shopping
   // settings post here, and the import reads each order confirmation it finds.
   'app/api/inbox/sync/route.ts#POST': ['extract-email-order'],
+  // Check all and each workspace's button in the account menu's Check mail
+  // section (plan #3019) start the same sync as Sync now.
+  'app/api/inbox/check/route.ts#POST': ['extract-email-order'],
   // "Add from this email" on the review list reads the confirmation and makes
   // the order in one press (plan #1950.3.3), through the aimed capture.
   'app/capture-actions.ts#makeAimedCapture:email': ['extract-email-order'],
@@ -191,6 +194,10 @@ export const PAID_ACTIONS = {
   'app/vault/n/[...path]/actions.ts#askMaya': ['write-maya-thought'],
   'app/vault/maya/actions.ts#replyToMaya': ['reply-to-maya'],
   'app/you/work/actions.ts#readTranscriptAction': ['read-transcript'],
+  // Draft or redraft a person's persona card on Chat's People form (plan #2748.11)
+  'app/chat/actions.ts#draftPersonCard': ['draft-persona'],
+  // Set it up: what a person texts you about, made into a rule (plan #2931.3)
+  'app/chat/actions.ts#setReachOut': ['make-reach-out-rule'],
   // The one explain prompt on a graded course (plan #2172.4.2)
   'app/you/work/actions.ts#answerCourseExplainAction': ['grade-course-explain'],
   // Summarise on a file kept under a course (plan #2401.4)
@@ -253,6 +260,10 @@ export const PAID_ACTIONS = {
   'app/dev/specs/interview-actions.ts#startInterview': ['ask-dash'],
   'app/dev/specs/interview-actions.ts#answerInterviewQuestion': ['ask-dash'],
 
+  // You: talking to one advisor alone, from the Talk tab of their profile
+  // (plan #2581.6): their reply, then what they remember of it
+  'app/you/council/advisors/[key]/talk-actions.ts#sendToAdvisor': ['talk-to-advisor', 'remember-advisor-talk'],
+
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],
 } as const satisfies Record<string, readonly OperationName[]>;
@@ -264,8 +275,12 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/api/projects/[id]/notes/route.ts#POST':
+    'A note sent from a project\'s own app, such as the music studio\'s note button (docs/PROJECT-NOTES.md), with a token Dash gave that app. It is triaged as a note filed in Dash is, one short Jev call recorded as triage-note, and an idea it leaves is scored. The button is in the other app, so there is no button here to carry a hint.',
   'app/learn/go/actions.ts#nextSessionItem':
     'A learning session (plan #2546.3) asks for the next item as each one shows, so the one after is written before Next is pressed: a review question, a lesson, a topic level’s lesson (plan #2546.5, with its source search), a piece check, a practice task or a level question, the same writing the review list, the piece page and Practice do. No button starts it; the presses that answer each item carry their own hints.',
+  'app/api/speak/route.ts#POST':
+    'A chat reply read aloud by Fish Audio (plan #3006), recorded as speak-reply: each new reply plays as it arrives while speaking is on, so no press comes before the spend to carry a hint. One reply is at most 600 characters, about a cent, and the month stops at 330,000 bytes, $4.95, in core.speech_usage.',
   'app/api/ask/voice/route.ts#POST':
     'The ask address, called by a Siri Shortcut holding an ask token: one spoken request is one Ask Dash answer, recorded as ask-dash. There is no page and no button, only the voice, and the token is limited to 5 questions a minute and 60 a day.',
   'app/api/cron/daily/route.ts#GET':

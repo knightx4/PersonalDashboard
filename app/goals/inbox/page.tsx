@@ -32,7 +32,7 @@ export default async function GoalsInboxPage() {
     <PageColumn className="space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash, home.waitingRuns)}
+        groups={goalInboxGroups(home.onYou, home.dash, home.waitingRuns, home.sessionQuestions)}
         laterOn={home.laterOn}
         preparable={home.preparable}
         canRun={owner}

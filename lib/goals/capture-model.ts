@@ -15,7 +15,8 @@ import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AskToolResult } from '@/lib/ask/db';
-import { runDash, type DashVoice, type DashWriter } from '@/lib/dash/loop';
+import { runDash, type DashCall, type DashVoice, type DashWriter } from '@/lib/dash/loop';
+import { UNFINISHED_REASON, type DashFailure } from '@/lib/dash/failures';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { captureDashTools } from '@/lib/dash/registry';
 import { describeFiled, moveOfTool, type AskResult, type FiledMove } from '@/lib/goals/capture';
@@ -89,6 +90,11 @@ export type CaptureModelOptions = {
   client?: Anthropic;
   /** What the calls cost; recorded as 'file-capture'. */
   onSpend?: SpendSink;
+  /**
+   * Keeps a filing that failed or came back unfinished, with its reason and
+   * each model call (plan #2937.2, lib/dash/failures.ts). Absent: not kept.
+   */
+  recordFailure?: (failure: DashFailure) => Promise<void>;
 };
 
 /** What the model is told about a move once fileCapture has filed it or refused it. */
@@ -113,6 +119,7 @@ export async function askCaptureModel(
     const fields = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
     return told(await file({ ...fields, type }));
   };
+  const calls: DashCall[] = [];
   const answer = await runDash({
     voice: CAPTURE_VOICE,
     context: { surface: 'capture', subject: { ref: `goals.captures:${options.captureId}` }, page: null },
@@ -123,7 +130,22 @@ export async function askCaptureModel(
     anthropicApiKey: options.apiKey,
     client: options.client,
     onSpend: options.onSpend,
+    onCall: (call) => calls.push(call),
   });
+  if (!answer.ok || answer.stop === 'unfinished') {
+    try {
+      await options.recordFailure?.({
+        surface: 'capture',
+        outcome: answer.ok ? 'unfinished' : 'failed',
+        reason: answer.ok ? UNFINISHED_REASON : answer.detail,
+        model: CAPTURE_VOICE.model,
+        subjectRef: `goals.captures:${options.captureId}`,
+        calls,
+      });
+    } catch (error) {
+      console.error('the failed filing was not recorded', error);
+    }
+  }
   if (!answer.ok) {
     console.error('capture filing failed', answer.detail);
     return { ok: false, error: 'Filing failed.' };

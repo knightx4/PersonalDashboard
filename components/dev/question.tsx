@@ -9,6 +9,8 @@ import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
 import { LinkedText } from '@/components/ui/linked-text';
 import { SectionLabel } from '@/components/ui/section-heading';
+import { MockupViewer, OptionPictures, useQuestionMockups, type PictureTarget } from '@/components/dev/mockups';
+import { hasOptionPictures, type MockupPicture } from '@/lib/plan/mockups';
 
 /**
  * A question put to you, wherever it is read.
@@ -78,12 +80,33 @@ export function TheQuestion({ outline, title }: { outline: string; title: string
 export function TheOptions({
   detail,
   onChoose,
+  itemId,
+  mockups,
+  holdPictures,
 }: {
   detail: string | null;
   onChoose?: (option: PlanOption) => void;
+  /**
+   * The plan item the question is, to look up the pictures kept with it
+   * (plan #2810.2). Left out, none are shown.
+   */
+  itemId?: string;
+  /** Pictures given rather than fetched, for the gallery and the tests. */
+  mockups?: readonly MockupPicture[];
+  /** Keeps the pictures' loading shimmer up, for the gallery. */
+  holdPictures?: boolean;
 }) {
+  const pictures = useQuestionMockups(itemId, mockups);
+  const [viewing, setViewing] = useState<PictureTarget | null>(null);
   if (!detail) return null;
   const options = planOptions(detail);
+  // A picture of the whole question stands above the options only when no
+  // option has one of its own; otherwise each option carries its own.
+  const whole = !hasOptionPictures(pictures);
+  const wholeTarget: PictureTarget = { letter: null, label: 'The mockup' };
+  const viewer = viewing && (
+    <MockupViewer pictures={pictures} target={viewing} onClose={() => setViewing(null)} />
+  );
   // The letter the prose recommends wears a soft green ring, so the choice a
   // session would make shows before its paragraph is read (note 3a57b12f).
   const recommended = recommendedLetter(detail, options);
@@ -92,9 +115,13 @@ export function TheOptions({
     return (
       <div className="space-y-0.5">
         <QuestionPartLabel>The options</QuestionPartLabel>
+        {whole && (
+          <OptionPictures pictures={pictures} target={wholeTarget} onOpen={setViewing} hold={holdPictures} />
+        )}
         <p className="whitespace-pre-wrap text-small text-ink-muted">
           <LinkedText text={detail} />
         </p>
+        {viewer}
       </div>
     );
   }
@@ -102,6 +129,11 @@ export function TheOptions({
   return (
     <div className="space-y-1">
       <QuestionPartLabel>The options</QuestionPartLabel>
+      {whole && (
+        <div className="px-1.5">
+          <OptionPictures pictures={pictures} target={wholeTarget} onOpen={setViewing} hold={holdPictures} />
+        </div>
+      )}
       <ul className="space-y-1">
         {options.map((option) => {
           const isRecommended = option.letter === recommended;
@@ -139,6 +171,16 @@ export function TheOptions({
               ) : (
                 <span className="flex items-start gap-2 px-1.5 py-1">{body}</span>
               )}
+              {!whole && (
+                <div className="pb-1 pl-9 pr-1.5">
+                  <OptionPictures
+                    pictures={pictures}
+                    target={{ letter: option.letter, label: option.label }}
+                    onOpen={setViewing}
+                    hold={holdPictures}
+                  />
+                </div>
+              )}
             </li>
           );
         })}
@@ -148,6 +190,7 @@ export function TheOptions({
           <LinkedText text={detail} />
         </p>
       </Disclosure>
+      {viewer}
     </div>
   );
 }

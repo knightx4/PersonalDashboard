@@ -71,6 +71,37 @@ afterAll(async () => {
   await closeDb();
 });
 
+describe('the voice counter (plan #3006.3)', () => {
+  const reserve = (userId: string, bytes: number, cap: number) =>
+    asUser(userId, (tx) => tx<{ total: number | null }[]>`
+      select core.reserve_speech_bytes('2026-11-17'::date, ${bytes}::int, ${cap}::int) as total`);
+
+  it('adds a reply while it fits and refuses the one that would pass the cap', async () => {
+    expect((await reserve(userA, 600, 1000))[0].total).toBe(600);
+    expect((await reserve(userA, 300, 1000))[0].total).toBe(900);
+    expect((await reserve(userA, 200, 1000))[0].total).toBeNull();
+    const [row] = await admin<{ bytes: number; replies: number; day: number }[]>`
+      select bytes, replies, extract(day from month)::int as day
+      from core.speech_usage where user_id = ${userA}`;
+    expect(row).toEqual({ bytes: 900, replies: 2, day: 1 });
+  });
+
+  it('takes a reservation back', async () => {
+    await asUser(userA, (tx) => tx`select core.release_speech_bytes('2026-11-03'::date, 300)`);
+    const [row] = await admin<{ bytes: number }[]>`
+      select bytes from core.speech_usage where user_id = ${userA} and month = '2026-11-01'`;
+    expect(row.bytes).toBe(600);
+  });
+
+  it('shows each account its own month and lets nobody write it directly', async () => {
+    expect(await asUser(userB, (tx) => tx`select bytes from core.speech_usage`)).toHaveLength(0);
+    expect(await asUser(userA, (tx) => tx`select bytes from core.speech_usage`)).toHaveLength(1);
+    await expect(
+      asUser(userA, (tx) => tx`update core.speech_usage set bytes = 0 where user_id = ${userA}`),
+    ).rejects.toThrow();
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in core', async () => {
     const rows = await admin<{ tablename: string }[]>`

@@ -142,8 +142,8 @@ describe('the page the sheet will tell Dash', () => {
 
   it('shows nothing when there is no page, or on the Ask page', () => {
     expect(panel(null)).not.toContain('Looking at');
-    expect(panel('/ask')).not.toContain('Looking at');
-    expect(panel('/ask/00000000-0000-4000-8000-000000000009')).not.toContain('Looking at');
+    expect(panel('/chat/dash')).not.toContain('Looking at');
+    expect(panel('/chat/dash/00000000-0000-4000-8000-000000000009')).not.toContain('Looking at');
   });
 
   it('drops the page when its × is pressed', () => {
@@ -178,5 +178,17 @@ describe('the page the sheet will tell Dash', () => {
       ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined, null, expect.any(Function), undefined],
       ['And after that?', null, null, expect.any(Function), undefined, null, expect.any(Function), undefined],
     ]);
+  });
+});
+
+describe('the sheet under its heading (plans #2976, #2981)', () => {
+  it('offers no starter questions under the box', () => {
+    const html = renderToStaticMarkup(
+      <AskDashProvider source={SOURCE}>
+        <AskDashPanel page={null} source={SOURCE} onClose={() => {}} />
+      </AskDashProvider>,
+    );
+    expect(html).not.toContain('Questions to start from');
+    expect(html).not.toContain('Which applications have not heard back');
   });
 });
