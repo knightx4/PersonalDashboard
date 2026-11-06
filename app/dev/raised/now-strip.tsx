@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import type { MainCheck } from '@/lib/plan/main-check';
 import { overnightStanding, type OvernightRun } from '@/lib/plan/overnight';
 import type { SlipCount } from '@/lib/dash/slips';
+import type { OpenSessions } from '@/lib/talk/handoff-count';
 
 /** One fact of the strip: a word, the tone it is said in, and the page it opens. */
 type Chip = {
@@ -72,13 +73,29 @@ function slipsChip(slips: SlipCount | null): Chip {
 }
 
 /**
+ * The sessions' chip (plan #3005.5): requests a bot handed to a Claude Code
+ * session that are still open, working or waiting to start.
+ */
+function sessionsChip(open: OpenSessions | null): Chip {
+  const base = { key: 'sessions', label: 'Sessions', href: '/chat' };
+  if (!open) return { ...base, value: 'Not read', tone: 'ghost' };
+  const total = open.working + open.waiting;
+  if (total === 0) return { ...base, value: 'None open', tone: 'quiet', check: true };
+  const parts = [
+    open.working > 0 ? `${open.working} working` : null,
+    open.waiting > 0 ? `${open.waiting} waiting` : null,
+  ].filter(Boolean);
+  return { ...base, value: parts.join(' · '), tone: 'accent' };
+}
+
+/**
  * The top of Home: what is running and what is waiting, one chip each, every
  * chip a link to the page that holds the detail. The first question of the
  * morning is "is anything going, and is anything broken", and it used to take
  * the whole Status card to answer. The controls that were on that card are
  * on Dev settings now (plan #1937.10).
  *
- * The chips wrap rather than scroll at phone width, so all five are read
+ * The chips wrap rather than scroll at phone width, so all six are read
  * without a swipe.
  */
 export function NowStrip({
@@ -88,6 +105,7 @@ export function NowStrip({
   mainCheck,
   inbox,
   slips,
+  sessions,
 }: {
   run: OvernightRun | null;
   /** Features the runner could pick up, as the runner card counts them. */
@@ -98,6 +116,8 @@ export function NowStrip({
   inbox: number;
   /** Chat slips in the last seven days (lib/dash/slips.ts); null when not read. */
   slips: SlipCount | null;
+  /** Hand-offs to a Claude Code session still open; null when not read. */
+  sessions: OpenSessions | null;
 }) {
   const chips: Chip[] = [
     runnerChip(run, ready),
@@ -118,6 +138,7 @@ export function NowStrip({
       href: '/dev/inbox',
     },
     slipsChip(slips),
+    sessionsChip(sessions),
   ];
 
   return (

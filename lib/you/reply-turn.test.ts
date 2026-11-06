@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { keepRenewing, SETTLE_MAX_MS, SETTLE_QUIET_MS, settleWaitMs, waitForQuiet, waitingLast } from './reply-turn';
+import { groupStillOwed, keepRenewing, owedGroupReply, SETTLE_MAX_MS, SETTLE_QUIET_MS, settleWaitMs, waitForQuiet, waitingLast } from './reply-turn';
 
 describe('settleWaitMs (plan #2988)', () => {
   const now = Date.parse('2026-11-06T10:00:10Z');
@@ -75,5 +75,35 @@ describe('keepRenewing', () => {
     expect(landed).toEqual(['renewed', 'stopped']);
     vi.advanceTimersByTime(20_000);
     expect(landed).toEqual(['renewed', 'stopped']);
+  });
+});
+
+describe('owedGroupReply (plan #2988.3)', () => {
+  it('is the newest message when it is theirs', () => {
+    const last = { id: 'b', role: 'person' };
+    expect(owedGroupReply([{ id: 'a', role: 'advisor' }, last])).toBe(last);
+  });
+
+  it('is nothing once a bot spoke after it, since a burst marks nothing delivered', () => {
+    expect(owedGroupReply([{ id: 'a', role: 'person' }, { id: 'b', role: 'advisor' }])).toBeNull();
+    expect(owedGroupReply([])).toBeNull();
+  });
+});
+
+describe('groupStillOwed (plan #2988.3)', () => {
+  const textAt = '2026-11-06T10:00:00Z';
+
+  it('is not owed when a burst asked for after the text ended quietly', () => {
+    expect(groupStillOwed({ replyStatus: 'idle', requestedAt: '2026-11-06T10:00:01Z' }, textAt)).toBe(false);
+  });
+
+  it('is owed when the burst ended before the text was sent', () => {
+    expect(groupStillOwed({ replyStatus: 'idle', requestedAt: '2026-11-06T09:59:00Z' }, textAt)).toBe(true);
+  });
+
+  it('is owed when a burst died while waiting, or failed', () => {
+    expect(groupStillOwed({ replyStatus: 'waiting', requestedAt: '2026-11-06T10:00:01Z' }, textAt)).toBe(true);
+    expect(groupStillOwed({ replyStatus: 'failed', requestedAt: '2026-11-06T10:00:01Z' }, textAt)).toBe(true);
+    expect(groupStillOwed({ replyStatus: null, requestedAt: null }, textAt)).toBe(true);
   });
 });

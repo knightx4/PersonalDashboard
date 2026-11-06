@@ -1,6 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadSlipCount } from '@/lib/dash/slips';
+import { loadOpenSessionCount } from '@/lib/talk/handoff-count';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
@@ -90,6 +91,7 @@ export default async function DevRaisedPage() {
     recentScreens,
     snoozes,
     slips,
+    sessions,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -130,6 +132,10 @@ export default async function DevRaisedPage() {
     // How often a chat with Dash slipped in the last seven days (plan #2999).
     createCoreClient()
       .then((core) => loadSlipCount(core, user.id, now))
+      .catch(() => null),
+    // Requests a bot handed to a Claude Code session still open (plan #3005.5).
+    createCoreClient()
+      .then((core) => loadOpenSessionCount(core, user.id))
       .catch(() => null),
   ]);
 
@@ -198,6 +204,7 @@ export default async function DevRaisedPage() {
           mainCheck={mainCheck}
           inbox={onYou}
           slips={slips}
+          sessions={sessions}
         />
         <AskBox />
       </div>

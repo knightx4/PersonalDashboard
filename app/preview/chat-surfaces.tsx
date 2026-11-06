@@ -12,6 +12,8 @@ import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moment
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
 import { GroupThreadView } from '@/app/chat/groups/[id]/group-thread-view';
 import { groupTitleOf, type GroupMember, type GroupRow, type Reacted } from '@/lib/you/group-chats-model';
+import type { PaneChats } from '@/components/shell/ask-dash-chats';
+import type { PaneThread } from '@/lib/you/pane-threads-model';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -253,7 +255,7 @@ const UNNAMED_GROUP: GroupRow = {
 
 export const MESSAGE_GROUPS: GroupRow[] = [GROUP_ROW, UNNAMED_GROUP];
 
-type GroupState = 'thread' | 'typing' | 'new' | 'settings' | 'settings-delete';
+type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'settings' | 'settings-delete';
 
 /** A group open beside the list, in each of its states, and its settings. */
 export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
@@ -264,9 +266,18 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
   // A group just started has no name of its own, so the list and the thread both call it by its members.
   const unnamed = groupTitleOf(null, GROUP_MEMBERS.map((m) => m.name));
   const groups = MESSAGE_GROUPS.map((g) =>
-    g.id === GROUP_ID ? { ...g, unread: false, members, ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}) } : g,
+    g.id === GROUP_ID
+      ? {
+          ...g,
+          unread: false,
+          members,
+          ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}),
+          ...(state === 'reply-failed' ? { last: { role: 'person' as const, speaker: null, text: GROUP_THREAD[GROUP_THREAD.length - 1].text, at: '2026-11-03T08:50:00Z' } } : {}),
+        }
+      : g,
   );
-  const messages = state === 'new' ? [] : typing ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
+  // A burst that failed leaves your last text with no answer (plan #2988.3).
+  const messages = state === 'new' ? [] : typing || state === 'reply-failed' ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
   return (
     <ChatShell path={`/chat/groups/${GROUP_ID}`}>
       <PeopleView rows={MESSAGE_ROWS} groups={groups} current={GROUP_ID} timezone={ZONE} now={NOW} live={false}>
@@ -278,7 +289,8 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
             title={state === 'new' ? unnamed : 'Northwind offer'}
             members={members}
             former={[]}
-            page={{ messages, hasOlder: false, reactions: GROUP_REACTIONS }}
+            replyFailed={state === 'reply-failed' ? 'The group ran out of time before anyone answered.' : null}
+            page={{ messages, hasOlder: false, reactions: state === 'reply-failed' ? { g4: GROUP_REACTIONS.g4, g5: GROUP_REACTIONS.g5 } : GROUP_REACTIONS }}
             timezone={ZONE}
             now={NOW}
             live={false}
@@ -778,3 +790,39 @@ export function ChatBuilderTextSurface() {
     </ChatShell>
   );
 }
+
+/**
+ * The Ask Dash sheet's chats (plan #2981): the Messages rows and groups for
+ * its row, and each thread as it opens in the sheet, from the fixtures above.
+ */
+export const PANE_CHATS: PaneChats = {
+  list: async () => ({ rows: MESSAGE_ROWS, groups: MESSAGE_GROUPS }),
+  open: async (pick): Promise<PaneThread> => {
+    if (pick.kind === 'group') {
+      const group = MESSAGE_GROUPS.find((g) => g.id === pick.id);
+      if (!group) return { kind: 'error', error: 'That chat is not there any more.' };
+      return {
+        kind: 'group',
+        chatId: group.id,
+        title: group.title,
+        members: group.members,
+        former: [],
+        page: { messages: group.id === GROUP_ID ? GROUP_THREAD : [], hasOlder: false, reactions: GROUP_REACTIONS },
+        timezone: ZONE,
+        now: NOW,
+      };
+    }
+    const row = MESSAGE_ROWS.find((r) => pick.kind === 'person' && r.key === pick.key);
+    if (!row) return { kind: 'error', error: 'That chat is not there any more.' };
+    return {
+      kind: 'person',
+      person: { ...row, unread: false },
+      page: { messages: row.id === FRANKLIN.id ? THREAD : [], hasOlder: false },
+      changes: [],
+      builds: {},
+      timezone: ZONE,
+      now: NOW,
+      today: '2026-11-03',
+    };
+  },
+};

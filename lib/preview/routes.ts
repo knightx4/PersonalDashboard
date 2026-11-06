@@ -175,6 +175,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-page-dash-arrival': ['/goals/[goalId]'],
   'goals-page-activity': ['/goals/[goalId]'],
   'goals-file': ['/goals/files/[fileId]'],
+  'goals-file-page': ['/goals/files/[fileId]'],
   'goals-page-bare': ['/goals/[goalId]'],
   'goals-page-linking': ['/goals/[goalId]'],
   'goals-info-one': ['/goals/[goalId]'],
@@ -389,7 +390,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
   'shell-capture-aimed-jobs-learn': ['/home'],
   'ask-dash-new': ['/chat/dash', '/chat/dash/[ref]'],
-  'ask-dash-new-earlier': ['/chat/dash', '/chat/dash/[ref]'],
+  // The sheet's row of chats (plan #2981), over any page; listed under the Messages routes it opens.
+  'ask-dash-chat': ['/chat', '/chat/people/[key]'],
+  'ask-dash-group': ['/chat', '/chat/groups/[id]'],
+  'ask-dash-earlier': ['/chat/dash', '/chat/dash/[ref]'],
+  'ask-dash-chat-name': ['/chat', '/chat/people/[key]'],
   'ask-dash-answer': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-writing': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-failed': ['/chat/dash', '/chat/dash/[ref]'],
@@ -454,6 +459,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-group': ['/chat/groups/[id]'],
   'chat-group-typing': ['/chat/groups/[id]'],
   'chat-group-new': ['/chat/groups/[id]'],
+  'chat-group-reply-failed': ['/chat/groups/[id]'],
   'chat-group-settings': ['/chat/groups/[id]'],
   'chat-group-settings-delete': ['/chat/groups/[id]'],
   'chat-bots': ['/chat/bots'],
@@ -1108,6 +1114,12 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // which reached 57 surfaces through it and the two pages that quote one.
   'dev-comment-thread': ['components/dev/comment-body.tsx'],
   'ask-dash-rows': ['components/shell/ask-dash.tsx'],
+  // The sheet's row of chats and the chat open in it (plan #2981).
+  'ask-dash-new': ['components/shell/ask-dash.tsx', 'components/shell/ask-dash-chats.tsx'],
+  'ask-dash-chat': ['components/shell/ask-dash.tsx', 'components/shell/ask-dash-chats.tsx'],
+  'ask-dash-group': ['components/shell/ask-dash-chats.tsx'],
+  'ask-dash-earlier': ['components/shell/ask-dash.tsx'],
+  'ask-dash-chat-name': ['components/shell/ask-dash-chats.tsx'],
   // Dash's box: @ rows, / commands and the scope chip (plan #1899.5).
   'ask-box-rows': ['components/talk/ask-box.tsx'],
   // The $ hint found by the action it prices: drawn on its own surface, as

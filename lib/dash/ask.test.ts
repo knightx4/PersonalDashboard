@@ -834,23 +834,32 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
   function handoffStores(fire: (h: DashHandoff) => { status: DashHandoff['status']; error?: string }) {
     const memory = memoryStores();
     const handoffs: DashHandoff[] = [];
+    const keys = new Map<string, string>();
+    const asked: { asked: string; summary: string | null; refs: readonly { ref: string; note?: string }[] }[] = [];
     const fired: string[] = [];
     const stores: AskStores = {
       ...memory.stores,
-      saveHandoff: async (conversationId, request, subjectRef) => {
+      // One row per question, as keepSessionHandoff keys it (plan #3005.2).
+      saveHandoff: async (input) => {
+        const conversationId = input.thread.kind === 'ask' ? input.thread.conversationId : '';
+        const key = `${conversationId}#${input.messageId}`;
+        const before = handoffs.find((h) => keys.get(h.id) === key);
+        if (before) return { ok: true, handoff: before, created: false };
         const kept: DashHandoff = {
           id: `h${handoffs.length + 1}`,
           conversationId,
           turnId: null,
-          request,
-          subjectRef,
+          request: input.request,
+          subjectRef: input.subjectRef ?? null,
           status: 'pending',
           runId: null,
           error: null,
           createdAt: '2026-10-02T10:00:00Z',
         };
+        keys.set(kept.id, key);
+        asked.push({ asked: input.asked, summary: input.summary ?? null, refs: input.refs ?? [] });
         handoffs.push(kept);
-        return kept;
+        return { ok: true, handoff: kept, created: true };
       },
       attachHandoffs: async (ids, turnId) => {
         for (const h of handoffs) if (ids.includes(h.id)) h.turnId = turnId;
@@ -863,7 +872,7 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
         return fire(h);
       },
     };
-    return { ...memory, stores, handoffs, fired };
+    return { ...memory, stores, handoffs, fired, asked };
   }
 
   it('offers the tool, keeps the request, and starts the routine once the answer is kept', async () => {
@@ -871,7 +880,7 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
       reply([use('u1', 'hand_off', { request: REQUEST })]),
       reply([use('a', 'answer', { answer: 'I have passed that on; the reply will appear here.', cited: [] })]),
     ]);
-    const { stores, handoffs, fired, written } = handoffStores(() => ({ status: 'fired' }));
+    const { stores, handoffs, fired, written, asked } = handoffStores(() => ({ status: 'fired' }));
     const result = await askDash(
       { question: ASK, today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
       stores,
@@ -881,6 +890,9 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
     expect(handoffs).toHaveLength(1);
     expect(handoffs[0]).toMatchObject({ conversationId: 'conv-new', request: REQUEST, turnId: 't2' });
     expect(fired).toEqual(['h1']);
+    // A session row (plan #3005.2): the person's words, and the thread first among the refs.
+    expect(asked[0].asked).toBe(ASK);
+    expect(asked[0].refs[0]).toEqual({ ref: 'core.conversations:conv-new', note: 'The thread this was asked in, with Ask Dash: /chat/dash/conv-new' });
     expect(result.handoffs?.map((h) => h.status)).toEqual(['fired']);
     // The question and the answer, and no turn saying it failed.
     expect(written.flatMap((w) => w.turns.map((t) => t.role))).toEqual(['user', 'assistant']);
@@ -912,8 +924,8 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
       },
       stores,
     );
-    // The page's row is kept; a row Dash never saw is not.
-    expect(handoffs.map((h) => h.subjectRef)).toEqual(['job_search.applications:a1', null]);
+    // The page's row is kept. One hand-off per question (plan #3005.2): the second call starts nothing.
+    expect(handoffs.map((h) => h.subjectRef)).toEqual(['job_search.applications:a1']);
   });
 
   it('refuses a hand-off where nothing can take it, so Dash says it cannot', async () => {

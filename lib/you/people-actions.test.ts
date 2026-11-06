@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ASK_ACTION_RULES } from '@/lib/dash/ask';
 import { dashTool, type DashPaidTool, type DashWriteTool } from '@/lib/dash/registry';
 import type { DashChange } from '@/lib/talk/changes';
-import { PEOPLE_ACTION_RULES, PEOPLE_TOOLS, peopleActing, type PeopleDash } from './people-actions';
+import { PEOPLE_ACTION_RULES, PEOPLE_TOOLS, peopleActing, peopleActionRules, type PeopleDash } from './people-actions';
 
 const CAUSE = { advisorId: 'adv-1', chatId: 'chat-1', messageId: 'msg-1' };
 const seen = () => true;
@@ -45,6 +45,13 @@ describe('the tools people on People act with', () => {
     expect(names).not.toContain('show_chart');
     // No row thread's own tool: People has no row.
     expect(PEOPLE_TOOLS.every((tool) => !('subjects' in tool) || !tool.subjects)).toBe(true);
+  });
+
+  it('say there is no hand-off only to a person who cannot hand on (plan #3005.2)', () => {
+    expect(peopleActionRules(false)).toBe(PEOPLE_ACTION_RULES);
+    expect(PEOPLE_ACTION_RULES).toContain('There is no hand_off here');
+    expect(peopleActionRules(true)).not.toContain('There is no hand_off here');
+    expect(peopleActionRules(true)).toContain(ASK_ACTION_RULES);
   });
 
   it("carry Ask's own rules for changes, word for word, after the lean", () => {

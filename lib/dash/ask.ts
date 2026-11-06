@@ -4,7 +4,8 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
-import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
+import type { DashHandoff, SessionHandoffInput } from '@/lib/talk/handoff';
+import { startSessionHandoff } from '@/lib/talk/session-handoff';
 import { DASH_MODELS } from './models';
 import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
@@ -263,12 +264,16 @@ confirm.
 
 ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
 change something none of your tools can (a job application, a contact, a
-vault note, a goal's done-when), or to do work your lookups cannot finish
-(drafting something long, sorting or tidying many rows), call hand_off with the request written out
-in full, including every detail they gave and the refs of rows you looked up
-for it. A routine does it within a few minutes and its reply appears in this
-conversation. Then say in a sentence that you have passed it on; do not say
-it is done, and do not propose something near it instead. Never hand on a
+vault note, a goal's done-when), or for work that needs more than one answer
+(long writing such as a plan step with its full detail, a prep doc or a cover
+letter; building something; research; sorting or tidying many rows), call
+hand_off with the request written out in full, including every detail they
+gave, a short summary of the conversation so far and the refs of rows you
+looked up for it. A Claude Code session does it within a few minutes and its
+reply appears in this conversation. Do the same as soon as you see this
+answer will not fit what they asked: hand it on rather than stop part-way.
+Then say in a sentence that you are on it; do not say it is done, do not
+propose something near it instead, and never end by asking them to try again. Never hand on a
 question you can answer by looking things up, and never a request to delete
 something (application answers, job notes, job roles and tasks are the exception, above: propose_delete), send an email or spend money: for those, say you cannot. Those
 three are the only requests you turn down; anything else is looked up, done
@@ -439,8 +444,15 @@ export type AskStores = {
   attachProposals: (ids: readonly string[], turnId: string) => Promise<void>;
   /** Removes the proposals of an answer that was not kept. */
   discardProposals: (ids: readonly string[]) => Promise<void>;
-  /** Keeps a hand-off as pending (handoffs.ts insertHandoff). Absent with no fireHandoff. */
-  saveHandoff?: (conversationId: string, request: string, subjectRef: string | null) => Promise<DashHandoff>;
+  /**
+   * Keeps a hand-off as a pending session row, once per question
+   * (handoffs.ts keepSessionHandoff, plan #3005.2): `created` is false when
+   * this question's request was kept before, as on a retry, and nothing is
+   * started for it again. Absent with no fireHandoff.
+   */
+  saveHandoff?: (
+    input: SessionHandoffInput,
+  ) => Promise<{ ok: true; handoff: DashHandoff; created: boolean } | { ok: false; error: string }>;
   /** Ties the answer's hand-offs to its turn once that is written. */
   attachHandoffs?: (ids: readonly string[], turnId: string) => Promise<void>;
   /** Removes the hand-offs of an answer that was not kept. */
@@ -764,17 +776,27 @@ export async function askDash(
     : undefined;
   const handed: DashHandoff[] = [];
   const saveHandoff = stores.saveHandoff;
+  // The shared hand-to-a-session action (plan #3005.2), keyed by the
+  // question: a session starts once the answer is kept (startHandoffs), and
+  // only for a row this answer made.
+  const askedTurn = asked[asked.length - 1];
   const handOff =
-    saveHandoff && stores.fireHandoff
+    saveHandoff && stores.fireHandoff && askedTurn
       ? async (args: unknown, seen: (table: string, ref: string) => boolean) => {
-          const parsed = handoffRequest(args, seen);
-          if (!parsed.ok) return { ok: false as const, error: parsed.error };
-          try {
-            handed.push(await saveHandoff(subject.ref, parsed.request, parsed.subjectRef));
-          } catch {
-            return { ok: false as const, error: 'The request could not be kept. Tell them it was not passed on.' };
-          }
-          return { ok: true as const, rows: [], note: HANDED_OFF };
+          const result = await startSessionHandoff(
+            { keep: saveHandoff },
+            {
+              thread: { kind: 'ask', conversationId: subject.ref },
+              messageId: askedTurn.id,
+              asked: askedTurn.body,
+              botName: 'Ask Dash',
+              href: `/chat/dash/${subject.ref}`,
+            },
+            args,
+            seen,
+          );
+          if (result.kept?.created) handed.push(result.kept.handoff);
+          return result.told;
         }
       : undefined;
   const discard = async () => {

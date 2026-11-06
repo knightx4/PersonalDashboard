@@ -10,8 +10,10 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
 import type { ContextMessage } from '@/lib/you/chat-context-model';
 import { loadCarryOver } from '@/lib/you/carry-over';
+import { MAKE_PAGE, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } from '@/lib/you/bot-pages';
+import { HAND_OFF, SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 import {
-  PEOPLE_ACTION_RULES,
+  peopleActionRules,
   PEOPLE_TOOLS,
   PEOPLE_WEB_RULES,
   peopleActing,
@@ -91,6 +93,16 @@ export type MentorReplyInput = {
    * the model (plan #2974). Absent: the mentor reads the words alone.
    */
   readFiles?: (messageIds: string[]) => Promise<DashFile[]>;
+  /**
+   * Starts a page in a Claude Code session (plan #2997), offered to the
+   * mentor as make_page. Absent: the mentor cannot make pages.
+   */
+  makePage?: BotPageStarter;
+  /**
+   * Hands heavy work to a Claude Code session (plan #3005.2), offered to
+   * the mentor as hand_off. Absent: the mentor has no hand_off.
+   */
+  handOn?: SessionStarter;
   /** For tests. */
   anthropic?: Anthropic;
   now?: () => number;
@@ -358,12 +370,52 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   const acting = input.act
     ? peopleActing(input.act, { advisorId: ctx.mentor.id, chatId, messageId: answering.id, href: threadHref })
     : null;
+  // A page is made in a session, not in this turn (plan #2997): the tool keeps it and the mentor says it is on it.
+  // Heavy work goes to a session the same way (plan #3005.2): hand_off keeps it and the mentor says it is on it.
+  const makePage = input.makePage;
+  const handOn = input.handOn;
+  const handOff =
+    makePage || handOn
+      ? (args: unknown, seen: (table: string, ref: string) => boolean, tool: { name: string }) => {
+          if (tool.name === MAKE_PAGE_TOOL_NAME && makePage) {
+            return makePage(
+              {
+                advisorId: ctx.mentor.id,
+                advisorName: name,
+                chatId,
+                messageId: answering.id,
+                asked: answering.text,
+                persona: ctx.layers.persona.text,
+                href: threadHref,
+              },
+              args,
+            );
+          }
+          if (!handOn) return Promise.resolve({ ok: false as const, error: `There is no tool called ${tool.name}.` });
+          return handOn(
+            {
+              thread: { kind: 'chat', chatId, advisorId: ctx.mentor.id },
+              messageId: answering.id,
+              asked: answering.text,
+              botName: name,
+              href: threadHref,
+            },
+            args,
+            seen,
+          );
+        }
+      : undefined;
   const voice: DashVoice = {
     model: input.model,
-    system: acting
-      ? `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}\n\n${PEOPLE_ACTION_RULES}`
-      : `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}`,
-    tools: acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS,
+    system: [
+      ctx.layers.persona.text,
+      REPLY_RULES,
+      PEOPLE_WEB_RULES,
+      ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
+      ...(makePage ? [PAGE_RULES] : []),
+      ...(handOn ? [SESSION_RULES] : []),
+    ].join('\n\n'),
+    tools: [...(acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS), ...(makePage ? [MAKE_PAGE] : []), ...(handOn ? [HAND_OFF] : [])],
     serverTools: peopleServerTools(input.model),
     // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
     maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
@@ -394,6 +446,7 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       contextBlocks: rest,
       execute: input.execute,
       ...(acting ? { write: acting.write, propose: acting.propose, queue: acting.queue } : {}),
+      ...(handOff ? { handOff } : {}),
       anthropicApiKey: input.anthropicApiKey ?? '',
       client: anthropic,
       onSpend: (report) => spent['mentor-reply'].push(report),

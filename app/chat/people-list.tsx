@@ -11,6 +11,7 @@ import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
 import { GroupMark } from './group-parts';
+import { entriesOf } from '@/lib/you/pane-threads-model';
 import { groupHref, groupPreviewOf, typingNames, type GroupRow } from '@/lib/you/group-chats-model';
 import { NO_PATCHES, outcomeOf, patchGroups, patchRows, type LivePatches } from '@/lib/you/live-list-model';
 import {
@@ -134,21 +135,6 @@ function useTypingClock(rows: readonly PersonRow[], groups: readonly GroupRow[],
     return () => clearTimeout(timer);
   }, [rows, groups, now, live]);
   return live ? Math.max(now, start) : start;
-}
-
-type Entry = { kind: 'person'; row: PersonRow; at: string | null } | { kind: 'group'; row: GroupRow; at: string | null };
-
-/** Direct chats and groups in one run, newest message first; those with nothing said after them, as sortPeople keeps them. */
-export function entriesOf(rows: readonly PersonRow[], groups: readonly GroupRow[]): Entry[] {
-  const said: Entry[] = [
-    ...rows.filter((r) => r.last).map((row): Entry => ({ kind: 'person', row, at: row.last?.at ?? null })),
-    ...groups.filter((g) => g.last).map((row): Entry => ({ kind: 'group', row, at: row.last?.at ?? null })),
-  ].sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
-  const quiet: Entry[] = [
-    ...groups.filter((g) => !g.last).map((row): Entry => ({ kind: 'group', row, at: null })),
-    ...rows.filter((r) => !r.last).map((row): Entry => ({ kind: 'person', row, at: null })),
-  ];
-  return [...said, ...quiet];
 }
 
 const NO_GROUPS: readonly GroupRow[] = [];

@@ -18,6 +18,9 @@ import { canTalkOf } from '@/lib/you/people-cards-model';
 import { claimTyping } from '@/lib/you/mentor-reply';
 import { mentorReplyPayload } from '@/lib/you/mentor-reply-notice';
 import { notifyPerson } from '@/lib/talk/reply-state-store';
+import { isOwner } from '@/lib/dev/owner';
+import { botPageStarter } from '@/lib/you/bot-pages-store';
+import { sessionStarter } from '@/lib/talk/session-handoff-store';
 
 /**
  * Texting a mentor from a request (plan #2748.4): the Council's send and
@@ -67,7 +70,12 @@ export async function sendMentorMessageInRequest(
 async function replyInRequest(userId: string, chatId: string): Promise<void> {
   const client = await createYouClient();
   try {
-    const [core, settings, dash] = await Promise.all([createCoreClient(), loadAccountSettings(userId), peopleDashInRequest(userId)]);
+    const [core, settings, dash, owner] = await Promise.all([
+      createCoreClient(),
+      loadAccountSettings(userId),
+      peopleDashInRequest(userId),
+      isOwner(),
+    ]);
     await replyToMentor({
       client,
       userId,
@@ -82,6 +90,10 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       claimed: true,
       // The pictures and PDFs sent with the messages being answered (plan #2974).
       readFiles: (messageIds) => readMessageFiles(core, messageIds),
+      // Pages made in a session (plan #2997). The routine writes through scripts/sql.ts, which writes the owner's rows alone.
+      makePage: owner ? (botPageStarter(core, userId) ?? undefined) : undefined,
+      // Heavy work handed to a session (plan #3005.2), for the owner alone for the same reason.
+      handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
     });
   } catch (error) {
     // replyToMentor never throws, so this is the setup before it: let go of the claim and say so.

@@ -1,8 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
+import { PAGE_RULES } from '@/lib/you/bot-pages';
+import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
@@ -378,6 +380,34 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     expect(sent).toHaveLength(SPEAKER_MAX_LOOKUPS + 1);
     expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
     expect(said).toBe('No more lookups today, sorry.');
+  });
+
+  it('offers make_page when the speaker can start one, and hands the start back before the bot texts (plan #2997)', async () => {
+    const pageCall = { content: [{ type: 'tool_use', id: 'g1', name: 'make_page', input: { request: 'A drill.', title: 'Drill' } }], usage: USAGE };
+    const { anthropic, sent } = scripted([pageCall, text("On it, I'll drop the link here.")]);
+    const page = vi.fn(async () => ({ ok: true as const, rows: [], note: 'Started. Say you are on it.' }));
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, page }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['make_page']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(PAGE_RULES);
+    expect(page).toHaveBeenCalledWith({ request: 'A drill.', title: 'Drill' });
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'g1', content: 'Started. Say you are on it.' });
+    expect(said).toBe("On it, I'll drop the link here.");
+  });
+
+  it('offers hand_off when the speaker can hand on, and hands the result back before the bot texts (plan #3005.2)', async () => {
+    const handCall = { content: [{ type: 'tool_use', id: 'h1', name: 'hand_off', input: { request: 'A prep doc for Friday.' } }], usage: USAGE };
+    const { anthropic, sent } = scripted([handCall, text("On it, I'll post it here.")]);
+    const handOn = vi.fn(async () => ({ ok: true as const, rows: [], note: 'Handed on. Say you are on it.' }));
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, handOn }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['hand_off']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(SESSION_RULES);
+    expect(handOn).toHaveBeenCalledWith({ request: 'A prep doc for Friday.' });
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'h1', content: 'Handed on. Say you are on it.' });
+    expect(said).toBe("On it, I'll post it here.");
   });
 
   it('sends no tools when there is no way to look places up', async () => {

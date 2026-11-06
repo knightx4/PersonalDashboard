@@ -455,6 +455,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // the sentence in; the places it goes out. About three pauses in typing a
   // sentence.
   'place-capture': run(HAIKU, 3 * 1_200, 3 * 120),
+  // A Claude Code session on Opus: most of what it sends is read from the
+  // prompt cache, so the input here is the full-price equivalent of a few
+  // million cached tokens and a few hundred thousand written, about $2.
+  'hand-off-session': background(run(OPUS, 450_000, 15_000)),
   // One passage of about 1,500 characters and its row's title.
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
   // One question of a sentence or so.
@@ -541,6 +545,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'group-director': background(run(HAIKU, 3_000, 120)),
   // The bot's persona, memory and the last thirty messages in, one text out (plan #2879.1.2).
   'group-speaker': run(SONNET, 5_000, 120),
+  // A session's run making one page (plan #2997), priced as though it were
+  // Opus on the API: the run itself is on the routine, and its ledger rows
+  // carry no tokens.
+  'make-bot-page': background(run(OPUS, 60_000, 15_000)),
   // The rules, the form and for a redraft the current card in; a card of
   // about 2,500 characters out (plan #2748.11).
   'draft-persona': run(SONNET, 1_800, 700),

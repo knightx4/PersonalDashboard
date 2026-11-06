@@ -48,9 +48,18 @@ import { readJobBoard } from '@/lib/jobs/discover/read-board';
 import { lookUpPlaces } from '@/lib/you/places-lookup';
 import { createYouClient } from '@/lib/you/auth/server';
 import { readMail } from '@/lib/inbox/read-mail';
-import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
-import { handoffBrief } from './handoff';
-import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
+import type { SessionHandoffInput } from './handoff';
+import { fireSessionHandoff } from './handoff-fire';
+import {
+  askHandoffOf,
+  attachHandoffs,
+  discardHandoffs,
+  handoffStatusOf,
+  keepSessionHandoff,
+  loadOpenHandoffs,
+  type SessionHandoff,
+} from './handoffs';
+import { canHandToSession } from './session-handoff-store';
 import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { keepSlip } from '@/lib/dash/slips';
@@ -152,8 +161,9 @@ export async function askDashInRequest(input: {
   const asked = where ? await pageFor(ctx, where) : null;
   const page = asked && list ? { ...asked, list } : asked;
   // Dash is offered the hand-off only when the backup routine can be started.
-  const backup = dashBackupRoutine();
-  const canHandOff = Boolean(backup.id && backup.token);
+  const canHandOff = canHandToSession();
+  // The session rows this answer kept, so each is started from its own row.
+  const keptSessions = new Map<string, SessionHandoff>();
   // A question kept to one workspace (plan #1899.5) looks only there: its
   // lookups run as though that were the only workspace switched on, and
   // one outside it is refused. Writes and the page keep the full context.
@@ -272,18 +282,22 @@ export async function askDashInRequest(input: {
       },
       ...(canHandOff
         ? {
-            saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>
-              insertHandoff(core, user.id, conversationId, request, subjectRef),
+            // One session row per question (plan #3005.2), read as Ask's hand-off.
+            saveHandoff: async (handoff: SessionHandoffInput) => {
+              const kept = await keepSessionHandoff(core, user.id, handoff);
+              if (!kept.ok) return kept;
+              keptSessions.set(kept.handoff.id, kept.handoff);
+              return { ok: true as const, handoff: askHandoffOf(kept.handoff), created: kept.created };
+            },
             attachHandoffs: (ids: readonly string[], turnId: string) => attachHandoffs(core, ids, turnId),
             discardHandoffs: (ids: readonly string[]) => discardHandoffs(core, ids),
+            // Started as People's are, with the session brief (plan #3005.3).
             fireHandoff: async (handoff) => {
-              const fired = await fireFeatureRoutine({
-                apiKey: backup.token,
-                routineId: backup.id,
-                text: handoffBrief(handoff, user.id),
-              });
-              const status = await markHandoffFired(core, handoff.id, fired);
-              return fired.ok ? { status } : { status, error: fired.error };
+              const kept = keptSessions.get(handoff.id);
+              if (!kept) return { status: 'failed' as const, error: 'the request was not found to pass on.' };
+              const started = await fireSessionHandoff(core, user.id, kept);
+              const status = handoffStatusOf(started.state);
+              return started.error ? { status, error: started.error } : { status };
             },
           }
         : {}),

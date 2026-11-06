@@ -32,7 +32,7 @@ function check(over: Partial<MainCheck> = {}): MainCheck {
 describe('the strip at the top of Home', () => {
   it('says what is running and what is waiting, each a link to its page', () => {
     const html = renderToStaticMarkup(
-      <NowStrip run={null} ready={3} openNotes={12} mainCheck={check()} inbox={4} slips={null} />,
+      <NowStrip run={null} ready={3} openNotes={12} mainCheck={check()} inbox={4} slips={null} sessions={null} />,
     );
     expect(html).toContain('Resting · 3 ready');
     expect(html).toContain('12 open');
@@ -51,12 +51,14 @@ describe('the strip at the top of Home', () => {
         mainCheck={check({ unapplied: ['0190_x.sql', '0191_y.sql'] })}
         inbox={0}
         slips={{ count: 0, newestHref: null }}
+        sessions={{ working: 0, waiting: 0 }}
       />,
     );
     expect(html).toContain('2 migrations unapplied');
     expect(html).not.toContain('Green');
     expect(html).toContain('Clear');
     expect(html).toContain('None in 7 days');
+    expect(html).toContain('None open');
   });
 
   it('counts the chat slips of the last seven days and opens where the newest happened (plan #2999)', () => {
@@ -68,11 +70,14 @@ describe('the strip at the top of Home', () => {
         mainCheck={check()}
         inbox={0}
         slips={{ count: 3, newestHref: '/chat/people/builder' }}
+        sessions={{ working: 2, waiting: 1 }}
       />,
     );
     expect(html).toContain('Chat slips');
     expect(html).toContain('3 in 7 days');
     expect(html).toContain('href="/chat/people/builder"');
+    expect(html).toContain('Sessions');
+    expect(html).toContain('2 working · 1 waiting');
   });
 });
 

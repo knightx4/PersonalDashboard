@@ -19,7 +19,8 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { MESSAGE_MAX } from '@/lib/you/council-model';
-import { mergeMessages, threadBlocks, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import { mergeMessages, replyFailedOf, threadBlocks, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import { owedGroupReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import {
   firstName,
   groupDetailOf,
@@ -41,16 +42,24 @@ import { GroupMark, Reactions } from '../../group-parts';
  * you.advisor_message_reactions, you.advisor_chat_members.typing_until).
  * Sending goes through POST /api/chat/groups/[id]/messages; the director
  * decides who answers, so nothing claims a bot is typing until one is.
+ *
+ * A burst that failed (advisor_chats.reply_status) says why under your last
+ * text, with Try again, and a text of yours left a minute with no burst
+ * holding the chat and no bot typing asks the group once more, as Try again
+ * would (plan #2988.3).
  */
 
 export type GroupThreadActions = {
   older: (chatId: string, before: string) => Promise<{ messages: ThreadMessage[]; hasOlder: boolean; reactions: Record<string, Reacted[]> } | { error: string }>;
   read: (chatId: string) => Promise<void>;
+  /** Ask the group to answer your newest text again; `stalled` for the safety net rather than a press. */
+  retryReply?: (chatId: string, options?: { stalled?: boolean }) => Promise<{ error: string | null }>;
 };
 
 const NO_ACTIONS: GroupThreadActions = {
   older: async () => ({ messages: [], hasOlder: false, reactions: {} }),
   read: async () => {},
+  retryReply: async () => ({ error: null }),
 };
 
 type Pending = { id: string; text: string; at: string; failed: string | null };
@@ -61,6 +70,11 @@ function newPending(text: string): Pending {
   return { id: `pending-${at.getTime()}-${Math.random().toString(36).slice(2, 6)}`, text, at: at.toISOString(), failed: null };
 }
 
+/** How long ago a time was, read when an effect runs rather than during render. */
+function ageOf(at: string): number {
+  return Date.now() - Date.parse(at);
+}
+
 const NEAR_FOOT_PX = 120;
 const NEAR_TOP_PX = 80;
 
@@ -69,6 +83,10 @@ export type GroupThreadProps = {
   title: string;
   members: GroupMember[];
   former: GroupMember[];
+  /** The chat's lease, held while a burst works, as the server drew it. */
+  typingUntil?: string | null;
+  /** Why the last burst failed, as the server drew it; null when it did not. */
+  replyFailed?: string | null;
   page: { messages: ThreadMessage[]; hasOlder: boolean; reactions: Record<string, Reacted[]> };
   timezone: string;
   now: number;
@@ -76,6 +94,12 @@ export type GroupThreadProps = {
   live?: boolean;
   /** For the gallery: messages still being sent. */
   pending?: Pending[];
+  /** Drawn in the Ask Dash pane (plan #2981), which names the group in its own header. */
+  bare?: boolean;
+  /** What the box opens with, unsent: the pane keeps each thread's words while another is open. */
+  initialDraft?: string;
+  /** Told each change to the box's words, so the pane can keep them. */
+  onDraftChange?: (text: string) => void;
 };
 
 export function GroupThreadView({
@@ -83,12 +107,17 @@ export function GroupThreadView({
   title,
   members: firstMembers,
   former,
+  typingUntil: initialLease = null,
+  replyFailed: initialFailed = null,
   page,
   timezone,
   now: start,
   actions = NO_ACTIONS,
   live = true,
   pending: initialPending = [],
+  bare = false,
+  initialDraft = '',
+  onDraftChange,
 }: GroupThreadProps) {
   const [heard, setHeard] = useState<ThreadMessage[]>([]);
   const messages = mergeMessages(page.messages, heard);
@@ -101,8 +130,24 @@ export function GroupThreadView({
   const hasOlder = hasOlderState ?? page.hasOlder;
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState<string | null>(null);
+  // The lease and why a burst failed, as Realtime last said, or as the server drew them.
+  const [heardLease, setLease] = useState<string | null | undefined>(undefined);
+  const [heardFailed, setReplyFailed] = useState<string | null | undefined>(undefined);
+  const [drawnReply, setDrawnReply] = useState({ lease: initialLease, failed: initialFailed });
+  if (drawnReply.lease !== initialLease || drawnReply.failed !== initialFailed) {
+    setDrawnReply({ lease: initialLease, failed: initialFailed });
+    setLease(undefined);
+    setReplyFailed(undefined);
+  }
+  const lease = heardLease === undefined ? initialLease : heardLease;
+  const replyFailed = heardFailed === undefined ? initialFailed : heardFailed;
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>(initialPending);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftText] = useState(initialDraft);
+  const setDraft = (text: string) => {
+    setDraftText(text);
+    onDraftChange?.(text);
+  };
   const [now, setNow] = useState(start);
   const scroller = useRef<HTMLDivElement | null>(null);
   const keepFrom = useRef<number | null>(null);
@@ -134,6 +179,12 @@ export function GroupThreadView({
         setTyping((t) => ({ ...t, [next.advisor_id as string]: typeof next.typing_until === 'string' ? next.typing_until : null }));
         setNow(Date.now());
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chats', filter: `id=eq.${chatId}` }, (event) => {
+        const next = (event.new ?? {}) as Record<string, unknown>;
+        setLease(typeof next.typing_until === 'string' ? next.typing_until : null);
+        if ('reply_status' in next) setReplyFailed(replyFailedOf(next));
+        setNow(Date.now());
+      })
       .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_message_reactions' }, (event) => {
         const next = (event.new ?? {}) as Record<string, unknown>;
         if (typeof next.message_id !== 'string' || typeof next.advisor_id !== 'string' || !isReaction(next.reaction)) return;
@@ -162,9 +213,9 @@ export function GroupThreadView({
     if (live) void act.current.read(chatId);
   }, [live, chatId]);
 
-  // Each bot's dots end on their own clock.
-  const soonest = members
-    .map((m) => (m.typingUntil ? Date.parse(m.typingUntil) : NaN))
+  // Each bot's dots end on their own clock, and the lease on its own.
+  const soonest = [...members.map((m) => m.typingUntil), lease]
+    .map((until) => (until ? Date.parse(until) : NaN))
     .filter((t) => Number.isFinite(t) && t > now)
     .sort((a, b) => a - b)[0];
   useEffect(() => {
@@ -174,6 +225,7 @@ export function GroupThreadView({
   }, [live, soonest]);
 
   const typingMembers = members.filter((m) => m.typingUntil && Date.parse(m.typingUntil) > now);
+  const leaseHeld = lease !== null && Date.parse(lease) > now;
 
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -260,8 +312,52 @@ export function GroupThreadView({
     void send(again);
   };
 
+  const retryReply = async (options: { stalled?: boolean } = {}) => {
+    const tryAgain = act.current.retryReply;
+    if (!tryAgain) return;
+    setReplyFailed(null);
+    setRetryError(null);
+    atFoot.current = true;
+    // Held from the press, so the net does not ask again before Realtime says the burst has the chat.
+    setLease(new Date(Date.now() + 15_000).toISOString());
+    const outcome = await tryAgain(chatId, options).catch(() => ({ error: 'Not sent. Check your connection.' }));
+    if (outcome.error) {
+      setLease(null);
+      setRetryError(outcome.error);
+    }
+  };
+
+  // The safety net (plan #2988.3): a text of yours left a minute with no
+  // burst holding the chat and no bot typing asks the group again, once per
+  // text; the server starts nothing when a burst already ended quietly after
+  // it. A failure then shows Try again.
+  const owed =
+    live && canSend && !leaseHeld && typingMembers.length === 0 && pending.length === 0 && !replyFailed && !retryError
+      ? owedGroupReply(messages)
+      : null;
+  const owedId = owed?.id ?? null;
+  const owedAt = owed?.createdAt ?? null;
+  const asked = useRef(new Set<string>());
+  const askAgain = useRef(retryReply);
+  useEffect(() => {
+    askAgain.current = retryReply;
+  });
+  useEffect(() => {
+    if (!owedId || !owedAt || asked.current.has(owedId)) return;
+    const age = ageOf(owedAt);
+    if (!(age < STALLED_LIMIT_MS)) return;
+    const timer = setTimeout(() => {
+      asked.current.add(owedId);
+      void askAgain.current({ stalled: true });
+    }, Math.max(STALLED_MS - age, 0));
+    return () => clearTimeout(timer);
+  }, [owedId, owedAt]);
+
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
   const empty = messages.length === 0 && pending.length === 0;
+  // A failed burst is said under your last text, while nothing newer is on its way.
+  const failedNote =
+    typingMembers.length === 0 && !leaseHeld && pending.length === 0 && messages.at(-1)?.role === 'person' ? (retryError ?? replyFailed) : null;
 
   return (
     <MessagingThread
@@ -278,6 +374,7 @@ export function GroupThreadView({
       }
       scrollRef={scroller}
       onScroll={onScroll}
+      bare={bare}
       box={
         <form onSubmit={submit} className="flex items-end gap-2">
           <MessageInput
@@ -367,6 +464,21 @@ export function GroupThreadView({
             </div>
           ))}
         </MessageGroup>
+      )}
+      {failedNote && (
+        <div role="alert" className="flex flex-col items-start">
+          <MessageNote tone="danger">
+            {failedNote}
+            {actions.retryReply && (
+              <>
+                {' '}
+                <button type="button" onClick={() => void retryReply()} className="font-medium text-accent hover:underline">
+                  Try again
+                </button>
+              </>
+            )}
+          </MessageNote>
+        </div>
       )}
       {typingMembers.map((m) => (
         <div key={m.id} className="flex flex-col items-start">

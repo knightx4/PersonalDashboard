@@ -117,6 +117,12 @@ describe('one more stretch at a limit (plan #2999)', () => {
     expect(answer).toMatchObject({ ok: true, body: 'Added it.', stop: 'answered', extended: true });
   });
 
+  it('tells a voice that can hand on to pass on what will not fit (plan #3005.2)', () => {
+    expect(keepGoing('time', true)).toContain('call hand_off');
+    expect(keepGoing('time')).not.toContain('hand_off');
+    expect(keepGoing('time', true)).toContain('Never ask them to say "try again".');
+  });
+
   it('makes it answer, saying what is not done, when it runs out again', async () => {
     const clock = { at: 0 };
     const { client: stub, sent } = client(
