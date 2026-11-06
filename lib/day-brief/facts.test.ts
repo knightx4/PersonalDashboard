@@ -4,6 +4,7 @@ import type { AgendaItem, DayContext } from '@/lib/todo/agenda/sources';
 import type { Task } from '@/lib/todo/tasks/model';
 import type { DailyGoal, WaitingItem } from '@/lib/goals/daily';
 import type { Goal } from '@/lib/goals/tree';
+import { foldSchedule, type ScheduleEntry } from '@/lib/todo/schedule/model';
 import {
   agendaCandidates,
   agendaFacts,
@@ -186,6 +187,60 @@ describe('candidatesSince', () => {
     expect(candidatesSince('2026-09-27T10:04:00Z', NOW)).toBe('2026-09-27T10:04:00.000Z');
     expect(candidatesSince(null, NOW)).toBe('2026-09-27T10:05:00.000Z');
     expect(candidatesSince('2026-09-20T10:00:00Z', NOW)).toBe('2026-09-26T10:05:00.000Z');
+  });
+});
+
+/** One booked schedule entry today (plan #3027). */
+function onSchedule(over: Partial<ScheduleEntry> & Pick<ScheduleEntry, 'key' | 'source' | 'title' | 'from'>): ScheduleEntry {
+  return {
+    kind: 'booked',
+    ref: `todo.events:${over.key}`,
+    day: TODAY,
+    lastDay: TODAY,
+    startsAt: null,
+    endsAt: null,
+    allDay: false,
+    location: null,
+    detail: null,
+    href: '/todo/calendar',
+    alsoIn: [],
+    conflicts: [],
+    ...over,
+  };
+}
+
+describe('the brief read from the schedule (plan #3027)', () => {
+  const party = onSchedule({
+    key: 'feed_event:1',
+    source: 'feed_event',
+    from: 'Partiful calendar',
+    title: 'Diwali Bash',
+    startsAt: '2026-09-28T22:00:00Z',
+    location: '20 River Ct',
+  });
+  const dinner = onSchedule({ key: 'appointment:1', source: 'appointment', from: 'Booking email', title: 'Double Chicken Please', startsAt: '2026-09-29T00:00:00Z' });
+  const dinnerOwn = onSchedule({ key: 'own_event:1', source: 'own_event', from: 'Your calendar', title: 'Double Chicken Please with Sam', startsAt: '2026-09-28T23:30:00Z' });
+  const round = onSchedule({ key: 'interview:i1', source: 'interview', from: 'Job interviews', title: 'Respark · Designer', startsAt: '2026-09-28T14:30:00Z', href: '/jobs/roles/r1' });
+
+  it('lists feed events and appointments as booked, and asks about a time two sources disagree on', () => {
+    const entries = foldSchedule([party, dinner, dinnerOwn]);
+    const facts = agendaFacts([], TODAY, ZONE, entries).map((fact) => fact.text);
+    expect(facts[0]).toBe('6:00\u00a0PM: Diwali Bash (20 River Ct)');
+    expect(facts.slice(1).every((text) => text.includes('which is right?'))).toBe(true);
+    expect(facts).toHaveLength(3);
+  });
+
+  it('makes an interview an interview and everything else booked today a booked candidate', () => {
+    const got = agendaCandidates([], TODAY, { entries: foldSchedule([party, round]), timezone: ZONE });
+    expect(got).toEqual([
+      expect.objectContaining({ kind: 'interview', key: 'interview:i1', title: 'Respark · Designer', conflict: null }),
+      expect.objectContaining({ kind: 'booked', key: 'feed_event:1', from: 'Partiful calendar', detail: '20 River Ct', conflict: null }),
+    ]);
+  });
+
+  it('leaves out what is not on today', () => {
+    const tomorrow = { ...party, day: '2026-09-29', lastDay: '2026-09-29' };
+    expect(agendaCandidates([], TODAY, { entries: [tomorrow], timezone: ZONE })).toEqual([]);
   });
 });
 

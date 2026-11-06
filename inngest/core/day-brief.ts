@@ -50,6 +50,7 @@ import { loadLiveTree } from '@/lib/goals/steps-store';
 import { readStories } from '@/lib/news/issues/stories';
 import type { AgendaClients } from '@/lib/todo/agenda/clients';
 import { loadAgenda } from '@/lib/todo/agenda/load';
+import { loadSchedule } from '@/lib/todo/schedule/load';
 
 /**
  * The morning brief run (plan #1123), called every hour by pg_cron through
@@ -366,11 +367,26 @@ async function gatherDay(
   const on = (module: Parameters<typeof moduleEnabled>[1]) => moduleEnabled(account, module);
 
   const agenda = part(loadAgenda(userId, now, clients), null);
+  // Today as the one schedule has it (plan #3027): every calendar, booking
+  // email and interview, so the brief cannot leave one out.
+  const schedule = on('todo')
+    ? part(
+        loadSchedule(userId, { from: day, to: day }, {
+          clients,
+          now,
+          timezone: account.timezone,
+          enabledModules: account.enabledModules,
+        }),
+        null,
+      )
+    : Promise.resolve(null);
   const since = part(lastBriefAt(core, userId, day), null).then((at) => candidatesSince(at, now));
   const tree = on('goals') ? readGoalTree(clients, userId) : null;
 
   const [facts, goal, story, question, candidates] = await Promise.all([
-    agenda.then((loaded) => (loaded ? agendaFacts(loaded.piles, day, loaded.timezone) : [])),
+    Promise.all([agenda, schedule]).then(([loaded, today]) =>
+      loaded ? agendaFacts(loaded.piles, day, loaded.timezone, today?.entries) : [],
+    ),
     on('goals')
       ? part(
           (async () => {
@@ -401,7 +417,9 @@ async function gatherDay(
             dashResultCandidates(await readDashResults(clients, userId, from), items, from),
           )
         : [],
-      agenda.then((loaded) => (loaded ? agendaCandidates(loaded.piles, day) : [])),
+      Promise.all([agenda, schedule]).then(([loaded, today]) =>
+        loaded ? agendaCandidates(loaded.piles, day, today ?? undefined) : [],
+      ),
     ]),
   ]);
 

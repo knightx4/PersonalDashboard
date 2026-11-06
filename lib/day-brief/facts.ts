@@ -4,6 +4,7 @@ import { addDays } from '@/lib/todo/tasks/model';
 import { zoneDay, zoneParts, whenTime, whenWeekday } from '@/lib/core/when';
 import { isInterviewContext } from '@/lib/todo/agenda/sources';
 import { stepHref } from '@/lib/goals/all-goals';
+import { conflictQuestion, entriesOn, type ScheduleEntry } from '@/lib/todo/schedule/model';
 
 /**
  * The morning brief's facts (plan #1123): what today holds, as short lines,
@@ -88,15 +89,30 @@ function entryTitle(entry: AgendaPile['entries'][number]): string {
  * items dated within seven days are kept: a return window or a bill is a date
  * the person cannot move, where a task due on Friday will be on Friday's brief.
  */
-export function agendaFacts(piles: readonly AgendaPile[], today: string, timezone: string): BriefFact[] {
+export function agendaFacts(
+  piles: readonly AgendaPile[],
+  today: string,
+  timezone: string,
+  schedule?: readonly ScheduleEntry[],
+): BriefFact[] {
   const pile = (bucket: AgendaPile['bucket']) => piles.find((p) => p.bucket === bucket);
 
-  const booked = [...(pile('today')?.context ?? [])]
-    .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
-    .map((entry) => {
-      const when = entry.at ? clock(entry.at, timezone) : 'All day';
-      return `${when}: ${entry.label}${entry.detail ? ` (${entry.detail})` : ''}`;
-    });
+  // What is booked today comes from the one schedule (plan #3027) when the
+  // caller read it: every calendar, booking email and interview, each once,
+  // with a time two of them disagree on put as a question.
+  const booked = schedule
+    ? bookedToday(schedule, today).map((entry) => {
+        const when = entry.startsAt ? clock(entry.startsAt, timezone) : 'All day';
+        const about = [entry.detail, entry.location].filter(Boolean).join(' · ');
+        const conflict = conflictQuestion(entry, timezone);
+        return `${when}: ${entry.title}${about ? ` (${about})` : ''}${conflict ? `. ${conflict}` : ''}`;
+      })
+    : [...(pile('today')?.context ?? [])]
+        .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''))
+        .map((entry) => {
+          const when = entry.at ? clock(entry.at, timezone) : 'All day';
+          return `${when}: ${entry.label}${entry.detail ? ` (${entry.detail})` : ''}`;
+        });
 
   const overdue = (pile('overdue')?.entries ?? []).map(entryTitle).filter(Boolean);
   const dueToday = (pile('today')?.entries ?? []).map(entryTitle).filter(Boolean);
@@ -114,6 +130,11 @@ export function agendaFacts(piles: readonly AgendaPile[], today: string, timezon
     ...capped('today', dueToday, (n) => `and ${n} more due today`),
     ...capped('week', week, (n) => `and ${n} more closing this week`),
   ];
+}
+
+/** The schedule's booked entries on `today`, earliest first, all-day ones leading. */
+function bookedToday(schedule: readonly ScheduleEntry[], today: string): ScheduleEntry[] {
+  return entriesOn(schedule, today).filter((entry) => entry.kind === 'booked');
 }
 
 /**
@@ -169,8 +190,17 @@ export const DUE_EVENTS = ['bill', 'renewal_notice', 'trial_ending'] as const;
 export type DueEvent = (typeof DUE_EVENTS)[number];
 
 export type Candidate =
-  /** An interview today, from the job-interviews agenda source. */
-  | (CandidateBase & { kind: 'interview'; at: string | null; detail: string | null })
+  /**
+   * An interview today, from the job-interviews agenda source. `conflict` is
+   * the question to ask when a calendar gives it another time (plan #3027).
+   */
+  | (CandidateBase & { kind: 'interview'; at: string | null; detail: string | null; conflict?: string | null })
+  /**
+   * Anything else booked today (plan #3027): an event of theirs, one from a
+   * subscribed calendar, an appointment from a booking email. `from` names
+   * where it came from.
+   */
+  | (CandidateBase & { kind: 'booked'; at: string | null; detail: string | null; from: string; conflict: string | null })
   /** A dated thing from another workspace closing today: a return window. */
   | (CandidateBase & { kind: 'deadline'; day: string })
   /** A bill, renewal or trial end due today (dueIn 0) or tomorrow (dueIn 1). */
@@ -253,11 +283,15 @@ export function goalStepHref(goalId: string | null, stepId: string): string | nu
  * What the agenda gives: today's interviews, return windows closing today,
  * and the to-dos overdue or due today as the fallback kind.
  */
-export function agendaCandidates(piles: readonly AgendaPile[], today: string): Candidate[] {
+export function agendaCandidates(
+  piles: readonly AgendaPile[],
+  today: string,
+  schedule?: { entries: readonly ScheduleEntry[]; timezone: string },
+): Candidate[] {
   const pile = (bucket: AgendaPile['bucket']) => piles.find((p) => p.bucket === bucket);
-  const out: Candidate[] = [];
+  const out: Candidate[] = schedule ? scheduleCandidates(schedule.entries, today, schedule.timezone) : [];
 
-  for (const context of pile('today')?.context ?? []) {
+  for (const context of schedule ? [] : (pile('today')?.context ?? [])) {
     if (!isInterviewContext(context.key)) continue;
     out.push({
       kind: 'interview',
@@ -294,6 +328,37 @@ export function agendaCandidates(piles: readonly AgendaPile[], today: string): C
     }
   }
   return out;
+}
+
+/**
+ * What is booked today, from the one schedule (plan #3027): an interview as
+ * an interview, and every other event, subscribed-calendar entry and
+ * appointment as booked. Only what starts today: a holiday running since
+ * Monday is not news on Wednesday.
+ */
+export function scheduleCandidates(
+  entries: readonly ScheduleEntry[],
+  today: string,
+  timezone: string,
+): Candidate[] {
+  return entries
+    .filter((entry) => entry.kind === 'booked' && entry.day === today)
+    .map((entry): Candidate => {
+      const conflict = conflictQuestion(entry, timezone);
+      if (entry.source === 'interview') {
+        return { kind: 'interview', key: entry.key, title: entry.title, href: entry.href, at: entry.startsAt, detail: entry.detail, conflict };
+      }
+      return {
+        kind: 'booked',
+        key: entry.key,
+        title: entry.title,
+        href: entry.href,
+        at: entry.startsAt,
+        detail: [entry.detail, entry.location].filter(Boolean).join(' · ') || null,
+        from: entry.from,
+        conflict,
+      };
+    });
 }
 
 /** An open reply task and when its email arrived (todo.reply_threads). */
