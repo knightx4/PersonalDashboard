@@ -2,7 +2,15 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { claimTyping, MENTOR_LOOKUPS, REPLY_RULES, replyToMentor, type MentorSpendOperation } from './mentor-reply';
+import {
+  ACTING_MAX_TOKENS,
+  claimTyping,
+  MENTOR_LOOKUPS,
+  REPLY_MAX_TOKENS,
+  REPLY_RULES,
+  replyToMentor,
+  type MentorSpendOperation,
+} from './mentor-reply';
 import { sendMentorText } from './mentor-send';
 import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 
@@ -229,6 +237,9 @@ describe('replyToMentor', () => {
     expect(tools[0]).toBe('web_search');
     expect(lookupsOnly[0]).toBe('web_search');
     expect(system).toContain(PEOPLE_WEB_RULES);
+    // Room for a change's input, which at the texts' cap was cut off (plan #2999).
+    expect(acting.streamed[0].max_tokens).toBe(ACTING_MAX_TOKENS);
+    expect(looking.streamed[0].max_tokens).toBe(REPLY_MAX_TOKENS);
   });
 
   it('saves the first bubble while the rest is still being written', async () => {
