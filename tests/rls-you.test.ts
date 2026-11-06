@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'places_cache', 'places_calls', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -1423,5 +1423,45 @@ describe("a bot's picture", () => {
     expect(await own(userA, `${userA}/p.png`)).toBe(false);
     expect(await own(userA, `${userA}/${botA}/`)).toBe(false);
     expect(await own(userA, `${userA}/${botA}/deeper/p.png`)).toBe(false);
+  });
+});
+
+describe('the places lookup cap and cache', () => {
+  // migrations-you/0046_places_lookup.sql (plan #2987.2).
+  it('stops a person at 50 Places calls in a UTC day, and counts nobody else', async () => {
+    await admin`insert into you.places_calls (user_id) select ${userA}::uuid from generate_series(1, 49)`;
+    await asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`);
+    await expect(asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`)).rejects.toThrow(
+      /50 calls today/,
+    );
+    // Calls from before today do not count toward today.
+    await admin`update you.places_calls set created_at = now() - interval '2 days' where user_id = ${userA}`;
+    await asUser(userA, (tx) => tx`insert into places_calls (user_id) values (${userA})`);
+    await asUser(userB, (tx) => tx`insert into places_calls (user_id) values (${userB})`);
+    expect(await asUser(userB, (tx) => tx`select id from places_calls`)).toHaveLength(1);
+  });
+
+  it('lets no one lower the count or write a call for someone else', async () => {
+    await asUser(userA, (tx) => tx`delete from places_calls`).catch(() => undefined);
+    await asUser(userA, (tx) => tx`update places_calls set created_at = now() - interval '2 days'`).catch(() => undefined);
+    const [row] = await admin<{ n: number }[]>`
+      select count(*)::int as n from you.places_calls
+       where user_id = ${userA} and created_at >= date_trunc('day', now() at time zone 'utc') at time zone 'utc'`;
+    expect(row.n).toBe(1);
+    await expect(asUser(userB, (tx) => tx`insert into places_calls (user_id) values (${userA})`)).rejects.toThrow();
+  });
+
+  it('keeps cached answers to their owner', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'search|coffee', ${tx.json({ places: [] })})`,
+    );
+    expect(await asUser(userB, (tx) => tx`select id from places_cache`)).toHaveLength(0);
+    await expect(
+      asUser(userB, (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'x', '{}')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`insert into places_cache (user_id, cache_key, body) values (${userA}, 'y', '[]')`),
+    ).rejects.toThrow(/places_cache_body_ck/);
   });
 });

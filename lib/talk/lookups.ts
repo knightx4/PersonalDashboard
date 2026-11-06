@@ -258,6 +258,10 @@ export function lookupLabel(name: string, input: unknown): string {
       return 'Reading an email';
     case 'read_job_board':
       return 'Reading a job board';
+    case 'find_places': {
+      const q = quoted(field(input, 'query'));
+      return q ? `Looking up places for ${q}` : 'Looking up places nearby';
+    }
     default:
       return 'Looking something up';
   }
