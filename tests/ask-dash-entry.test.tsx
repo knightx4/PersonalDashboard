@@ -13,6 +13,7 @@ import { CaptureProvider } from '@/components/shell/capture';
 import {
   AskDashPanel,
   AskDashProvider,
+  BotRow,
   LookingAt,
   useAskSend,
   type AskSource,
@@ -178,5 +179,34 @@ describe('the page the sheet will tell Dash', () => {
       ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined, null, expect.any(Function), undefined],
       ['And after that?', null, null, expect.any(Function), undefined, null, expect.any(Function), undefined],
     ]);
+  });
+});
+
+describe('the sheet under its heading (plan #2976)', () => {
+  it('offers no starter questions under the box', () => {
+    const html = renderToStaticMarkup(
+      <AskDashProvider source={SOURCE}>
+        <AskDashPanel page={null} source={SOURCE} onClose={() => {}} />
+      </AskDashProvider>,
+    );
+    expect(html).not.toContain('Questions to start from');
+    expect(html).not.toContain('Which applications have not heard back');
+  });
+
+  it('draws Dash first as the one open, then each bot in the order given, each opening its thread', () => {
+    const html = renderToStaticMarkup(
+      <BotRow
+        onSwitch={() => {}}
+        bots={[
+          { key: 'cfo', name: 'The CFO', colour: '#2f7d4f', photo: null, unread: true },
+          { key: 'skeptic', name: 'The Skeptic', colour: '#b04a3a', photo: null, unread: false },
+        ]}
+      />,
+    );
+    expect(html).toContain('aria-current="page"');
+    expect(html.indexOf('>Dash<')).toBeLessThan(html.indexOf('/chat/people/cfo'));
+    expect(html.indexOf('/chat/people/cfo')).toBeLessThan(html.indexOf('/chat/people/skeptic'));
+    expect(html).toContain('aria-label="Chat with The CFO, unread"');
+    expect(html).toContain('aria-label="Chat with The Skeptic"');
   });
 });
