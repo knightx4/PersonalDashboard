@@ -3,6 +3,7 @@ import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { REACH_OUT_KINDS, kindParams, reachOutKind } from '@/lib/you/reach-out-kinds';
 import {
   REACH_OUT_FORMS,
   REACH_OUT_LIMITS,
@@ -69,15 +70,28 @@ export const REACH_OUT_REPLY_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['key', 'about', 'tables', 'mode', 'every_days', 'repeat_after_days', 'form'],
+        required: ['key', 'about', 'kind', 'params', 'tables', 'mode', 'every_days', 'repeat_after_days', 'form', 'always'],
         properties: {
           key: { type: 'string', description: 'Short snake_case name, unique in the rule.' },
           about: { type: 'string', description: 'What it watches, in plain words.' },
+          kind: { anyOf: [{ type: 'string', enum: REACH_OUT_KINDS.map((k) => k.kind) }, { type: 'null' }] },
+          params: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['words', 'amount', 'days', 'from'],
+            properties: {
+              words: { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] },
+              amount: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+              days: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
+              from: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+            },
+          },
           tables: { type: 'array', items: { type: 'string', enum: REACH_OUT_TABLES.map((t) => t.table) } },
           mode: { type: 'string', enum: [...REACH_OUT_MODES] },
           every_days: { type: 'integer' },
           repeat_after_days: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
           form: { anyOf: [{ type: 'string', enum: [...REACH_OUT_FORMS] }, { type: 'null' }] },
+          always: { type: 'boolean' },
         },
       },
     },
@@ -90,15 +104,29 @@ export const REACH_OUT_RULES = `The person keeps a list of people who text them,
 one of those people they wrote, in their own words, what that person should
 text them about and how often. Turn it into a rule.
 
-A rule is a list of watches. Each watch reads one or more of these tables and
-nothing else:
+A rule is a list of watches. A watch is one of two sorts.
+
+A fixed kind, which reads something narrower than a whole table. Use one
+whenever an ask fits it:
+
+${REACH_OUT_KINDS.map((k) => `- ${k.kind} (${k.area}): ${k.sends}`).join('\n')}
+
+Or a table watch, with kind null, which hands over every new row of one or
+more of these tables and nothing else:
 
 ${REACH_OUT_TABLES.map((t) => `- ${t.table}: ${t.holds}`).join('\n')}
 
 For each watch give:
 - key: a short snake_case name, unique in the rule.
 - about: what it watches, in a few plain words, as the person would say it.
-- tables: the tables above that hold it.
+- kind: the fixed kind, or null for a table watch.
+- params: what a kind is told, each null when the kind does not read it or
+  they did not say. words: the topics or subject words to match, short, as
+  they wrote them ("AI", "interest rates"). amount: a number in their
+  currency's whole units, so "£2,000" is 2000. days: how many days ahead
+  ("within a week" is 7). from: the sender's name or address, as they wrote
+  it ("Monzo"). All null for a table watch.
+- tables: for a table watch, the tables above that hold it; empty for a kind.
 - mode: "each" for a text as each new row appears ("tell me when"), "roundup"
   for one text about the rows since the last ("a weekly round-up", "sum up",
   "highlights"), "pick" for one row now and then ("name one person").
@@ -112,21 +140,30 @@ For each watch give:
   still waiting on them, which should be named again while it waits.
 - form: "list" for a round-up of several items, "bubbles" for advice or a
   pick, which read better as two or three short texts; null for "each".
+- always: true only when they want the text even on a day with nothing new
+  ("a summary every morning either way", "even if nothing happened");
+  otherwise false, and nothing is sent when nothing is new.
+
+"News from the past 24 hours each morning" is news_issues, roundup, every 1
+day. "Tell me about stories on AI" is news_topics with words ["AI"]. "My plan
+for the day, with my todos and calendar" is schedule_today. A kind whose rows
+are a state (balance_under, todos_overdue, review_due) takes
+repeat_after_days 7 unless they say how often to be reminded.
 
 Use at most ${REACH_OUT_LIMITS.watches} watches. Split an ask into two watches when the parts differ in
 mode or cadence.
 
-A watch hands the person on People every new row of its tables, and they
-choose what to say. An ask only for rows holding a given word, name or amount
-("a note that mentions my sister", "a charge over 100") is not a watch: put it
-under cannot_watch.
+A table watch hands the person on People every new row of its tables, and
+they choose what to say. An ask for rows holding a given word, name or amount
+that no fixed kind reads ("a note that mentions my sister") is not a watch:
+put it under cannot_watch.
 
 cannot_watch: each thing they asked for that none of the tables holds, in a
 few of their own words. Leave nothing they asked for out of both lists.
 
 understood: one or two sentences, addressed to them as "you", saying what this
-person will text about and how often, as a friend would repeat it back. Name
-the person. Do not mention what cannot be watched; the app says that itself.
+person will text about and how often, as a friend would repeat it back, with
+the amount, sender, topic or days they gave. Name the person. Do not mention what cannot be watched; the app says that itself.
 No more than 400 characters.`;
 
 export function reachOutPrompt(input: { name: string; brief: string }): string {
@@ -176,6 +213,12 @@ export function readReachOutReply(reply: unknown): MadeReachOut {
   const watches: ReachOutWatch[] = [];
   for (const raw of reply.watches) {
     if (!isObject(raw)) continue;
+    if (raw.kind !== null && raw.kind !== undefined) {
+      const kind = kindWatch(raw);
+      if (kind) watches.push(kind);
+      else if (str(raw.about)) cannot.push(str(raw.about));
+      continue;
+    }
     const tables = Array.isArray(raw.tables) ? raw.tables.map(str) : [];
     if (!tables.length || !tables.every((t) => WATCHABLE.has(t))) {
       const about = str(raw.about);
@@ -191,6 +234,7 @@ export function readReachOutReply(reply: unknown): MadeReachOut {
       repeat_after_days: (raw.repeat_after_days ?? null) as number | null,
     };
     if (raw.form === 'list' || raw.form === 'bubbles') watch.form = raw.form;
+    if (raw.always === true) watch.always = true;
     watches.push(watch);
   }
   const cannotWatch = [...new Set(cannot)]
@@ -214,6 +258,31 @@ export function readReachOutReply(reply: unknown): MadeReachOut {
   const understood = str(reply.understood);
   if (!understood) return { ok: false, error: 'Dash made a rule but did not say it back. Your words are kept; try again.' };
   return { ok: true, rule: parsed.rule, summary: reachOutSummary(understood, cannotWatch) };
+}
+
+/**
+ * A fixed-kind watch from the model's reply, or null when the kind is not one
+ * this build reads or it lacks what the kind cannot run without (a charge
+ * over what amount), which then goes to cannot_watch.
+ */
+function kindWatch(raw: Record<string, unknown>): ReachOutWatch | null {
+  const def = reachOutKind(str(raw.kind));
+  if (!def) return null;
+  const params = kindParams(def, isObject(raw.params) ? raw.params : null);
+  if (!params) return null;
+  const watch: ReachOutWatch = {
+    key: str(raw.key),
+    about: str(raw.about),
+    kind: def.kind,
+    tables: [def.table],
+    mode: raw.mode as ReachOutWatch['mode'],
+    every_days: raw.every_days as number,
+    repeat_after_days: (raw.repeat_after_days ?? null) as number | null,
+  };
+  if (Object.keys(params).length) watch.params = params;
+  if (raw.form === 'list' || raw.form === 'bubbles') watch.form = raw.form;
+  if (raw.always === true) watch.always = true;
+  return watch;
 }
 
 type Reply = { content: Array<{ type: string; text?: string }>; stop_reason?: string | null };

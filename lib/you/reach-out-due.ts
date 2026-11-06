@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { asText, listableSource, ownerColumn, viaTitle } from '@/lib/ask/list-rows';
 import { readableName, type Source } from '@/lib/sources/types';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { readKindRows } from '@/lib/you/reach-out-kinds';
 import { parseReachOutRule, type ReachOutRule, type ReachOutWatch } from '@/lib/you/reach-out-rule';
 
 /**
@@ -88,6 +89,8 @@ export type DueWatch = {
    * no-repeat window.
    */
   custom?: boolean;
+  /** Asked for a summary either way (plan #3030.3): due at its cadence even with nothing new. */
+  always?: boolean;
 };
 
 export type DuePerson = { advisorId: string; key: string; name: string; watches: DueWatch[] };
@@ -158,7 +161,10 @@ export function dueWatchesOf(input: {
       candidates.push(row);
       if (candidates.length >= CANDIDATES_PER_WATCH) break;
     }
-    if (candidates.length === 0) continue;
+    if (candidates.length === 0) {
+      if (!watch.always) continue;
+      candidates.push(nothingNewRow(watch, now));
+    }
     due.push({
       key: watch.key,
       about: watch.about,
@@ -167,9 +173,24 @@ export function dueWatchesOf(input: {
       everyDays: watch.every_days,
       repeatAfterDays: watch.repeat_after_days,
       candidates,
+      ...(watch.always ? { always: true } : {}),
     });
   }
   return due;
+}
+
+/**
+ * The one row an `always` watch lists when nothing is new: recording it in
+ * advisor_reach_outs like any row moves the watch's clock on, and its ref is
+ * the day, so it never trips the no-repeat window.
+ */
+export function nothingNewRow(watch: Pick<ReachOutWatch, 'tables'>, now: number): CandidateRow {
+  return {
+    table: watch.tables[0],
+    ref: `nothing_new:${new Date(now).toISOString().slice(0, 10)}`,
+    title: 'Nothing new since the last text. They asked for this either way: say so in a line.',
+    at: null,
+  };
 }
 
 /**
@@ -199,7 +220,8 @@ export function dueBriefLines(due: readonly DuePerson[]): string[] {
           ? 'never repeat'
           : `repeat after ${watch.repeatAfterDays} days`;
       const form = watch.form ? `, ${watch.form}` : '';
-      lines.push(`  - watch ${watch.key} [${watch.mode}${form}, every ${watch.everyDays} days, ${repeat}]: ${oneLine(watch.about)}`);
+      const always = watch.always ? ', send even when nothing is new' : '';
+      lines.push(`  - watch ${watch.key} [${watch.mode}${form}, every ${watch.everyDays} days, ${repeat}${always}]: ${oneLine(watch.about)}`);
       for (const row of watch.candidates) {
         if (listed >= BRIEF_CANDIDATES_MAX) break;
         lines.push(`    - ${row.table} ${row.ref} | ${clipTitle(row.title)}${row.changed ? ' (changed)' : ''}`);
@@ -406,6 +428,17 @@ export async function readWatchRows(db: SchemaReader, userId: string, table: str
   });
 }
 
+/** The person's zone from their settings, UTC when none is kept or it cannot be read. */
+async function readTimezone(db: SchemaReader, userId: string): Promise<string> {
+  try {
+    const { data } = await db('core').from('account_settings').select('timezone').eq('user_id', userId).maybeSingle();
+    const zone = typeof data?.timezone === 'string' ? data.timezone : '';
+    return zone && Intl.supportedValuesOf('timeZone').includes(zone) ? zone : 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 /**
  * Who is due by their rule now and free to write, read from the database. A table that cannot be read leaves that watch with
  * no candidates rather than failing the round.
@@ -418,6 +451,9 @@ export async function loadReachOutDue(input: {
   now: number;
 }): Promise<{ people: RulePerson[]; due: DuePerson[]; heldBack: number }> {
   const { you, db, userId, now } = input;
+  let zone: Promise<string> | null = null;
+  // Read once, and only when a kind that works by the day asks for it.
+  const timezone = () => (zone ??= readTimezone(db, userId));
   const people = await readRulePeople(you, userId, input.unreadBy);
   const sent = await readSent(
     you,
@@ -433,7 +469,15 @@ export async function loadReachOutDue(input: {
       const clock = watchClock(watch, mine, now);
       if (!clock.due) continue;
       const rows: CandidateRow[] = [];
-      for (const table of watch.tables) {
+      if (watch.kind) {
+        try {
+          rows.push(...(await readKindRows(watch, { db, userId, since: clock.since, now, timezone })));
+        } catch (error) {
+          // An unreadable kind gives this watch nothing to say today.
+          console.error(`reach-out: ${watch.kind} could not be read`, error instanceof Error ? error.message : error);
+        }
+      }
+      for (const table of watch.kind ? [] : watch.tables) {
         try {
           rows.push(...(await readWatchRows(db, userId, table, clock.since)));
         } catch {
