@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn';
 import { NoteButton } from '@/components/shell/feedback-button';
 import { ThemeRepair } from '@/components/shell/theme-picker';
 import { AccountMenu } from '@/components/shell/account-menu';
+import { mailWorkspacesFor } from '@/lib/core/inbox/mail-check';
 import { StatusLine } from '@/components/shell/status-line';
 import { CommandPalette } from '@/components/shell/command-palette';
 import { SearchBar, isSearchShortcut } from '@/components/shell/search-bar';
@@ -885,7 +886,12 @@ export function AppShell({
                   left of the four Dashes (note 2f0f2a60). */}
                   <NoteButton className="lg:hidden" />
 
-                  <AccountMenu initial={initial} label={`Your account, ${displayName ?? email}`} theme={theme} />
+                  <AccountMenu
+                    initial={initial}
+                    label={`Your account, ${displayName ?? email}`}
+                    theme={theme}
+                    mailWorkspaces={mailWorkspacesFor(workspaces)}
+                  />
                 </div>
               </div>
             </header>

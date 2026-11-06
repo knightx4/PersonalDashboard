@@ -407,6 +407,8 @@ import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { withBadges } from '@/lib/shell/tabs';
 import { AccountMenu } from '@/components/shell/account-menu';
+import { MAIL_WORKSPACES, type MailCheckStatus } from '@/lib/core/inbox/mail-check';
+
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
 import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
@@ -723,6 +725,44 @@ import {
   VaultThemeSurface,
 } from './vault-page-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
+
+/** The gallery's clock for Check mail (plan #3019). */
+const MAIL_NOW = Date.parse('2026-11-06T12:00:00Z');
+const MAIL_CHECK_DONE: MailCheckStatus = {
+  mailboxes: 2,
+  running: false,
+  lastCheckedAt: '2026-11-06T11:58:00Z',
+  nextAllowedAt: null,
+  linked: {
+    jobs: { claimed: 2, linked: 1, failed: 0, errors: 0 },
+    commerce: { claimed: 3, linked: 3, failed: 0, errors: 0 },
+    appointments: { claimed: 1, linked: 1, failed: 0, errors: 0 },
+  },
+  problems: [],
+};
+const MAIL_CHECK_PROBLEMS: MailCheckStatus = {
+  mailboxes: 2,
+  running: false,
+  lastCheckedAt: '2026-11-06T11:59:35Z',
+  nextAllowedAt: '2026-11-06T12:00:35Z',
+  linked: { jobs: { claimed: 0, linked: 0, failed: 0, errors: 0 } },
+  problems: [
+    {
+      kind: 'reconnect',
+      email: 'christopher.alexander-whitfield@example.com',
+      message:
+        'Gmail stopped letting the app read christopher.alexander-whitfield@example.com. Reconnect it to check again.',
+    },
+  ],
+};
+const MAIL_CHECK_NONE: MailCheckStatus = {
+  mailboxes: 0,
+  running: false,
+  lastCheckedAt: null,
+  nextAllowedAt: null,
+  linked: null,
+  problems: [],
+};
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -8515,7 +8555,55 @@ export const SURFACES: readonly Surface[] = [
       // The top bar's rule for its icon buttons, so the picture shows the
       // theme controls as they are drawn inside the bar.
       <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
-        <AccountMenu initial="C" label="Your account, Chris" theme={{ kind: 'written', id: 'paper' }} defaultOpen />
+        <AccountMenu
+          initial="C"
+          label="Your account, Chris"
+          theme={{ kind: 'written', id: 'paper' }}
+          mailWorkspaces={MAIL_WORKSPACES}
+          mailFixture={{ status: MAIL_CHECK_DONE, now: MAIL_NOW }}
+          defaultOpen
+        />
+      </div>
+    ),
+  },
+  {
+    /* Check mail in the account menu (plan #3019) while one mailbox needs
+     * reconnecting and the last check was under a minute ago, so the
+     * buttons wait out the minute. */
+    id: 'shell-account-menu-mail-problems',
+    label: 'Top bar · Account menu · Check mail problems',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
+        <AccountMenu
+          initial="C"
+          label="Your account, Chris"
+          theme={{ kind: 'written', id: 'paper' }}
+          mailWorkspaces={MAIL_WORKSPACES.filter((w) => w.id !== 'finances')}
+          mailFixture={{ status: MAIL_CHECK_PROBLEMS, now: MAIL_NOW }}
+          defaultOpen
+        />
+      </div>
+    ),
+  },
+  {
+    /* Check mail with no mailbox connected (plan #3019): one Connect Gmail
+     * link in place of the buttons. */
+    id: 'shell-account-menu-mail-none',
+    label: 'Top bar · Account menu · No mailbox',
+    module: 'jobs',
+    width: 'narrow',
+    render: () => (
+      <div className="flex min-h-[44rem] justify-end max-lg:[&_button:not([data-menu-panel]_button)]:size-10 lg:[&_button:not([data-menu-panel]_button)]:size-9">
+        <AccountMenu
+          initial="C"
+          label="Your account, Chris"
+          theme={{ kind: 'written', id: 'paper' }}
+          mailWorkspaces={MAIL_WORKSPACES}
+          mailFixture={{ status: MAIL_CHECK_NONE, now: MAIL_NOW }}
+          defaultOpen
+        />
       </div>
     ),
   },

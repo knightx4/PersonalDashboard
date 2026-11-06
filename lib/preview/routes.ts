@@ -385,6 +385,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-go-to': ['/home'],
   'shell-capture': ['/home'],
   'shell-account-menu': ['/home'],
+  'shell-account-menu-mail-problems': ['/home'],
+  'shell-account-menu-mail-none': ['/home'],
   'shell-capture-aimed': ['/home'],
   'shell-capture-aimed-shopping': ['/shopping/orders', '/shopping/inventory', '/shopping/saved'],
   'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
@@ -1161,7 +1163,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/shell/back-link.tsx',
     'components/shell/page-width.tsx',
   ],
-  'shell-account-menu': ['components/shell/account-menu.tsx'],
+  'shell-account-menu': ['components/shell/account-menu.tsx', 'components/shell/mail-check.tsx'],
   // The status line while a run is going (plan #1964.2.3).
   'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
   'shell-status-run-new': ['components/shell/status-line.tsx'],
