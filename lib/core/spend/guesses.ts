@@ -455,6 +455,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // the sentence in; the places it goes out. About three pauses in typing a
   // sentence.
   'place-capture': run(HAIKU, 3 * 1_200, 3 * 120),
+  // A Claude Code session on Opus: most of what it sends is read from the
+  // prompt cache, so the input here is the full-price equivalent of a few
+  // million cached tokens and a few hundred thousand written, about $2.
+  'hand-off-session': background(run(OPUS, 450_000, 15_000)),
   // One passage of about 1,500 characters and its row's title.
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
   // One question of a sentence or so.
