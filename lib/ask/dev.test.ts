@@ -504,6 +504,35 @@ describe('find_dev_text', () => {
     expect(text.endsWith(' …')).toBe(true);
   });
 
+  it('says where each row stands, and names the step a shaped idea became (note 8913d747)', async () => {
+    const SHAPED = id(41);
+    const TRIAGED = id(42);
+    const SHAPED_STEP = id(43);
+    const staged: Tables = {
+      ...tables,
+      ideas: [
+        ...tables.ideas,
+        { id: SHAPED, user_id: ME, body: 'Ranking in the studio', source: 'me', triage: { kind: { value: 'feature' } }, plan_item_id: SHAPED_STEP, updated_at: '2026-09-07T10:00:00Z', dismissed_at: null },
+        { id: TRIAGED, user_id: ME, body: 'Ranking by bar', source: 'me', triage: { kind: { value: 'feature' } }, plan_item_id: null, updated_at: '2026-09-06T10:00:00Z', dismissed_at: null },
+      ],
+      feedback_items: [{ ...tables.feedback_items[0], status: 'in_progress' }],
+      plan_items: [
+        ...tables.plan_items,
+        { id: SHAPED_STEP, user_id: ME, number: 2833, title: 'Studio fixes', kind: 'build', status: 'in_progress', detail: null, acceptance: null, comment: null, resolution: null, updated_at: '2026-09-01T10:00:00Z', dismissed_at: null },
+      ],
+    };
+    const result = await find({ query: 'ranking', kinds: ['idea', 'note', 'raise'] }, { tables: staged });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(Object.fromEntries(result.rows.map((row) => [row.ref, row.detail?.status]))).toEqual({
+      [SHAPED]: 'shaped into the plan as #2833, in progress',
+      [TRIAGED]: 'triaged, not yet on the plan',
+      [RANK_IDEA]: 'waiting for triage',
+      [NOTE]: 'in progress',
+      [RAISE]: 'open',
+    });
+  });
+
   it('finds the comment that said to drop a step, cited as the step it sits on', async () => {
     const result = await find({ query: 'drop step', kinds: ['comment'] });
     expect(result.ok).toBe(true);
