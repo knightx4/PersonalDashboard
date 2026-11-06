@@ -6,6 +6,7 @@ import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import { buildRunId, type BuildRun } from '@/lib/you/live-cards';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { withMessageFiles } from '@/lib/you/chat-message-files';
+import { withWatches } from '@/lib/you/watch-decide';
 import { loadThreadPage, type ThreadPage } from '@/lib/you/chat-threads';
 
 /**
@@ -35,6 +36,8 @@ export async function loadThreadParts(
     // The thread still opens when its cards cannot be read; a reply re-reads them.
     createCoreClient()
       .then((core) => loadPeopleChanges(core, chatId))
+      // A watch Dash wrote is drawn as it is now, with Approve and Decline while proposed (plan #3030.1.2).
+      .then((changes) => withWatches(client, changes))
       .catch((error: unknown) => {
         console.error('thread changes not read', error);
         return [];
