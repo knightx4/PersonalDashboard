@@ -11,6 +11,7 @@ import { BURST_REQUEST_MS, MAX_REPLY_ROUNDS, runGroupBurst } from '@/lib/you/gro
 import { loadGroup } from '@/lib/you/group-chats';
 import { lookUpPlaces } from '@/lib/you/places-lookup';
 import { claimTyping } from '@/lib/you/mentor-reply';
+import { groupStillOwed } from '@/lib/you/reply-turn';
 import { isOwner } from '@/lib/dev/owner';
 import { botPageStarter } from '@/lib/you/bot-pages-store';
 import { sessionStarter } from '@/lib/talk/session-handoff-store';
@@ -48,6 +49,54 @@ export async function sendGroupMessageInRequest(userId: string, input: { chatId:
   // A burst already running sees this message after the turn in hand and plans again.
   if (await claimTyping(client, userId, input.chatId, now)) after(() => burstInRequest(userId, input.chatId, { claimed: true, round: undefined }, chainTo));
   return { error: null, saved: true, messageId: message.data.id };
+}
+
+/**
+ * Ask a group to answer the person's newest text again (plan #2988.3): Try
+ * again on a burst that failed, or the thread's safety net once a text has
+ * waited a minute with nothing typing (`stalled`). It claims the lease and
+ * runs the burst after the action answers, as a send does; nothing starts
+ * while a burst already holds the lease, since that one reads the text. The
+ * safety net also starts nothing when the text is no longer the newest, or
+ * a burst already ended quietly after it.
+ */
+export async function retryGroupBurstInRequest(
+  userId: string,
+  chatId: string,
+  chainTo: ChainTo,
+  options: { stalled?: boolean } = {},
+): Promise<{ error: string | null }> {
+  const client = await createYouClient();
+  const group = await loadGroup(client, userId, chatId);
+  if (!group) return { error: 'That group is not there any more.' };
+  if (group.members.length === 0) return { error: 'Add a bot to the group first.' };
+  if (options.stalled) {
+    const [chat, newest] = await Promise.all([
+      client.from('advisor_chats').select('reply_status, reply_requested_at').eq('user_id', userId).eq('id', chatId).maybeSingle(),
+      client
+        .from('advisor_messages')
+        .select('role, created_at')
+        .eq('user_id', userId)
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (chat.error || newest.error) return { error: 'The group could not reply. Try again.' };
+    const last = (newest.data ?? null) as { role?: unknown; created_at?: unknown } | null;
+    if (last?.role !== 'person' || typeof last.created_at !== 'string') return { error: null };
+    const row = (chat.data ?? {}) as { reply_status?: unknown; reply_requested_at?: unknown };
+    const owed = groupStillOwed(
+      {
+        replyStatus: typeof row.reply_status === 'string' ? row.reply_status : null,
+        requestedAt: typeof row.reply_requested_at === 'string' ? row.reply_requested_at : null,
+      },
+      last.created_at,
+    );
+    if (!owed) return { error: null };
+  }
+  if (await claimTyping(client, userId, chatId, Date.now())) after(() => burstInRequest(userId, chatId, { claimed: true, round: undefined }, chainTo));
+  return { error: null };
 }
 
 /** A chained request carrying a burst on; the request before it still holds the lease. */
@@ -91,7 +140,7 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
     console.error('group burst could not run', error);
     await client
       .from('advisor_chats')
-      .update({ typing_until: null, reply_status: 'failed', reply_error: 'The group could not reply. Send it again to try once more.' })
+      .update({ typing_until: null, reply_status: 'failed', reply_error: 'The group could not reply.' })
       .eq('user_id', userId)
       .eq('id', chatId);
     await client.from('advisor_chat_members').update({ typing_until: null }).eq('user_id', userId).eq('chat_id', chatId);

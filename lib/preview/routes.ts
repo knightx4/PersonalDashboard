@@ -458,6 +458,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-group': ['/chat/groups/[id]'],
   'chat-group-typing': ['/chat/groups/[id]'],
   'chat-group-new': ['/chat/groups/[id]'],
+  'chat-group-reply-failed': ['/chat/groups/[id]'],
   'chat-group-settings': ['/chat/groups/[id]'],
   'chat-group-settings-delete': ['/chat/groups/[id]'],
   'chat-bots': ['/chat/bots'],
