@@ -49,8 +49,11 @@ order by created_at;
 ```
 
 If the row is not there, or its status is `done` or `failed`, stop: it has been
-handled. With no id in the brief, work every row for that user whose status is
-`pending` or `fired`, oldest first.
+handled. If its `kind` is `session`, or the brief's second line is `kind
+session`, follow **A session hand-off** below instead of the steps here. With
+no id in the brief, work every row for that user whose `kind` is `request` and
+whose status is `pending` or `fired`, oldest first. Rows of kind `page` and
+`session` are left alone there: each is started with its own id.
 
 ## 2. Decide whether you may do it
 
@@ -174,6 +177,73 @@ If something stopped you from finishing (a write refused, a table you could not
 find), still write a reply saying what went wrong in a sentence, then set
 `status = 'failed'` and `error` to the reason. A hand-off is never left
 `fired`: the thread keeps waiting on it.
+
+## A session hand-off
+
+A brief that opens `Hand-off <id>` and then `kind session` comes from a bot
+handing on work too big for a chat turn (plan #3005): Ask Dash, or a bot on
+People such as Gert, Zena, Jerwyn, Maya or the builder, in a one-on-one or a
+group chat. The work is usually long writing (a plan step with its full
+detail, a vault note, a prep doc, a cover letter), research, or changes across
+many rows. The bot has already told the person it is on it. The app started
+this run (`lib/talk/handoff-fire.ts`) and moved the row to running.
+
+The rules in step 2 hold as they are: create and edit their rows, never
+delete, send or spend, and change rows, not code. What differs:
+
+**Read the row, the thread and the refs.**
+
+```sql
+select id, kind, advisor_id, conversation_id, advisor_chat_id, request, asked,
+       summary, refs, subject_ref, state
+from core.dash_handoffs where id = '<id>' and user_id = '<user_id>' and kind = 'session';
+
+-- Ask Dash (conversation_id set): the conversation, as in step 1.
+-- A People chat (advisor_chat_id set): the last of it, and who the bot is.
+select role, speaker_id, text, created_at from you.advisor_messages
+where chat_id = '<advisor_chat_id>' and user_id = '<user_id>'
+order by created_at desc limit 40;
+select name from you.board_advisors where id = '<advisor_id>' and user_id = '<user_id>';
+```
+
+`asked` is the person's request in their own words and is what you are held
+to; `request` is the bot's version of it. Read every row in `refs` before you
+start: the bot named them because the work needs them.
+
+**Say you are at work.** Run this first, and again after each long stretch,
+about every ten minutes. It keeps `last_seen_at`, which is how a session gone
+quiet is noticed:
+
+```sh
+npx tsx scripts/handoff-session.ts seen <id>
+```
+
+**Do all of it.** You have the room the chat turn did not, so finish the
+work rather than a first part of it. A plan step goes through
+`scripts/plan.ts` and the plan skill's rules, a goal through the goals
+skill's. Record each row you write with `core.record_dash_action`, as step 3
+says. No note is filed: a session hand-off is the bot using a session as
+meant, not a gap in its tools.
+
+**Reply in the thread.** For an Ask Dash conversation, write the reply as
+step 4 says and keep its turn id. In a People chat the bot posts the result
+in its own voice; that post is plan #3005.4 and not built yet, so put what
+you did, with links, in your report until it is.
+
+**Close it through the script, never with an update.** Closing counts the
+session's cost toward spend: one `core.model_spend` row per model under
+`core / hand-off-session`, read from this session's transcripts, and the
+total on `cost_micros`. An update through `scripts/sql.ts` would skip that.
+
+```sh
+npx tsx scripts/handoff-session.ts close <id> --done --reply-turn <turn id>
+npx tsx scripts/handoff-session.ts close <id> --failed "The vault note was refused: its folder does not exist."
+```
+
+The failure reason is read by the person in the thread, so write it as one
+plain sentence on what stopped you. Run `close` as the last thing you do, so
+the cost it counts is the whole session's. A session hand-off is never left
+running, whatever happened.
 
 ## Report
 

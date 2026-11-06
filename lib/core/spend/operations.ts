@@ -198,6 +198,11 @@ export const SPEND_OPERATIONS = {
     // todo, a goal update or a note on a job (plan #1581). Haiku, one call
     // per pause in typing, and one on Enter when no guess had come back yet.
     'place-capture',
+    // A Claude Code session doing work a bot handed on (plan #3005.3): Ask
+    // Dash or a bot on People, on the Dash backup routine. Counted from the
+    // session's own transcripts when it closes the hand-off
+    // (scripts/handoff-session.ts), one row per model; background.
+    'hand-off-session',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one
