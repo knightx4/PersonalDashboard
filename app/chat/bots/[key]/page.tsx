@@ -7,6 +7,7 @@ import { loadPersonCard } from '@/lib/you/people-cards';
 import { botVoiceStatus } from '@/lib/talk/speech/fish';
 import {
   correctPersonMemory,
+  decidePersonWatch,
   deletePersonCard,
   draftPersonCard,
   removePersonMemory,
@@ -63,6 +64,7 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
           delete: deletePersonCard,
           setReachOut,
           turnOffReachOut: turnOffPersonReachOut,
+          decideWatch: decidePersonWatch,
           photo: saveBotPhoto,
           voice: { list: listBotVoices, save: saveBotVoice },
         }}

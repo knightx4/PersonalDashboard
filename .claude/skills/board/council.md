@@ -364,6 +364,16 @@ watch's key, as for any watch. The app already keeps what the watch saw, so
 nothing else is written for it, and a row of it you pass over is not listed
 again unless it changes.
 
+Some watches are fixed kinds (plan #3030.3): the app has already narrowed
+their rows to what was asked, such as the newsletter issues of the last day,
+the stories on a named topic, a charge over the named amount, tomorrow's
+schedule, a return window closing or a goal the review marked stalled. Each
+row's title carries the figures to quote. Write about them as the person
+would, in their voice, and record each row named as for any watch. A watch
+whose line ends `send even when nothing is new` was asked for either way:
+when its only row is `nothing_new:<day>`, send one short text saying nothing
+new came in, and record that row under the watch so its clock moves on.
+
 A person with two due watches sends one text that covers both. When nothing
 listed is worth a text, write nothing for them and say so in the summary;
 the same rows stay listed at the next due round.

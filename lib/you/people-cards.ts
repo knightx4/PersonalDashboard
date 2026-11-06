@@ -11,6 +11,7 @@ import { mentorColour } from '@/lib/you/chat-threads-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { ruleFor, storedTextWhen, textSwitches, type TextSwitch } from '@/lib/you/first-texts';
 import { REACH_OUT_COLUMNS, readSentBy, reachOutViewOf } from '@/lib/you/reach-out-card';
+import { readWaitingWatches } from '@/lib/you/watch-decide';
 import {
   ASK_MAX,
   briefOf,
@@ -56,7 +57,7 @@ export async function loadPersonCard(
   const row = found.data as Record<string, unknown> | null;
   if (!row || typeof row.id !== 'string') return null;
   const photoPath = str(row.photo_path);
-  const [versions, memory, sent, photos] = await Promise.all([
+  const [versions, memory, sent, photos, watches] = await Promise.all([
     client
       .from('advisor_persona_versions')
       .select('id, persona, made_by, ask, created_at')
@@ -74,6 +75,7 @@ export async function loadPersonCard(
       .limit(60),
     row.reach_out_rule == null ? Promise.resolve([]) : readSentBy(client, userId, row.id),
     signBotPhotos(client, [photoPath]),
+    readWaitingWatches(client, userId, row.id),
   ]);
   if (versions.error) throw new Error(`Reading their earlier cards failed: ${versions.error.message}`);
   if (memory.error) throw new Error(`Reading what they remember failed: ${memory.error.message}`);
@@ -90,7 +92,7 @@ export async function loadPersonCard(
     versions: (versions.data ?? []).flatMap((v) => versionOf(v as Record<string, unknown>) ?? []),
     memory: (memory.data ?? []).flatMap((m) => memoryOf(m as Record<string, unknown>) ?? []) as CouncilMemory[],
     texts: textsOf(str(row.key), row.text_when),
-    reachOut: reachOutViewOf(row, sent, now),
+    reachOut: { ...reachOutViewOf(row, sent, now), watches },
     photo: photos.get(photoPath) ?? null,
     voice: voiceOfRow(row),
   };

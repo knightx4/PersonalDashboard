@@ -142,6 +142,27 @@ describe("a person's due watches", () => {
     expect(due).toEqual([]);
   });
 
+  it('is due with nothing new when they asked for a summary either way (plan #3030.3)', () => {
+    const daily: ReachOutWatch = { ...roundup, key: 'news', kind: 'news_issues', tables: ['news.issues'], every_days: 1, always: true };
+    const due = dueWatchesOf({ person: person({ version: 1, watches: [daily] }), sent: [], rowsFor: () => [], now: MONDAY });
+    expect(due).toHaveLength(1);
+    expect(due[0]).toMatchObject({ key: 'news', always: true });
+    expect(due[0].candidates).toEqual([
+      { table: 'news.issues', ref: 'nothing_new:2026-11-02', title: expect.stringMatching(/^Nothing new/), at: null },
+    ]);
+    expect(dueBriefLines([{ advisorId: 'n', key: 'newt', name: 'Newt', watches: due }]).join('\n')).toContain(
+      'send even when nothing is new',
+    );
+    // Recorded like any row, it moves the clock on to the next day.
+    const next = dueWatchesOf({
+      person: person({ version: 1, watches: [daily] }),
+      sent: [sent('news', 'news.issues', 'nothing_new:2026-11-02', MONDAY)],
+      rowsFor: () => [],
+      now: MONDAY + 2 * 60 * 60 * 1000,
+    });
+    expect(next).toEqual([]);
+  });
+
   it('lists at most a handful of rows per watch', () => {
     const many = Array.from({ length: 20 }, (_, i) => row('job_search.applications', `r${i}`, MONDAY - 60_000 * (i + 1)));
     const [watch] = dueWatchesOf({

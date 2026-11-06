@@ -9,6 +9,7 @@ import { BotsView } from '@/app/chat/bots-view';
 import { PersonForm } from '@/app/chat/people/person-form';
 import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
 import type { ReachOutView } from '@/lib/you/reach-out-card-model';
+import type { WatchCard } from '@/lib/you/watch-card-model';
 import type { VoiceList } from '@/lib/talk/speech/voices-model';
 import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
@@ -200,6 +201,25 @@ const FRANKLIN_REACH_OUT_FAILED: ReachOutView = {
   next: null,
 };
 
+/** The watch Dash wrote for Franklin's savings, waiting for your OK (plan #3030.2). */
+const SAVINGS_WATCH: WatchCard = {
+  id: 'w-savings',
+  about: 'Your savings balance dropping under £2,000',
+  sendsWhen: 'Your savings account is under £2,000 at the check and was not at the last one.',
+  sample: 'Your savings are at £1,940, just under the £2,000 you set. A quiet week on takeaway would put you back over.',
+  everyDays: 1,
+  mode: 'each',
+  tables: ['finances.accounts'],
+  status: 'proposed',
+  matched: 0,
+};
+
+/** Nothing in the words is in a table a fixed watch reads, so Dash wrote a watch for all of it. */
+const FRANKLIN_REACH_OUT_WATCH: ReachOutView = { ...FRANKLIN_REACH_OUT_FAILED, watches: [SAVINGS_WATCH] };
+
+/** The rule covers the weekly habit; the savings and takeaway it left out get a watch of their own. */
+const FRANKLIN_REACH_OUT_PARTLY: ReachOutView = { ...FRANKLIN_REACH_OUT, watches: [SAVINGS_WATCH] };
+
 /** The Skeptic, one of the board's seats: its form says it cannot be deleted. */
 const SKEPTIC_SEAT: PersonCard = {
   ...FRANKLIN_PERSON,
@@ -259,7 +279,9 @@ export function ChatPersonEditSurface({
     | 'reach-out'
     | 'reach-out-empty'
     | 'reach-out-setting'
-    | 'reach-out-failed';
+    | 'reach-out-failed'
+    | 'reach-out-watch'
+    | 'reach-out-partly';
 }) {
   const card =
     state === 'seat'
@@ -272,9 +294,13 @@ export function ChatPersonEditSurface({
             ? { ...FRANKLIN_PERSON, reachOut: { ...FRANKLIN_REACH_OUT, summary: null, cannotWatch: [], next: null } }
             : state === 'reach-out-failed'
               ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_FAILED }
-              : state === 'voice' || state === 'voice-picker' || state === 'voice-gone'
-                ? { ...FRANKLIN_PERSON, voice: FRANKLIN_VOICE }
-                : FRANKLIN_PERSON;
+              : state === 'reach-out-watch'
+                ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_WATCH }
+                : state === 'reach-out-partly'
+                  ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_PARTLY }
+                  : state === 'voice' || state === 'voice-picker' || state === 'voice-gone'
+                    ? { ...FRANKLIN_PERSON, voice: FRANKLIN_VOICE }
+                    : FRANKLIN_PERSON;
   return (
     <Shell path={`/chat/bots/${card.key}`}>
       <BotsView rows={state === 'photo' ? WITH_PHOTO : EVERYONE} current={card.key}>
@@ -302,9 +328,11 @@ export function ChatPersonEditSurface({
                   ? 'memory'
                   : state === 'delete' || state === 'seat'
                     ? 'delete'
-                    : state.startsWith('reach-out')
-                      ? 'reach-out'
-                      : null
+                    : state === 'reach-out-partly'
+                      ? 'reach-out-watches'
+                      : state.startsWith('reach-out')
+                        ? 'reach-out'
+                        : null
           }
         />
       </BotsView>

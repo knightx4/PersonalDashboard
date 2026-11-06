@@ -28,7 +28,27 @@ export const REACH_OUT_LIMITS = {
   cannotWatchLength: 200,
   brief: 2000,
   summary: 600,
+  words: 8,
+  wordLength: 60,
+  amount: 10_000_000,
+  days: 90,
+  from: 200,
 } as const;
+
+/**
+ * What a fixed watch kind is told (plan #3030.3): the topics or subject words
+ * to match, an amount in the account's currency (major units, so 2000 is
+ * £2,000), a number of days ahead, and a sender's name or address. Which of
+ * them a kind reads is lib/you/reach-out-kinds.ts's business.
+ */
+export type ReachOutParams = {
+  words?: string[];
+  amount?: number;
+  days?: number;
+  from?: string;
+};
+
+const PARAM_KEYS = ['words', 'amount', 'days', 'from'] as const;
 
 export type ReachOutWatch = {
   /** Unique in the rule; advisor_reach_outs.watch_key names it. */
@@ -43,6 +63,15 @@ export type ReachOutWatch = {
   /** Days before the same row may be named again; null for never. */
   repeat_after_days: number | null;
   form?: ReachOutForm;
+  /**
+   * A fixed watch kind (lib/you/reach-out-kinds.ts, plan #3030.3): the round
+   * reads its rows with the kind's own reader rather than from `tables`,
+   * which then names the one table the rows are recorded under.
+   */
+  kind?: string;
+  params?: ReachOutParams;
+  /** Text at its cadence even when nothing is new: "a daily summary either way". */
+  always?: boolean;
 };
 
 export type ReachOutRule = {
@@ -67,6 +96,29 @@ function textIn(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.trim().length >= 1 && value.trim().length <= max;
 }
 
+/** Why a watch's params would be refused, or null when they would not. */
+export function paramsError(params: unknown): string | null {
+  if (!isObject(params)) return 'params is not an object.';
+  const unknown = Object.keys(params).filter((k) => !(PARAM_KEYS as readonly string[]).includes(k));
+  if (unknown.length) return `unknown param ${unknown[0]}.`;
+  if ('words' in params) {
+    const words = params.words;
+    if (!Array.isArray(words) || words.length < 1 || words.length > REACH_OUT_LIMITS.words) {
+      return `words is a list of one to ${REACH_OUT_LIMITS.words}.`;
+    }
+    if (!words.every((w) => textIn(w, REACH_OUT_LIMITS.wordLength))) return 'a word is empty or too long.';
+  }
+  if ('amount' in params) {
+    const amount = params.amount;
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > REACH_OUT_LIMITS.amount) {
+      return `amount is not a number above 0 and up to ${REACH_OUT_LIMITS.amount}.`;
+    }
+  }
+  if ('days' in params && !wholeIn(params.days, 1, REACH_OUT_LIMITS.days)) return `days is not a whole number from 1 to ${REACH_OUT_LIMITS.days}.`;
+  if ('from' in params && !textIn(params.from, REACH_OUT_LIMITS.from)) return 'from is empty or too long.';
+  return null;
+}
+
 /** The rule, or why it would be refused. */
 export function parseReachOutRule(value: unknown): { rule: ReachOutRule } | { error: string } {
   if (!isObject(value)) return { error: 'The rule is not an object.' };
@@ -81,7 +133,7 @@ export function parseReachOutRule(value: unknown): { rule: ReachOutRule } | { er
   for (const watch of watches) {
     if (!isObject(watch)) return { error: 'A watch is not an object.' };
     const unknown = Object.keys(watch).filter(
-      (k) => !['key', 'about', 'tables', 'mode', 'every_days', 'repeat_after_days', 'form'].includes(k),
+      (k) => !['key', 'about', 'tables', 'mode', 'every_days', 'repeat_after_days', 'form', 'kind', 'params', 'always'].includes(k),
     );
     if (unknown.length) return { error: `Unknown key ${unknown[0]} on a watch.` };
     if (typeof watch.key !== 'string' || !KEY.test(watch.key)) return { error: 'A watch key is not a short snake_case name.' };
@@ -104,6 +156,14 @@ export function parseReachOutRule(value: unknown): { rule: ReachOutRule } | { er
     }
     if ('form' in watch && !(REACH_OUT_FORMS as readonly unknown[]).includes(watch.form)) {
       return { error: `${watch.key}: the form is not list or bubbles.` };
+    }
+    if ('kind' in watch && (typeof watch.kind !== 'string' || !KEY.test(watch.kind))) {
+      return { error: `${watch.key}: the kind is not a short snake_case name.` };
+    }
+    if ('always' in watch && typeof watch.always !== 'boolean') return { error: `${watch.key}: always is not true or false.` };
+    if ('params' in watch) {
+      const why = paramsError(watch.params);
+      if (why) return { error: `${watch.key}: ${why}` };
     }
   }
   if ('cannot_watch' in value) {

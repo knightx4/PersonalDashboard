@@ -15,6 +15,7 @@ import {
   watchRhythm,
   type WatchCard,
   type WatchDecision,
+  type WatchOutcome,
   type WatchStatus,
 } from '@/lib/you/watch-card-model';
 
@@ -25,8 +26,10 @@ import {
  * Decline while it waits. Approve sets the watch active and Decline sets it
  * declined; the toast after Decline puts it back.
  *
- * The press is handed in (app/chat/actions.ts, or the gallery's fixtures),
- * keyed by the set_reach_out change that proposed the watch.
+ * In a thread the press is keyed by the set_reach_out change that proposed
+ * the watch (WatchProposal); on a person's form it is keyed by the watch
+ * itself (WatchDecisionCard, plan #3030.2). Either is handed in from
+ * app/chat/actions.ts, or from the gallery's fixtures.
  */
 
 const GLYPH: Record<WatchStatus, typeof Check> = {
@@ -37,9 +40,12 @@ const GLYPH: Record<WatchStatus, typeof Check> = {
   stopped: CircleSlash,
 };
 
+const OFFLINE = 'That did not go through. Check your connection and try again.';
+
+/** The thread's card: the press goes by the change, and the thread hears of the change as it now is. */
 export function WatchProposal({
   change,
-  watch: given,
+  watch,
   press,
   onChanged,
 }: {
@@ -48,9 +54,32 @@ export function WatchProposal({
   press?: (id: string, decision: WatchDecision) => Promise<ChangeOutcome>;
   onChanged?: (change: DashChange) => void;
 }) {
+  const decide = press
+    ? async (decision: WatchDecision): Promise<WatchOutcome> => {
+        const outcome = await press(change.id, decision).catch((): ChangeOutcome => ({ ok: false, error: OFFLINE, change: null }));
+        if (outcome.change?.watch) onChanged?.(outcome.change);
+        const now = outcome.change?.watch ?? null;
+        if (outcome.ok) return now ? { ok: true, watch: now } : { ok: false, error: OFFLINE, watch: null };
+        return { ok: false, error: outcome.error, watch: now };
+      }
+    : undefined;
+  return <WatchDecisionCard watch={watch} decide={decide} />;
+}
+
+/** The card itself, with the press keyed however the page keys it. */
+export function WatchDecisionCard({
+  watch: given,
+  decide: press,
+  undoable = true,
+}: {
+  watch: WatchCard;
+  decide?: (decision: WatchDecision) => Promise<WatchOutcome>;
+  /** Whether a change's Undo stands behind the card, as in a thread; the form has none. */
+  undoable?: boolean;
+}) {
   const [watch, setWatch] = useState(given);
   const [seen, setSeen] = useState(given);
-  // A newer copy from the thread (a reply re-read the changes) wins.
+  // A newer copy from the page (a reply re-read the changes) wins.
   if (given !== seen) {
     setSeen(given);
     setWatch(given);
@@ -65,14 +94,9 @@ export function WatchProposal({
     setError(null);
     setPressing(decision);
     startPress(async () => {
-      const outcome = await press(change.id, decision).catch(
-        (): ChangeOutcome => ({ ok: false, error: 'That did not go through. Check your connection and try again.', change: null }),
-      );
+      const outcome = await press(decision).catch((): WatchOutcome => ({ ok: false, error: OFFLINE, watch: null }));
       setPressing(null);
-      if (outcome.change?.watch) {
-        setWatch(outcome.change.watch);
-        onChanged?.(outcome.change);
-      }
+      if (outcome.watch) setWatch(outcome.watch);
       if (!outcome.ok) {
         setError(outcome.error);
         return;
@@ -81,10 +105,9 @@ export function WatchProposal({
         toast({
           text: closedToast('declined', watch.about),
           undo: async () => {
-            const back = await press(change.id, 'reopen');
+            const back = await press('reopen');
             if (!back.ok) throw new Error(back.error);
-            if (back.change.watch) setWatch(back.change.watch);
-            onChanged?.(back.change);
+            setWatch(back.watch);
           },
         });
       }
@@ -140,7 +163,7 @@ export function WatchProposal({
               onClick={() => decide('decline')}
             />
           </div>
-          <p className="text-small text-ink-muted">Once you approve it, Undo can no longer take it back.</p>
+          {undoable && <p className="text-small text-ink-muted">Once you approve it, Undo can no longer take it back.</p>}
         </div>
       )}
 

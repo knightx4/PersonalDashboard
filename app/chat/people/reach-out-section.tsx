@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/field';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { NO_REACH_OUT, nextTextWhen, REACH_OUT_CAPS, type ReachOutView } from '@/lib/you/reach-out-card-model';
 import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
+import type { WatchDecision, WatchOutcome } from '@/lib/you/watch-card-model';
+import { WatchDecisionCard } from '@/components/talk/watch-card';
 
 /**
  * Reaching out, on a person's form (plan #2931.3): what they should text you
@@ -18,11 +20,17 @@ import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
  * hold one back. Change reopens the box with your words; Turn off drops the
  * rule and keeps them. A rule that could not be made keeps your words and
  * says what Dash could not read.
+ *
+ * What no fixed watch reads gets a watch Dash writes itself (plan #3030.2),
+ * shown in the card waiting for your OK with Approve and Decline: the whole
+ * brief when the rule was refused, or the parts it could not watch.
  */
 
 export type ReachOutActions = {
   set: (advisorId: string, brief: string) => Promise<{ view: ReachOutView } | { error: string }>;
   turnOff: (advisorId: string) => Promise<{ view: ReachOutView } | { error: string }>;
+  /** Approve or decline a waiting watch, by its id; absent, its card has no presses. */
+  decide?: (watchId: string, decision: WatchDecision) => Promise<WatchOutcome>;
 };
 
 export function ReachOutSection({
@@ -49,7 +57,10 @@ export function ReachOutSection({
   const [setting, setSetting] = useState(initialSetting);
   const [failed, setFailed] = useState<string | null>(null);
   const [turningOff, startTurnOff] = useTransition();
-  const set = view.summary !== null;
+  const ruled = view.summary !== null;
+  const watches = view.watches ?? [];
+  // A watch waiting for your OK stands in for a rule the brief could not make.
+  const set = ruled || watches.length > 0;
   const showCard = set && !changing && !setting;
 
   const setUp = async () => {
@@ -89,21 +100,36 @@ export function ReachOutSection({
       </div>
       {showCard ? (
         <Card padding="standard" className="flex flex-col gap-3 bg-sunken">
-          <p className="text-body text-ink">{view.summary}</p>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-small">
-            {view.next && (
-              <>
-                <dt className="text-ink-muted">Next text</dt>
-                <dd className="text-ink">{nextTextWhen(view.next, { timeZone: timezone, now })}</dd>
-              </>
-            )}
-            {view.cannotWatch.length > 0 && (
-              <>
-                <dt className="text-ink-muted">Not watched</dt>
-                <dd className="text-ink">{view.cannotWatch.join('; ')}</dd>
-              </>
-            )}
-          </dl>
+          {/* With no rule, the watch below carries the card and this is only its lead. */}
+          {ruled ? (
+            <p className="text-body text-ink">{view.summary}</p>
+          ) : (
+            <p className="text-small text-ink-muted">No fixed watch reads what you asked for, so Dash wrote {name} a watch of its own.</p>
+          )}
+          {(view.next || view.cannotWatch.length > 0) && (
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-small">
+              {view.next && (
+                <>
+                  <dt className="text-ink-muted">Next text</dt>
+                  <dd className="text-ink">{nextTextWhen(view.next, { timeZone: timezone, now })}</dd>
+                </>
+              )}
+              {view.cannotWatch.length > 0 && (
+                <>
+                  <dt className="text-ink-muted">Not watched</dt>
+                  <dd className="text-ink">{view.cannotWatch.join('; ')}</dd>
+                </>
+              )}
+            </dl>
+          )}
+          {watches.length > 0 && (
+            <div id="person-reach-out-watches" className={ruled ? 'flex scroll-mt-4 flex-col gap-3 border-t border-border pt-3' : 'flex scroll-mt-4 flex-col gap-3'}>
+              {ruled && <p className="text-small text-ink-muted">For what that leaves out, Dash wrote a watch of its own.</p>}
+              {watches.map((watch) => (
+                <WatchDecisionCard key={watch.id} watch={watch} undoable={false} decide={actions.decide ? (decision) => actions.decide!(watch.id, decision) : undefined} />
+              ))}
+            </div>
+          )}
           <p className="text-small text-ink-muted">{REACH_OUT_CAPS}</p>
           {failed && (
             <p role="alert" className="text-small text-danger">
@@ -114,9 +140,11 @@ export function ReachOutSection({
             <Button type="button" variant="link" disabled={turningOff} onClick={() => setChanging(true)}>
               Change
             </Button>
-            <Button type="button" variant="link" pending={turningOff} disabled={turningOff} onClick={turnOff}>
-              Turn off
-            </Button>
+            {ruled && (
+              <Button type="button" variant="link" pending={turningOff} disabled={turningOff} onClick={turnOff}>
+                Turn off
+              </Button>
+            )}
           </div>
         </Card>
       ) : (

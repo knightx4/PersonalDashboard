@@ -1,4 +1,5 @@
 import { whenDay } from '@/lib/core/when';
+import type { WatchCard } from '@/lib/you/watch-card-model';
 
 /**
  * What a person's edit form and their thread show of their reach-out rule
@@ -25,6 +26,12 @@ export type ReachOutView = {
   error: string | null;
   /** When the next text is due: at null, the next daily round. Null with no rule. */
   next: { at: string | null } | null;
+  /**
+   * Watches Dash wrote for what no fixed watch reads, waiting for your OK
+   * (plan #3030.2): the whole brief when nothing in it was covered, or the
+   * parts the rule could not watch. None when absent.
+   */
+  watches?: WatchCard[];
 };
 
 export const NO_REACH_OUT: ReachOutView = { brief: '', summary: null, cannotWatch: [], error: null, next: null };

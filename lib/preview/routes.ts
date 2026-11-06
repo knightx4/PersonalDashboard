@@ -492,6 +492,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-person-edit-reach-out-empty': ['/chat/bots/[key]'],
   'chat-person-edit-reach-out-setting': ['/chat/bots/[key]'],
   'chat-person-edit-reach-out-failed': ['/chat/bots/[key]'],
+  'chat-person-edit-reach-out-watch': ['/chat/bots/[key]'],
+  'chat-person-edit-reach-out-partly': ['/chat/bots/[key]'],
   'chat-people-thread-next-text': ['/chat/people/[key]'],
   'chat-people-thread-text-first': ['/chat/people/[key]'],
   'ask-page-hidden': ['/chat/dash', '/chat/dash/[ref]'],

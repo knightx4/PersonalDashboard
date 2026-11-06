@@ -8,6 +8,7 @@ import {
   watchIdOf,
   type WatchCard,
   type WatchDecision,
+  type WatchOutcome,
 } from '@/lib/you/watch-card-model';
 
 /**
@@ -39,7 +40,7 @@ export async function withWatches(you: YouSupabaseClient, changes: DashChange[])
   });
 }
 
-export type WatchDecided = { ok: true; watch: WatchCard } | { ok: false; error: string; watch: WatchCard | null };
+export type WatchDecided = WatchOutcome;
 
 /** Why a decision did not move a watch that is now in `status`. */
 function alreadyWords(decision: WatchDecision, watch: WatchCard): string {
@@ -78,4 +79,43 @@ export async function decideWatch(
   const current = watchCardFrom(found as Record<string, unknown> | null);
   if (!current) return { ok: false, error: 'That watch was taken back, so there is nothing to decide.', watch: null };
   return { ok: false, error: alreadyWords(decision, current), watch: current };
+}
+
+/**
+ * The watches waiting for the person's OK for one person on People, oldest
+ * first, for the Reaching out section of their form (plan #3030.2), wherever
+ * they were written: the form or Dash in a thread. Approved and stopped ones
+ * are listed on the mentor page instead.
+ */
+export async function readWaitingWatches(you: YouSupabaseClient, userId: string, advisorId: string): Promise<WatchCard[]> {
+  const { data, error } = await you
+    .from('advisor_watches')
+    .select(WATCH_CARD_SELECT)
+    .eq('user_id', userId)
+    .eq('advisor_id', advisorId)
+    .eq('status', 'proposed')
+    .order('created_at', { ascending: true })
+    .limit(10);
+  if (error) throw new Error(`Reading the watches waiting for your OK failed: ${error.message}`);
+  return ((data ?? []) as Record<string, unknown>[]).flatMap((row) => watchCardFrom(row) ?? []);
+}
+
+/**
+ * New words on the form replace the old (plan #3030.2): a watch still
+ * waiting for this person is declined, so pressing Set it up again never
+ * leaves two proposals side by side. Approved watches keep running.
+ */
+export async function declineWaitingWatches(
+  you: YouSupabaseClient,
+  userId: string,
+  advisorId: string,
+  now: string = new Date().toISOString(),
+): Promise<void> {
+  const { error } = await you
+    .from('advisor_watches')
+    .update({ status: 'declined', decided_at: now })
+    .eq('user_id', userId)
+    .eq('advisor_id', advisorId)
+    .eq('status', 'proposed');
+  if (error) throw new Error(`Setting aside the watches waiting for your OK failed: ${error.message}`);
 }

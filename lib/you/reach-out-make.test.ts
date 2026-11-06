@@ -277,6 +277,85 @@ describe('readReachOutReply', () => {
   });
 });
 
+// Plan #3030.3: the asks that used to come back as cannot_watch.
+const kindWatch = (over: Record<string, unknown>) => ({
+  key: 'w',
+  about: 'x',
+  kind: null,
+  params: { words: null, amount: null, days: null, from: null },
+  tables: [],
+  mode: 'roundup',
+  every_days: 1,
+  repeat_after_days: null,
+  form: 'list',
+  always: false,
+  ...over,
+});
+
+describe('fixed watch kinds in a reply', () => {
+  it("makes Newt's news from the past 24 hours each morning a daily news round-up", () => {
+    const made = readReachOutReply({
+      watches: [kindWatch({ key: 'morning_news', about: 'the news from the past 24 hours', kind: 'news_issues' })],
+      cannot_watch: [],
+      understood: 'Newt the Newsboy will text you each morning with a summary of the news from the past 24 hours.',
+    });
+    if (!made.ok) throw new Error(made.error);
+    expect(made.rule.watches).toEqual([
+      {
+        key: 'morning_news',
+        about: 'the news from the past 24 hours',
+        kind: 'news_issues',
+        tables: ['news.issues'],
+        mode: 'roundup',
+        every_days: 1,
+        repeat_after_days: null,
+        form: 'list',
+      },
+    ]);
+    expect(made.rule.cannot_watch).toBeUndefined();
+  });
+
+  it('keeps the amount, topic and days it was told, and a summary either way', () => {
+    const made = readReachOutReply({
+      watches: [
+        kindWatch({ key: 'big_charges', kind: 'charge_over', mode: 'each', form: null, params: { words: ['x'], amount: 2000, days: null, from: null } }),
+        kindWatch({ key: 'ai_news', kind: 'news_topics', params: { words: ['AI'], amount: null, days: null, from: null }, always: true }),
+        kindWatch({ key: 'returns', kind: 'return_window', every_days: 1, params: { words: null, amount: null, days: null, from: null } }),
+      ],
+      cannot_watch: [],
+      understood: 'Ok.',
+    });
+    if (!made.ok) throw new Error(made.error);
+    const byKey = Object.fromEntries(made.rule.watches.map((w) => [w.key, w]));
+    expect(byKey.big_charges).toMatchObject({ kind: 'charge_over', tables: ['finances.transactions'], params: { amount: 2000 } });
+    expect(byKey.big_charges.params).toEqual({ amount: 2000 });
+    expect(byKey.ai_news).toMatchObject({ params: { words: ['AI'] }, always: true });
+    expect(byKey.returns.params).toEqual({ days: 7 });
+  });
+
+  it('sends a kind missing what it needs to cannot_watch, where a custom watch picks it up', () => {
+    const made = readReachOutReply({
+      watches: [
+        kindWatch({ key: 'news', kind: 'news_issues' }),
+        kindWatch({ key: 'charges', about: 'big charges', kind: 'charge_over' }),
+      ],
+      cannot_watch: [],
+      understood: 'Ok.',
+    });
+    if (!made.ok) throw new Error(made.error);
+    expect(made.rule.watches.map((w) => w.key)).toEqual(['news']);
+    expect(made.rule.cannot_watch).toEqual(['big charges']);
+  });
+
+  it('offers every kind in the reply schema and the prompt', async () => {
+    const { REACH_OUT_KINDS } = await import('@/lib/you/reach-out-kinds');
+    const { REACH_OUT_RULES } = await import('@/lib/you/reach-out-make');
+    const kinds = REACH_OUT_REPLY_SCHEMA.properties.watches.items.properties.kind.anyOf[0].enum;
+    expect([...kinds]).toEqual(REACH_OUT_KINDS.map((k) => k.kind));
+    for (const k of REACH_OUT_KINDS) expect(REACH_OUT_RULES).toContain(`- ${k.kind} (`);
+  });
+});
+
 describe('reachOutSummary', () => {
   it('stays inside the 600 characters the column allows, gaps included', () => {
     const summary = reachOutSummary('a'.repeat(700), ['one thing', 'another']);

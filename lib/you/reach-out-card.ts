@@ -3,6 +3,7 @@ import { DUE_SLACK_MS, lastSentUnder, type SentRef } from '@/lib/you/reach-out-d
 import { reachOutSummary } from '@/lib/you/reach-out-make';
 import { parseReachOutRule, type ReachOutRule } from '@/lib/you/reach-out-rule';
 import { NO_REACH_OUT, type ReachOutView } from '@/lib/you/reach-out-card-model';
+import { readWaitingWatches } from '@/lib/you/watch-decide';
 
 /**
  * Building the reach-out view a person's form and thread draw (plan
@@ -88,8 +89,11 @@ export async function loadReachOutView(client: YouSupabaseClient, userId: string
   if (error) throw new Error(`Reading what they text you about failed: ${error.message}`);
   if (!data) return NO_REACH_OUT;
   const row = data as Record<string, unknown>;
-  const sent = row.reach_out_rule == null ? [] : await readSentBy(client, userId, advisorId);
-  return reachOutViewOf(row, sent, now);
+  const [sent, watches] = await Promise.all([
+    row.reach_out_rule == null ? Promise.resolve([]) : readSentBy(client, userId, advisorId),
+    readWaitingWatches(client, userId, advisorId),
+  ]);
+  return { ...reachOutViewOf(row, sent, now), watches };
 }
 
 /**
