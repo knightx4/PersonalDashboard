@@ -542,7 +542,7 @@ export function ThreadView({
       }),
     [messages, openingIds, olderIds, person.id],
   );
-  useSpeakArrivals(arrived);
+  useSpeakArrivals(arrived, person.key);
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
   // What they have done for a reply still coming is the live card's, at the foot, until the reply settles it.
   const working = workingCard(messages, changes, awaitingReply, today);
@@ -755,7 +755,7 @@ export function SpeakRun({ messages, bot }: { messages: readonly ThreadMessage[]
   const ids = said.map((m) => m.id);
   return (
     <div className="flex flex-col items-start">
-      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} bot={bot} />
+      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} parts={said} bot={bot} />
       <SpeakNote ids={ids} className="px-1" />
     </div>
   );

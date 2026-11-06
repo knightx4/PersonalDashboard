@@ -367,7 +367,7 @@ export function GroupThreadView({
       ? [{ id: m.id, text: m.text, bot: m.speakerId ?? null }]
       : [],
   );
-  useSpeakArrivals(arrived);
+  useSpeakArrivals(arrived, chatId);
   const empty = messages.length === 0 && pending.length === 0;
   // A failed burst is said under your last text, while nothing newer is on its way.
   const failedNote =
