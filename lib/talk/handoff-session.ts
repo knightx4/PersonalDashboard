@@ -182,15 +182,18 @@ export const SEEN_SQL = `update core.dash_handoffs
  * writes the spend (SPEND_SQL), and a second close counts nothing. Two
  * statements rather than one with a writing CTE, because the HTTPS path
  * (public.service_sql) runs a statement inside a query, where Postgres
- * refuses one. Parameters from closeParameters.
+ * refuses one. Parameters from closeParameters. A reply turn written in an
+ * Ask Dash conversation has told the thread, so told_at is set with it and
+ * the watch (you.watch_bot_pages) leaves the row alone.
  */
 export const CLOSE_SQL = `update core.dash_handoffs
      set status = $3, error = $4, finished_at = now(), last_seen_at = now(),
          cost_micros = $5::bigint,
+         told_at = case when $6::uuid is not null then now() else told_at end,
          reply_turn_id = coalesce($6::uuid, reply_turn_id),
          note_id = coalesce($7::uuid, note_id)
    where id = $1 and user_id = $2 and kind = 'session' and status in ('pending', 'fired')
-   returning id, state, cost_micros`;
+   returning id, state, cost_micros, told_at`;
 
 /**
  * The session's cost toward spend: one core.model_spend row per model, under
@@ -239,4 +242,95 @@ export function spendParameter(spend: readonly SessionSpend[]): string {
       cost_micros: row.costMicros,
     })),
   );
+}
+
+/*
+ * Telling the thread (plan #3005.4). An Ask Dash session writes its own reply
+ * turn and passes its id to close. A People chat (one-on-one or group) is
+ * told by the bot through you.tell_bot_session: the session's sentence in
+ * the bot's voice, its links as the message's receipts, and the Undo as a
+ * link to Home, where every change it recorded with core.record_dash_action
+ * has one. A failure is told through you.tell_bot_page, with the reason.
+ * Whatever a session leaves unsaid, you.watch_bot_pages says: quiet for
+ * SESSION_NUDGE_MINUTES is flagged, quiet for SESSION_GIVE_UP_MINUTES is
+ * failed and told, and one closed done with nothing posted is reported.
+ */
+
+/** Silence, from the last report, before the thread is told it is taking long. */
+export const SESSION_NUDGE_MINUTES = 20;
+/** Silence before the hand-off is failed and the thread told. */
+export const SESSION_GIVE_UP_MINUTES = 90;
+
+/** The hand-off's thread, read before closing so the right telling is checked. $1 id, $2 owner. */
+export const THREAD_SQL = `select id, conversation_id, advisor_chat_id, state
+    from core.dash_handoffs
+   where id = $1 and user_id = $2 and kind = 'session'`;
+
+/** Posts a finished session's result in its People chat, once. $1 id, $2 owner, $3 text, $4 receipts. */
+export const TELL_DONE_SQL = `select you.tell_bot_session($1::uuid, $2::uuid, $3, $4::text::jsonb) as message_id`;
+
+/** Tells the thread a session failed, with the reason, once. $1 id. */
+export const TELL_FAILED_SQL = `select you.tell_bot_page($1::uuid) as message_id`;
+
+/** A link under the bot's message: the People thread shows each under the text. */
+export type SessionReceipt = { label: string; link: string };
+
+/** Where every change Dash recorded today has its Undo (app/home/dash-today.tsx). */
+export const UNDO_RECEIPT: SessionReceipt = { label: 'Undo on Home', link: '/home#dash-today' };
+
+const MAX_RECEIPTS = 8;
+const MAX_LABEL = 120;
+const MAX_REPLY = 20000;
+
+/**
+ * The receipts for a People post, from `--link "<label>=<path>"` values and
+ * whether any change was recorded (the Undo). A link is a path in the app,
+ * so nothing posted points outside it.
+ */
+export function sessionReceipts(
+  links: readonly string[],
+  undo: boolean,
+): { ok: true; receipts: SessionReceipt[] } | { ok: false; error: string } {
+  const receipts: SessionReceipt[] = [];
+  for (const value of links) {
+    const at = value.lastIndexOf('=');
+    const label = at > 0 ? value.slice(0, at).trim() : '';
+    const link = at > 0 ? value.slice(at + 1).trim() : '';
+    if (!label || !link) return { ok: false, error: `--link "${value}" is not "<label>=<path>".` };
+    if (!link.startsWith('/') || link.startsWith('//')) {
+      return { ok: false, error: `--link "${value}" is not a path in the app, such as /goals/<id>.` };
+    }
+    receipts.push({ label: label.slice(0, MAX_LABEL), link });
+  }
+  if (undo) receipts.push(UNDO_RECEIPT);
+  if (receipts.length > MAX_RECEIPTS) return { ok: false, error: `At most ${MAX_RECEIPTS} links, the Undo among them.` };
+  return { ok: true, receipts };
+}
+
+/** Where the hand-off was asked, as THREAD_SQL reads it. */
+export type SessionThread = { conversationId: string | null; advisorChatId: string | null };
+
+/**
+ * Why a close would leave the thread without its result, or null when it
+ * would not. Done in an Ask Dash conversation needs the reply turn; done in
+ * a People chat needs the reply text. A failure needs neither: the reason
+ * is told for it.
+ */
+export function closeRefusal(
+  thread: SessionThread,
+  close: SessionClose,
+  reply: string | null,
+): string | null {
+  if (close.outcome === 'failed') return null;
+  if (thread.conversationId && !close.replyTurnId) {
+    return 'An Ask Dash hand-off closes done with --reply-turn <id>: write the reply turn first, so the thread hears what you did.';
+  }
+  if (thread.advisorChatId) {
+    const text = reply?.trim() ?? '';
+    if (!text) {
+      return 'A People hand-off closes done with --reply "<what you did, in the bot\'s voice>", so the thread hears it.';
+    }
+    if (text.length > MAX_REPLY) return `The reply is over ${MAX_REPLY} characters.`;
+  }
+  return null;
 }

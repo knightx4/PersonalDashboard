@@ -14,7 +14,10 @@ import type { SessionHandoff } from './handoffs';
  * The row is claimed before the routine is fired: pending becomes fired
  * (state running) only where it is still pending, so two callers holding the
  * same row start one session between them. A fire that fails marks it
- * failed with Anthropic's reason, so the thread can say so.
+ * failed with Anthropic's reason and as told: the turn that handed it on
+ * says it did not get passed on (startHandoffs in lib/dash/ask.ts, notHandedOn
+ * in lib/talk/session-handoff.ts), so the watch (you.watch_bot_pages) does
+ * not say it a second time.
  */
 
 export type FireSessionDeps = {
@@ -85,7 +88,7 @@ async function finish(
 ): Promise<void> {
   const { error } = await core
     .from('dash_handoffs')
-    .update({ status: 'failed', error: reason, finished_at: now })
+    .update({ status: 'failed', error: reason, finished_at: now, told_at: now })
     .eq('id', id)
     .eq('user_id', userId)
     .eq('status', from);

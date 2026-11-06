@@ -99,7 +99,11 @@ describe('fireSessionHandoff', () => {
       error: 'The session could not be started: Anthropic answered 401.',
     });
     expect(row.status).toBe('failed');
-    expect(updates[1]).toMatchObject({ status: 'failed', finished_at: '2026-11-06T10:00:00.000Z' });
+    expect(updates[1]).toMatchObject({
+      status: 'failed',
+      finished_at: '2026-11-06T10:00:00.000Z',
+      told_at: '2026-11-06T10:00:00.000Z',
+    });
   });
 
   it('marks it failed when no routine is set up', async () => {

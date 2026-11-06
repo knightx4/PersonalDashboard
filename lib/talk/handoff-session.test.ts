@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { costMicrosFor } from '@/lib/core/spend/pricing';
-import { sessionHandoffBrief, totalSessionMicros, transcriptSpend } from './handoff-session';
+import {
+  closeRefusal,
+  sessionHandoffBrief,
+  sessionReceipts,
+  totalSessionMicros,
+  transcriptSpend,
+  UNDO_RECEIPT,
+} from './handoff-session';
 
 const HANDOFF = {
   id: 'h1',
@@ -90,5 +97,45 @@ describe('transcriptSpend', () => {
     expect(totalSessionMicros(spend)).toBe(20);
     expect(totalSessionMicros([])).toBe(0);
     expect(totalSessionMicros(spend.filter((row) => row.costMicros === null))).toBeNull();
+  });
+});
+
+describe('sessionReceipts (plan #3005.4)', () => {
+  it('reads each link as a label and a path in the app, with the Undo last', () => {
+    const made = sessionReceipts(['Prep sheet=/goals/files/f1', 'Goal: run a 10k = /goals/g1'], true);
+    expect(made).toEqual({
+      ok: true,
+      receipts: [
+        { label: 'Prep sheet', link: '/goals/files/f1' },
+        { label: 'Goal: run a 10k', link: '/goals/g1' },
+        UNDO_RECEIPT,
+      ],
+    });
+    expect(sessionReceipts([], false)).toEqual({ ok: true, receipts: [] });
+  });
+
+  it('refuses a link with no label, or one outside the app', () => {
+    expect(sessionReceipts(['/goals/g1'], false).ok).toBe(false);
+    expect(sessionReceipts(['Site=https://example.com'], false).ok).toBe(false);
+    expect(sessionReceipts(['Site=//example.com'], false).ok).toBe(false);
+    expect(sessionReceipts(Array.from({ length: 8 }, (_, i) => `R${i}=/r/${i}`), true).ok).toBe(false);
+  });
+});
+
+describe('closeRefusal (plan #3005.4)', () => {
+  const ask = { conversationId: 'c1', advisorChatId: null };
+  const people = { conversationId: null, advisorChatId: 'chat1' };
+
+  it('holds a done close to telling its thread', () => {
+    expect(closeRefusal(ask, { outcome: 'done' }, null)).toMatch(/--reply-turn/);
+    expect(closeRefusal(ask, { outcome: 'done', replyTurnId: 't1' }, null)).toBeNull();
+    expect(closeRefusal(people, { outcome: 'done' }, null)).toMatch(/--reply/);
+    expect(closeRefusal(people, { outcome: 'done' }, '   ')).toMatch(/--reply/);
+    expect(closeRefusal(people, { outcome: 'done' }, 'Done: I wrote the step in full.')).toBeNull();
+  });
+
+  it('lets a failure close with its reason alone', () => {
+    expect(closeRefusal(ask, { outcome: 'failed', reason: 'x' }, null)).toBeNull();
+    expect(closeRefusal(people, { outcome: 'failed', reason: 'x' }, null)).toBeNull();
   });
 });
