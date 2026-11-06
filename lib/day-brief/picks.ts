@@ -52,6 +52,7 @@ export type Shortlisted = { candidate: Candidate; pick: DayBriefPick };
  */
 export const KIND_ORDER: readonly Exclude<CandidateKind, 'todo'>[] = [
   'interview',
+  'booked',
   'deadline',
   'bill',
   'card',
@@ -94,7 +95,15 @@ export function reasonFor(candidate: Candidate, context: Context): string {
       const when = candidate.at
         ? `Interview today at ${whenTime(candidate.at, { timeZone: context.timezone })}`
         : 'Interview today';
-      return candidate.detail ? `${when} (${candidate.detail})` : when;
+      const said = candidate.detail ? `${when} (${candidate.detail})` : when;
+      return candidate.conflict ? `${said}. ${candidate.conflict}` : said;
+    }
+    case 'booked': {
+      const when = candidate.at
+        ? `Today at ${whenTime(candidate.at, { timeZone: context.timezone })}`
+        : 'Today, all day';
+      const said = `${when}, from ${candidate.from}${candidate.detail ? ` (${candidate.detail})` : ''}`;
+      return candidate.conflict ? `${said}. ${candidate.conflict}` : said;
     }
     case 'deadline':
       return 'The return window closes today';
@@ -179,7 +188,7 @@ export function toPick(candidate: Candidate, context: Context): DayBriefPick {
 /** Within a kind, the stronger first; the key settles every tie. */
 function compareWithinKind(a: Candidate, b: Candidate): number {
   const byKey = a.key.localeCompare(b.key);
-  if (a.kind === 'interview' && b.kind === 'interview') {
+  if ((a.kind === 'interview' && b.kind === 'interview') || (a.kind === 'booked' && b.kind === 'booked')) {
     return (a.at ?? '￿').localeCompare(b.at ?? '￿') || byKey;
   }
   if (a.kind === 'bill' && b.kind === 'bill') {
@@ -274,6 +283,7 @@ export function picksFromKeys(
 
 const KIND_LABEL: Record<CandidateKind, string> = {
   interview: 'Interview',
+  booked: 'Booked today',
   deadline: 'Deadline',
   bill: 'Bill',
   card: 'Card payment',

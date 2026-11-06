@@ -91,8 +91,10 @@ own jobs, bills, card payments, email, goals and your own finished work, each wi
 might matter today. Choose the one to three that matter most to them today.
 
 Rules:
-- Prefer what cannot be moved today (an interview, a deadline, a bill or card payment due)
+- Prefer what cannot be moved today (an interview, something booked, a deadline, a bill or card
+  payment due)
   and what someone is waiting on the person for, over what can wait a day.
+- When a line asks which of two times is right, choose it and keep that question in.
 - Choose fewer when only one or two really matter. Never more than three.
 - Answer with the keys exactly as given, the most important first.`;
 

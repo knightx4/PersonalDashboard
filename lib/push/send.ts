@@ -44,7 +44,7 @@ export type PushPorts = {
 export type PushResult = { sent: number; forgotten: number; failed: number };
 
 /** First picks that keep the notification on the home page: they cannot move today. */
-const HOLDS_THE_MORNING: ReadonlySet<CandidateKind> = new Set<CandidateKind>(['interview', 'deadline', 'bill']);
+const HOLDS_THE_MORNING: ReadonlySet<CandidateKind> = new Set<CandidateKind>(['interview', 'booked', 'deadline', 'bill']);
 
 /**
  * The brief as a notification: the title and body stored with the day

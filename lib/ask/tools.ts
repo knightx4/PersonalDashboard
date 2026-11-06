@@ -20,6 +20,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { agendaLookup } from './agenda';
+import { scheduleLookup } from './schedule';
 import { accountsLookup, balanceHistoryLookup, transactionSpendLookup } from './finances';
 import { applicationAnswersLookup } from './answers';
 import { duplicateAnswersLookup } from './duplicate-answers';
@@ -67,6 +68,7 @@ export const ASK_TOOL_NAMES = [
   'duplicate_answers',
   'todos',
   'agenda',
+  'schedule',
   'goal_status',
   'vault_notes',
   'note_positions',
@@ -418,6 +420,19 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'schedule',
+    description:
+      "What is on a day or a range of days, from morning to night: the person's own calendar events, every calendar they subscribe to (such as Partiful), appointments and reservations from booking emails, job interviews, and the todos, job reminders, bills, return windows and goal steps due. Each thing is listed once, with also_in naming the other places it is; conflict asks which time is right when two places disagree. Use it for every question about what they have on, what is planned or whether they are free, and give every day of the range: for a weekend, Saturday and Sunday (and Friday evening when they ask about the weekend on a Friday).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: { ...DATE_FIELD, description: 'First day, YYYY-MM-DD, inclusive. Defaults to today.' },
+        to: { ...DATE_FIELD, description: 'Last day, YYYY-MM-DD, inclusive. Defaults to from. At most 31 days.' },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'goal_status',
     description:
       'Each of the person\'s open goals with its area and its newest status from the daily goals review: on track, stalled, waiting on them, waiting on a date or waiting on another goal, with the reason and the next move. The note lists all their areas, in order, and totals count goals per area, so this answers "what areas are my goals in". Each links to the goal\'s page.',
@@ -671,6 +686,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   duplicate_answers: { run: duplicateAnswersLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
   agenda: { run: agendaLookup, module: 'todo' },
+  schedule: { run: scheduleLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },
