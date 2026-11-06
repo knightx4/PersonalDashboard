@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import type { AskRows } from '@/lib/ask/list-filter';
-import { MENTOR_PALETTE } from '@/lib/you/chat-threads-model';
 import { AskDashProvider, AskThread, useAskDash, type AskSource } from '@/components/shell/ask-dash';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import { PageHeader } from '@/components/shell/page-header';
@@ -33,6 +32,7 @@ import { SESSION_SENT_BODY, THINK_FALLBACK, type SessionSentState } from '@/lib/
 import { SessionSentFixture } from '@/components/talk/think-switch';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import { PANE_CHATS } from './chat-surfaces';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -283,17 +283,6 @@ const BOX_ROWS = [
   { kind: 'task' as const, id: 't1', title: 'List the Catan lot', href: '/todo/t/t1' },
 ];
 
-/** The bots in the sheet's row (plan #2976), the one messaged last first; enough to scroll on a phone. */
-const BOTS = [
-  { key: 'hiring-manager', name: 'Hiring Manager', colour: MENTOR_PALETTE[0], photo: null, unread: true },
-  { key: 'cfo', name: 'The CFO', colour: MENTOR_PALETTE[2], photo: null, unread: false },
-  { key: 'skeptic', name: 'The Skeptic', colour: MENTOR_PALETTE[5], photo: null, unread: false },
-  { key: 'dreamer', name: 'Dreamer', colour: MENTOR_PALETTE[4], photo: null, unread: false },
-  { key: 'franklin', name: 'Benjamin Franklin', colour: MENTOR_PALETTE[1], photo: null, unread: false },
-  { key: 'buffett', name: 'Warren Buffett', colour: MENTOR_PALETTE[6], photo: null, unread: false },
-  { key: 'washington', name: 'George Washington', colour: MENTOR_PALETTE[3], photo: null, unread: false },
-];
-
 const FIXTURES: AskSource = {
   ask: async (question, _ref, _page, onLookup, _files, _list, onText, more) => {
     // The lookups appear one by one, then the answer as it is written (plans #1438, #1902).
@@ -368,7 +357,6 @@ const FIXTURES: AskSource = {
     return { conversation, turns, stop: 'answered' };
   },
   recent: async () => ({ conversations: RECENT }),
-  bots: async () => ({ bots: BOTS }),
   // A goal's page names the goal; every other page keeps the sheet's own
   // name for it, the workspace.
   label: async (page) => {
@@ -389,24 +377,42 @@ const FIXTURES: AskSource = {
   decline: pressed('declined'),
   undo: pressed('undone'),
   costs: async () => ASK_COSTS,
+  // The Messages chats the sheet's row switches to (plan #2981).
+  chats: PANE_CHATS,
 };
 
+/**
+ * The sheet with a Messages chat open in it (plan #2981), Earlier questions
+ * open over Dash's chat, or a mark's name showing under the row: each a
+ * state only a press or a pointer reaches.
+ */
+export function AskDashChatsSurface({ part, children }: { part: 'chat' | 'group' | 'earlier' | 'name'; children: React.ReactNode }) {
+  const label =
+    part === 'chat'
+      ? 'Benjamin Franklin, unread'
+      : part === 'group'
+        ? 'Northwind offer, unread'
+        : part === 'earlier'
+          ? 'Earlier questions'
+          : 'The Mentor';
+  return (
+    <AskDashSurface open>
+      {children}
+      {/* After the sheet has opened and read its row. */}
+      <ActOnArrival label={label} focus={part === 'name'} after={300} />
+    </AskDashSurface>
+  );
+}
+
 /** Opens the sheet as the page arrives, sending `question` when given. */
-function OpenOnArrival({ question, rows, earlier }: { question?: string; rows?: AskRows; earlier?: boolean }) {
+function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }) {
   const handle = useAskDash();
   useEffect(() => {
     // A tick after hydration, as a press would: a question sent from inside
     // the hydrating render showed nothing until its answer landed, so the
     // lookups and the answer being written never drew (plan #1902).
     const timer = setTimeout(() => handle?.open(question, rows), 0);
-    // Earlier questions pressed open (plan #2976), once the list has been read.
-    const press = earlier
-      ? setTimeout(() => document.querySelector<HTMLButtonElement>('[aria-controls="ask-dash-earlier"]')?.click(), 400)
-      : undefined;
-    return () => {
-      clearTimeout(timer);
-      if (press) clearTimeout(press);
-    };
+    return () => clearTimeout(timer);
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -420,11 +426,8 @@ export function AskDashSurface({
   rows,
   page = '/jobs',
   modelStart,
-  earlier,
   children,
 }: {
-  /** Earlier questions pressed open under the box (plan #2976). */
-  earlier?: boolean;
   /** The model chip's list open, or a pick that could not be saved (plan #2458.3). */
   modelStart?: 'open' | 'failed';
   open?: boolean;
@@ -448,7 +451,7 @@ export function AskDashSurface({
       modelStart={modelStart}
     >
       {children}
-      {open && <OpenOnArrival question={question} rows={rows} earlier={earlier} />}
+      {open && <OpenOnArrival question={question} rows={rows} />}
     </AskDashProvider>
   );
 }
