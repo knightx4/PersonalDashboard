@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
+import { BUBBLE_GAP_MS, createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
 
 function audioResponse() {
   return new Response(new Blob(['mp3'], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
@@ -13,7 +13,12 @@ function setup(responses: (() => Promise<Response>)[], play: () => Promise<void>
   const sent: string[] = [];
   const audios: SpeechAudio[] = [];
   const released: number[] = [];
+  const waits: number[] = [];
   const player = createSpeechPlayer({
+    wait: async (ms) => {
+      waits.push(ms);
+    },
+    now: () => 1000,
     fetch: (_url, init) => {
       sent.push(JSON.parse(String(init.body)).text);
       const next = responses.shift();
@@ -25,7 +30,14 @@ function setup(responses: (() => Promise<Response>)[], play: () => Promise<void>
       return { audio, release: () => released.push(audios.length) };
     },
   });
-  return { player, sent, audios, released };
+  return { player, sent, audios, released, waits };
+}
+
+/** A response that arrives when the test says. */
+function later() {
+  let answer: (r: Response) => void = () => {};
+  const promise = new Promise<Response>((resolve) => (answer = resolve));
+  return { next: () => promise, answer: () => answer(audioResponse()) };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -61,6 +73,7 @@ describe('the speech player', () => {
     await settle();
     expect(bodies).toEqual([
       { text: 'From Zena.', bot: 'zena-id' },
+      { text: 'From Jerwyn.', bot: 'jerwyn-id' },
       { text: 'A sample.', voice: 'v1' },
       { text: 'Dash.' },
     ]);
@@ -100,10 +113,11 @@ describe('the speech player', () => {
     player.speakOnce('b', 'Second.');
     player.speakOnce('a', 'First.');
     await settle();
-    expect(sent).toEqual(['First.']);
+    expect(sent).toEqual(['First.', 'Second.']);
+    expect(audios).toHaveLength(1);
     audios[0].onended?.();
     await settle();
-    expect(sent).toEqual(['First.', 'Second.']);
+    expect(audios).toHaveLength(2);
     expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
     audios[1].onended?.();
     player.speakOnce('b', 'Second.');
@@ -112,7 +126,7 @@ describe('the speech player', () => {
   });
 
   it('stops what is playing and empties the queue', async () => {
-    const { player, sent, audios } = setup([]);
+    const { player, audios } = setup([]);
     player.queue('a', 'First.');
     player.queue('b', 'Second.');
     await settle();
@@ -121,7 +135,8 @@ describe('the speech player', () => {
     expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
     audios[0].onended?.();
     await settle();
-    expect(sent).toEqual(['First.']);
+    expect(audios).toHaveLength(1);
+    expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
   });
 
   it('a press on another reply stops the first, and a late answer for the first is dropped', async () => {
@@ -134,5 +149,101 @@ describe('the speech player', () => {
     await settle();
     expect(audios).toHaveLength(1);
     expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
+  });
+
+  it('asks for every bubble as it is queued, while the first speaks (plan #3028)', async () => {
+    const second = later();
+    const third = later();
+    const { player, sent, audios } = setup([async () => audioResponse(), second.next, third.next]);
+    player.queue('a', 'One.');
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'a', phase: 'playing' });
+    player.queue('b', 'Two.');
+    player.queue('c', 'Three.');
+    // Both are on their way before the first ends, and neither cuts into it.
+    expect(sent).toEqual(['One.', 'Two.', 'Three.']);
+    expect(audios).toHaveLength(1);
+    expect(audios[0].pause).not.toHaveBeenCalled();
+  });
+
+  it('plays in the order the bubbles posted, not the order their audio came back, waiting for a slow one', async () => {
+    const first = later();
+    const { player, audios } = setup([first.next, async () => audioResponse(), async () => audioResponse()]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    player.queue('c', 'Three.');
+    await settle();
+    // Two and three are back, one is not: nothing plays yet, and two does not jump ahead.
+    expect(audios).toHaveLength(0);
+    expect(player.get()).toMatchObject({ key: 'a', phase: 'loading' });
+    first.answer();
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'a', phase: 'playing' });
+    audios[0].onended?.();
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
+    audios[1].onended?.();
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'c', phase: 'playing' });
+    audios[2].onended?.();
+    await settle();
+    expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
+  });
+
+  it('pauses briefly between bubbles, and not before the first', async () => {
+    const { player, audios, waits } = setup([]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    expect(waits).toEqual([]);
+    audios[0].onended?.();
+    await settle();
+    expect(waits).toEqual([BUBBLE_GAP_MS]);
+    expect(BUBBLE_GAP_MS).toBeLessThanOrEqual(400);
+  });
+
+  it('skips a bubble whose audio failed, keeps its note, and reads the next', async () => {
+    const { player, audios } = setup([async () => audioResponse(), async () => refusal(502, 'failed', 'Fish sent no audio.')]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    player.queue('c', 'Three.');
+    await settle();
+    audios[0].onended?.();
+    await settle();
+    expect(audios).toHaveLength(2);
+    expect(player.get()).toMatchObject({ key: 'c', phase: 'playing', notes: { b: 'Fish sent no audio.' } });
+  });
+
+  it('stop drops what is queued, and a later press does not fetch a stopped bubble again', async () => {
+    const second = later();
+    const { player, sent, audios } = setup([async () => audioResponse(), second.next]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    player.stop();
+    second.answer();
+    await settle();
+    expect(audios).toHaveLength(1);
+    expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
+    player.playList([
+      { key: 'a', text: 'One.' },
+      { key: 'b', text: 'Two.' },
+    ]);
+    await settle();
+    audios[1].onended?.();
+    await settle();
+    expect(sent).toEqual(['One.', 'Two.']);
+    expect(audios).toHaveLength(3);
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
+  });
+
+  it('asks again on a press after the route refused, since nothing was spent', async () => {
+    const { player, sent } = setup([async () => refusal(502, 'failed', 'Fish sent no audio.')]);
+    player.play('a', 'One.');
+    await settle();
+    player.play('a', 'One.');
+    await settle();
+    expect(sent).toEqual(['One.', 'One.']);
+    expect(player.get()).toMatchObject({ key: 'a', phase: 'playing' });
   });
 });

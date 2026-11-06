@@ -10,19 +10,36 @@
  * touched.
  *
  * - `play` starts a reply now, stopping whatever was playing.
- * - `queue` plays it after what is playing: a mentor sends a reply as several
- *   messages, and each arriving one is queued so they read in order.
+ * - `playList` does the same for a run of bubbles, read one after another.
+ * - `queue` plays it after what is playing: a bot sends a reply as several
+ *   bubbles, and each arriving one joins the end of the queue, so they are
+ *   read in the order they posted and a new one never cuts into the one
+ *   speaking.
  * - `speakOnce` queues a reply the first time it is asked for and never
  *   again, so a new reply plays once however often its row is drawn.
  * - `stop` ends the reply playing and empties the queue.
+ *
+ * Each bubble's audio is asked for the moment it is queued (plan #3028), not
+ * when its turn comes, so the second and third are fetched while the first
+ * speaks and are ready when it ends. Playback still follows the queue's
+ * order: a clip still loading when its turn comes is waited for, and one the
+ * route refused is skipped with its note while the rest carry on. Between
+ * bubbles there is a short pause, BUBBLE_GAP_MS, like someone moving on to
+ * their next text.
+ *
+ * What came back is kept by the bubble's key, text and voice, so a bubble is
+ * never sent twice: a press on a run already heard, or on a bubble that was
+ * stopped while its audio was on its way, plays what came back without
+ * spending the month's characters again. A stop lets fetches already sent
+ * finish into that store instead of throwing away audio already paid for.
  *
  * Whether new replies play at all is the speaking switch, kept in this
  * browser's storage (`talk.speaking`, '1' while on). Every access is
  * guarded: where site data is blocked the switch lasts until the page is
  * left.
  *
- * The fetch and the audio element are handed in so the order can be tested
- * (player.test.ts).
+ * The fetch, the audio and the wait are handed in so the order can be tested
+ * (player.test.ts); the browser's side is lib/talk/speech/output.ts.
  */
 
 export type SpeechPhase = 'idle' | 'loading' | 'playing';
@@ -44,11 +61,15 @@ export type SpeechAudio = {
 };
 
 export type PlayerDeps = {
+  /** Asked for each bubble's audio; never aborted, so what is paid for is kept. */
   fetch: (url: string, init: RequestInit) => Promise<Response>;
-  /** An audio element playing the MP3 in this blob. */
+  /** Something that plays the MP3 in this blob. */
   audio: (blob: Blob) => { audio: SpeechAudio; release: () => void };
   /** An audio element playing the recording at this link (plan #3006.5). */
   audioUrl?: (url: string) => { audio: SpeechAudio; release: () => void };
+  /** The pause between bubbles: a timer unless a test hands in its own. */
+  wait?: (ms: number) => Promise<void>;
+  now?: () => number;
 };
 
 /** A stand-in that cannot play, for a player given no audioUrl. */
@@ -63,6 +84,12 @@ export const SPEAK_HELD_BACK = 'Your browser held the sound back. Press play to 
 
 export const SPEAKING_KEY = 'talk.speaking';
 
+/** The pause between one bubble ending and the next starting. */
+export const BUBBLE_GAP_MS = 300;
+
+/** How many bubbles' audio is kept for a second hearing. */
+const KEPT_CLIPS = 40;
+
 /**
  * Whose voice a reply is read in (plan #3006.5): `bot`, the id of the bot
  * that wrote it, read in its own voice when it has one; or `voice`, a Fish
@@ -70,21 +97,36 @@ export const SPEAKING_KEY = 'talk.speaking';
  */
 export type SpeechVoice = { bot?: string | null; voice?: string | null };
 
+/** One bubble to read, as a run's press hands them in. */
+export type SpeechItem = { key: string; text: string; voice?: SpeechVoice };
+
 function voiceFields(voice: SpeechVoice | undefined): { bot?: string; voice?: string } {
   if (voice?.voice) return { voice: voice.voice };
   if (voice?.bot) return { bot: voice.bot };
   return {};
 }
 
+/** What came back for a bubble: its audio, or the route's word on why not. */
+type Clip = { ok: true; blob: Blob } | { ok: false; message: string };
+
+type Queued = { key: string; clip: Promise<Clip> };
+
 const IDLE: SpeechState = { key: null, phase: 'idle', notes: {} };
 
 export function createSpeechPlayer(deps: PlayerDeps) {
+  const wait = deps.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const now = deps.now ?? (() => Date.now());
   let state: SpeechState = IDLE;
   const listeners = new Set<() => void>();
   const spoken = new Set<string>();
-  let waiting: { key: string; text: string; voice?: SpeechVoice }[] = [];
-  type Current = { abort: AbortController; audio: SpeechAudio | null; release: () => void };
-  let current: Current | null = null;
+  const fetched = new Map<string, Promise<Clip>>();
+  let waiting: Queued[] = [];
+  /** Bumped by every stop and every fresh start, so a turn begun before it does nothing. */
+  let run = 0;
+  type Made = { audio: SpeechAudio; release: () => void };
+  let current: Made | null = null;
+  /** When the last bubble finished, for the pause before the next. */
+  let endedAt: number | null = null;
 
   const set = (next: Partial<SpeechState>) => {
     state = { ...state, ...next };
@@ -100,41 +142,37 @@ export function createSpeechPlayer(deps: PlayerDeps) {
 
   const end = () => {
     if (!current) return;
-    current.abort.abort();
-    current.audio?.pause();
+    current.audio.pause();
     current.release();
     current = null;
   };
 
-  const next = () => {
-    const item = waiting.shift();
-    if (item) void start(item.key, item.text, item.voice);
-    else set({ key: null, phase: 'idle' });
-  };
+  /** Asks the route for a bubble's audio once. A refusal is not kept, so a press can ask again. */
+  function clipFor(item: SpeechItem): Promise<Clip> {
+    const fields = voiceFields(item.voice);
+    const id = JSON.stringify([item.key, item.text, fields.voice ?? null, fields.bot ?? null]);
+    const kept = fetched.get(id);
+    if (kept) return kept;
+    const clip = ask(item.text, fields);
+    fetched.set(id, clip);
+    void clip.then((made) => {
+      if (!made.ok && fetched.get(id) === clip) fetched.delete(id);
+    });
+    while (fetched.size > KEPT_CLIPS) fetched.delete(fetched.keys().next().value as string);
+    return clip;
+  }
 
-  async function start(key: string, text: string, voice?: SpeechVoice) {
-    end();
-    const mine = { abort: new AbortController(), audio: null as SpeechAudio | null, release: () => {} };
-    current = mine;
-    set({ key, phase: 'loading', notes: note(key, null) });
-
+  async function ask(text: string, fields: { bot?: string; voice?: string }): Promise<Clip> {
     let response: Response;
     try {
       response = await deps.fetch('/api/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, ...voiceFields(voice) }),
-        signal: mine.abort.signal,
+        body: JSON.stringify({ text, ...fields }),
       });
     } catch {
-      if (current !== mine) return;
-      current = null;
-      set({ notes: note(key, SPEAK_UNREACHABLE) });
-      next();
-      return;
+      return { ok: false, message: SPEAK_UNREACHABLE };
     }
-    if (current !== mine) return;
-
     if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
       const message = await response
         .json()
@@ -144,53 +182,77 @@ export function createSpeechPlayer(deps: PlayerDeps) {
             : SPEAK_UNREACHABLE,
         )
         .catch(() => SPEAK_UNREACHABLE);
-      if (current !== mine) return;
-      current = null;
-      set({ notes: note(key, message) });
-      next();
-      return;
+      return { ok: false, message };
     }
-
-    let blob: Blob;
     try {
-      blob = await response.blob();
+      return { ok: true, blob: await response.blob() };
     } catch {
-      if (current !== mine) return;
-      current = null;
-      set({ notes: note(key, SPEAK_UNREACHABLE) });
-      next();
+      return { ok: false, message: SPEAK_UNREACHABLE };
+    }
+  }
+
+  const enqueue = (item: SpeechItem): Queued => ({ key: item.key, clip: clipFor(item) });
+
+  /** Plays the next bubble waiting, or goes idle when none is. */
+  async function turn(mine: number) {
+    const item = waiting.shift();
+    if (!item) {
+      endedAt = null;
+      set({ key: null, phase: 'idle' });
       return;
     }
-    if (current !== mine) return;
-    await sound(mine, key, deps.audio(blob));
+    set({ key: item.key, phase: 'loading', notes: note(item.key, null) });
+    const clip = await item.clip;
+    if (mine !== run) return;
+    if (!clip.ok) {
+      set({ notes: note(item.key, clip.message) });
+      void turn(mine);
+      return;
+    }
+    if (endedAt !== null) {
+      const rest = BUBBLE_GAP_MS - (now() - endedAt);
+      if (rest > 0) await wait(rest);
+      if (mine !== run) return;
+    }
+    await sound(mine, item.key, deps.audio(clip.blob));
   }
 
   /** Plays what was made for `key`, then moves on to what waits. */
-  async function sound(mine: Current, key: string, made: { audio: SpeechAudio; release: () => void }) {
-    mine.audio = made.audio;
-    mine.release = made.release;
+  async function sound(mine: number, key: string, made: Made) {
+    current = made;
     const finished = () => {
-      if (current !== mine) return;
+      if (mine !== run || current !== made) return;
       made.release();
       current = null;
-      next();
+      endedAt = now();
+      void turn(mine);
     };
     made.audio.onended = finished;
     made.audio.onerror = () => {
-      if (current !== mine) return;
+      if (mine !== run || current !== made) return;
       set({ notes: note(key, SPEAK_UNREACHABLE) });
       finished();
     };
     try {
       await made.audio.play();
-      if (current === mine) set({ phase: 'playing' });
+      if (mine === run && current === made) set({ phase: 'playing' });
     } catch {
-      if (current !== mine) return;
+      if (mine !== run || current !== made) return;
       made.release();
       current = null;
       set({ notes: note(key, SPEAK_HELD_BACK) });
-      next();
+      void turn(mine);
     }
+  }
+
+  /** Stops everything and reads these bubbles from the top. */
+  function fresh(items: readonly SpeechItem[]) {
+    run += 1;
+    end();
+    endedAt = null;
+    for (const item of items) spoken.add(item.key);
+    waiting = items.map(enqueue);
+    void turn(run);
   }
 
   return {
@@ -203,27 +265,29 @@ export function createSpeechPlayer(deps: PlayerDeps) {
     },
     /** Plays this reply now, stopping what was playing and emptying the queue. */
     play(key: string, text: string, voice?: SpeechVoice) {
-      spoken.add(key);
-      waiting = [];
-      void start(key, text, voice);
+      fresh([{ key, text, voice }]);
     },
-    /** Plays this reply after what is playing or waiting. */
+    /** Plays these bubbles now, one after another, stopping what was playing. */
+    playList(items: readonly SpeechItem[]) {
+      if (items.length > 0) fresh(items);
+    },
+    /** Plays this reply after what is playing or waiting, and asks for its audio now. */
     queue(key: string, text: string, voice?: SpeechVoice) {
       spoken.add(key);
-      if (state.phase === 'idle' && !current) void start(key, text, voice);
-      else waiting.push({ key, text, voice });
+      waiting.push(enqueue({ key, text, voice }));
+      if (state.phase === 'idle' && !current) void turn(run);
     },
     /**
      * Plays a recording at a link now (a voice's sample, plan #3006.5),
      * stopping what was playing and emptying the queue. Nothing is spent.
      */
     playUrl(key: string, url: string) {
+      run += 1;
       waiting = [];
       end();
-      const mine: Current = { abort: new AbortController(), audio: null, release: () => {} };
-      current = mine;
+      endedAt = null;
       set({ key, phase: 'loading', notes: note(key, null) });
-      void sound(mine, key, deps.audioUrl ? deps.audioUrl(url) : { audio: silent(), release: () => {} });
+      void sound(run, key, deps.audioUrl ? deps.audioUrl(url) : { audio: silent(), release: () => {} });
     },
     /** Queues a reply the first time only: a new reply plays once. */
     speakOnce(key: string, text: string, voice?: SpeechVoice) {
@@ -231,8 +295,10 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       this.queue(key, text, voice);
     },
     stop() {
+      run += 1;
       waiting = [];
       end();
+      endedAt = null;
       set({ key: null, phase: 'idle' });
     },
   };
