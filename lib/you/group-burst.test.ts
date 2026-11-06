@@ -74,6 +74,8 @@ function memoryDb(tables: Record<string, Row[]>) {
         in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), chain),
         is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), chain),
         gt: (c: string, v: string) => (filters.push((r) => String(r[c]) > v), chain),
+        gte: (c: string, v: string) => (filters.push((r) => String(r[c]) >= v), chain),
+        not: (c: string, op: string, v: unknown) => (filters.push((r) => (op === 'is' ? (r[c] ?? null) !== v : r[c] !== v)), chain),
         or: () => chain,
         order: (c: string, o?: { ascending?: boolean }) => ((orders = [...orders, [c, o?.ascending !== false]]), chain),
         limit: (n: number) => ((limit = n), chain),
@@ -353,5 +355,31 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     const { anthropic, sent } = scripted([text('Try the noodle place.')]);
     expect(await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [])).toBe('Try the noodle place.');
     expect(sent[0].tools).toBeUndefined();
+  });
+});
+
+describe('what a bot heard in its other chats (plan #2983)', () => {
+  it("gives each speaker its memory page and its own one-on-one since the nightly run, and never another bot's", async () => {
+    const { client, tables } = group('Ada, what do you think I should cook on Saturday?', 2);
+    tables.advisor_chats.push(
+      { id: 'd-ada', user_id: USER, kind: 'direct', advisor_id: 'id-ada', title: null },
+      { id: 'd-ben', user_id: USER, kind: 'direct', advisor_id: 'id-ben', title: null },
+    );
+    tables.advisor_memory.push({ id: 'mem1', user_id: USER, advisor_id: 'id-ada', kind: 'fact', text: 'Keeps a sourdough starter.', retired_at: null, created_at: '2026-10-01T00:00:00Z' });
+    tables.advisor_messages.push(
+      { id: 'x1', user_id: USER, chat_id: 'd-ada', role: 'person', speaker_id: null, text: 'I have gone vegetarian this week.', created_at: '2026-11-04T09:50:00Z' },
+      { id: 'x2', user_id: USER, chat_id: 'd-ben', role: 'person', speaker_id: null, text: 'Ben, keep this between us.', created_at: '2026-11-04T09:51:00Z' },
+    );
+    const heard: SpeakerInput[] = [];
+    const director = async (input: DirectorInput): Promise<DirectorPlan> =>
+      input.state.round === 0 ? { wait: false, picks: [{ key: 'ada', why: 'answer' }], reactions: [] } : { wait: true, picks: [], reactions: [] };
+    const speak = async (input: SpeakerInput) => (heard.push(input), 'A mushroom risotto.');
+    await runGroupBurst({ ...base(client), director, speak, timeZone: 'UTC' });
+    const system = heard[0].speaker.system;
+    expect(heard[0].speaker.id).toBe('id-ada');
+    expect(system).toContain('Keeps a sourdough starter.');
+    expect(system).toContain('[one-on-one with them, Wed 4 Nov 09:50] They: I have gone vegetarian this week.');
+    expect(system).not.toContain('keep this between us');
+    expect(system).not.toContain('what do you think I should cook');
   });
 });

@@ -59,6 +59,8 @@ function fakeClient(tables: Tables, onInsert?: (table: string, row: Row) => void
       not: (col: string) => (filters.push((r) => r[col] != null), chain),
       lt: (col: string, value: string) => (filters.push((r) => String(r[col]) < value), chain),
       gt: (col: string, value: string) => (filters.push((r) => String(r[col]) > value), chain),
+      gte: (col: string, value: string) => (filters.push((r) => String(r[col]) >= value), chain),
+      in: (col: string, values: unknown[]) => (filters.push((r) => values.includes(r[col])), chain),
       or: (expr: string) => {
         const before = /typing_until\.lt\.(\S+)$/.exec(expr)?.[1];
         if (before) filters.push((r) => r.typing_until == null || String(r.typing_until) < before);
@@ -89,7 +91,7 @@ const ADVISOR = 'a1';
 
 function world(): Tables {
   return {
-    'you.advisor_chats': [{ id: CHAT, user_id: USER, advisor_id: ADVISOR, typing_until: null, reply_status: 'idle', last_message_at: iso() }],
+    'you.advisor_chats': [{ id: CHAT, user_id: USER, kind: 'direct', advisor_id: ADVISOR, typing_until: null, reply_status: 'idle', last_message_at: iso() }],
     'you.board_advisors': [
       { id: ADVISOR, user_id: USER, key: 'money', name: 'Money', kind: 'seat', question: 'Can you afford it?', focus: null, persona: 'You talk plainly about cash.', brain: null, made_by_you: false },
     ],
@@ -445,5 +447,28 @@ describe('sendMentorText with files (plan #2974)', () => {
       now: clock,
     });
     expect(sent).toMatchObject({ saved: false });
+  });
+});
+
+describe('what a mentor heard in its groups (plan #2983)', () => {
+  it("reads a group's newest messages straight away, and not a group it is not in", async () => {
+    const tables = world();
+    tables['you.advisor_chats'].push(
+      { id: 'g1', user_id: USER, kind: 'group', advisor_id: null, title: 'Flat hunt' },
+      { id: 'g2', user_id: USER, kind: 'group', advisor_id: null, title: 'Not theirs' },
+    );
+    tables['you.advisor_chat_members'] = [
+      { chat_id: 'g1', advisor_id: ADVISOR, user_id: USER, joined_at: '2026-11-01T00:00:00Z', left_at: null },
+      { chat_id: 'g2', advisor_id: 'a2', user_id: USER, joined_at: '2026-11-01T00:00:00Z', left_at: null },
+    ];
+    tables['you.advisor_messages'].push(
+      { id: 'g1m', user_id: USER, chat_id: 'g1', role: 'person', kind: 'reply', speaker_id: null, text: 'The rent went up by 200 a month.', created_at: '2026-11-03T14:55:00Z' },
+      { id: 'g2m', user_id: USER, chat_id: 'g2', role: 'person', kind: 'reply', speaker_id: null, text: 'A secret for the other group.', created_at: '2026-11-03T14:56:00Z' },
+    );
+    const { stub, streamed } = anthropicStub(['Then wait.']);
+    await run(tables, stub).promise;
+    const sent = JSON.stringify(streamed[0]);
+    expect(sent).toContain('[group: Flat hunt, Tue 3 Nov 14:55] They: The rent went up by 200 a month.');
+    expect(sent).not.toContain('A secret for the other group.');
   });
 });
