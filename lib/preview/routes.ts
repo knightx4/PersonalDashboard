@@ -418,6 +418,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
+  'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-page': ['/chat/dash/[ref]'],
   'ask-page-new': ['/chat/dash'],
   'ask-page-empty': ['/chat/dash'],
@@ -1107,6 +1108,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],
+  // A question sent while Dash answers, held under the answer (plan #2988.2).
+  'ask-dash-held': ['components/thread/thread.tsx'],
   // A comment's body (plan #2815.3), which the thread draws on every row and
   // which reached 57 surfaces through it and the two pages that quote one.
   'dev-comment-thread': ['components/dev/comment-body.tsx'],

@@ -1597,3 +1597,38 @@ function ActOnArrival({ label, focus = false, after = 0 }: { label: string; focu
   }, [label, focus, after]);
   return null;
 }
+
+/**
+ * A question sent while Dash answers (plan #2988.2): the follow-up on its
+ * way, the next text held under the loading line until the answer lands,
+ * and a third typed in the box, where Stop and Send sit side by side.
+ */
+export function AskHeldSurface() {
+  const at = '2026-10-14T09:00:00Z';
+  return (
+    <AskDashProvider source={FIXTURES} account="preview" workspaces={BOX_WORKSPACES} searchHits={BOX_HITS}>
+      <PageColumn className="py-4">
+        <Card padding="standard" className="mx-auto w-full max-w-prose">
+          <AskThread
+            id="ask-held-preview"
+            conversationRef="00000000-0000-4000-8000-000000000063"
+            turns={[
+              { id: 'h-q', role: 'user', body: 'What did I spend on food delivery in July?', createdAt: at },
+              {
+                id: 'h-a',
+                role: 'assistant',
+                body: 'You spent $299.40 on food delivery in July across 14 orders, which is close to your usual $300 a month.',
+                createdAt: at,
+              },
+            ]}
+            label="Ask a follow-up"
+            pendingQuestion="And in August?"
+            heldQuestions={['Which restaurant did I order from most?']}
+            startWriting
+            initialDraft="And was any of it on the work card?"
+          />
+        </Card>
+      </PageColumn>
+    </AskDashProvider>
+  );
+}
