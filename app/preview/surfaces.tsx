@@ -9184,6 +9184,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatGroupSurface state="new" />,
   },
   {
+    /* A group whose burst failed (plan #2988.3): why, under your last text, with Try again. */
+    id: 'chat-group-reply-failed',
+    label: 'Chat · A group chat, their reply failed',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="reply-failed" />,
+  },
+  {
     /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
     id: 'chat-group-settings',
     label: 'Chat · A group chat, settings',

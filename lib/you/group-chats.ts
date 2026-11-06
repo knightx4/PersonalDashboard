@@ -1,6 +1,6 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { listRoster, type RosterAdvisor } from '@/lib/you/board-advisors';
-import { mentorColour, THREAD_MESSAGE_COLUMNS, THREAD_PAGE, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import { mentorColour, replyFailedOf, THREAD_MESSAGE_COLUMNS, THREAD_PAGE, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
 import { canTalkOf } from '@/lib/you/people-cards-model';
 import {
   cleanGroupTitle,
@@ -36,6 +36,8 @@ export type Group = {
   former: GroupMember[];
   typingUntil: string | null;
   lastReadAt: string | null;
+  /** Why the last burst failed, while it stands (plan #2988.3); null otherwise. */
+  replyFailed: string | null;
 };
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -171,7 +173,7 @@ export async function deleteGroup(client: YouSupabaseClient, userId: string, cha
 export async function loadGroup(client: YouSupabaseClient, userId: string, chatId: string): Promise<Group | null> {
   const chat = await client
     .from('advisor_chats')
-    .select('id, title, typing_until, last_read_at')
+    .select('id, title, typing_until, last_read_at, reply_status, reply_error')
     .eq('user_id', userId)
     .eq('id', chatId)
     .eq('kind', 'group')
@@ -190,6 +192,7 @@ export async function loadGroup(client: YouSupabaseClient, userId: string, chatI
     former,
     typingUntil: strOrNull(row.typing_until),
     lastReadAt: strOrNull(row.last_read_at),
+    replyFailed: replyFailedOf(row),
   };
 }
 

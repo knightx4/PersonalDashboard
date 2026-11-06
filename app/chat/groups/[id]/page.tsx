@@ -4,7 +4,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, withChats } from '@/lib/you/chat-threads';
 import { loadGroup, loadGroupRows, loadGroupThreadPage } from '@/lib/you/group-chats';
-import { deleteGroupChat, olderGroupMessages, readGroup, saveGroup } from '../../actions';
+import { deleteGroupChat, olderGroupMessages, readGroup, retryGroupReply, saveGroup } from '../../actions';
 import { PeopleView } from '../../people-view';
 import { GroupSettings } from './group-settings';
 import { GroupThreadView } from './group-thread-view';
@@ -66,10 +66,12 @@ export default async function ChatGroupPage({
         title={group.title}
         members={group.members}
         former={group.former}
+        typingUntil={group.typingUntil}
+        replyFailed={group.replyFailed}
         page={page}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderGroupMessages, read: readGroup }}
+        actions={{ older: olderGroupMessages, read: readGroup, retryReply: retryGroupReply }}
       />
     </PeopleView>
   );

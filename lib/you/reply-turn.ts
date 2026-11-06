@@ -98,6 +98,33 @@ export const STALLED_MS = 60_000;
 export const STALLED_LIMIT_MS = 24 * 60 * 60_000;
 
 /**
+ * The text a group is still owed a burst for (plan #2988.3): its newest
+ * message, when that is theirs. A burst marks nothing delivered, so an older
+ * text of theirs with bots after it has been answered.
+ */
+export function owedGroupReply<T extends { role: string }>(messages: readonly T[]): T | null {
+  const last = messages.at(-1);
+  return last?.role === 'person' ? last : null;
+}
+
+/**
+ * Whether a group is still owed a burst for its newest text (plan #2988.3),
+ * from the chat's reply columns. A burst that ran to its end after the text
+ * and said nothing (the director chose quiet) leaves the chat `idle` with
+ * its request after the text: that silence was chosen, and asking again on
+ * every visit would only spend another director call. A burst that died
+ * leaves `waiting`; one asked for before the text, and one that failed, are
+ * still owed.
+ */
+export function groupStillOwed(chat: { replyStatus: string | null; requestedAt: string | null }, textAt: string): boolean {
+  if (chat.replyStatus !== 'idle' || !chat.requestedAt) return true;
+  const asked = Date.parse(chat.requestedAt);
+  const sent = Date.parse(textAt);
+  if (!Number.isFinite(asked) || !Number.isFinite(sent)) return true;
+  return asked < sent;
+}
+
+/**
  * The text of theirs a thread is still owed a reply to, for the safety net
  * (plan #2988): the newest message when it is theirs, or the newest of theirs
  * no reply has read. Null when every text has been answered.

@@ -22,6 +22,9 @@ import {
   type Reacted,
 } from '@/lib/you/group-chats';
 import { retryMentorReplyInRequest } from '@/lib/you/mentor-reply-request';
+import { retryGroupBurstInRequest } from '@/lib/you/group-burst-request';
+import { requestOrigin } from '@/lib/auth/origin';
+import { headers } from 'next/headers';
 import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
 import {
   addPerson,
@@ -230,6 +233,30 @@ export async function retryReply(chatId: string, advisorId: string): Promise<{ e
   } catch (error) {
     console.error('mentor reply not retried', error);
     return { error: 'The reply could not start. Try again.' };
+  }
+}
+
+/**
+ * Ask a group to answer again (plan #2988.3): Try again on a failed burst,
+ * or the thread's safety net when a text has waited a minute with nothing
+ * typing (`stalled`). The bots' messages come over Realtime as after a send.
+ * A burst that runs short of time chains on with this request's cookie, as
+ * a send's does.
+ */
+// latency: instant
+export async function retryGroupReply(chatId: string, options: { stalled?: boolean } = {}): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  if (!UUID.test(chatId)) return { error: 'That group is not there any more.' };
+  try {
+    const h = await headers();
+    // The host this request came to, as the send's route reads it from its URL; the chain must reach the same deployment.
+    const host = (h.get('x-forwarded-host') ?? h.get('host'))?.split(',')[0].trim();
+    const proto = (h.get('x-forwarded-proto') ?? (host?.startsWith('localhost') ? 'http' : 'https')).split(',')[0].trim();
+    const origin = host ? `${proto}://${host}` : await requestOrigin();
+    return await retryGroupBurstInRequest(user.id, chatId, { origin, cookie: h.get('cookie') }, { stalled: options.stalled === true });
+  } catch (error) {
+    console.error('group reply not retried', error);
+    return { error: 'The group could not reply. Try again.' };
   }
 }
 
