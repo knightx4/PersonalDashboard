@@ -181,8 +181,8 @@ export const PAID_ACTIONS = {
   // Not an action: "Import orders from Gmail" and "Sync now" in Shopping
   // settings post here, and the import reads each order confirmation it finds.
   'app/api/inbox/sync/route.ts#POST': ['extract-email-order'],
-  // Check all and each workspace's button in the account menu's Check mail
-  // section (plan #3019) start the same sync as Sync now.
+  // Check all and each mailbox's button in the account menu's Check mail
+  // section (plans #3019, #3019.1) start the same sync as Sync now.
   'app/api/inbox/check/route.ts#POST': ['extract-email-order'],
   // "Add from this email" on the review list reads the confirmation and makes
   // the order in one press (plan #1950.3.3), through the aimed capture.

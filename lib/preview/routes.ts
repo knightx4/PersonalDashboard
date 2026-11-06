@@ -1171,6 +1171,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/shell/page-width.tsx',
   ],
   'shell-account-menu': ['components/shell/account-menu.tsx', 'components/shell/mail-check.tsx'],
+  // Check mail's other states (plans #3019, #3019.1).
+  'shell-account-menu-mail-problems': ['components/shell/mail-check.tsx'],
+  'shell-account-menu-mail-none': ['components/shell/mail-check.tsx'],
   // The status line while a run is going (plan #1964.2.3).
   'shell-status-run': ['components/shell/status-line.tsx', 'components/runs/use-going-run-line.ts'],
   'shell-status-run-new': ['components/shell/status-line.tsx'],
