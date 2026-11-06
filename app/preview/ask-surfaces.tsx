@@ -32,6 +32,7 @@ import { SESSION_SENT_BODY, THINK_FALLBACK, type SessionSentState } from '@/lib/
 import { SessionSentFixture } from '@/components/talk/think-switch';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
+import { PANE_CHATS } from './chat-surfaces';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -376,7 +377,32 @@ const FIXTURES: AskSource = {
   decline: pressed('declined'),
   undo: pressed('undone'),
   costs: async () => ASK_COSTS,
+  // The Messages chats the sheet's row switches to (plan #2981).
+  chats: PANE_CHATS,
 };
+
+/**
+ * The sheet with a Messages chat open in it (plan #2981), Earlier questions
+ * open over Dash's chat, or a mark's name showing under the row: each a
+ * state only a press or a pointer reaches.
+ */
+export function AskDashChatsSurface({ part, children }: { part: 'chat' | 'group' | 'earlier' | 'name'; children: React.ReactNode }) {
+  const label =
+    part === 'chat'
+      ? 'Benjamin Franklin, unread'
+      : part === 'group'
+        ? 'Northwind offer, unread'
+        : part === 'earlier'
+          ? 'Earlier questions'
+          : 'The Mentor';
+  return (
+    <AskDashSurface open>
+      {children}
+      {/* After the sheet has opened and read its row. */}
+      <ActOnArrival label={label} focus={part === 'name'} after={300} />
+    </AskDashSurface>
+  );
+}
 
 /** Opens the sheet as the page arrives, sending `question` when given. */
 function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }) {

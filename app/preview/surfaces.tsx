@@ -497,6 +497,7 @@ import {
   AskChangesSurface,
   AT_WORK_QUESTION,
   AskDashSurface,
+  AskDashChatsSurface,
   AskMadeChangesSurface,
   DashPageSurface,
   AskAnswerActionsSurface,
@@ -8559,8 +8560,8 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* Ask Dash (plan #1090): the sheet the Dash button in the top bar opens,
-     * over the same shell as below, first on a new question with the earlier
-     * ones under it, then with an answer and the rows it used. Fixtures
+     * over the same shell as below, first on a new question with the row of
+     * chats above it (plan #2981), then with an answer and the rows it used. Fixtures
      * stand in for the server actions (ask-surfaces.tsx). */
     id: 'ask-dash-new',
     label: 'Ask Dash · A new question',
@@ -8581,6 +8582,57 @@ export const SURFACES: readonly Surface[] = [
       <AskDashSurface open question="What did I spend on eBay flips this quarter?">
         <PreviewShell />
       </AskDashSurface>
+    ),
+  },
+  {
+    /* The sheet's row of chats (plan #2981): a press on Benjamin Franklin
+     * opens his Messages thread in the sheet, in place, the header naming
+     * him and the way to the thread on the Messages tab beside Close. */
+    id: 'ask-dash-chat',
+    label: 'Ask Dash · A bot open in the sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashChatsSurface part="chat">
+        <PreviewShell />
+      </AskDashChatsSurface>
+    ),
+  },
+  {
+    /* A group chat open in the sheet (plan #2981), its stacked mark lit in the row. */
+    id: 'ask-dash-group',
+    label: 'Ask Dash · A group open in the sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashChatsSurface part="group">
+        <PreviewShell />
+      </AskDashChatsSurface>
+    ),
+  },
+  {
+    /* Earlier questions (plan #2981): the header's button opens the last
+     * few over Dash's chat in the sheet, with the way back to it. */
+    id: 'ask-dash-earlier',
+    label: 'Ask Dash · Earlier questions',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashChatsSurface part="earlier">
+        <PreviewShell />
+      </AskDashChatsSurface>
+    ),
+  },
+  {
+    /* A mark's name under the row (plan #2981), on hover, focus or a long press. */
+    id: 'ask-dash-chat-name',
+    label: 'Ask Dash · A chat mark named',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashChatsSurface part="name">
+        <PreviewShell />
+      </AskDashChatsSurface>
     ),
   },
   {

@@ -75,6 +75,12 @@ export type GroupThreadProps = {
   live?: boolean;
   /** For the gallery: messages still being sent. */
   pending?: Pending[];
+  /** Drawn in the Ask Dash pane (plan #2981), which names the group in its own header. */
+  bare?: boolean;
+  /** What the box opens with, unsent: the pane keeps each thread's words while another is open. */
+  initialDraft?: string;
+  /** Told each change to the box's words, so the pane can keep them. */
+  onDraftChange?: (text: string) => void;
 };
 
 export function GroupThreadView({
@@ -88,6 +94,9 @@ export function GroupThreadView({
   actions = NO_ACTIONS,
   live = true,
   pending: initialPending = [],
+  bare = false,
+  initialDraft = '',
+  onDraftChange,
 }: GroupThreadProps) {
   const [heard, setHeard] = useState<ThreadMessage[]>([]);
   const messages = mergeMessages(page.messages, heard);
@@ -101,7 +110,11 @@ export function GroupThreadView({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [olderError, setOlderError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending[]>(initialPending);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftText] = useState(initialDraft);
+  const setDraft = (text: string) => {
+    setDraftText(text);
+    onDraftChange?.(text);
+  };
   const [now, setNow] = useState(start);
   const scroller = useRef<HTMLDivElement | null>(null);
   const keepFrom = useRef<number | null>(null);
@@ -261,6 +274,7 @@ export function GroupThreadView({
       }
       scrollRef={scroller}
       onScroll={onScroll}
+      bare={bare}
       box={
         <form onSubmit={submit} className="flex items-end gap-2">
           <MessageInput
