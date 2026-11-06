@@ -336,6 +336,50 @@ describe('replyToMentor', () => {
     expect(mentorRows(tables).map((m) => m.text)).toEqual(['Tell me what it says.']);
   });
 
+  it('looks places up with find_places and hands the result back before it texts (plan #2987.3)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].text = 'Find me a Thai place near my house';
+    const streamed: { tools: { name: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const lookup = {
+      content: [{ type: 'tool_use', id: 'p1', name: 'find_places', input: { query: 'thai restaurant' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = 'Kin Khao, ten minutes on foot and open now: https://maps.google.com/?cid=111';
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? lookup : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const execute = vi.fn(async (name: string) =>
+      name === 'find_places'
+        ? { ok: true as const, rows: [], found: [{ name: 'Kin Khao', distance_from_home: '850 m', maps_url: 'https://maps.google.com/?cid=111' }] }
+        : { ok: false as const, error: 'no' },
+    );
+
+    const outcome = await run(tables, stub, { ackAfterMs: 60_000, execute }).promise;
+
+    expect(streamed[0].tools.map((t) => t.name)).toContain('find_places');
+    expect(execute).toHaveBeenCalledWith('find_places', { query: 'thai restaurant' });
+    const back = streamed[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'p1' });
+    expect(back[0].content).toContain('https://maps.google.com/?cid=111');
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
   it('offers every lookup but the chart, and nothing that writes', () => {
     expect(MENTOR_LOOKUPS.every((t) => t.kind === 'lookup')).toBe(true);
     expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(false);

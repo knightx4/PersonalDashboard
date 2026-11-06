@@ -45,6 +45,8 @@ import { createTask } from '@/lib/todo/tasks/write';
 import { fileVaultNote, sessionInboxPorts, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readJobBoard } from '@/lib/jobs/discover/read-board';
+import { lookUpPlaces } from '@/lib/you/places-lookup';
+import { createYouClient } from '@/lib/you/auth/server';
 import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
@@ -465,6 +467,9 @@ function askContext(
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
     readMail: async (message) => readMail(await createCoreClient(), userId, message),
     readJobBoard,
+    // Google Places near home, under the app's daily cap (plan #2987.3).
+    findPlaces: async (search) =>
+      lookUpPlaces({ you: await createYouClient(), core: await createCoreClient(), userId }, search),
   };
 }
 
