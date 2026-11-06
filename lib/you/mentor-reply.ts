@@ -3,9 +3,11 @@ import { MODELS } from '@/lib/core/models';
 import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { zoneDay } from '@/lib/core/when';
 import { DASH_TOOLS } from '@/lib/dash/registry';
+import type { DashFile } from '@/lib/dash/files';
 import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
+import type { ContextMessage } from '@/lib/you/chat-context-model';
 import {
   PEOPLE_ACTION_RULES,
   PEOPLE_TOOLS,
@@ -75,6 +77,11 @@ export type MentorReplyInput = {
   recordSpend: (operation: MentorSpendOperation, reports: SpendReport[]) => Promise<void>;
   /** True when the send already claimed the typing dots for this run. */
   claimed?: boolean;
+  /**
+   * The pictures and PDFs sent with these messages of the person's, read for
+   * the model (plan #2974). Absent: the mentor reads the words alone.
+   */
+  readFiles?: (messageIds: string[]) => Promise<DashFile[]>;
   /** For tests. */
   anthropic?: Anthropic;
   now?: () => number;
@@ -99,6 +106,17 @@ export type RoundOutcome = {
   costMicros: number;
   ok: boolean;
 };
+
+/**
+ * The person's messages the reply answers: those after the mentor last
+ * spoke, oldest first. Their files go to the model with the reply's last
+ * turn, as Ask sends the newest question's (plan #2974).
+ */
+export function unansweredFromPerson(messages: readonly Pick<ContextMessage, 'id' | 'role'>[]): string[] {
+  const ids: string[] = [];
+  for (let i = messages.length - 1; i >= 0 && messages[i].role === 'person'; i -= 1) ids.unshift(messages[i].id);
+  return ids;
+}
 
 const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -233,6 +251,17 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     client.from('advisor_messages').update({ read_at: seen }).eq('user_id', userId).eq('chat_id', chatId).eq('role', 'person').is('read_at', null),
   ]);
 
+  // What was sent with the messages being answered; a reply still goes when they cannot be read.
+  let files: DashFile[] | undefined;
+  if (input.readFiles) {
+    try {
+      const read = await input.readFiles(unansweredFromPerson(ctx.messages));
+      if (read.length > 0) files = read;
+    } catch (error) {
+      console.error('the files sent to a mentor were not read', error);
+    }
+  }
+
   const anthropic = input.anthropic ?? new Anthropic({ apiKey: input.anthropicApiKey ?? undefined });
   const spent: Record<MentorSpendOperation, SpendReport[]> = { 'mentor-reply': [], 'mentor-ack': [] };
   const name = ctx.mentor.name;
@@ -305,6 +334,7 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       voice,
       context: { surface: 'thread', subject: null, page: null },
       turns: prompt.messages.map((m: PromptMessage) => ({ role: m.role, body: m.content })),
+      files,
       today: zoneDay(at, timeZone),
       contextBlocks: rest,
       execute: input.execute,

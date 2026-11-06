@@ -300,6 +300,42 @@ describe('replyToMentor', () => {
     expect(JSON.stringify(lastTurn)).toContain('the start date');
   });
 
+  it('sends the pictures and PDFs of the messages it answers before their words (plan #2974)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'].push({
+      id: 'm2',
+      user_id: USER,
+      chat_id: CHAT,
+      role: 'person',
+      kind: 'reply',
+      text: 'Offer.pdf',
+      created_at: new Date(clock + 1).toISOString(),
+    });
+    const { stub, streamed } = anthropicStub(['The base is 12% up.']);
+    const readFiles = vi.fn(async () => [
+      { name: 'Offer.pdf', kind: 'pdf' as const, data: 'JVBERi0=' },
+    ]);
+    const outcome = await run(tables, stub, { readFiles }).promise;
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    // Both of the person's messages since the mentor last spoke.
+    expect(readFiles).toHaveBeenCalledWith(['m1', 'm2']);
+    const messages = streamed[0].messages as { role: string; content: unknown }[];
+    const last = messages.at(-1);
+    expect(last?.role).toBe('user');
+    expect(JSON.stringify(last?.content)).toContain('"type":"document"');
+  });
+
+  it('still replies when the files cannot be read', async () => {
+    const tables = world();
+    const { stub } = anthropicStub(['Tell me what it says.']);
+    const readFiles = vi.fn(async () => {
+      throw new Error('storage is down');
+    });
+    const outcome = await run(tables, stub, { readFiles }).promise;
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual(['Tell me what it says.']);
+  });
+
   it('offers every lookup but the chart, and nothing that writes', () => {
     expect(MENTOR_LOOKUPS.every((t) => t.kind === 'lookup')).toBe(true);
     expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(false);
@@ -329,5 +365,41 @@ describe('claimTyping', () => {
     });
     expect(sent).toMatchObject({ saved: true, chatId: CHAT, claimed: false });
     expect(tables['you.advisor_messages'].at(-1)).toMatchObject({ role: 'person', text: 'One more thing' });
+  });
+});
+
+describe('sendMentorText with files (plan #2974)', () => {
+  const upload = { path: `${USER}/00000000-0000-4000-8000-000000000001-shot.png`, name: 'Pasted image 1.png', contentType: 'image/png' as const, size: 2048 };
+
+  it('saves a message of files alone as their names and records them against it', async () => {
+    const tables = world();
+    const recordFiles = vi.fn(async (messageId: string) => [
+      { id: 'f1', name: upload.name, contentType: upload.contentType, size: upload.size, href: `/attachments/f1?m=${messageId}` },
+    ]);
+    const sent = await sendMentorText({
+      client: fakeClient(tables),
+      userId: USER,
+      mentor: { id: ADVISOR, name: 'Money', canTalk: true },
+      text: '  ',
+      files: [upload],
+      recordFiles,
+      now: clock,
+    });
+    expect(sent.saved).toBe(true);
+    const saved = tables['you.advisor_messages'].at(-1);
+    expect(saved).toMatchObject({ role: 'person', text: 'Pasted image 1.png' });
+    expect(recordFiles).toHaveBeenCalledWith(saved?.id, [upload]);
+    expect(sent.saved && sent.files.map((f) => f.name)).toEqual(['Pasted image 1.png']);
+  });
+
+  it('refuses a message with neither words nor files', async () => {
+    const sent = await sendMentorText({
+      client: fakeClient(world()),
+      userId: USER,
+      mentor: { id: ADVISOR, name: 'Money', canTalk: true },
+      text: '',
+      now: clock,
+    });
+    expect(sent).toMatchObject({ saved: false });
   });
 });

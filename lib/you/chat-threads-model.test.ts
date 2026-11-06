@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bubbleText,
+  filesOnlyText,
   botLineOf,
   botsOf,
   filterRecipients,
@@ -206,5 +208,34 @@ describe('the Bots tab (plan #2879.3)', () => {
     expect(botLineOf({ about: 'Money', canTalk: true })).toBe('Money');
     expect(botLineOf({ about: 'Money', canTalk: false })).toBe('Money · not ready to talk yet');
     expect(botLineOf({ about: '', canTalk: false })).toBe('Not ready to talk yet');
+  });
+});
+
+describe('files sent with a message (plan #2974)', () => {
+  const file = { id: 'f1', name: 'Screenshot.png', contentType: 'image/png', size: 2048, href: '/attachments/f1' };
+
+  it('keeps the files of the copy a send made when Realtime sends the row again', () => {
+    const sent = msg('a', 'person', '2026-11-03T08:00:00Z', { files: [file] });
+    const heard = msg('a', 'person', '2026-11-03T08:00:00Z', { deliveredAt: '2026-11-03T08:00:01Z' });
+    const [merged] = mergeMessages([sent], [heard]);
+    expect(merged.deliveredAt).toBe('2026-11-03T08:00:01Z');
+    expect(merged.files).toEqual([file]);
+  });
+
+  it('takes the files from an incoming copy whose receipts are behind', () => {
+    const read = msg('a', 'person', '2026-11-03T08:00:00Z', { readAt: '2026-11-03T08:00:02Z' });
+    const page = msg('a', 'person', '2026-11-03T08:00:00Z', { files: [file] });
+    const [merged] = mergeMessages([read], [page]);
+    expect(merged.readAt).toBe('2026-11-03T08:00:02Z');
+    expect(merged.files).toEqual([file]);
+  });
+
+  it('draws no bubble for a message that is its files alone', () => {
+    const text = filesOnlyText(['Screenshot.png', 'Offer.pdf']);
+    expect(text).toBe('Screenshot.png, Offer.pdf');
+    const files = [file, { ...file, id: 'f2', name: 'Offer.pdf', contentType: 'application/pdf' }];
+    expect(bubbleText({ text, files })).toBeNull();
+    expect(bubbleText({ text: 'What does this say?', files })).toBe('What does this say?');
+    expect(bubbleText({ text })).toBe(text);
   });
 });

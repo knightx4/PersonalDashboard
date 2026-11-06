@@ -9120,6 +9120,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface state="reply-failed" />,
   },
   {
+    /* Pictures and PDFs in a thread (plan #2974): a screenshot as a thumbnail and the letter as its name, then the reply that read them, and a paste sent with no words. */
+    id: 'chat-people-thread-files',
+    label: 'Chat · A thread with files sent',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="files" />,
+  },
+  {
+    /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */
+    id: 'chat-people-thread-adding',
+    label: 'Chat · A thread, files in the box',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="adding" />,
+  },
+  {
     /* A mentor you have never written to: their mark and name, and a line saying to write below. */
     id: 'chat-people-thread-new',
     label: 'Chat · A thread never written in',

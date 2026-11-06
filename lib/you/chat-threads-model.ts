@@ -1,3 +1,4 @@
+import { filesOnlyText } from '@/lib/attachments/rules';
 import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
 
@@ -38,7 +39,29 @@ export type ThreadMessage = {
   readAt: string | null;
   /** In a group, the bot that wrote it (plan #2879.1.3); null or absent elsewhere. */
   speakerId?: string | null;
+  /**
+   * The pictures and PDFs the person sent with it (plan #2974), kept in
+   * core.attachments under messageFilesRef; absent when there are none. A
+   * Realtime row never carries them, so a merge keeps the copy that does.
+   */
+  files?: ThreadFile[];
 };
+
+/** A file sent with a message, as the thread draws it: `href` opens it through a short signed link. */
+export type ThreadFile = { id: string; name: string; contentType: string; size: number; href: string };
+
+/** The ref a message's files are recorded under in core.attachments. */
+export function messageFilesRef(messageId: string): string {
+  return `you.advisor_messages:${messageId}`;
+}
+
+export { filesOnlyText };
+
+/** The words a message's bubble shows, or null when it carries files and nothing else. */
+export function bubbleText(m: Pick<ThreadMessage, 'text' | 'files'>): string | null {
+  if (m.files && m.files.length > 0 && m.text === filesOnlyText(m.files.map((f) => f.name))) return null;
+  return m.text;
+}
 
 /** A page of a thread, oldest first, and whether there is more before it. */
 export type ThreadPage = { messages: ThreadMessage[]; hasOlder: boolean };
@@ -71,14 +94,19 @@ const progress = (m: ThreadMessage): number => (m.readAt ? 2 : m.deliveredAt ? 1
 /**
  * Messages oldest first, each id once. Of two copies the incoming one wins
  * unless the other's receipts are further on: Realtime sends a row again when
- * its receipts change, and the copy a send keeps has none.
+ * its receipts change, and the copy a send keeps has none. The files either
+ * copy carries are kept, since a Realtime row has none.
  */
 export function mergeMessages(list: readonly ThreadMessage[], incoming: readonly ThreadMessage[]): ThreadMessage[] {
   const byId = new Map<string, ThreadMessage>();
   for (const m of list) byId.set(m.id, m);
   for (const m of incoming) {
     const had = byId.get(m.id);
-    if (!had || progress(m) >= progress(had)) byId.set(m.id, m);
+    if (had && progress(m) < progress(had)) {
+      if (!had.files && m.files) byId.set(m.id, { ...had, files: m.files });
+      continue;
+    }
+    byId.set(m.id, !m.files && had?.files ? { ...m, files: had.files } : m);
   }
   return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
