@@ -14,6 +14,7 @@ import {
 import { CHART_TOOL } from '@/lib/talk/chart';
 import { dashWebSearch, WEB_RULES } from '@/lib/dash/web-search';
 import type { DashChange, MadeDashChange, NewDashChange, PeopleCause } from '@/lib/talk/changes';
+import type { DashSlip } from '@/lib/dash/slips';
 
 /**
  * The people on People acting, not only looking things up (plan #2854.2).
@@ -87,7 +88,11 @@ export type PeopleDash = {
     tool: DashWriteTool,
     input: unknown,
     seen: DashSeen,
+    /** The thread and text that asked, so a refusal kept as a slip names them (plan #2999). */
+    cause?: PeopleCause,
   ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
+  /** Keeps a slip, such as a reply that ran out of its turn (plan #2999). Never throws. Absent: not kept. */
+  recordSlip?: (slip: DashSlip) => Promise<void>;
   /** Keeps a write's record, naming who made it and where (insertPeopleChange). */
   saveChange: (made: MadeDashChange, cause: PeopleCause) => Promise<DashChange>;
   /** Checks a proposal against the person's rows and keeps it with `save` (executeProposal). */
@@ -135,7 +140,7 @@ export function peopleActing(dash: PeopleDash, cause: PeopleCause): PeopleActing
   const write: DashWriter = async (tool, args, seen) => {
     let result: Awaited<ReturnType<PeopleDash['apply']>>;
     try {
-      result = await dash.apply(tool, args, seen);
+      result = await dash.apply(tool, args, seen, cause);
     } catch (error) {
       console.error(`people write ${tool.name} failed`, error);
       return { ok: false, error: 'That change could not be made. Tell them nothing was changed.' };

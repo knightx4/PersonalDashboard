@@ -5,6 +5,7 @@ import { zoneDay } from '@/lib/core/when';
 import { DASH_TOOLS } from '@/lib/dash/registry';
 import type { DashFile } from '@/lib/dash/files';
 import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
+import { budgetSlip } from '@/lib/dash/slips';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
 import type { ContextMessage } from '@/lib/you/chat-context-model';
@@ -20,6 +21,7 @@ import {
   ACK_AFTER_MS,
   ACK_MAX_TOKENS,
   ACK_RULES,
+  ACTING_MAX_TOKENS,
   bubblePauseMs,
   cleanAck,
   MAX_FOLLOW_UPS,
@@ -314,8 +316,9 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   }, input.ackAfterMs ?? ACK_AFTER_MS);
 
   // Whatever the mentor changes is kept under the text being answered, naming them.
+  const threadHref = `/chat/people/${ctx.mentor.key}`;
   const acting = input.act
-    ? peopleActing(input.act, { advisorId: ctx.mentor.id, chatId, messageId: answering.id })
+    ? peopleActing(input.act, { advisorId: ctx.mentor.id, chatId, messageId: answering.id, href: threadHref })
     : null;
   const voice: DashVoice = {
     model: input.model,
@@ -324,7 +327,10 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       : `${ctx.layers.persona.text}\n\n${REPLY_RULES}\n\n${PEOPLE_WEB_RULES}`,
     tools: acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS,
     serverTools: peopleServerTools(input.model),
-    maxTokens: REPLY_MAX_TOKENS,
+    // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
+    maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
+    // A reply that reaches a limit gets one more stretch to make the change it was asked for.
+    extend: acting !== null,
   };
   const rest = (['memory', 'episodes', 'recall', 'live'] as const).map((layer) => ctx.layers[layer].text).filter(Boolean);
 
@@ -351,6 +357,12 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     });
   } finally {
     clearTimeout(ackTimer);
+  }
+
+  // A reply that reached its limit is kept as a slip for Dev Home's count (plan #2999).
+  const slip = answer.ok ? budgetSlip(answer, name) : null;
+  if (slip && input.act?.recordSlip) {
+    await input.act.recordSlip({ ...slip, surface: 'people', conversation: `people:${chatId}`, href: threadHref });
   }
 
   const bubbles = answer.ok ? splitBubbles(answer.body) : [];

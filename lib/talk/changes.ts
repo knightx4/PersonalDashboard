@@ -436,7 +436,13 @@ export async function insertMadeChange(
  * (you.board_advisors), the thread (you.advisor_chats) and the person's text
  * the change answered (you.advisor_messages).
  */
-export type PeopleCause = { advisorId: string; chatId: string; messageId: string };
+export type PeopleCause = {
+  advisorId: string;
+  chatId: string;
+  messageId: string;
+  /** The thread's page, for a slip kept from it (plan #2999). Not kept on the change. */
+  href?: string;
+};
 
 function peopleColumns(cause: PeopleCause) {
   return {

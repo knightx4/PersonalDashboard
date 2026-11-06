@@ -53,6 +53,7 @@ import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
+import { keepSlip } from '@/lib/dash/slips';
 import { codeDeps } from '@/lib/dash/think-code';
 import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
@@ -224,6 +225,7 @@ export async function askDashInRequest(input: {
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
             origin: { kind: 'ask_dash', ref: conversationId },
+            slipWhere: { surface: 'ask', conversation: `ask:${conversationId}`, href: `/chat/dash/${conversationId}` },
           },
           args,
         ),
@@ -251,6 +253,7 @@ export async function askDashInRequest(input: {
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       recordFailure: (failure) => keepFailure(core, user.id, failure),
+      recordSlip: (slip) => keepSlip(core, user.id, slip),
       ...(sessions?.toSession ? { toSession: sessions.toSession } : {}),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
@@ -393,7 +396,7 @@ export async function peopleDashInRequest(userId: string): Promise<PeopleDash & 
   return {
     today: todayInTimezone(settings.timezone),
     execute: (name, args) => executeAskTool(name, args, ctx),
-    apply: (tool, args, seen) =>
+    apply: (tool, args, seen, cause) =>
       tool.apply(
         {
           ...ctx,
@@ -404,9 +407,15 @@ export async function peopleDashInRequest(userId: string): Promise<PeopleDash & 
           goalRoutine: goalRoutineInRequest,
           // A question handed to a goal from a People thread is answered from Chat.
           origin: { kind: 'chat', ref: null },
+          slipWhere: {
+            surface: 'people',
+            conversation: cause ? `people:${cause.chatId}` : null,
+            href: cause?.href ?? null,
+          },
         },
         args,
       ),
+    recordSlip: (slip) => keepSlip(core, userId, slip),
     saveChange: (made, cause) => insertPeopleChange(core, userId, cause, made),
     propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
     queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
