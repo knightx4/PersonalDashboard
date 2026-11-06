@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { after } from 'next/server';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { keepBotHandoff } from './bot-handoffs';
@@ -8,7 +9,10 @@ import { passToBot, type BotEntry, type BotPassPorts, type BotPasser } from './h
 /**
  * Passing a request to another bot (plan #3003.2), bound to the person's
  * own clients so RLS keeps both the roster read and the row kept to theirs.
- * The bots' reply code and Ask Dash are handed `botPasser`.
+ * The bots' reply code and Ask Dash are handed `botPasser`. A row newly
+ * kept is taken up by its receiver once this request has answered (plan
+ * #3003.3, lib/you/bot-handoff-reply-request.ts); a repeat of one already
+ * kept starts nothing.
  */
 
 /** The active people on People, as the names a request can go to. */
@@ -25,8 +29,35 @@ export async function listBotEntries(you: YouSupabaseClient, userId: string): Pr
 export function botPassPorts(you: YouSupabaseClient, core: CoreSupabaseClient, userId: string): BotPassPorts {
   return {
     bots: () => listBotEntries(you, userId),
-    keep: (input) => keepBotHandoff(core, userId, input),
+    keep: async (input) => {
+      const kept = await keepBotHandoff(core, userId, input);
+      if (kept.ok && kept.created) startReceiver(userId, kept.handoff.id);
+      return kept;
+    },
   };
+}
+
+/**
+ * The receiving bot's run, after the sending bot's reply is out. Loaded
+ * when it starts, since the run reads Ask Dash's tools, whose request file
+ * hands out this passer. Outside a request there is no `after`, so it runs
+ * alongside instead.
+ */
+function startReceiver(userId: string, handoffId: string): void {
+  const run = async () => {
+    try {
+      const { answerBotHandoffInRequest } = await import('@/lib/you/bot-handoff-reply-request');
+      const done = await answerBotHandoffInRequest(userId, handoffId);
+      console.info(`bot-handoff ${handoffId} ${done.status}${done.status === 'skipped' ? `: ${done.why}` : ''}`);
+    } catch (error) {
+      console.error('the receiving bot could not take up the hand-off', error);
+    }
+  };
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
 }
 
 /** The passer a bot's reply is handed. */

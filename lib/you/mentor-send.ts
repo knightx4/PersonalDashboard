@@ -26,6 +26,35 @@ export type MentorSent =
       files: ThreadFile[];
     };
 
+/**
+ * The mentor's one-on-one thread, started when there is none: the one
+ * written in most lately. A hand-off to them is answered here too (plan
+ * #3003.3).
+ */
+export async function directChatFor(
+  client: YouSupabaseClient,
+  userId: string,
+  mentor: Pick<Mentor, 'id' | 'name'>,
+): Promise<string> {
+  const found = await client
+    .from('advisor_chats')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('advisor_id', mentor.id)
+    .order('last_message_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (found.error) throw new Error(found.error.message);
+  if (typeof found.data?.id === 'string') return found.data.id;
+  const made = await client
+    .from('advisor_chats')
+    .insert({ user_id: userId, advisor_id: mentor.id, title: `Talking with ${mentor.name}`.slice(0, 200) })
+    .select('id')
+    .single();
+  if (made.error || typeof made.data?.id !== 'string') throw new Error(made.error?.message ?? 'Could not start the talk.');
+  return made.data.id;
+}
+
 export async function sendMentorText(input: {
   client: YouSupabaseClient;
   userId: string;
@@ -47,25 +76,7 @@ export async function sendMentorText(input: {
   if (!clean.ok) return { error: clean.error, saved: false };
   if (!mentor.canTalk) return { error: `${mentor.name} cannot talk until their brain is built.`, saved: false };
 
-  const found = await client
-    .from('advisor_chats')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('advisor_id', mentor.id)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle();
-  if (found.error) throw new Error(found.error.message);
-  let chatId = typeof found.data?.id === 'string' ? found.data.id : null;
-  if (!chatId) {
-    const made = await client
-      .from('advisor_chats')
-      .insert({ user_id: userId, advisor_id: mentor.id, title: `Talking with ${mentor.name}`.slice(0, 200) })
-      .select('id')
-      .single();
-    if (made.error || typeof made.data?.id !== 'string') throw new Error(made.error?.message ?? 'Could not start the talk.');
-    chatId = made.data.id;
-  }
+  const chatId = await directChatFor(client, userId, mentor);
 
   const message = await client
     .from('advisor_messages')

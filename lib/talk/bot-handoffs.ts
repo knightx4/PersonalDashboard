@@ -88,6 +88,14 @@ export function toBotHandoff(row: DbRow): BotHandoff {
   };
 }
 
+/** One hand-off by id, the person's own, or null. */
+export async function loadBotHandoff(core: CoreSupabaseClient, userId: string, id: string): Promise<BotHandoff | null> {
+  const { data, error } = await core.from('bot_handoffs').select(SELECT).eq('user_id', userId).eq('id', id).maybeSingle();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading the hand-off failed: ${error.message}`);
+  return data ? toBotHandoff(data as DbRow) : null;
+}
+
 /** The hand-off kept under one key, or null. */
 export async function loadBotHandoffByKey(
   core: CoreSupabaseClient,
