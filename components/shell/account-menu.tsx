@@ -22,8 +22,9 @@ import type { Theme } from '@/lib/theme';
  * leaving the page. The picker is the one the account page shows: the same
  * controls in both places, written to the same setting.
  *
- * Under the theme, Check mail (plan #3019): the way to make the app read new
- * mail now, for each mail workspace that is switched on.
+ * Under the theme, Check mail (plans #3019, #3019.1): the way to make the app
+ * read new mail now, with a button for each connected mailbox. It shows while
+ * any workspace that reads mail is switched on.
  */
 export function AccountMenu({
   initial,
@@ -36,7 +37,7 @@ export function AccountMenu({
   initial: string;
   label: string;
   theme: Theme;
-  /** The mail workspaces switched on, each with a Check mail button. None hides the section. */
+  /** The mail workspaces switched on, which name what a check found. None hides the section. */
   mailWorkspaces?: readonly MailWorkspace[];
   /** Drawn open, for the gallery's picture of the menu. */
   defaultOpen?: boolean;

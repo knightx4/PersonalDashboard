@@ -4,6 +4,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { pumpInboxSync, startIncrementalSync } from '@/inngest/core/inbox-sync';
 import {
   mailCheckStatus,
+  planCheck,
   type CheckAccount,
   type CheckJob,
   type MailCheckStatus,
@@ -12,13 +13,15 @@ import {
 export const maxDuration = 300;
 
 /**
- * Check mail now, from the account menu (plan #3019).
+ * Check mail now, from the account menu (plans #3019, #3019.1).
  *
- * GET says what the section should show: whether a check is running, when
- * mail was last checked, what the latest check found per workspace, and
- * anything wrong. POST starts a check of every connected mailbox, the same
- * incremental sync the daily job runs (inngest/cron/inbox.ts), joining one
- * that is already running and refusing a second within a minute of the last.
+ * GET says what the section should show for each connected mailbox: whether
+ * a check of it is running, when it was last checked, what its latest check
+ * found per workspace, and anything wrong. POST starts a check: of one
+ * mailbox when the body names `mailboxId`, of every mailbox for Check all.
+ * Each is the incremental sync the daily job runs (inngest/cron/inbox.ts),
+ * for that mailbox; a mailbox already being checked is joined, and one
+ * checked under a minute ago is refused.
  */
 
 function requestOrigin(request: NextRequest): string {
@@ -32,12 +35,13 @@ function requestOrigin(request: NextRequest): string {
 async function loadStatus(
   supabase: Awaited<ReturnType<typeof createCoreClient>>,
   userId: string,
-): Promise<{ status: MailCheckStatus; accounts: CheckAccount[] }> {
+): Promise<MailCheckStatus> {
   const { data: accountRows } = await supabase
     .from('email_accounts')
     .select('id, email_address, status, last_synced_at, backfill_completed_at')
     .eq('user_id', userId)
-    .neq('status', 'disconnected');
+    .neq('status', 'disconnected')
+    .order('created_at', { ascending: true });
   const accounts = (accountRows ?? []) as CheckAccount[];
 
   let jobs: CheckJob[] = [];
@@ -55,50 +59,48 @@ async function loadStatus(
     jobs = (jobRows ?? []) as CheckJob[];
   }
 
-  return { status: mailCheckStatus(accounts, jobs, Date.now()), accounts };
+  return mailCheckStatus(accounts, jobs, Date.now());
 }
 
 export async function GET() {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   const supabase = await createCoreClient();
-  const { status } = await loadStatus(supabase, user.id);
-  return NextResponse.json(status);
+  return NextResponse.json(await loadStatus(supabase, user.id));
 }
 
 export async function POST(request: NextRequest) {
   const user = await getUser();
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  const supabase = await createCoreClient();
-  const { status, accounts } = await loadStatus(supabase, user.id);
+  const body = (await request.json().catch(() => null)) as { mailboxId?: unknown } | null;
+  const mailboxId = typeof body?.mailboxId === 'string' ? body.mailboxId : null;
 
-  if (status.running) return NextResponse.json({ ...status, joined: true });
-  if (status.nextAllowedAt) {
-    return NextResponse.json(
-      { ...status, error: 'Mail was checked under a minute ago.' },
-      { status: 429 },
-    );
-  }
+  const supabase = await createCoreClient();
+  const status = await loadStatus(supabase, user.id);
+  const plan = planCheck(status, mailboxId);
+
+  if (plan.kind === 'joined') return NextResponse.json({ ...status, joined: true });
+  if (plan.kind === 'wait') return NextResponse.json({ ...status, error: plan.message }, { status: 429 });
+  if (plan.kind === 'none') return NextResponse.json({ ...status, error: plan.message }, { status: 409 });
 
   const origin = requestOrigin(request);
-  const ready = accounts.filter((a) => a.status === 'active' && a.backfill_completed_at);
   const failures: string[] = [];
-  for (const account of ready) {
+  for (const accountId of plan.ids) {
     try {
-      const started = await startIncrementalSync({ userId: user.id, accountId: account.id, origin });
+      const started = await startIncrementalSync({ userId: user.id, accountId, origin });
       if ('skipped' in started || started.alreadyRunning) continue;
       const jobId = started.jobId;
-      after(() =>
-        pumpInboxSync({ userId: user.id, accountId: account.id, jobId, origin, type: 'incremental' }),
-      );
+      after(() => pumpInboxSync({ userId: user.id, accountId, jobId, origin, type: 'incremental' }));
     } catch (err) {
-      failures.push(`${account.email_address}: ${err instanceof Error ? err.message : 'could not start'}`);
+      const email = status.mailboxes.find((m) => m.id === accountId)?.email ?? 'a mailbox';
+      failures.push(`${email}: ${err instanceof Error ? err.message : 'could not start'}`);
     }
   }
 
-  const { status: after_ } = await loadStatus(supabase, user.id);
+  const next = await loadStatus(supabase, user.id);
   return NextResponse.json({
-    ...after_,
+    ...next,
+    ...(plan.joined ? { joined: true } : {}),
     ...(failures.length > 0 ? { error: `Could not start a check of ${failures.join('; ')}` } : {}),
   });
 }

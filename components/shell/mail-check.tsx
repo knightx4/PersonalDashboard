@@ -4,15 +4,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import Link, { linkVariants } from '@/components/ui/link';
-import { IconButton } from '@/components/ui/icon-button';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { DashAction } from '@/components/ui/dash-action';
 import { Tooltip } from '@/components/ui/tooltip';
 import { deviceTimeZone, whenAgo } from '@/lib/core/when';
 import {
-  resultLine,
-  workspaceCount,
+  canStart,
+  mailboxLine,
+  type MailboxCheck,
   type MailCheckStatus,
   type MailWorkspace,
 } from '@/lib/core/inbox/mail-check';
@@ -20,11 +21,12 @@ import {
 const CHECK_ACTION = 'app/api/inbox/check/route.ts#POST';
 const POLL_MS = 2500;
 
-/** Which button was pressed: one workspace's, or Check all. */
-type Pressed = MailWorkspace['id'] | 'all';
+/** Which button was pressed: one mailbox's (by its id), or Check all. */
+type Pressed = string | 'all';
 
-function connectHref(returnTo: string): string {
-  return `/api/auth/gmail/connect?return_to=${encodeURIComponent(returnTo)}`;
+function connectHref(returnTo: string, email?: string): string {
+  const hint = email ? `&login_hint=${encodeURIComponent(email)}` : '';
+  return `/api/auth/gmail/connect?return_to=${encodeURIComponent(returnTo)}${hint}`;
 }
 
 function secondsUntil(at: string, now: number): number {
@@ -32,14 +34,15 @@ function secondsUntil(at: string, now: number): number {
 }
 
 /**
- * Check mail, under Theme in the account menu (plan #3019).
+ * Check mail, under Theme in the account menu (plans #3019, #3019.1).
  *
  * Mail is read on a schedule, so when the person is waiting on a reply there
- * was no way to make the app look now. Check all and each workspace's button
- * start the one sync the daily job runs, over every connected mailbox
- * (lib/core/inbox/mail-check.ts says why it is one pass), and the section
- * watches it until it ends, then re-reads the page so the new rows show
- * without a reload.
+ * was no way to make the app look now. Each connected mailbox has a button
+ * labelled with its address, which checks that mailbox for every workspace
+ * that reads mail, and Check all checks each of them. Both start the sync the
+ * daily job runs (lib/core/inbox/mail-check.ts says why per mailbox and never
+ * per workspace). The section watches the checks until they end, then
+ * re-reads the page so the new rows show without a reload.
  *
  * It reads its state when the menu opens, not with the top bar, so the bar
  * costs no query. `initial` and `now` are for the gallery's pictures.
@@ -49,7 +52,7 @@ export function MailCheck({
   initial = null,
   now: fixedNow,
 }: {
-  /** The mail workspaces the account has switched on. */
+  /** The mail workspaces the account has switched on, which name a result's breakdown. */
   workspaces: readonly MailWorkspace[];
   initial?: MailCheckStatus | null;
   now?: number;
@@ -82,7 +85,7 @@ export function MailCheck({
   const running = status?.running ?? false;
 
   // While a check runs, ask after it; the clock ticks for "2 min ago" and the
-  // cooldown's seconds.
+  // minute's seconds.
   useEffect(() => {
     if (fixedNow !== undefined) return;
     const tick = window.setInterval(() => setClock(Date.now()), 1000);
@@ -94,7 +97,7 @@ export function MailCheck({
     return () => window.clearInterval(poll);
   }, [running, initial, load]);
 
-  // When a check ends, re-read the page so what it found shows without a reload.
+  // When the checks end, re-read the page so what they found shows without a reload.
   const wasRunning = useRef(running);
   useEffect(() => {
     if (wasRunning.current && !running) {
@@ -110,12 +113,16 @@ export function MailCheck({
     setError(null);
     setNote(null);
     try {
-      const res = await fetch('/api/inbox/check', { method: 'POST' });
-      const data = (await res.json()) as MailCheckStatus & { error?: string; joined?: boolean };
-      if (data.mailboxes !== undefined) setStatus(data);
+      const res = await fetch('/api/inbox/check', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(which === 'all' ? {} : { mailboxId: which }),
+      });
+      const data = (await res.json()) as Partial<MailCheckStatus> & { error?: string; joined?: boolean };
+      if (data.mailboxes) setStatus({ mailboxes: data.mailboxes, running: data.running ?? false });
       if (data.joined) setNote('Already checking. This joins the check under way.');
-      if (!res.ok && res.status !== 429) setError(data.error ?? 'Could not start the check.');
-      else if (data.error && res.status !== 429) setError(data.error);
+      if (data.error) setError(data.error);
+      else if (!res.ok) setError('Could not start the check.');
     } catch {
       setError('Could not reach the app to start the check. Try again.');
     } finally {
@@ -136,28 +143,46 @@ export function MailCheck({
     );
   }
 
-  if (status.mailboxes === 0) {
+  const returnTo = pathname ?? '/home';
+
+  if (status.mailboxes.length === 0) {
     return (
       <div>
         {heading}
-        <Link href={connectHref(pathname ?? '/home')} className={cn(linkVariants(), 'text-ui')}>
+        <Link href={connectHref(returnTo)} className={cn(linkVariants(), 'text-ui')}>
           Connect Gmail
         </Link>
       </div>
     );
   }
 
-  const busy = running || starting;
-  const waitSeconds = status.nextAllowedAt && !busy ? secondsUntil(status.nextAllowedAt, now) : null;
-  const blocked = busy || waitSeconds !== null;
   const timeZone = deviceTimeZone() ?? 'UTC';
-  const when = running
+  const anyStartable = status.mailboxes.some(canStart);
+  // Check all waits out the minute only when every mailbox it could start is waiting.
+  const soonest = status.mailboxes
+    .filter((m) => m.checkable && !m.running && m.nextAllowedAt)
+    .map((m) => m.nextAllowedAt as string)
+    .sort()[0];
+  const allSummary = running
     ? 'Checking…'
-    : waitSeconds !== null
-      ? `Again in ${waitSeconds} s`
-      : status.lastCheckedAt
-        ? `Last checked ${whenAgo(status.lastCheckedAt, { timeZone, now })}`
-        : 'Not checked yet';
+    : !anyStartable && soonest
+      ? `Again in ${secondsUntil(soonest, now)} s`
+      : null;
+
+  function whenLine(m: MailboxCheck): string {
+    if (m.running) return 'Checking…';
+    if (m.nextAllowedAt) return `Again in ${secondsUntil(m.nextAllowedAt, now)} s`;
+    if (!m.lastCheckedAt) return 'Not checked yet';
+    return `Last checked ${whenAgo(m.lastCheckedAt, { timeZone, now })}`;
+  }
+
+  // A note or error from a press goes under what was pressed.
+  const message = (which: Pressed) =>
+    pressed === which && (error || note) ? (
+      <p className={cn('px-2 text-small', error ? 'text-danger' : 'text-ink-muted')} aria-live="polite">
+        {error ?? note}
+      </p>
+    ) : null;
 
   return (
     <div>
@@ -168,67 +193,70 @@ export function MailCheck({
           size="sm"
           paid={CHECK_ACTION}
           what="Cost of reading new mail"
-          pending={busy && (pressed === 'all' || pressed === null)}
-          disabled={blocked}
+          pending={starting && pressed === 'all'}
+          disabled={starting || !anyStartable}
           onClick={() => void check('all')}
         >
           Check all
         </DashAction>
         <span className="tabular min-w-0 truncate text-small text-ink-muted" aria-live="polite">
-          {when}
+          {allSummary}
         </span>
       </div>
+      {message('all')}
 
-      <ul className="mt-2 flex flex-col">
-        {workspaces.map((workspace) => {
-          const result = status.linked ? resultLine(workspace, workspaceCount(workspace, status.linked)) : null;
-          const spinning = busy && pressed === workspace.id;
+      <ul className="-mx-2 mt-2 flex flex-col gap-1">
+        {status.mailboxes.map((m) => {
+          const spinning = m.running || (starting && pressed === m.id);
+          const held = starting || !canStart(m);
+          const line = mailboxLine(whenLine(m), workspaces, m.running ? null : m.linked);
           return (
-            <li key={workspace.id} className="flex min-h-8 items-center gap-2">
-              <span className="w-18 shrink-0 text-ui text-ink">{workspace.label}</span>
-              <span className="min-w-0 flex-1 truncate text-small text-ink-muted">
-                {spinning ? 'Checking…' : (result ?? '')}
-              </span>
-              <Tooltip label={`Check mail for ${workspace.label}`} align="end">
-                <IconButton
+            <li key={m.id}>
+              <Tooltip label={`Check ${m.email} for new mail`} align="end" className="flex">
+                <Button
+                  variant="ghost"
                   size="sm"
-                  label={`Check mail for ${workspace.label}`}
-                  disabled={blocked}
+                  disabled={held}
                   aria-busy={spinning || undefined}
-                  onClick={() => void check(workspace.id)}
-                  className="shrink-0"
+                  onClick={() => void check(m.id)}
+                  // The address names the row, so it stays readable while the
+                  // button waits; the icon fades to say it cannot be pressed.
+                  className="w-full min-w-0 justify-between px-2 text-ink disabled:opacity-100"
                 >
+                  <span className="min-w-0 truncate">{m.email}</span>
                   <RefreshCw
                     aria-hidden
                     strokeWidth={1.75}
-                    className={cn(spinning && 'motion-safe:animate-spin')}
+                    className={cn(
+                      'size-4 shrink-0 text-ink-muted',
+                      held && !spinning && 'opacity-50',
+                      spinning && 'motion-safe:animate-spin',
+                    )}
                   />
-                </IconButton>
+                </Button>
               </Tooltip>
+              {(m.checkable || (m.lastCheckedAt && m.problem?.kind !== 'importing')) && (
+                <p className="tabular truncate px-2 text-small text-ink-muted" aria-live="polite">
+                  {line}
+                </p>
+              )}
+              {m.problem && (
+                <p
+                  className={cn('px-2 text-small', m.problem.kind === 'importing' ? 'text-ink-muted' : 'text-danger')}
+                >
+                  {m.problem.message}{' '}
+                  {m.problem.kind === 'reconnect' && (
+                    <Link href={connectHref(returnTo, m.email)} className={linkVariants()}>
+                      Reconnect
+                    </Link>
+                  )}
+                </p>
+              )}
+              {message(m.id)}
             </li>
           );
         })}
       </ul>
-
-      {note && <p className="mt-1 text-small text-ink-muted">{note}</p>}
-      {(error || status.problems.length > 0) && (
-        <ul className="mt-1.5 flex flex-col gap-1" aria-live="polite">
-          {error && <li className="text-small text-danger">{error}</li>}
-          {status.problems.map((problem) => (
-            <li
-              key={`${problem.kind}-${problem.email ?? ''}`}
-              className={cn('text-small', problem.kind === 'importing' ? 'text-ink-muted' : 'text-danger')}
-            >
-              {problem.message}{' '}
-              {problem.kind === 'reconnect' && (
-                <Link href={connectHref(pathname ?? '/home')} className={linkVariants()}>
-                  Reconnect Gmail
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

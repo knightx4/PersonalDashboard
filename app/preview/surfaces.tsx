@@ -407,7 +407,7 @@ import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { withBadges } from '@/lib/shell/tabs';
 import { AccountMenu } from '@/components/shell/account-menu';
-import { MAIL_WORKSPACES, type MailCheckStatus } from '@/lib/core/inbox/mail-check';
+import { MAIL_WORKSPACES, type MailboxCheck, type MailCheckStatus } from '@/lib/core/inbox/mail-check';
 
 import { StatusLine } from '@/components/shell/status-line';
 import type { GoingRunLine } from '@/components/runs/use-going-run-line';
@@ -727,43 +727,61 @@ import {
 } from './vault-page-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
 
-/** The gallery's clock for Check mail (plan #3019). */
+/** The gallery's clock for Check mail (plans #3019, #3019.1). */
 const MAIL_NOW = Date.parse('2026-11-06T12:00:00Z');
-const MAIL_CHECK_DONE: MailCheckStatus = {
-  mailboxes: 2,
+const MAILBOX: MailboxCheck = {
+  id: 'mb-personal',
+  email: 'chris.whitfield@gmail.com',
+  checkable: true,
   running: false,
   lastCheckedAt: '2026-11-06T11:58:00Z',
   nextAllowedAt: null,
-  linked: {
-    jobs: { claimed: 2, linked: 1, failed: 0, errors: 0 },
-    commerce: { claimed: 3, linked: 3, failed: 0, errors: 0 },
-    appointments: { claimed: 1, linked: 1, failed: 0, errors: 0 },
-  },
-  problems: [],
+  linked: null,
+  problem: null,
 };
-const MAIL_CHECK_PROBLEMS: MailCheckStatus = {
-  mailboxes: 2,
+const MAIL_CHECK_DONE: MailCheckStatus = {
   running: false,
-  lastCheckedAt: '2026-11-06T11:59:35Z',
-  nextAllowedAt: '2026-11-06T12:00:35Z',
-  linked: { jobs: { claimed: 0, linked: 0, failed: 0, errors: 0 } },
-  problems: [
+  mailboxes: [
     {
-      kind: 'reconnect',
+      ...MAILBOX,
+      linked: {
+        jobs: { claimed: 2, linked: 1, failed: 0, errors: 0 },
+        commerce: { claimed: 3, linked: 3, failed: 0, errors: 0 },
+        appointments: { claimed: 1, linked: 1, failed: 0, errors: 0 },
+      },
+    },
+    {
+      ...MAILBOX,
+      id: 'mb-work',
       email: 'christopher.alexander-whitfield@example.com',
-      message:
-        'Gmail stopped letting the app read christopher.alexander-whitfield@example.com. Reconnect it to check again.',
+      lastCheckedAt: '2026-11-06T11:40:00Z',
+      linked: { jobs: { claimed: 1, linked: 1, failed: 0, errors: 0 } },
     },
   ],
 };
-const MAIL_CHECK_NONE: MailCheckStatus = {
-  mailboxes: 0,
-  running: false,
-  lastCheckedAt: null,
-  nextAllowedAt: null,
-  linked: null,
-  problems: [],
+const MAIL_CHECK_PROBLEMS: MailCheckStatus = {
+  running: true,
+  mailboxes: [
+    { ...MAILBOX, running: true, nextAllowedAt: '2026-11-06T12:00:35Z' },
+    {
+      ...MAILBOX,
+      id: 'mb-work',
+      email: 'christopher.alexander-whitfield@example.com',
+      lastCheckedAt: '2026-11-06T11:59:35Z',
+      nextAllowedAt: '2026-11-06T12:00:35Z',
+      linked: { jobs: { claimed: 0, linked: 0, failed: 0, errors: 0 } },
+    },
+    {
+      ...MAILBOX,
+      id: 'mb-old',
+      email: 'chris.old.address@gmail.com',
+      checkable: false,
+      lastCheckedAt: '2026-11-02T09:00:00Z',
+      problem: { kind: 'reconnect', message: 'Gmail stopped letting the app read this mailbox.' },
+    },
+  ],
 };
+const MAIL_CHECK_NONE: MailCheckStatus = { running: false, mailboxes: [] };
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -8568,9 +8586,9 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
-    /* Check mail in the account menu (plan #3019) while one mailbox needs
-     * reconnecting and the last check was under a minute ago, so the
-     * buttons wait out the minute. */
+    /* Check mail in the account menu (plans #3019, #3019.1) while one
+     * mailbox is being checked, one was checked under a minute ago and waits
+     * it out, and one needs reconnecting. */
     id: 'shell-account-menu-mail-problems',
     label: 'Top bar · Account menu · Check mail problems',
     module: 'jobs',
