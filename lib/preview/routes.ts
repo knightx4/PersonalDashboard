@@ -389,6 +389,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-capture-aimed-camera': ['/shopping/orders', '/shopping/inventory'],
   'shell-capture-aimed-jobs-learn': ['/home'],
   'ask-dash-new': ['/chat/dash', '/chat/dash/[ref]'],
+  'ask-dash-new-earlier': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-answer': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-writing': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-failed': ['/chat/dash', '/chat/dash/[ref]'],
