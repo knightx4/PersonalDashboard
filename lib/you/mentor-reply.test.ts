@@ -314,6 +314,97 @@ describe('replyToMentor', () => {
     expect(JSON.stringify(lastTurn)).toContain('the start date');
   });
 
+  it('answers a message sent before the reply in hand had written anything (plan #2988)', async () => {
+    // The person sent a second text while the mentor was still thinking: it
+    // lands before the reply's bubbles, so the thread ends on the mentor and
+    // the second text was never answered until a third was sent.
+    const tables = world();
+    let sentMore = false;
+    const { stub, streamed } = anthropicStub(['Answer to the first.'], {
+      onPiece: () => {
+        if (sentMore) return;
+        sentMore = true;
+        tables['you.advisor_messages'].push({ id: 'm2', user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: 'try again', created_at: iso() });
+        clock += 50;
+      },
+    });
+    const outcome = await run(tables, stub).promise;
+    expect(outcome.rounds).toHaveLength(2);
+    expect(streamed).toHaveLength(2);
+    const turns = streamed[1].messages as { role: string; content: string }[];
+    expect(turns.at(-1)?.role).toBe('user');
+    expect(turns.at(-1)?.content).toContain('try again');
+    const second = tables['you.advisor_messages'].find((m) => m.id === 'm2');
+    expect(second?.delivered_at).toBeTruthy();
+  });
+
+  it('marks delivered only the messages the reply read, so one sent as it starts is answered next (plan #2988)', async () => {
+    const tables = world();
+    const client = fakeClient(tables);
+    const spy = client as unknown as { from: (t: string) => unknown };
+    const real = spy.from;
+    let pushed = false;
+    // A text lands between the reply reading the thread and marking it delivered.
+    spy.from = (t: string) => {
+      const chain = real(t) as { update: (v: Row) => unknown };
+      if (t === 'advisor_messages' && !pushed) {
+        const update = chain.update;
+        chain.update = (v: Row) => {
+          if ('delivered_at' in v && !pushed) {
+            pushed = true;
+            tables['you.advisor_messages'].push({ id: 'm3', user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: 'and the bonus?', created_at: iso() });
+            clock += 50;
+          }
+          return update(v);
+        };
+      }
+      return chain;
+    };
+    const { stub, streamed } = anthropicStub(['Answer.']);
+    await replyToMentor({
+      client,
+      userId: USER,
+      chatId: CHAT,
+      timeZone: 'Europe/London',
+      model: 'claude-sonnet-5-5',
+      anthropicApiKey: 'k',
+      anthropic: stub,
+      execute: vi.fn(),
+      recordSpend: async () => undefined,
+      claimed: true,
+      now: () => clock,
+      sleep: async () => undefined,
+    });
+    expect(streamed).toHaveLength(2);
+    expect(JSON.stringify((streamed[1].messages as unknown[]).at(-1))).toContain('the bonus');
+  });
+
+  it('waits for the person to stop sending before it reads the thread (plan #2988)', async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].created_at = iso();
+    const slept: number[] = [];
+    let more = 0;
+    const { stub, streamed } = anthropicStub(['One answer to all three.']);
+    const outcome = await run(tables, stub, {
+      sleep: async (ms) => {
+        slept.push(ms);
+        clock += ms;
+        // Two more texts arrive during the first two waits.
+        if (more < 2) {
+          more += 1;
+          tables['you.advisor_messages'].push({ id: `m-more-${more}`, user_id: USER, chat_id: CHAT, role: 'person', kind: 'reply', text: `and ${more}`, created_at: iso() });
+          clock += 1;
+        }
+      },
+    }).promise;
+    expect(slept.length).toBeGreaterThanOrEqual(3);
+    expect(streamed).toHaveLength(1);
+    expect(outcome.rounds).toHaveLength(1);
+    const last = JSON.stringify((streamed[0].messages as unknown[]).at(-1));
+    expect(last).toContain('Should I take the offer?');
+    expect(last).toContain('and 2');
+  });
+
   it('sends the pictures and PDFs of the messages it answers before their words (plan #2974)', async () => {
     const tables = world();
     tables['you.advisor_messages'].push({

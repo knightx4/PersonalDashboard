@@ -191,6 +191,35 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
   });
 
+  it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
+    const { client, tables, stamp } = group('@cy quick one');
+    let clock = Date.parse('2026-11-04T09:59:00Z');
+    let more = 0;
+    const plans: string[][] = [];
+    await runGroupBurst({
+      ...base(client),
+      now: () => clock,
+      sleep: async (ms) => {
+        clock += ms;
+        // Two more texts while the burst waits.
+        if (more < 2) {
+          more += 1;
+          tables.advisor_messages.push({ id: `p-more-${more}`, user_id: USER, chat_id: CHAT, role: 'person', speaker_id: null, text: `and ${more}`, created_at: new Date(clock).toISOString() });
+          stamp();
+        }
+      },
+      director: async (input) => {
+        plans.push(input.lines.filter((l) => l.speakerId === null).map((l) => l.text));
+        return { wait: true, picks: [], reactions: [] };
+      },
+      speak: async () => 'One answer to all three.',
+    });
+    // The director planned once, with all three, and the bot named in the first text answered.
+    expect(plans[0]).toEqual(['@cy quick one', 'and 1', 'and 2']);
+    expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
+    expect(tables.advisor_chats[0].typing_until).toBeNull();
+  });
+
   it('ends the burst when a bot asks the person something', async () => {
     const { client, tables } = group('What should I do?');
     await runGroupBurst({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Search, SquarePen } from 'lucide-react';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn';
 import { useRowArrival } from './use-row-arrival';
 import { GroupMark } from './group-parts';
 import { groupHref, groupPreviewOf, typingNames, type GroupRow } from '@/lib/you/group-chats-model';
+import { NO_PATCHES, outcomeOf, patchGroups, patchRows, type LivePatches } from '@/lib/you/live-list-model';
 import {
   isTyping,
   NEW_MESSAGE_HREF,
@@ -37,33 +38,69 @@ import {
  */
 
 const SETTLE_MS = 400;
+/**
+ * The least time between two redraws from the server. A redraw rebuilds the
+ * page and every thread its rows prefetch, so a run of changes is read once.
+ */
+const MIN_REDRAW_GAP_MS = 3_000;
 
-/** Redraw from the server when a thread or a message changes. */
-function useLiveThreads(live: boolean) {
+/**
+ * Keep the list current over Realtime. Typing, a thread being read and a
+ * failed reply patch the drawn rows in place (lib/you/live-list-model.ts);
+ * only a new message, a new chat, a renamed group or a bot joining or leaving
+ * redraws from the server, at most once every MIN_REDRAW_GAP_MS.
+ */
+function useLiveThreads(rows: readonly PersonRow[], groups: readonly GroupRow[], live: boolean): LivePatches {
   const router = useRouter();
+  const [heard, setHeard] = useState<{ rows: readonly PersonRow[]; groups: readonly GroupRow[]; patches: LivePatches }>({
+    rows,
+    groups,
+    patches: NO_PATCHES,
+  });
+  // A redraw brings fresh rows, which already hold what was patched.
+  const patches = heard.rows === rows && heard.groups === groups ? heard.patches : NO_PATCHES;
+  const drawn = useRef({ rows, groups, patches });
+  useEffect(() => {
+    drawn.current = { rows, groups, patches };
+  }, [rows, groups, patches]);
+
   useEffect(() => {
     if (!live) return;
     const supabase = createClient();
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastRedraw = 0;
     const refresh = () => {
       if (timer) return;
+      const wait = Math.max(SETTLE_MS, lastRedraw + MIN_REDRAW_GAP_MS - Date.now());
       timer = setTimeout(() => {
         timer = null;
+        lastRedraw = Date.now();
         router.refresh();
-      }, SETTLE_MS);
+      }, wait);
+    };
+    const heardChange = (table: string) => (event: { eventType: string; new: Record<string, unknown> | null }) => {
+      const now = drawn.current;
+      const out = outcomeOf({ table, eventType: event.eventType, new: event.new }, now, now.patches);
+      if (out.kind === 'refresh') refresh();
+      else if (out.kind === 'patch') {
+        drawn.current = { ...now, patches: out.patches };
+        setHeard({ rows: now.rows, groups: now.groups, patches: out.patches });
+      }
     };
     const channel = supabase
       .channel(`chat-people:${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_chats' }, refresh)
-      .on('postgres_changes', { event: 'INSERT', schema: 'you', table: 'advisor_messages' }, refresh)
-      // A bot typing in a group (plan #2879.1.3).
-      .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chat_members' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_chats' }, heardChange('advisor_chats'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'you', table: 'advisor_messages' }, heardChange('advisor_messages'))
+      // A bot typing in a group (plan #2879.1.3), or joining or leaving one.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chat_members' }, heardChange('advisor_chat_members'))
       .subscribe();
     return () => {
       if (timer) clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
   }, [live, router]);
+
+  return patches;
 }
 
 /**
@@ -114,9 +151,11 @@ export function entriesOf(rows: readonly PersonRow[], groups: readonly GroupRow[
   return [...said, ...quiet];
 }
 
+const NO_GROUPS: readonly GroupRow[] = [];
+
 export function PeopleList({
-  rows,
-  groups = [],
+  rows: drawnRows,
+  groups: drawnGroups = NO_GROUPS,
   current = null,
   currentWide = false,
   query = null,
@@ -141,7 +180,9 @@ export function PeopleList({
   /** False in the gallery, which has no database to listen to. */
   live?: boolean;
 }) {
-  useLiveThreads(live);
+  const patches = useLiveThreads(drawnRows, drawnGroups, live);
+  const rows = useMemo(() => patchRows(drawnRows, patches), [drawnRows, patches]);
+  const groups = useMemo(() => patchGroups(drawnGroups, patches), [drawnGroups, patches]);
   useFreshOnOpen(start, live);
   const now = useTypingClock(rows, groups, start, live);
   const listRef = useRef<HTMLUListElement>(null);

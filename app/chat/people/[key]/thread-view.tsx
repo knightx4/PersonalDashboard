@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import {
   MessageBubble,
   MessageCard,
@@ -43,6 +44,7 @@ import {
 } from '@/lib/you/chat-threads-model';
 import { editHref } from '@/lib/you/people-cards-model';
 import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
+import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
 import type { DashChange } from '@/lib/talk/changes';
@@ -212,12 +214,20 @@ export function ThreadView({
   const hasOlder = olderState ?? page.hasOlder;
   const [loadingOlder, setLoadingOlder] = useState(initialLoadingOlder);
   const [olderError, setOlderError] = useState<string | null>(null);
+  // Why the reply failed, as Realtime last said or as the server drew it (plan #2854.4).
+  const [heardFailed, setReplyFailed] = useState<string | null | undefined>(undefined);
   // Typing as Realtime last said, or as the server drew it before Realtime has spoken.
   const [heardTyping, setTypingUntil] = useState<string | null | undefined>(undefined);
   const typingUntil = heardTyping === undefined ? initialTyping : heardTyping;
+  // A fresh page from the server (on return to the tab, or after Realtime
+  // reconnects) says where typing and the reply stand; what was heard before it gives way.
+  const [drawnReply, setDrawnReply] = useState({ typing: initialTyping, failed: person.replyFailed ?? null });
+  if (drawnReply.typing !== initialTyping || drawnReply.failed !== (person.replyFailed ?? null)) {
+    setDrawnReply({ typing: initialTyping, failed: person.replyFailed ?? null });
+    setTypingUntil(undefined);
+    setReplyFailed(undefined);
+  }
   const [pending, setPending] = useState<Pending[]>(initialPending);
-  // Why the reply failed, as Realtime last said or as the server drew it (plan #2854.4).
-  const [heardFailed, setReplyFailed] = useState<string | null | undefined>(undefined);
   const replyFailed = heardFailed === undefined ? (person.replyFailed ?? null) : heardFailed;
   const [retryError, setRetryError] = useState<string | null>(null);
   // The changes as the server drew them, then as a press or a re-read left them.
@@ -256,10 +266,17 @@ export function ThreadView({
   // thread hidden behind the list, and that one is not read.
   const shown = () => scroller.current?.checkVisibility?.() ?? true;
 
-  // Realtime: the thread's messages and its typing.
+  // Realtime: the thread's messages and its typing. Realtime does not replay
+  // what it missed while the phone slept or the socket dropped, so the page is
+  // read again whenever the channel joins after the first time, or the tab
+  // comes back; without it a reply written meanwhile stayed hidden until the
+  // next send redrew the page (plan #2988).
+  const router = useRouter();
+  const drawnWithChat = useRef(initialChatId !== null);
   useEffect(() => {
     if (!live || !chatId) return;
     const supabase = createClient();
+    let joined = drawnWithChat.current ? 0 : 1;
     const channel = supabase
       .channel(`chat-thread:${chatId}:${Math.random().toString(36).slice(2)}`)
       .on('postgres_changes', { event: '*', schema: 'you', table: 'advisor_messages', filter: `chat_id=eq.${chatId}` }, (event) => {
@@ -277,11 +294,22 @@ export function ThreadView({
         setTypingUntil(typeof next.typing_until === 'string' ? next.typing_until : null);
         if ('reply_status' in next) setReplyFailed(replyFailedOf(next));
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') return;
+        joined += 1;
+        if (joined > 1) router.refresh();
+      });
+    const back = () => {
+      if (document.visibilityState === 'visible') router.refresh();
+    };
+    document.addEventListener('visibilitychange', back);
+    window.addEventListener('online', back);
     return () => {
+      document.removeEventListener('visibilitychange', back);
+      window.removeEventListener('online', back);
       void supabase.removeChannel(channel);
     };
-  }, [live, chatId, person.id]);
+  }, [live, chatId, person.id, router]);
 
   useEffect(() => {
     if (live && chatId && scroller.current?.checkVisibility?.() !== false) void act.current.read(chatId, person.id);
@@ -430,6 +458,29 @@ export function ThreadView({
   useEvery(live && chatId && awaitingReply ? WORKING_POLL_MS : null, () => {
     if (chatId) void act.current.changes?.(chatId).then((next) => next && setChanges(next));
   });
+
+  // The safety net (plan #2988): a text of theirs left with no reply and
+  // nothing writing one is answered once it has waited a minute, as Try
+  // again would. Each text is asked for once; a failure then shows Try again.
+  const owed =
+    live && chatId && person.canTalk && !typingNow && pending.length === 0 && !replyFailed && !retryError ? owedReply(messages) : null;
+  const owedId = owed?.id ?? null;
+  const owedAt = owed?.createdAt ?? null;
+  const asked = useRef(new Set<string>());
+  const askAgain = useRef(retryReply);
+  useEffect(() => {
+    askAgain.current = retryReply;
+  });
+  useEffect(() => {
+    if (!owedId || !owedAt || asked.current.has(owedId)) return;
+    const age = Date.now() - Date.parse(owedAt);
+    if (!(age < STALLED_LIMIT_MS)) return;
+    const timer = setTimeout(() => {
+      asked.current.add(owedId);
+      void askAgain.current();
+    }, Math.max(STALLED_MS - age, 0));
+    return () => clearTimeout(timer);
+  }, [owedId, owedAt]);
 
   // The builds still going are heard over Realtime: their run and their
   // session's reports. One newly confirmed is read straight away.
