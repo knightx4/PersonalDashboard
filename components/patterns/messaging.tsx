@@ -93,6 +93,7 @@ export function MessagingThread({
   box,
   scrollRef,
   onScroll,
+  bare = false,
   children,
 }: {
   /** Their name; a skeleton while the thread loads. */
@@ -111,18 +112,23 @@ export function MessagingThread({
   /** The scrolling part, for a thread that keeps its place or reads further back. */
   scrollRef?: React.Ref<HTMLDivElement>;
   onScroll?: React.UIEventHandler<HTMLDivElement>;
+  /**
+   * Drawn inside another pane that names the thread itself, as the Ask Dash
+   * pane does (plan #2981): no bar of its own, and the height of what holds
+   * it rather than of the window.
+   */
+  bare?: boolean;
   /** The messages, oldest first: day labels and MessageGroups. */
   children: React.ReactNode;
 }) {
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col overflow-hidden bg-surface',
-        PHONE_PANE,
-        PANE_H,
+        'flex min-w-0 flex-col overflow-hidden',
+        bare ? 'min-h-0 flex-1' : ['bg-surface', PHONE_PANE, PANE_H],
       )}
     >
-      <header className="shrink-0 border-b border-border px-4 py-2.5">
+      {!bare && <header className="shrink-0 border-b border-border px-4 py-2.5">
         <div className="mb-1 min-[720px]:hidden">
           <BackLink crumbs={crumbs} fallback={back} />
         </div>
@@ -134,12 +140,17 @@ export function MessagingThread({
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
-      </header>
+      </header>}
       {/* The only part that scrolls; the box below it stays where it is. */}
       <div
         ref={scrollRef}
         onScroll={onScroll}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 [scrollbar-gutter:stable]"
+        className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 [scrollbar-gutter:stable]',
+          // A pane narrower than a page's keeps each side's bubbles to three
+          // quarters of it at every width, so whose turn it is reads by side.
+          bare && '[&_[data-from]]:lg:max-w-3/4',
+        )}
       >
         {children}
       </div>

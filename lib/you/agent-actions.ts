@@ -121,6 +121,8 @@ export const youActions: ModuleActions = {
   // Chat's People tab: threads (plan #2748.6), and adding and editing a person (plan #2748.11).
   'app/chat/actions.ts': {
     olderMessages: none('page', 'Reads the page of a thread before the oldest one shown; it serves the page.'),
+    paneThreads: none('page', 'Reads the chats for the row in the Ask Dash sheet; it serves the sheet.'),
+    paneThread: none('page', 'Reads one chat for the Ask Dash sheet, as its Messages page does; it serves the sheet.'),
     readThread: none('own', "Having a thread open is the person's own reading of what a mentor wrote."),
     retryReply: none('own', "Asking a mentor to answer again after a failed reply is the person's own press on their thread (plan #2854.4)."),
     threadChanges: none('page', 'Reads the cards for what a person did in a thread; it serves the page (plan #2854.2.1).'),
