@@ -2,12 +2,12 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { vectorLiteral } from '@/lib/learn/catalogue/embed-sweep';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { embedTexts, type EmbedOutcome } from '@/lib/learn/embed/embed';
 import type { EmbeddingClient } from '@/lib/learn/embed/voyage';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import { cosine } from '@/lib/news/issues/repeats';
 import { MODELS } from '@/lib/core/models';
 
@@ -239,33 +239,30 @@ async function judge(
     model: MERGE_MODEL,
     max_tokens: 400,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL,
-        description: 'Report whether the new idea repeats an earlier one, and what already covers it.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            same_as: { type: 'string', enum: labels('T', earlier.length) },
-            clearer: { type: 'string', enum: ['new', 'earlier'] },
-            covered_by: { type: 'string', enum: labels('C', cover.length) },
-            cover_quote: {
-              type: 'string',
-              description: 'The covering row’s sentence, word for word. Empty when covered_by is none.',
-            },
+    ...reportRequest({
+      name: TOOL,
+      description: 'Report whether the new idea repeats an earlier one, and what already covers it.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          same_as: { type: 'string', enum: labels('T', earlier.length) },
+          clearer: { type: 'string', enum: ['new', 'earlier'] },
+          covered_by: { type: 'string', enum: labels('C', cover.length) },
+          cover_quote: {
+            type: 'string',
+            description: 'The covering row’s sentence, word for word. Empty when covered_by is none.',
           },
-          required: ['same_as', 'clearer', 'covered_by', 'cover_quote'],
         },
+        required: ['same_as', 'clearer', 'covered_by', 'cover_quote'],
       },
-    ],
-    tool_choice: forceTool(TOOL, MERGE_MODEL),
+    }, MERGE_MODEL),
     messages: [{ role: 'user', content: matchPrompt(fresh, earlier, cover) }],
   });
   onSpend({ model: MERGE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { sameAs: null, newIsClearer: false, coveredBy: null };
+  const reportRead = readReport(response, TOOL, MERGE_MODEL);
+  if (!reportRead.ok) return { sameAs: null, newIsClearer: false, coveredBy: null };
   return readJudgement(
-    block.input,
+    reportRead.value,
     earlier.length,
     cover.map((row) => row.text),
   );

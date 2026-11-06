@@ -52,7 +52,9 @@ const DESIGN_CHECK: RegExp[] = [
  * True for an ask that hands the person a design check. Since 12 October 2026
  * those are not theirs: a screen the critic would not pass after three rounds,
  * or surfaces a shared file reaches that nobody checked, are settled by the
- * session (`npm run ui-guard -- <n> --settle "<why>"`).
+ * session (`npm run ui-guard -- <n> --settle "<why>"`). The one exception (plan
+ * #2966.4) is asked as a decision whose ask names the page and its options,
+ * not the critic, so this does not catch it (`ui-guard --ask`).
  */
 export function blockAskIsDesignCheck(ask: string): boolean {
   const text = ask.toLowerCase().replace(/\s+/g, ' ');
@@ -80,7 +82,9 @@ export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
     return (
       'That ask puts a design check to the person, and those are not theirs to answer. ' +
       'Settle the surfaces yourself: npm run ui-guard -- <n> --settle "<why>", then merge ' +
-      'and close the step with any open fixes in the close note. screen.md, beside ' +
+      'and close the step with any open fixes in the close note. A screen that still cites ' +
+      'its mockup, its done-when or a regression after round 3 is the exception: ' +
+      'npm run ui-guard -- <n> --ask writes the question and the ask to block with. screen.md, beside ' +
       'building.md in the plan skill, has the rule.'
     );
   }

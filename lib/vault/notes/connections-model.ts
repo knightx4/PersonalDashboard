@@ -1,9 +1,9 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * The sentence above each weekly connection (plan #1115): what a week's notes
@@ -100,30 +100,27 @@ export async function writeConnectionSentences(
       model: CONNECTIONS_MODEL,
       max_tokens: 800,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Give the sentence for each group, by group number.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              sentences: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    group: { type: 'integer' },
-                    sentence: { type: 'string' },
-                  },
-                  required: ['group', 'sentence'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Give the sentence for each group, by group number.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            sentences: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  group: { type: 'integer' },
+                  sentence: { type: 'string' },
                 },
+                required: ['group', 'sentence'],
               },
             },
-            required: ['sentences'],
           },
+          required: ['sentences'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, CONNECTIONS_MODEL),
+      }, CONNECTIONS_MODEL),
       messages: [{ role: 'user', content: prompt(groups) }],
     });
   } catch (error) {
@@ -132,9 +129,9 @@ export async function writeConnectionSentences(
   }
   options.onSpend?.({ model: CONNECTIONS_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return none;
-  const input = block.input as { sentences?: unknown };
+  const report = readReport(response, TOOL_NAME, CONNECTIONS_MODEL);
+  if (!report.ok) return none;
+  const input = report.value as { sentences?: unknown };
   if (!Array.isArray(input.sentences)) return none;
 
   const out: (string | null)[] = [...none];

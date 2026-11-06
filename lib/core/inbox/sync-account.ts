@@ -18,6 +18,7 @@ import {
   type FanOutResult,
 } from '@/lib/core/inbox/fan-out';
 import type { SyncPhase } from '@/lib/core/inbox/progress';
+import { addFanOut } from '@/lib/core/inbox/mail-check';
 import { ensureAccessToken, loadAccount } from '@/lib/core/inbox/access-token';
 
 export { incrementalFallbackQuery };
@@ -122,6 +123,26 @@ async function markPhase(
   if (error) console.error('sync phase write failed', jobId, error.message);
 }
 
+/**
+ * Add a batch's per-workspace counts to the job, for the account menu's
+ * Check mail results (plan #3019). The pump runs one batch at a time per job,
+ * so a read and a write cannot cross another batch's. Like markPhase, a
+ * failure here is logged and never fails the sync.
+ */
+async function recordLinked(
+  supabase: CoreSupabaseClient,
+  jobId: string,
+  batch: FanOutResult | undefined,
+): Promise<void> {
+  if (!batch || Object.keys(batch).length === 0) return;
+  const { data } = await supabase.from('sync_jobs').select('linked').eq('id', jobId).maybeSingle();
+  const { error } = await supabase
+    .from('sync_jobs')
+    .update({ linked: addFanOut(data?.linked, batch) })
+    .eq('id', jobId);
+  if (error) console.error('sync linked write failed', jobId, error.message);
+}
+
 async function failJob(
   supabase: CoreSupabaseClient,
   jobId: string,
@@ -181,6 +202,8 @@ async function processPage(
     accessToken: opts.accessToken,
     envelopes,
   });
+
+  if (opts.jobId) await recordLinked(supabase, opts.jobId, opts.progress.linkers);
 
   // Everything has had its say, so anything nobody claimed can lose its
   // subject and sender now. See core.scrub_unclaimed_messages().

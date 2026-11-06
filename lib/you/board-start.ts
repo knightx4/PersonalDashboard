@@ -40,7 +40,7 @@ export function boardBrief(input: {
 }): string {
   return [
     `Follow ${BOARD_SKILL_PATH}`,
-    `Board meeting ${input.meetingId}`,
+    `Council meeting ${input.meetingId}`,
     `user_id ${input.userId}`,
     input.decision ? `called: ${input.decision}` : 'weekly',
     ...(input.questionIds?.length ? [`questions ${input.questionIds.join(', ')}`] : []),
@@ -53,7 +53,7 @@ function noRoutine(): CallBoardMeetingResult {
     started: false,
     reason: 'no_routine',
     error:
-      'Board meetings run on the board routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.',
+      'Council meetings run on the council routine, which is not set up on this deployment: it needs CLAUDE_BOARD_ROUTINE_ID and CLAUDE_BOARD_ROUTINE_TOKEN.',
   };
 }
 

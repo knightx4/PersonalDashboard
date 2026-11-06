@@ -127,12 +127,18 @@ describe('localCheckRounds', () => {
     try {
       const dir = join(root, '.preview-shots/checks');
       mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, '42--news-home--r3.json'), JSON.stringify({ verdict: 'fix' }));
+      const fixes = [{ shot: 'phone-light', where: 'top', problem: 'Not the mockup', breaks: 'reference', change: 'Match it' }];
+      writeFileSync(join(dir, '42--news-home--r3.json'), JSON.stringify({ verdict: 'fix', fixes }));
       writeFileSync(join(dir, '42--news-home--r3--phone-light.png'), '');
       writeFileSync(join(dir, '420--news-home--r1.json'), JSON.stringify({ verdict: 'pass' }));
       writeFileSync(join(dir, '42--jobs-role--r1.json'), 'not json');
+      writeFileSync(
+        join(dir, '42--people--r1.json'),
+        JSON.stringify({ verdict: 'fix', layout: { answer: 'x', ok: false } }),
+      );
       expect(localCheckRounds(42, root)).toEqual([
-        { surface: 'news-home', round: 3, verdict: 'fix' },
+        { surface: 'news-home', round: 3, verdict: 'fix', layout_ok: null, fixes, notes: null },
+        { surface: 'people', round: 1, verdict: 'fix', layout_ok: false, notes: null },
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

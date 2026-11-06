@@ -185,6 +185,24 @@ describe('releaseStaleClaims', () => {
     );
   });
 
+  it('leaves a built step alone, however old, and does not count it', async () => {
+    const { supabase, updates, rows } = stubClient([
+      claim({
+        started_at: minutesAgo(60 * 30),
+        comment: 'Built 2026-03-01: on a branch, landing with its feature.',
+      }),
+      claim({ id: 'b', number: 43, started_at: minutesAgo(60 * 30) }),
+    ]);
+
+    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
+      released: 1,
+      steps: [43],
+      kept: [],
+    });
+    expect(updates.map((one) => one.id)).toEqual(['b']);
+    expect(rows[0].status).toBe('in_progress');
+  });
+
   it('keeps a claim a check-back is waiting on, however old', async () => {
     const { supabase, updates } = stubClient([claim({ started_at: minutesAgo(60 * 30) })], [], {}, [
       { plan_item_id: 'a' },

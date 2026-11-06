@@ -1,7 +1,8 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
@@ -220,48 +221,45 @@ export async function conceptsFromCourse(input: {
       model: MODEL,
       max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the ideas a course like this usually teaches.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              subject: { type: 'string' },
-              goal_concept: { type: 'string', description: 'A short concept name of a few words, never a sentence.' },
-              too_vague: { type: 'boolean' },
-              concepts: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    claim: { type: 'string' },
-                    basis: { type: 'string' },
-                    mastery: MASTERY_TOOL_FIELD,
-                    kind: KIND_TOOL_FIELD,
-                  },
-                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the ideas a course like this usually teaches.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            subject: { type: 'string' },
+            goal_concept: { type: 'string', description: 'A short concept name of a few words, never a sentence.' },
+            too_vague: { type: 'boolean' },
+            concepts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  claim: { type: 'string' },
+                  basis: { type: 'string' },
+                  mastery: MASTERY_TOOL_FIELD,
+                  kind: KIND_TOOL_FIELD,
                 },
-              },
-              edges: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    prerequisite: { type: 'string' },
-                    dependent: { type: 'string' },
-                    basis: { type: 'string' },
-                  },
-                  required: ['prerequisite', 'dependent', 'basis'],
-                },
+                required: ['name', 'claim', 'basis', 'mastery', 'kind'],
               },
             },
-            required: ['subject', 'goal_concept', 'concepts', 'edges'],
+            edges: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  prerequisite: { type: 'string' },
+                  dependent: { type: 'string' },
+                  basis: { type: 'string' },
+                },
+                required: ['prerequisite', 'dependent', 'basis'],
+              },
+            },
           },
+          required: ['subject', 'goal_concept', 'concepts', 'edges'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -274,12 +272,12 @@ export async function conceptsFromCourse(input: {
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = chainPayloadSchema.safeParse(block.input);
+  const safe = chainPayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }

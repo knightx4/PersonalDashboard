@@ -8,6 +8,8 @@ import { PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ThemePicker } from '@/components/shell/theme-picker';
+import { MailCheck } from '@/components/shell/mail-check';
+import type { MailCheckStatus, MailWorkspace } from '@/lib/core/inbox/mail-check';
 import { usePopover } from '@/lib/use-popover';
 import type { Theme } from '@/lib/theme';
 
@@ -19,18 +21,28 @@ import type { Theme } from '@/lib/theme';
  * first and the theme under it, where a click changes the room without
  * leaving the page. The picker is the one the account page shows: the same
  * controls in both places, written to the same setting.
+ *
+ * Under the theme, Check mail (plans #3019, #3019.1): the way to make the app
+ * read new mail now, with a button for each connected mailbox. It shows while
+ * any workspace that reads mail is switched on.
  */
 export function AccountMenu({
   initial,
   label,
   theme,
+  mailWorkspaces = [],
   defaultOpen = false,
+  mailFixture,
 }: {
   initial: string;
   label: string;
   theme: Theme;
+  /** The mail workspaces switched on, which name what a check found. None hides the section. */
+  mailWorkspaces?: readonly MailWorkspace[];
   /** Drawn open, for the gallery's picture of the menu. */
   defaultOpen?: boolean;
+  /** The Check mail state and clock to draw, for the gallery. */
+  mailFixture?: { status: MailCheckStatus | null; now: number };
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -68,6 +80,15 @@ export function AccountMenu({
           <div className="mt-1 border-t border-border px-2.5 pb-2 pt-3">
             <ThemePicker value={theme} />
           </div>
+          {mailWorkspaces.length > 0 && (
+            <div className="border-t border-border px-2.5 pb-2 pt-3">
+              <MailCheck
+                workspaces={mailWorkspaces}
+                initial={mailFixture?.status ?? null}
+                now={mailFixture?.now}
+              />
+            </div>
+          )}
         </Popover>
       )}
     </div>

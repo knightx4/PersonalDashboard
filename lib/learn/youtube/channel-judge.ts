@@ -2,12 +2,12 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { archivedAmong } from '@/lib/learn/archived-subjects';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadGraph } from '@/lib/learn/graph/load';
 import { rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import {
   chaptersFromDescription,
   fetchPlaylistVideoIds,
@@ -194,27 +194,24 @@ async function pickVideos(input: {
       model: CHANNEL_JUDGE_MODEL,
       max_tokens: 256,
       system: PICK_SYSTEM,
-      tools: [
-        {
-          name: PICK_TOOL,
-          description: 'Report the numbers of the videos picked, best first.',
-          input_schema: {
-            type: 'object',
-            properties: { numbers: { type: 'array', items: { type: 'integer' }, maxItems: SAMPLES_PER_CHANNEL } },
-            required: ['numbers'],
-          },
+      ...reportRequest({
+        name: PICK_TOOL,
+        description: 'Report the numbers of the videos picked, best first.',
+        input_schema: {
+          type: 'object',
+          properties: { numbers: { type: 'array', items: { type: 'integer' }, maxItems: SAMPLES_PER_CHANNEL } },
+          required: ['numbers'],
         },
-      ],
-      tool_choice: forceTool(PICK_TOOL, CHANNEL_JUDGE_MODEL),
+      }, CHANNEL_JUDGE_MODEL),
       messages: [{ role: 'user', content: input.prompt }],
     });
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : 'Picking the videos failed.' };
   }
   input.onSpend?.({ model: CHANNEL_JUDGE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === PICK_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const picks = readPickReply(block.input, input.videos);
+  const reportRead = readReport(response, PICK_TOOL, CHANNEL_JUDGE_MODEL);
+  if (!reportRead.ok) return { ok: false, detail: reportRead.reason };
+  const picks = readPickReply(reportRead.value, input.videos);
   return picks ? { ok: true, picks } : { ok: false, detail: 'The picks came back malformed.' };
 }
 
@@ -292,27 +289,24 @@ async function decideChannel(input: {
       model: CHANNEL_JUDGE_MODEL,
       max_tokens: 512,
       system: VERDICT_SYSTEM,
-      tools: [
-        {
-          name: VERDICT_TOOL,
-          description: 'Report follow or pass, and the reason.',
-          input_schema: {
-            type: 'object',
-            properties: { verdict: { type: 'string', enum: ['follow', 'pass'] }, why: { type: 'string' } },
-            required: ['verdict', 'why'],
-          },
+      ...reportRequest({
+        name: VERDICT_TOOL,
+        description: 'Report follow or pass, and the reason.',
+        input_schema: {
+          type: 'object',
+          properties: { verdict: { type: 'string', enum: ['follow', 'pass'] }, why: { type: 'string' } },
+          required: ['verdict', 'why'],
         },
-      ],
-      tool_choice: forceTool(VERDICT_TOOL, CHANNEL_JUDGE_MODEL),
+      }, CHANNEL_JUDGE_MODEL),
       messages: [{ role: 'user', content: input.prompt }],
     });
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : 'Judging the channel failed.' };
   }
   input.onSpend?.({ model: CHANNEL_JUDGE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === VERDICT_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const read = readVerdictReply(block.input);
+  const reportRead = readReport(response, VERDICT_TOOL, CHANNEL_JUDGE_MODEL);
+  if (!reportRead.ok) return { ok: false, detail: reportRead.reason };
+  const read = readVerdictReply(reportRead.value);
   return read ? { ok: true, ...read } : { ok: false, detail: 'The channel verdict came back malformed.' };
 }
 

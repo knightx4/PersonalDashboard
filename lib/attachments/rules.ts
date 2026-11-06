@@ -79,6 +79,15 @@ export function pastedFileName(name: string, type: string, number: number): stri
   return `Pasted ${type.startsWith('image/') ? 'image' : 'file'} ${number}.${ext}`;
 }
 
+/**
+ * What a message sent with files and no words is saved as (plan #2974): the
+ * files' names, since a message or a question is never empty. A list and a
+ * search show the names; the thread draws the files alone.
+ */
+export function filesOnlyText(names: readonly string[]): string {
+  return names.join(', ');
+}
+
 /** Whether a stored file is a picture, so it shows as a thumbnail rather than a chip. */
 export function isImageAttachment(contentType: string): boolean {
   return contentType.startsWith('image/');

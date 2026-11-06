@@ -11,9 +11,9 @@
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { DASH_MODELS } from '@/lib/dash/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import {
   MAX_CAPTURE_PARTS,
   captureSortMessage,
@@ -98,15 +98,14 @@ export async function requestCaptureSort(
         model: CAPTURE_SORT_MODEL,
         max_tokens: 400,
         system: SYSTEM,
-        tools: [sortTool(context)],
-        tool_choice: forceTool(CAPTURE_SORT_TOOL, CAPTURE_SORT_MODEL),
+        ...reportRequest(sortTool(context), CAPTURE_SORT_MODEL),
         messages: [{ role: 'user', content: captureSortMessage(sentence, context) }],
       },
       options.signal ? { signal: options.signal } : undefined,
     );
     options.onSpend?.({ model: CAPTURE_SORT_MODEL, usage: usageFrom(response.usage) });
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === CAPTURE_SORT_TOOL);
-    return block && block.type === 'tool_use' ? block.input : null;
+    const block = readReport(response, CAPTURE_SORT_TOOL, CAPTURE_SORT_MODEL);
+    return block.ok ? block.value : null;
   } catch (error) {
     console.error('capture sort failed', error);
     return null;

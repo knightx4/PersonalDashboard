@@ -9,8 +9,9 @@ import {
   relativeLuminance,
   withLuminance,
 } from '@/lib/theme/oklch';
-import { accentHueFor, generatePalette, MEANING_FLOOR, meaningGaps } from '@/lib/theme/palette';
+import { accentHueFor, generatePalette, MEANING_FLOOR, meaningGaps, SOLID_NEUTRAL_CHROMA } from '@/lib/theme/palette';
 import {
+  ACCENT_TOKENS,
   HUE_TOKENS,
   LIGHT_CAST,
   LIGHTBOX_HUE_TOKENS,
@@ -84,8 +85,12 @@ describe('generatePalette', () => {
     expect(generatePalette('dark', null)).toEqual(REFERENCE_PALETTES.ink);
   });
 
-  it('gives back Dusk for dark at the hue read off its own ground', () => {
-    expect(generatePalette('dark', REFERENCE_HUE.dusk)).toEqual(REFERENCE_PALETTES.dusk);
+  it("gives back Dusk's accent for dark at the hue read off its own ground", () => {
+    // The neutrals are quietened (see the Solid test below); the accent is Dusk's.
+    const palette = generatePalette('dark', REFERENCE_HUE.dusk);
+    for (const token of ACCENT_TOKENS) {
+      expect(`${token} ${palette[token]}`).toBe(`${token} ${REFERENCE_PALETTES.dusk[token]}`);
+    }
   });
 
   it('reflects as much light as the reference did, all the way round the circle', () => {
@@ -105,8 +110,10 @@ describe('generatePalette', () => {
           // Rounding to eight bits a channel is what is left, and near white
           // one of those steps is worth about six thousandths of luminance --
           // which moves a contrast ratio by well under a percent. A hue that
-          // could not reach the luminance in gamut would fail here.
-          expect(`${mode} ${hue} ${token} ${drift < 0.008}`).toBe(`${mode} ${hue} ${token} true`);
+          // could not reach the luminance in gamut would fail here. Solid's
+          // neutrals are rounded twice -- turned, then quietened -- so two
+          // of those steps.
+          expect(`${mode} ${hue} ${token} ${drift < 0.012}`).toBe(`${mode} ${hue} ${token} true`);
         }
       }
     }
@@ -204,36 +211,28 @@ describe('generatePalette', () => {
     for (const token of FIXED_TOKENS) {
       expect(`${token} ${LIGHT_CAST[token]}`).toBe(`${token} ${REFERENCE_PALETTES.paper[token]}`);
     }
-    expect(generatePalette('light', REFERENCE_HUE.paper)).toEqual(LIGHT_CAST);
+    const palette = generatePalette('light', REFERENCE_HUE.paper);
+    for (const token of ACCENT_TOKENS) {
+      expect(`${token} ${palette[token]}`).toBe(`${token} ${LIGHT_CAST[token]}`);
+    }
   });
 
-  it('gives a light theme enough colour to see, at the luminance Paper wrote', () => {
-    // #456: Paper's neutrals are near-greys between 0.004 and 0.013 chroma, so
-    // a chosen colour reached the links and almost nothing else. They now
-    // carry about what Dusk's neutrals carry, which is what dark has had all
-    // along. Near white there is less room than that -- a card at pure white
-    // reflects everything and cannot be any colour at all -- so what is
-    // checked here is the surfaces with room in them.
-    // Two floors, because the room a token has depends on how light it is.
-    // Borders and text sit far enough down the scale to take the whole lift at
-    // every hue; a well and the sidebar are a few per cent off white, where the
-    // warm hues run out of sRGB around 0.021.
-    const floors: Record<string, number> = {
-      '--c-border': 0.035,
-      '--c-border-strong': 0.035,
-      '--c-border-control': 0.035,
-      '--c-ink-muted': 0.035,
-      '--c-ink-ghost': 0.035,
-      '--c-sunken': 0.021,
-      '--c-shell': 0.018,
-    };
-    for (const hue of SWEEP) {
-      const palette = generatePalette('light', hue);
-      for (const [token, floor] of Object.entries(floors)) {
-        const got = hexToOklch(palette[token]).c;
-        const paper = hexToOklch(REFERENCE_PALETTES.paper[token]).c;
-        expect(`${hue} ${token} ${got >= floor}`).toBe(`${hue} ${token} true`);
-        expect(`${hue} ${token} louder ${got > paper * 2}`).toBe(`${hue} ${token} louder true`);
+  it("keeps Solid's grounds, borders and text quiet, and puts the colour in the accent", () => {
+    // Turning Dusk or LIGHT_CAST whole put the chosen colour into every surface,
+    // which read as a coloured glaze over the app. Solid's neutrals now carry a
+    // trace of the hue at most, and the accent carries the colour.
+    const accents = new Set(ACCENT_TOKENS);
+    for (const mode of ['light', 'dark'] as const) {
+      const cap = SOLID_NEUTRAL_CHROMA[mode] + 0.003; // eight-bit rounding
+      for (const hue of SWEEP) {
+        const palette = generatePalette(mode, hue);
+        for (const token of HUE_TOKENS) {
+          if (accents.has(token) || !HEX.test(palette[token])) continue;
+          const got = hexToOklch(palette[token]).c;
+          expect(`${mode} ${hue} ${token} ${got <= cap}`).toBe(`${mode} ${hue} ${token} true`);
+        }
+        const accent = hexToOklch(palette['--c-accent-base']).c;
+        expect(`${mode} ${hue} accent ${accent > 0.08}`).toBe(`${mode} ${hue} accent true`);
       }
     }
   });
@@ -439,7 +438,10 @@ describe('the accent and the colours that carry a meaning', () => {
         if (!moved(mode, hue)) continue;
         const palette = generatePalette(mode, hue);
         const ground = hexToOklch(palette['--c-page']);
-        expect(`${mode} ${hue} ground ${apart(ground.h, hue) < 4}`).toBe(
+        // Solid's ground carries only a trace of the hue, where eight-bit
+        // rounding moves the angle further.
+        const near = mode === 'light' || mode === 'dark' ? 20 : 4;
+        expect(`${mode} ${hue} ground ${apart(ground.h, hue) < near}`).toBe(
           `${mode} ${hue} ground true`,
         );
         const written = REFERENCE_PALETTES[WRITTEN_AS[mode]];

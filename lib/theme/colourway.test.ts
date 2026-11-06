@@ -85,7 +85,7 @@ describe('colourways', () => {
 
   it('stores a colourway by name and reads it back whole', () => {
     for (const way of COLOURWAYS) {
-      // Not Lightbox: a stored Lightbox reads as the poster now.
+      // Not Lightbox: a stored Lightbox reads as Solid light now.
       for (const mode of ['darkroom', 'light', 'dark'] as const) {
         const theme: Theme = { kind: 'generated', mode, hue: way.hue, way: way.id };
         const stored = formatTheme(theme);

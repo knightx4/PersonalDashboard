@@ -69,6 +69,9 @@ export const devActions: ModuleActions = {
     workPlanOverhaul: none('spends', DEV_SPENDS),
     setAutoApproveAction: none('setting'),
   },
+  'app/dev/plan/mockup-actions.ts': {
+    loadQuestionMockups: none('page', 'Signs the links for the pictures a question shows.'),
+  },
   'app/dev/plan/run-actions.ts': {
     acknowledgePlanRunAction: none('theirs'),
     answerPlanRunAction: none('theirs'),

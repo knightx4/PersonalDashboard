@@ -1,0 +1,777 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Apartment Goal Page</title>
+<!-- Saved for the design check (plan #2778.2). The people, the lender, the balances and the account numbers in the example data are made up; sizes, colours and spacing are the mockup's own. -->
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: the app's own goal page, rebuilt as a dashboard. Main column of tiles, side column for Dash's work and files. */
+:root{
+  --canvas:#f7f4ed; --surface:#fdfbf5; --sunken:#f2f0ea; --border:#e8e5df; --border-strong:#d5d1c8;
+  --ink:#1a1a18; --muted:#6b6b66; --ghost:#85857e;
+  --goal:#05734e; --goal-tint:#e3f7ec; --goal-line:#9fd8bd;
+  --accent:#4a5fd0; --accent-tint:#eef1fe;
+  --caution:#a34a07; --caution-tint:#fdf3e3;
+  --example:#7c3aed; --example-tint:#f4f0fe;
+  --shadow:0 1px 2px rgba(26,26,24,.05),0 4px 16px rgba(26,26,24,.05);
+  --display:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --canvas:#141412; --surface:#1c1c19; --sunken:#181816; --border:#2c2b27; --border-strong:#3b3a35;
+  --ink:#ecebe6; --muted:#a4a39c; --ghost:#86857e;
+  --goal:#4fcf98; --goal-tint:#16302a; --goal-line:#2f7a5a;
+  --accent:#8f9df0; --accent-tint:#22263f;
+  --caution:#f0a63f; --caution-tint:#33261a;
+  --example:#b69af5; --example-tint:#29213d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --canvas:#141412; --surface:#1c1c19; --sunken:#181816; --border:#2c2b27; --border-strong:#3b3a35;
+  --ink:#ecebe6; --muted:#a4a39c; --ghost:#86857e;
+  --goal:#4fcf98; --goal-tint:#16302a; --goal-line:#2f7a5a;
+  --accent:#8f9df0; --accent-tint:#22263f;
+  --caution:#f0a63f; --caution-tint:#33261a;
+  --example:#b69af5; --example-tint:#29213d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--canvas);color:var(--ink);font:14px/1.55 var(--sans);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;font-weight:700}
+h2{font-size:15px;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:12px} .micro{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* mock banner */
+.mockbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;background:var(--example-tint);border:1px solid color-mix(in srgb,var(--example) 30%,transparent);border-radius:12px;padding:10px 14px;font-size:13px}
+.mockbar b{color:var(--example)}
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:500}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--goal);border-color:var(--goal);color:var(--surface)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ex{background:var(--example);border-color:var(--example);color:var(--surface)}
+.btn.sm{padding:3px 9px;font-size:12px}
+
+/* header */
+.head{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.cover{height:84px;background:
+  repeating-linear-gradient(90deg,transparent 0 47px,color-mix(in srgb,var(--goal) 18%,transparent) 47px 48px),
+  linear-gradient(100deg,var(--goal-tint),color-mix(in srgb,var(--goal-tint) 40%,var(--surface)));position:relative}
+.cover::after{content:"26 of 106 done";position:absolute;right:18px;bottom:10px;font:700 13px var(--display);color:var(--goal);opacity:.7;letter-spacing:.02em}
+.headin{padding:14px 18px 16px;display:grid;gap:10px}
+.crumb{font-size:12px;color:var(--muted)}
+.titlerow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.titlerow h1{font-size:28px;line-height:1.1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--sunken);color:var(--muted)}
+.chip.goal{background:var(--goal-tint);color:var(--goal);border-color:transparent}
+.chip.wait{background:var(--caution-tint);color:var(--caution);border-color:transparent}
+.chip.ex{background:var(--example-tint);color:var(--example);border-color:transparent}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.done-when{font-size:13px;color:var(--muted)} .done-when b{color:var(--ink);font-weight:600}
+.dashline{display:flex;gap:10px;align-items:flex-start;background:var(--sunken);border-radius:10px;padding:10px 12px;font-size:13px}
+.mark{flex:none;width:22px;height:22px;border-radius:7px;background:var(--goal);color:var(--surface);display:grid;place-items:center;font:700 12px var(--display)}
+
+/* moves strip */
+.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.move{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.move.now{border-color:var(--goal-line);background:color-mix(in srgb,var(--goal-tint) 45%,var(--surface))}
+.move .t{font-weight:500}
+.move .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.lane{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.move.now .lane{color:var(--goal)} .move .lane{color:var(--muted)}
+
+/* main grid */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.fig{font:700 32px/1.05 var(--display);letter-spacing:-.01em}
+.fig.sm{font-size:26px}
+.plus{border:1px dashed var(--border-strong);background:transparent;color:var(--muted);border-radius:8px;padding:3px 9px;font-size:12px}
+.plus:hover{color:var(--goal);border-color:var(--goal)}
+
+/* tracker */
+.track{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.track li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;position:relative;padding-bottom:12px}
+.track li:not(:last-child)::before{content:"";position:absolute;left:10px;top:20px;bottom:0;width:2px;background:var(--border)}
+.track li.ok:not(:last-child)::before{background:var(--goal-line)}
+.node{width:22px;height:22px;border-radius:50%;border:2px solid var(--border-strong);background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--surface)}
+.ok .node{background:var(--goal);border-color:var(--goal)}
+.wait .node{border-color:var(--caution);background:var(--caution-tint)}
+.wait .node::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--caution);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+.track .lbl{font-weight:500} .track .sub{font-size:12px;color:var(--muted)}
+
+/* chart */
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+/* table */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.ord{width:22px;height:22px;border-radius:6px;background:var(--goal-tint);color:var(--goal);display:grid;place-items:center;font:700 12px var(--display)}
+.share{height:6px;border-radius:3px;background:var(--sunken);overflow:hidden;width:90px}
+.share i{display:block;height:100%;background:var(--goal)}
+
+/* Dash corner */
+.ws{border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;gap:8px;background:var(--surface);transition:box-shadow .3s,border-color .3s}
+.ws.live{border-color:var(--goal-line)}
+.ws.flash{box-shadow:0 0 0 3px color-mix(in srgb,var(--goal) 35%,transparent)}
+.ws .q{font-weight:600;font-size:14px;line-height:1.35}
+.ws .meta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:12px;color:var(--muted);align-items:center}
+.ws .res{font-size:13px;background:var(--sunken);border-radius:8px;padding:10px 11px;display:grid;gap:8px}
+.sugg{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:8px;font-size:13px}
+.working{display:inline-flex;gap:3px} .working i{width:5px;height:5px;border-radius:50%;background:var(--goal);animation:pulse 1.2s infinite} .working i:nth-child(2){animation-delay:.2s}.working i:nth-child(3){animation-delay:.4s}
+.fin{display:grid;gap:0}
+.fin details{border-top:1px solid var(--border)}
+.fin summary{list-style:none;cursor:pointer;padding:10px 2px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:baseline}
+.fin summary::-webkit-details-marker{display:none}
+.fin summary .q{font-weight:500;font-size:13px}
+.fin .body{padding:0 2px 12px;font-size:13px;display:grid;gap:6px;color:var(--muted)}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;min-width:0;border:1px solid var(--border-strong);background:var(--canvas);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+
+/* files */
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:0;background:transparent;color:var(--muted);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+.files{list-style:none;margin:0;padding:0;display:grid}
+.file{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.file:first-child{border-top:0}
+.ficon{width:34px;height:40px;border-radius:5px;border:1px solid var(--border-strong);background:var(--canvas);position:relative;display:grid;place-items:end center;padding-bottom:4px;font:700 8px var(--sans);letter-spacing:.05em;color:var(--muted)}
+.ficon::before{content:"";position:absolute;top:-1px;right:-1px;width:10px;height:10px;background:linear-gradient(225deg,var(--surface) 50%,var(--border-strong) 50%);border-radius:0 5px 0 0}
+.ficon.dash{color:var(--goal);border-color:var(--goal-line);background:var(--goal-tint)}
+.ficon.slot{border-style:dashed;background:transparent}
+.ficon.ex{color:var(--example);border-color:color-mix(in srgb,var(--example) 40%,transparent);background:var(--example-tint)}
+.file .ft{font-weight:500;font-size:13px;line-height:1.35}
+.file .fs{font-size:12px;color:var(--muted)}
+.unread{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px;vertical-align:middle}
+.pin{color:var(--goal);font-size:11px;font-weight:600}
+.drop{border:1.5px dashed var(--border-strong);border-radius:10px;padding:14px;text-align:center;font-size:13px;color:var(--muted);display:grid;gap:4px;transition:background .2s,border-color .2s}
+.drop.over{background:var(--goal-tint);border-color:var(--goal)}
+.drop input{display:none}
+.drop label{color:var(--accent);cursor:pointer;font-weight:500}
+
+/* plan fold */
+.plan summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.plan summary::-webkit-details-marker{display:none}
+.stage{display:grid;gap:4px;padding:10px 0;border-top:1px solid var(--border)}
+.stage .sh{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:13px}
+.stage ul{margin:0;padding:0 0 0 18px;font-size:13px;color:var(--muted);display:grid;gap:2px}
+.stage li.d{text-decoration:line-through;text-decoration-color:var(--ghost)}
+
+/* story */
+.story{list-style:none;margin:0;padding:0;display:grid}
+.story li{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--border);font-size:13px}
+.story li:first-child{border-top:0}
+.story .d{color:var(--muted);font-size:12px}
+.story .who{font-size:11px;font-weight:600;color:var(--goal)}
+
+/* chat demo */
+.scrim{position:fixed;inset:0;background:rgba(10,10,8,.45);display:grid;place-items:center;z-index:50;padding:16px}
+.phone{width:min(380px,100%);height:min(640px,calc(100% - 20px));background:var(--surface);border-radius:26px;border:1px solid var(--border-strong);box-shadow:0 20px 60px rgba(0,0,0,.35);display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+.phone header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.msgs{padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.msg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;animation:rise .35s ease both}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--surface);border-bottom-right-radius:4px}
+.msg.dash{align-self:flex-start;background:var(--sunken);border-bottom-left-radius:4px}
+.wscard{margin-top:8px;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:9px 10px;display:grid;gap:4px}
+.wscard .k{font-size:11px;color:var(--goal);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+.phone footer{padding:10px;border-top:1px solid var(--border);display:flex;gap:8px}
+.phone footer input{flex:1;min-width:0;border:1px solid var(--border-strong);border-radius:999px;padding:8px 12px;background:var(--canvas);color:var(--ink);font:inherit}
+.toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(380px,calc(100% - 32px));background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:12px 14px;display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;z-index:60;animation:drop .4s ease both}
+@keyframes drop{from{opacity:0;transform:translate(-50%,-12px)}}
+.toast .mark{width:30px;height:30px;border-radius:9px;font-size:14px}
+
+@media (max-width:960px){.grid{display:flex;flex-direction:column;gap:16px}.col{display:contents}
+.tiles{order:1}.o-ibr{order:2}#dashcorner{order:3}#recentfiles{order:4}.chart{order:5}.o-loans{order:6}}
+@media (max-width:720px){.tiles{grid-template-columns:minmax(0,1fr)}.moves{grid-template-columns:minmax(0,1fr)}.titlerow h1{font-size:24px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>
+/* goal tabs */
+.gtabs{display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-top:-4px}
+.gtab{border:0;background:transparent;color:var(--muted);padding:10px 14px;font-size:14px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.gtab:hover{color:var(--ink)}
+.gtab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--goal)}
+.gtab .n{font-size:11px;background:var(--sunken);color:var(--muted);border-radius:999px;padding:0 7px;font-variant-numeric:tabular-nums}
+.gtab .custom{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--goal);background:var(--goal-tint);border-radius:4px;padding:1px 5px}
+.view{display:grid;gap:16px}
+/* plan */
+.planbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--sunken);border-radius:9px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:5px 12px;border-radius:7px;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+.sect{display:grid;gap:10px}
+.sect>h3{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-family:var(--sans);font-weight:700;display:flex;gap:8px;align-items:center}
+.sect.nowsect>h3{color:var(--goal)}
+.pstep{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px}
+.pstep.now{border-color:var(--goal-line);box-shadow:0 0 0 3px color-mix(in srgb,var(--goal-tint) 70%,transparent)}
+.pnum{width:28px;height:28px;border-radius:50%;border:2px solid var(--border-strong);display:grid;place-items:center;font:700 12px var(--display);color:var(--muted);grid-row:span 3}
+.pstep.now .pnum{border-color:var(--goal);background:var(--goal);color:var(--surface)}
+.pstep .pt{font-weight:600;font-size:15px;line-height:1.35}
+.pstep .pm{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted);align-items:center}
+.pstep .pwhy{font-size:13px;color:var(--muted)}
+.pstep .pact{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.howto{grid-column:2;background:var(--sunken);border-radius:8px;padding:10px 12px;font-size:13px}
+.howto ol{margin:6px 0 0;padding-left:18px;display:grid;gap:3px}
+.waitchip{font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;background:var(--sunken);color:var(--muted)}
+.waitchip.date{background:var(--accent-tint);color:var(--accent)}
+.waitchip.dep{background:var(--caution-tint);color:var(--caution)}
+.later{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.later li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border)}
+.later li:first-child{border-top:0}
+.later .pnum{grid-row:auto;width:24px;height:24px;font-size:11px}
+.donefold{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.donefold summary{cursor:pointer;font-weight:500;font-size:13px;color:var(--muted)}
+.donefold ul{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:3px}
+.pside{display:grid;gap:16px}
+.mini{display:grid;gap:8px}
+.bar{height:8px;border-radius:4px;background:var(--sunken);overflow:hidden}.bar i{display:block;height:100%;background:var(--goal)}
+.seestage{display:grid;gap:0}
+.more{font-size:13px;font-weight:500}
+@media (max-width:960px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+</style>
+<style>
+.cover.apt{background:
+  linear-gradient(var(--goal-line) 0 0) 0 0/100% 0,
+  repeating-linear-gradient(0deg,transparent 0 23px,color-mix(in srgb,var(--goal) 12%,transparent) 23px 24px),
+  repeating-linear-gradient(90deg,transparent 0 23px,color-mix(in srgb,var(--goal) 12%,transparent) 23px 24px),
+  linear-gradient(100deg,var(--goal-tint),color-mix(in srgb,var(--goal-tint) 40%,var(--surface)))}
+.cover.apt::after{content:"26 of 106 done · 9 rooms"}
+.rooms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.room{border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;align-content:start;gap:8px;background:var(--surface);min-width:0;transition:box-shadow .3s,border-color .3s}
+.room.flash{box-shadow:0 0 0 3px color-mix(in srgb,var(--goal) 35%,transparent);border-color:var(--goal)}
+.room .rt{display:flex;gap:10px;align-items:center}
+.ring{flex:none;width:40px;height:40px}
+.room .rn{font-weight:600;font-size:14px;line-height:1.2}
+.room .rc{font-size:12px;color:var(--muted)}
+.room .nx{font-size:12.5px;line-height:1.4;border-top:1px solid var(--border);padding-top:8px}
+.room .nx .k{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:block}
+.room .tags{display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start}
+.tag{font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;background:var(--sunken);color:var(--muted)}
+.tag.sam{background:var(--accent-tint);color:var(--accent)}
+.tag.tape{background:var(--caution-tint);color:var(--caution)}
+.tag.new{background:var(--example-tint);color:var(--example)}
+.photo{border:1px dashed var(--border-strong);border-radius:8px;height:52px;display:grid;place-items:center;font-size:12px;color:var(--muted);background:repeating-linear-gradient(135deg,transparent 0 8px,var(--sunken) 8px 9px)}
+.room.untouched{background:color-mix(in srgb,var(--sunken) 60%,var(--surface))}
+.meas{list-style:none;margin:0;padding:0;display:grid}
+.meas li{display:grid;grid-template-columns:minmax(0,1fr) 96px 110px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.meas li:first-child{border-top:0}
+.meas .mt{font-weight:500;font-size:13px}
+.meas .mn{font-size:12px;color:var(--muted)}
+.meas input{width:100%;border:1px solid var(--border-strong);background:var(--canvas);color:var(--ink);border-radius:7px;padding:5px 8px;font:inherit;font-size:13px;font-variant-numeric:tabular-nums}
+.verdict{font-size:11.5px;font-weight:600;text-align:right}
+.verdict.ok{color:var(--goal)} .verdict.no{color:var(--caution)} .verdict.wait{color:var(--ghost)}
+.buys{list-style:none;margin:0;padding:0;display:grid}
+.buys li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 0;border-top:1px solid var(--border);align-items:center}
+.buys li:first-child{border-top:0}
+.buys .bt{font-weight:600;font-size:13.5px}
+.buys .bs{font-size:12px;color:var(--muted)}
+.state{font-size:11px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.state.tape{background:var(--caution-tint);color:var(--caution)}
+.state.pick{background:var(--accent-tint);color:var(--accent)}
+.state.ready{background:var(--goal-tint);color:var(--goal)}
+.samlist{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:13px}
+.samlist li{display:flex;justify-content:space-between;gap:8px}
+.tidy li{grid-template-columns:minmax(0,1fr) auto}
+.tidy .acts{display:flex;gap:6px}
+.tidy li.gone{opacity:.45;text-decoration:line-through}
+.stray{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:12px 14px;display:grid;gap:6px;font-size:13px}
+@media (max-width:1100px){.rooms{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.rooms{grid-template-columns:minmax(0,1fr)}.meas li{grid-template-columns:minmax(0,1fr) 80px;}.meas .verdict{grid-column:1/-1;text-align:left}}
+@media (max-width:960px){#measure{order:2}#buylist{order:4}#samcard{order:5}}
+</style>
+
+<style>@media (max-width:960px){#roomscard{order:1}#setaside{order:2}#recentfiles{order:6}}
+.focusbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px}
+.aside{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;background:var(--sunken);border:1px dashed var(--border-strong);border-radius:12px;padding:12px 14px}
+.aside .at{font-weight:600}
+.aside .as{font-size:12px;color:var(--muted)}</style>
+<div class="wrap">
+  <div class="mockbar">
+    <span><b>Mockup.</b> Example rooms, steps, buys and files on "Make the apartment clean and livable". Anything purple is an example of the new parts.</span>
+    <button class="btn ex" id="play" type="button">Play the chat flow</button>
+  </div>
+
+  <section class="head" aria-label="Goal">
+    <div class="cover apt" aria-hidden="true"></div>
+    <div class="headin">
+      <div class="crumb">Goals › Home</div>
+      <div class="titlerow">
+        <h1>Make the apartment clean and livable</h1>
+        <div class="chips">
+          <span class="chip goal"><span class="dot"></span>Active</span>
+          <span class="chip">With Alex</span>
+          <span class="chip">Started 28 Sep</span>
+        </div>
+      </div>
+      <div class="done-when">Done when <b>the kitchen counters, table and floor are clear; the whole couch is free and the TV is watchable from it; the hallway is walkable; and each kind of her things has a named home she has agreed to.</b></div>
+      <div class="dashline"><span class="mark">D</span><span class="f-clean"><b>This week:</b> the kitchen table, the couch and the desk are clear, all done on 27 and 29 Oct. Three quick ones would finish the kitchen and make the hallway walkable. Furniture is set aside, so nothing there is on you.</span><span class="f-all" hidden><b>This week:</b> the kitchen table, the couch and the desk are clear, all done on 27 and 29 Oct. Most of what's left is waiting on a tape measure: one session of about half an hour would let you order the bar cart, the pantry and the bookshelves.</span></div>
+    </div>
+  </section>
+
+  <nav class="gtabs" role="tablist" aria-label="Goal sections">
+    <button class="gtab" role="tab" data-v="dashboard" aria-selected="true">Dashboard <span class="custom">This goal</span></button>
+    <button class="gtab" role="tab" data-v="plan" aria-selected="false">Plan <span class="n">80 left</span></button>
+    <button class="gtab" role="tab" data-v="work" aria-selected="false">Work &amp; files <span class="n" id="worknum">5 unread</span></button>
+    <button class="gtab" role="tab" data-v="history" aria-selected="false">History</button>
+  </nav>
+
+  <!-- ===== DASHBOARD ===== -->
+  <div class="view" id="v-dashboard">
+    <div class="focusbar">
+      <span class="micro">Right now</span>
+      <div class="seg" id="focusseg" role="group" aria-label="What you're doing on this goal right now">
+        <button type="button" data-focus="clean" aria-pressed="true">Cleaning and sorting</button>
+        <button type="button" data-focus="all" aria-pressed="false">Everything</button>
+      </div>
+      <span class="small muted">You set this. Dash only shows, works on and asks about what fits it.</span>
+      <span class="chip ex">Example</span>
+    </div>
+    <section class="moves f-clean" aria-label="Your next moves">
+      <div class="move now">
+        <span class="lane">Now</span>
+        <span class="t">Take the dish rack out of its box and set it by the sink</span>
+        <div class="row"><span class="small muted">Kitchen · 5 min · finishes the clear baseline</span><button class="btn sm primary" type="button">Done</button></div>
+      </div>
+      <div class="move">
+        <span class="lane">Next</span>
+        <span class="t">Flatten and recycle the empty boxes</span>
+        <div class="row"><span class="small muted">Hallway · makes it walkable</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+      <div class="move">
+        <span class="lane">Later</span>
+        <span class="t">Clear the bedroom floor</span>
+        <div class="row"><span class="small muted">Bedroom · laundry to the hamper first</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+    </section>
+    <section class="moves f-all" hidden aria-label="Your next moves">
+      <div class="move now">
+        <span class="lane">Now</span>
+        <span class="t">One measuring session</span>
+        <div class="row"><span class="small muted">7 measurements · about 30 min · unlocks 4 buys</span><a class="small" href="#measure" id="tomeasure">Start</a></div>
+      </div>
+      <div class="move">
+        <span class="lane">Next</span>
+        <span class="t">Walk through the room map with Alex</span>
+        <div class="row"><span class="small muted">She approves it once, you move things</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+      <div class="move">
+        <span class="lane">Later</span>
+        <span class="t">Order the bar cart, pantry and bookshelves</span>
+        <div class="row"><span class="small muted">Once each spot is measured</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="col">
+        <div class="card" id="roomscard">
+          <div class="cardhead"><h2>Rooms</h2><span class="small muted">26 of 106 steps done · tap a room for its steps</span></div>
+          <div class="rooms" id="rooms"></div>
+        </div>
+
+        <div class="aside f-clean" id="setaside">
+          <div><div class="at">Set aside: furniture and buying</div><div class="as">The measuring session, 6 buys and the steps that build them. Dash leaves them alone until you're ready.</div></div>
+          <button class="btn sm" type="button" data-focus-go="all">Bring it back</button>
+        </div>
+
+        <div class="card f-all" id="measure" hidden>
+          <div class="cardhead"><h2>Measuring session</h2><span class="small muted">Type each number as you go. Dash checks it fits.</span></div>
+          <ul class="meas" id="meas"></ul>
+          <div class="small muted">Measurements are in inches. Each one is saved on its step, and the buy it unlocks moves to Ready.</div>
+        </div>
+
+        <div class="card f-all" id="buylist" hidden>
+          <div class="cardhead"><h2>Buy list</h2><span class="small muted">What Dash picked, and what each is waiting on</span></div>
+          <ul class="buys" id="buys"></ul>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card" id="dashcorner">
+          <div class="cardhead"><h2>Dash is on</h2><span class="small muted" id="dashcount">Nothing right now</span></div>
+          <div class="ws" id="ws-shoes" hidden>
+            <div class="meta"><span class="chip ex">Example</span><span>From your chat · today · Office</span></div>
+            <div class="q">Where should Alex's 100 pairs of shoes go?</div>
+            <div class="meta" id="ws-status"><span class="working" aria-hidden="true"><i></i><i></i><i></i></span><span>Reading the room map and the Office plan</span></div>
+            <div class="res" id="ws-result" hidden>
+              <div><b>In the Office, beside the bag units.</b> The room map already puts her bags there, and a shoe rack for about 100 pairs needs roughly another 3 ft of the same wall. Dash added that to your measuring session, so one number settles both.</div>
+              <div class="small"><a>Where the shoes go · file</a> · <a>Back to the chat</a></div>
+              <div class="sugg"><span>Add "Shoe rack" to the buy list, waiting on the Office wall</span><span><button class="btn sm" type="button">Add</button> <button class="btn sm" type="button">No</button></span></div>
+            </div>
+          </div>
+          <div class="small muted" id="idle">Last finished: <b style="color:var(--ink);font-weight:500">Shortlisted three tall, skinny dressers</b>, 21 Oct · <a href="#work" data-go="work">All of Dash's work</a></div>
+          <form class="ask" onsubmit="event.preventDefault()">
+            <input id="askbox" aria-label="Ask Dash about this goal" placeholder="Ask Dash, or drop a photo of a room…">
+            <button class="btn primary" type="submit">Ask</button>
+          </form>
+        </div>
+
+        <div class="card" id="samcard">
+          <div class="cardhead"><h2>Alex's calls</h2><span class="small muted">One a week</span></div>
+          <ul class="samlist">
+            <li><span>Agree the clothes plan</span><span class="tag sam">Office · Bedroom</span></li>
+            <li><span>Walk through the room map</span><span class="tag sam">All rooms</span></li>
+            <li><span>Get the returns done</span><span class="tag sam">Hallway</span></li>
+            <li><span>Organize her vanity</span><span class="tag sam">Bedroom</span></li>
+            <li><span>Organize the over-the-toilet shelving</span><span class="tag sam">Master bath</span></li>
+          </ul>
+          <div class="small muted">You agreed on 28 Sep: you do most of the moving, she decides where her things go.</div>
+        </div>
+
+        <div class="card" id="recentfiles">
+          <div class="cardhead"><h2>Recent files</h2><a class="small" href="#work" data-go="work">All files</a></div>
+          <ul class="files" id="files-recent"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PLAN ===== -->
+  <div class="view" id="v-plan" hidden>
+    <div class="planbar">
+      <div class="seg pseg" role="group" aria-label="Show the plan">
+        <button type="button" data-p="next" aria-pressed="true">What's next</button>
+        <button type="button" data-p="stage" aria-pressed="false">By room</button>
+      </div>
+      <button class="btn sm" type="button">Help me plan this</button>
+    </div>
+
+    <div class="pgrid">
+      <div id="p-next" class="sect" style="gap:20px">
+        <div class="sect nowsect f-clean">
+          <h3>Now</h3>
+          <div class="pstep now">
+            <span class="pnum">1</span>
+            <span class="pt">Take the dish rack out of its box and set it by the sink</span>
+            <span class="pm"><span>Yours · 5 min</span><span>Kitchen</span></span>
+            <span class="pwhy">The last open step in getting the kitchen to a clear baseline.</span>
+            <span class="pact" style="grid-column:2"><button class="btn sm primary" type="button">Done</button><button class="btn sm" type="button">Not now</button></span>
+          </div>
+        </div>
+        <div class="sect f-clean">
+          <h3>Up next</h3>
+          <div class="pstep"><span class="pnum">2</span><span class="pt">Flatten and recycle the empty boxes</span><span class="pm"><span>Yours</span><span>Hallway</span></span><span class="pwhy">Packaging, not her things, so it's yours to clear. The hallway being walkable is part of the done-when.</span></div>
+          <div class="pstep"><span class="pnum">3</span><span class="pt">Clear the bedroom floor</span><span class="pm"><span>Yours · 3 small steps</span><span>Bedroom</span></span><span class="pwhy">Laundry to the hamper, bedding on the bed, drawers closed.</span></div>
+        </div>
+        <div class="sect f-clean">
+          <h3>Later</h3>
+          <ul class="later">
+            <li><span class="pnum">4</span><div><div style="font-weight:500">Make room to hang winter coats</div><div class="small muted">Entry closet</div></div><span class="waitchip date">Before it gets cold</span></li>
+            <li><span class="pnum">5</span><div><div style="font-weight:500">Move what is stored in front of the machines</div><div class="small muted">Washer/dryer closet</div></div><span></span></li>
+            <li><span class="pnum">6</span><div><div style="font-weight:500">Walk through the room map with Alex</div><div class="small muted">Planning</div></div><span class="tag sam">Alex</span></li>
+            <li><span class="pnum">·</span><div><div style="font-weight:500">More cleaning and sorting, room by room</div><div class="small muted">Switch to By room to see them</div></div><span></span></li>
+          </ul>
+        </div>
+        <div class="aside f-clean">
+          <div><div class="at">Set aside: furniture and buying</div><div class="as">Measuring, ordering and building. Hidden here and from Todo until you bring it back.</div></div>
+          <button class="btn sm" type="button" data-focus-go="all">Bring it back</button>
+        </div>
+        <div class="sect nowsect f-all" hidden>
+          <h3>Now</h3>
+          <div class="pstep now">
+            <span class="pnum">1</span>
+            <span class="pt">One measuring session</span>
+            <span class="pm"><span>Yours · about 30 min</span><span class="chip ex">Dash grouped 7 steps</span></span>
+            <span class="pwhy">Seven measuring steps sit in four rooms. Done together, they unlock the bar cart, the pantry, the bookshelves and the bag units.</span>
+            <span class="pact" style="grid-column:2"><a class="btn sm primary" href="#dashboard" id="tomeasure2">Open the session</a><button class="btn sm" type="button">Not now</button></span>
+          </div>
+        </div>
+
+        <div class="sect f-all" hidden>
+          <h3>Up next</h3>
+          <div class="pstep">
+            <span class="pnum">2</span>
+            <span class="pt">Walk through the room map with Alex</span>
+            <span class="pm"><span class="tag sam">Alex</span><span>Planning</span></span>
+            <span class="pwhy">She approves where each kind of thing lives once, using Dash's map from 3 Oct. Then the moving is yours.</span>
+          </div>
+          <div class="pstep">
+            <span class="pnum">3</span>
+            <span class="pt">Take the dish rack out of its box and set it by the sink</span>
+            <span class="pm"><span>Yours · 5 min</span><span>Kitchen</span></span>
+            <span class="pwhy">The last open step in getting the kitchen to a clear baseline.</span>
+          </div>
+        </div>
+
+        <div class="sect f-all" hidden>
+          <h3>Later</h3>
+          <ul class="later">
+            <li><span class="pnum">4</span><div><div style="font-weight:500">Order the bar cart</div><div class="small muted">Kitchen · Naturefalls 14"</div></div><span class="waitchip dep">After measuring</span></li>
+            <li><span class="pnum">5</span><div><div style="font-weight:500">Order the pantry</div><div class="small muted">Living room · HOMCOM 72"</div></div><span class="waitchip dep">After measuring</span></li>
+            <li><span class="pnum">6</span><div><div style="font-weight:500">Agree the clothes plan with Alex</div><div class="small muted">Office and bedroom</div></div><span class="waitchip dep">After measuring</span></li>
+            <li><span class="pnum">7</span><div><div style="font-weight:500">Make room to hang winter coats</div><div class="small muted">Entry closet</div></div><span class="waitchip date">Before it gets cold</span></li>
+            <li><span class="pnum">·</span><div><div style="font-weight:500">74 more, room by room</div><div class="small muted">Switch to By room to see them</div></div><span></span></li>
+          </ul>
+        </div>
+
+        <div class="sect">
+          <h3>Tidy the list <span class="chip ex">Example</span></h3>
+          <div class="small muted" style="margin-top:-4px">Dash has 29 open "Do you still want…?" questions on this goal. Here they're one list: keep, later or drop.</div>
+          <ul class="later tidy" id="tidy"></ul>
+        </div>
+
+        <div class="stray">
+          <b>Not about the apartment</b>
+          <span class="muted">5 steps about Alex's business taxes sit at the bottom of this goal. "Do Alex's business taxes" was finished on 13 Oct.</span>
+          <span><button class="btn sm" type="button">Move them there</button> <button class="btn sm" type="button">Drop them</button></span>
+        </div>
+
+        <details class="donefold"><summary>26 done</summary>
+          <ul>
+            <li>Move everything off the desk into one box · Office · 29 Oct</li>
+            <li>Wipe the desk and put back only what you use daily · Office · 29 Oct</li>
+            <li>Clear the bottles, bags and papers off the table · Kitchen · 27 Oct</li>
+            <li>Give mail one tray and sweep the floor · Kitchen · 27 Oct</li>
+            <li>Take the bags and loose clothes off the couch · Living room · 27 Oct</li>
+            <li>Wipe down the seats and check every seat · Living room · 27 Oct</li>
+            <li>Set up the TV in the living room · 30 Sep</li>
+            <li>Put up the bedroom TV · 30 Sep</li>
+            <li>Order and build the over-the-toilet shelving · Master bath · 30 Sep</li>
+            <li>Order the missing IKEA shelf arms · Office closet · 28 Sep</li>
+            <li>and 16 more</li>
+          </ul>
+        </details>
+      </div>
+
+      <div id="p-stage" class="sect" hidden>
+        <div class="card seestage" id="byroom"></div>
+      </div>
+
+      <div class="pside">
+        <div class="card mini">
+          <div class="micro">Progress</div>
+          <div class="fig sm num">26 of 106</div>
+          <div class="bar"><i style="width:24.5%"></i></div>
+          <div class="small muted">Kitchen furthest along · 4 rooms not started</div>
+        </div>
+        <div class="card mini f-clean">
+          <div class="micro">Waiting on</div>
+          <div class="small"><b>Alex</b> · 5 calls</div>
+          <div class="small muted">Furniture and buying are set aside.</div>
+        </div>
+        <div class="card mini f-all" hidden>
+          <div class="micro">Waiting on</div>
+          <div class="small"><b>Tape measure</b> · 7 steps, 4 buys</div>
+          <div class="small"><b>Alex</b> · 5 calls</div>
+          <div class="small"><b>A choice</b> · dresser and Office shelf, 3 options each</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== WORK & FILES ===== -->
+  <div class="view" id="v-work" hidden>
+    <div class="grid">
+      <div class="col">
+        <div class="card" id="filescard">
+          <div class="cardhead"><h2>Files</h2><span class="small muted" id="filecount"></span></div>
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-f="all">All</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="dash">Dash wrote</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="mine">Yours</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="slot">Waiting for</button>
+          </div>
+          <ul class="files" id="files"></ul>
+          <div class="drop" id="drop">
+            <span>Drop a photo of a room, a receipt or a manual here</span>
+            <span><label for="fileinput">or choose a file</label>. Dash reads it and puts it on the right room.</span>
+            <input type="file" id="fileinput" multiple>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <div class="cardhead"><h2>Dash's work</h2><span class="small muted">10 pieces</span></div>
+          <div class="fin">
+            <details><summary><span class="q">Three tall, skinny dressers like the one in your photo</span><span class="small muted">21 Oct</span></summary><div class="body"><span>Bedroom. Three options to choose from. <a>file</a></span></div></details>
+            <details><summary><span class="q">Small Office shelves up to 12 inches tall</span><span class="small muted">21 Oct</span></summary><div class="body"><span>Office. Three options to choose from. <a>file</a></span></div></details>
+            <details><summary><span class="q">The HOMCOM pantry's real size</span><span class="small muted">16 Oct</span></summary><div class="body"><span>About 30" wide, 15.75" deep, 72" tall: wider than the 24" the first pick assumed. The measuring session uses the new width.</span></div></details>
+            <details><summary><span class="q">A bar cart that fits the kitchen</span><span class="small muted">7 Oct</span></summary><div class="body"><span>The Naturefalls Compact 14" cart: the narrowest of three, still takes 12 bottles and 8 glasses.</span></div></details>
+            <details><summary><span class="q">Where each kind of Alex's things lives, room by room</span><span class="small muted">3 Oct</span></summary><div class="body"><span>The room map you and Alex walk through. <a>file</a></span></div></details>
+            <details><summary><span class="q">Bookcases and game cubes for the living room</span><span class="small muted">3 Oct</span></summary><div class="body"><span>Three BILLY bookcases and one KALLAX 5×5, about $537, for three shelves of books and 100 games. <a>file</a></span></div></details>
+            <details><summary><span class="q">The best spot and model for a pantry</span><span class="small muted">3 Oct</span></summary><div class="body"><span>The living room wall nearest the kitchen, with a closed cabinet that needs no drilling.</span></div></details>
+            <details><summary><span class="q">Where Alex's clothes go</span><span class="small muted">29 Sep</span></summary><div class="body"><span>Nothing thrown away. Wardrobe racks or shelving with clear lidded bins, about 16 ft of wall. <a>file</a></span></div></details>
+            <details><summary><span class="q">Where the bags go</span><span class="small muted">29 Sep</span></summary><div class="body"><span>Two KALLAX 5×5 units in the Office so the bags stand up.</span></div></details>
+            <details><summary><span class="q">A ten-minute kitchen reset</span><span class="small muted">29 Sep</span></summary><div class="body"><span>Seven steps before bed, starting with what's dirty and ending with what you see first in the morning.</span></div></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HISTORY ===== -->
+  <div class="view" id="v-history" hidden>
+    <div class="card" style="max-width:760px">
+      <div class="cardhead"><h2>Story so far</h2><span class="small muted">Everything that happened on this goal</span></div>
+      <ul class="story" id="story"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="phone" role="dialog" aria-label="Chat with Dash">
+    <header><b>Dash</b><button class="btn sm" id="closechat" type="button">Close</button></header>
+    <div class="msgs" id="msgs"></div>
+    <footer><input id="chatin" aria-label="Message" placeholder="Message Dash" readonly><button class="btn primary sm" type="button">Send</button></footer>
+  </div>
+</div>
+<div id="toastslot"></div>
+
+<script>
+(function(){
+  const views=['dashboard','plan','work','history'];
+  function show(v){if(!views.includes(v))v='dashboard';views.forEach(n=>document.getElementById('v-'+n).hidden=n!==v);document.querySelectorAll('.gtab').forEach(t=>t.setAttribute('aria-selected',t.dataset.v===v))}
+  document.querySelectorAll('.gtab').forEach(t=>t.addEventListener('click',()=>{location.hash=t.dataset.v}));
+  document.querySelectorAll('[data-go]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();location.hash=a.dataset.go;window.scrollTo({top:0})}));
+  window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+  function toMeasure(e){e.preventDefault();location.hash='dashboard';show('dashboard');const m=document.getElementById('measure');m.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>m.querySelector('input')?.focus({preventScroll:true}),500)}
+  document.getElementById('tomeasure').addEventListener('click',toMeasure);
+  document.getElementById('tomeasure2').addEventListener('click',toMeasure);
+  document.querySelectorAll('.pseg button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.pseg button').forEach(o=>o.setAttribute('aria-pressed',o===b));document.getElementById('p-next').hidden=b.dataset.p!=='next';document.getElementById('p-stage').hidden=b.dataset.p!=='stage'}));
+
+  // Rooms: leaf steps done/total from the goal's tree, and each room's first open step.
+  const rooms=[
+    {n:'Kitchen',d:7,t:12,next:'Take the dish rack out of its box and set it by the sink',last:'27 Oct',tags:['tape']},
+    {n:'Living room',d:11,t:35,next:'Put what is left on the couch where it belongs, or in one bin',last:'27 Oct',tags:['tape']},
+    {n:'Office',d:5,t:25,next:'Put up the closet top shelf (the IKEA arms were ordered 28 Sep)',cnext:'Gather the kitchen things in the office and carry them to the kitchen',last:'29 Oct',tags:['tape','sam']},
+    {n:'Bedroom',d:1,t:11,next:'Put the laundry on the floor into the hamper',last:'30 Sep',tags:['sam']},
+    {n:'Master bath',d:2,t:3,next:'Organize the over-the-toilet shelving',last:'30 Sep',tags:['sam']},
+    {n:'Entry closet',d:0,t:6,next:'Take everything that is not a coat off the rail',tags:[]},
+    {n:'Hallway',d:0,t:7,next:'Flatten the empty boxes',tags:['sam']},
+    {n:'Washer/dryer closet',d:0,t:4,next:'Move the items in front of the washer',tags:[]},
+    {n:'First bathroom',d:0,t:3,next:'Clear the bathroom counter',tags:[]}];
+  const ring=(d,t)=>{const r=16,c=2*Math.PI*r,p=t?d/t:0;return `<svg class="ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="${r}" fill="none" stroke="var(--sunken)" stroke-width="5"/>${p?`<circle cx="20" cy="20" r="${r}" fill="none" stroke="var(--goal)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c*p).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 20 20)"/>`:''}<text x="20" y="24" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--ink)">${Math.round(p*100)}%</text></svg>`};
+  const tagHtml={tape:'<span class="tag tape">Needs measuring</span>',sam:'<span class="tag sam">Alex</span>'};
+  let focus='clean';
+  function drawRooms(){document.getElementById('rooms').innerHTML=rooms.map((r,i)=>{const tags=r.tags.filter(t=>focus==='all'||t!=='tape');const nx=(focus==='clean'&&r.cnext)||r.next;return `<div class="room ${r.d?'':'untouched'}" id="room-${i}"><div class="rt">${ring(r.d,r.t)}<div style="min-width:0"><div class="rn">${r.n}</div><div class="rc">${r.d} of ${r.t} done${r.last?' · last '+r.last:' · not started'}</div></div></div><div class="tags">${tags.map(t=>tagHtml[t]).join('')}</div><div class="nx"><span class="k">Next</span>${nx}</div>${i<2?`<div class="photo">${i===0?'Before photo · 27 Oct':'+ Add an after photo'} <span class="tag new" style="margin-left:6px">Example</span></div>`:''}</div>`}).join('')}
+  drawRooms();
+  function setFocus(f){focus=f;document.querySelectorAll('.f-clean').forEach(e=>e.hidden=f!=='clean');document.querySelectorAll('.f-all').forEach(e=>e.hidden=f!=='all');document.querySelectorAll('#focusseg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.focus===f));drawRooms();drawFiles()}
+  document.querySelectorAll('[data-focus]').forEach(b=>b.addEventListener('click',()=>setFocus(b.dataset.focus)));
+  document.querySelectorAll('[data-focus-go]').forEach(b=>b.addEventListener('click',()=>setFocus(b.dataset.focusGo)));
+
+  // Measuring session: needs taken from Dash's results on each step (inches).
+  const meas=[
+    {t:'Living room wall for the bookshelves',n:'Need 168" wide (3 BILLY + 1 KALLAX), 80" high',need:168,buy:'Bookshelves'},
+    {t:'Office wall for two bag units',n:'Need 144" wide, 72" high, 16" deep',need:144,buy:'Bag units'},
+    {t:'Pantry spot, living room by the kitchen',n:'Need about 36" (30" cabinet plus room)',need:36,buy:'Pantry'},
+    {t:'Bar cart spot in the kitchen',n:'Need 14" of depth',need:14,buy:'Bar cart'},
+    {t:'Office and bedroom wall for clothes',n:'Need 192" of wall (three 5 ft racks)',need:192,buy:'Clothes plan'},
+    {t:'Storage room',n:'Width and depth, for the room map',need:0},
+    {t:'Office closet',n:'Width, depth, height, so Dash can pick drawers',need:0}];
+  document.getElementById('meas').innerHTML=meas.map((m,i)=>`<li><div style="min-width:0"><div class="mt">${m.t}</div><div class="mn">${m.n}</div></div><input id="m${i}" inputmode="decimal" placeholder="${m.need?'inches':'W × D'}" aria-label="${m.t}"><span class="verdict wait" id="v${i}">${m.buy?'unlocks '+m.buy:'for Dash'}</span></li>`).join('');
+
+  const buys=[
+    {t:'Bar cart',s:'Naturefalls Compact 14" · Lowe\'s · Kitchen',st:'tape',m:3},
+    {t:'Pantry',s:'HOMCOM 72" · 30 × 15.75 × 72 in · Living room',st:'tape',m:2},
+    {t:'Bookshelves',s:'3 BILLY + 1 KALLAX 5×5 · about $537 · Living room',st:'tape',m:0},
+    {t:'Bag units',s:'2 KALLAX 5×5 · Office',st:'tape',m:1},
+    {t:'Tall, skinny dresser',s:'3 options from 21 Oct · Bedroom',st:'pick'},
+    {t:'Small Office shelf, up to 12"',s:'3 options from 21 Oct · Office',st:'pick'}];
+  const stLabel={tape:'Waiting on measuring',pick:'Pick one',ready:'Ready to order',no:'Doesn\'t fit'};
+  function drawBuys(){document.getElementById('buys').innerHTML=buys.map(b=>`<li><div style="min-width:0"><div class="bt">${b.t}</div><div class="bs">${b.s}</div></div><span class="state ${b.st==='no'?'tape':b.st}">${stLabel[b.st]}</span></li>`).join('')}
+  drawBuys();
+  meas.forEach((m,i)=>document.getElementById('m'+i).addEventListener('input',e=>{
+    const v=document.getElementById('v'+i),val=parseFloat(e.target.value);
+    if(!m.need){v.className='verdict '+(e.target.value?'ok':'wait');v.textContent=e.target.value?'Saved':'for Dash';return}
+    const b=buys.find(b=>b.m===i);
+    if(isNaN(val)){v.className='verdict wait';v.textContent='unlocks '+m.buy;if(b)b.st='tape'}
+    else if(val>=m.need){v.className='verdict ok';v.textContent='Fits';if(b)b.st='ready'}
+    else{v.className='verdict no';v.textContent=`${m.need-val}" short`;if(b)b.st='no'}
+    drawBuys();
+  }));
+
+  // Plan by room
+  const byroom=[['Planning with Alex','2 of 5',['Walk through the room map with Alex','Measure the storage room and living-room wall','Settle one of her calls, weekly']]].concat(rooms.map(r=>[r.n,`${r.d} of ${r.t}`,[r.next]]));
+  document.getElementById('byroom').innerHTML=byroom.map(([n,c,s],i)=>`<div class="stage" ${i?'':'style="border-top:0"'}><div class="sh"><span>${n}</span><span class="small muted">${c}</span></div><ul>${s.map(x=>`<li>${x}</li>`).join('')}<li style="list-style:none;margin-left:-18px"><a class="small">All of ${n.toLowerCase()}'s steps</a></li></ul></div>`).join('');
+
+  // Tidy list: real open "Do you still want…?" questions, as one list
+  const tidy=[['move skis under bed','Office'],['Move the L desk over','Office'],['Clear the bins','Bedroom'],['move rugs to downstairs','Living room'],['Put the laundry supplies on one shelf','Washer/dryer closet'],['Put up better shelving','Living room']];
+  document.getElementById('tidy').innerHTML=tidy.map(([t,r],i)=>`<li id="t${i}"><div><div style="font-weight:500">${t}</div><div class="small muted">${r}</div></div><span class="acts"><button class="btn sm" type="button" data-a="keep">Keep</button><button class="btn sm" type="button" data-a="later">Later</button><button class="btn sm" type="button" data-a="drop">Drop</button></span></li>`).join('')+`<li><div class="small muted">and 23 more</div><span></span></li>`;
+  document.querySelectorAll('#tidy [data-a]').forEach(b=>b.addEventListener('click',()=>{const li=b.closest('li');const a=b.dataset.a;li.querySelector('.acts').innerHTML=`<span class="small ${a==='drop'?'':'muted'}" style="font-weight:600">${a==='keep'?'Kept':a==='later'?'Later':'Dropped'}</span>`;if(a==='drop')li.classList.add('gone')}));
+
+  // Files: the five Dash filed on this goal, all unread
+  const files=[
+    {k:'ex',t:'Where the shoes go',s:'Dash · today · from your chat · Office',ty:'NOTE',hide:true},
+    {k:'dash',t:'Three tall, skinny dressers like the one in your photo',s:'Dash · 21 Oct · Bedroom',furn:true,u:true,ty:'NOTE'},
+    {k:'dash',t:'Small Office shelves up to 12 inches tall',s:'Dash · 21 Oct · Office',furn:true,u:true,ty:'NOTE'},
+    {k:'dash',t:'Where each kind of Alex\'s things lives, room by room',s:'Dash · 3 Oct · the room map',u:true,pin:true,ty:'NOTE'},
+    {k:'dash',t:'Bookcases and game cubes for the living room',s:'Dash · 3 Oct · Living room',furn:true,u:true,ty:'NOTE'},
+    {k:'dash',t:'Where Alex\'s clothes go',s:'Dash · 29 Sep · Office and bedroom',u:true,ty:'NOTE'},
+    {k:'slot',t:'Photo of each room, before',s:'Waiting · one per room, for the before-and-after',ty:'JPG'},
+    {k:'slot',t:'Bar cart and pantry receipts',s:'Waiting · for the returns window',ty:'PDF'}];
+  let filter='all';
+  const row=f=>`<li class="file"><span class="ficon ${f.k==='dash'?'dash':f.k==='slot'?'slot':f.k==='ex'?'ex':''}">${f.ty}</span><div style="min-width:0"><div class="ft">${f.u?'<span class="unread" title="Unread"></span>':''}${f.t}</div><div class="fs">${f.s}</div></div>${f.pin?'<span class="pin">Pinned</span>':f.k==='slot'?'<button class="btn sm" type="button">Add</button>':''}</li>`;
+  function drawFiles(){
+    const list=files.filter(f=>!f.hide&&(filter==='all'||f.k===filter||(filter==='dash'&&f.k==='ex')));
+    document.getElementById('files').innerHTML=list.length?list.map(row).join(''):`<li class="file"><span class="ficon slot">+</span><div><div class="ft">Nothing of yours yet</div><div class="fs">Photos, receipts and manuals you add land here.</div></div><span></span></li>`;
+    document.getElementById('files-recent').innerHTML=files.filter(f=>!f.hide&&f.k!=='slot'&&!(focus==='clean'&&f.furn)).slice(0,3).map(row).join('');
+    const shown=files.filter(f=>!f.hide&&f.k!=='slot').length, unread=files.filter(f=>!f.hide&&f.u).length;
+    document.getElementById('filecount').textContent=`${shown} files · ${unread} unread`;
+    document.getElementById('worknum').textContent=`${unread} unread`;
+  }
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(o=>o.setAttribute('aria-selected',o===t));filter=t.dataset.f;drawFiles()}));
+  drawFiles();
+  const drop=document.getElementById('drop'),fi=document.getElementById('fileinput');
+  function addFiles(list){[...list].forEach(f=>files.splice(1,0,{k:'mine',t:f.name,s:'You · just now · Dash is finding its room',ty:(f.name.split('.').pop()||'FILE').slice(0,4).toUpperCase()}));filter='all';document.querySelectorAll('.tab').forEach(o=>o.setAttribute('aria-selected',o.dataset.f==='all'));drawFiles()}
+  ['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',ev=>addFiles(ev.dataTransfer.files));
+  fi.addEventListener('change',()=>addFiles(fi.files));
+
+  const story=[
+    ['29 Oct','you','Cleared the desk in the Office'],
+    ['27 Oct','you','Cleared the kitchen table, gave mail one tray, cleared and wiped the couch'],
+    ['21 Oct','Dash','Shortlisted three dressers and three small Office shelves'],
+    ['16 Oct','Dash','Found the pantry is 30" wide, not 24"'],
+    ['7 Oct','Dash','Picked the Naturefalls bar cart'],
+    ['3 Oct','Dash','Drew the room map, picked the bookshelves and the pantry spot'],
+    ['3 Oct','you','Measured the walls that could take furniture'],
+    ['30 Sep','you','Put up both TVs and built the master bath shelving with Alex'],
+    ['28 Sep','you','Agreed with Alex how moving her things works, and ordered the IKEA shelf arms'],
+    ['28 Sep','you','Started the goal']];
+  document.getElementById('story').innerHTML=story.map(([d,w,t])=>`<li><span class="d">${d}</span><span><span class="who" style="${w==='you'?'color:var(--accent)':''}">${w==='you'?'You':'Dash'}</span> · ${t}</span></li>`).join('');
+
+  // Chat flow demo
+  const scrim=document.getElementById('scrim'),msgs=document.getElementById('msgs'),chatin=document.getElementById('chatin');
+  const ws=document.getElementById('ws-shoes'),wsStatus=document.getElementById('ws-status'),wsRes=document.getElementById('ws-result');
+  let timers=[];const later=(ms,fn)=>timers.push(setTimeout(fn,ms));
+  function reset(){timers.forEach(clearTimeout);timers=[];msgs.innerHTML='';chatin.value='';document.getElementById('toastslot').innerHTML='';ws.hidden=true;wsRes.hidden=true;document.getElementById('idle').hidden=false;files[0].hide=true;drawFiles();document.getElementById('dashcount').textContent='Nothing right now'}
+  function say(cls,html){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight}
+  function typeIn(text,done){let i=0;const step=()=>{chatin.value=text.slice(0,++i);if(i<text.length)later(22,step);else later(350,done)};step()}
+  document.getElementById('play').addEventListener('click',()=>{
+    reset();scrim.hidden=false;
+    later(300,()=>typeIn('where should alexs shoes go? she has like 100 pairs',()=>{
+      chatin.value='';say('me','where should alexs shoes go? she has like 100 pairs');
+      later(900,()=>{say('dash','I\'ll take this on under <b>Make the apartment clean and livable</b>, starting from the room map you and Alex have. I\'ll message you here when it\'s done.<div class="wscard"><span class="k">Working on it</span><b>Where should Alex\'s 100 pairs of shoes go?</b><a>Open in Goals</a></div>');
+        ws.hidden=false;ws.classList.add('live');document.getElementById('idle').hidden=true;wsStatus.innerHTML='<span class="working" aria-hidden="true"><i></i><i></i><i></i></span><span>Reading the room map and the Office plan</span>';document.getElementById('dashcount').textContent='1 thing'});
+      later(3800,()=>{scrim.hidden=true;
+        wsStatus.innerHTML='<span class="chip goal"><span class="dot"></span>Done</span><span>Just now · on the Office card too</span>';wsRes.hidden=false;ws.classList.remove('live');files[0].hide=false;files[0].u=true;drawFiles();document.getElementById('dashcount').textContent='1 new result';
+        const off=document.getElementById('room-2');if(!off.querySelector('.tag.new'))off.querySelector('.tags').insertAdjacentHTML('beforeend','<span class="tag new">New from Dash</span>');
+        document.getElementById('toastslot').innerHTML='<div class="toast" role="status"><span class="mark">D</span><div><b style="font-size:13px">Done: where Alex\'s shoes go</b><div class="small muted">In the Office, beside the bag units.</div></div><button class="btn sm primary" id="opentoast" type="button">Open</button></div>';
+        document.getElementById('opentoast').addEventListener('click',()=>{document.getElementById('toastslot').innerHTML='';location.hash='dashboard';show('dashboard');ws.scrollIntoView({behavior:'smooth',block:'center'});ws.classList.add('flash');off.classList.add('flash');setTimeout(()=>{ws.classList.remove('flash');off.classList.remove('flash')},1900)});
+      });
+    }));
+  });
+  document.getElementById('closechat').addEventListener('click',()=>{scrim.hidden=true});
+})();
+</script>
+
+</body></html>

@@ -23,8 +23,8 @@ function asCitation(row: unknown): TalkCitation | null {
 }
 
 /**
- * Every row Dash read in the chat, once each, in the order first met: the
- * rows each answer cites and the rows its lookups gave back. Rows a write
+ * Every row Dash read in the chat, once each, answer by answer: the rows it
+ * cites in the order it cites them, then the rows its lookups gave back. Rows a write
  * gave back are its change, listed with the changes instead.
  */
 export function chatReadRows(turns: readonly Pick<TalkTurn, 'toolCalls' | 'citations'>[]): ReadRow[] {
@@ -38,12 +38,15 @@ export function chatReadRows(turns: readonly Pick<TalkTurn, 'toolCalls' | 'citat
     rows.push({ ...row, workspace: moduleForPath(row.href) });
   };
   for (const turn of turns) {
+    // The rows the answer cites first, in its order, so the numbers in Used
+    // in this chat run 1, 2, 3 down the answer's marks (plan #2748.12); then
+    // the rows its lookups found that it did not cite.
+    for (const citation of turn.citations ?? []) add(asCitation(citation));
     for (const call of turn.toolCalls ?? []) {
       if (!isShownLookup(call.name)) continue;
       const found = call.result && typeof call.result === 'object' ? (call.result as { rows?: unknown }).rows : null;
       if (Array.isArray(found)) found.forEach((row) => add(asCitation(row)));
     }
-    for (const citation of turn.citations ?? []) add(asCitation(citation));
   }
   return rows;
 }

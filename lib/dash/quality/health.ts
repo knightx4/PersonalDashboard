@@ -40,10 +40,23 @@ export type HealthConnectorCall = {
   error: string | null;
 };
 
+/** One answer Dash could not give, from core.dash_failures (plan #2937.2). */
+export type HealthFailure = {
+  id: string;
+  surface: string;
+  outcome: 'failed' | 'unfinished';
+  reason: string;
+  model: string;
+  /** Each model call's stop reason, as kept. */
+  stops: readonly (string | null)[];
+};
+
 export type ToolFailure = { tool: string; count: number; sample: string; turns: string[] };
 
 export type DashHealth = {
   answers: number;
+  /** Answers that failed or came back unfinished, as core.dash_failures kept them. */
+  failures: { count: number; ids: string[] };
   unfinished: { count: number; turns: string[] };
   limited: { count: number; turns: string[] };
   failedLookups: ToolFailure[];
@@ -112,6 +125,11 @@ function failureAlerts(failures: readonly (ToolFailure & { broken: boolean })[],
     .map((f) => `${where}${f.tool} failed ${f.count} time${f.count === 1 ? '' : 's'}: ${f.sample}`);
 }
 
+/** A failing tool as the run keeps it, without the flag the alerts read. */
+function plainFailure({ tool, count, sample, turns }: ToolFailure): ToolFailure {
+  return { tool, count, sample, turns };
+}
+
 /** 85000 as "85,000". */
 function grouped(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -121,6 +139,7 @@ export function dashHealth(
   turns: readonly HealthTurn[],
   spend: readonly HealthSpend[],
   connectorCalls: readonly HealthConnectorCall[] = [],
+  failed: readonly HealthFailure[] = [],
 ): DashHealth {
   const unfinished: string[] = [];
   const limited: string[] = [];
@@ -167,6 +186,14 @@ export function dashHealth(
   }
   const connectorFailed = [...fromApps.values()].sort((a, b) => b.count - a.count);
   const alerts: string[] = [];
+  // Every kept failure is raised on its own line, first: each one is an
+  // answer the person asked for and did not get.
+  for (const failure of failed) {
+    const stops = failure.stops.map((stop) => stop ?? 'threw').join(', ') || 'no call';
+    alerts.push(
+      `${failure.outcome === 'failed' ? 'Failed' : 'Unfinished'} ${failure.surface} answer ${failure.id} on ${failure.model} (calls: ${stops}): ${failure.reason.replace(/\s+/g, ' ').slice(0, 200)}`,
+    );
+  }
   if (unfinished.length > 0) {
     alerts.push(`${unfinished.length} answer${unfinished.length === 1 ? '' : 's'} fell back to "I could not finish".`);
   }
@@ -188,10 +215,11 @@ export function dashHealth(
 
   return {
     answers: turns.length,
+    failures: { count: failed.length, ids: failed.map((f) => f.id) },
     unfinished: { count: unfinished.length, turns: unfinished },
     limited: { count: limited.length, turns: limited },
-    failedLookups: failedLookups.map(({ broken: _broken, ...f }) => f),
-    connector: { calls: connectorCalls.length, failed: connectorFailed.map(({ broken: _broken, ...f }) => f) },
+    failedLookups: failedLookups.map(plainFailure),
+    connector: { calls: connectorCalls.length, failed: connectorFailed.map(plainFailure) },
     skippedLookups: skipped,
     thumbsDown,
     pushback,

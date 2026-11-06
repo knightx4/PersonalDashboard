@@ -13,7 +13,8 @@ const RETURN_COOKIE = 'gmail_oauth_return';
  * Start the Gmail read grant. Separate from Google sign-in — see docs/SETUP.md.
  *
  * Optional `return_to` (relative path) is stored in an httpOnly cookie so the
- * callback can send the user back to onboarding or Settings.
+ * callback can send the user back to onboarding or Settings. Optional
+ * `login_hint` names the mailbox being reconnected.
  */
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -43,7 +44,11 @@ export async function GET(request: NextRequest) {
   const redirectUri = `${origin.replace(/\/$/, '')}/api/auth/gmail/callback`;
   const { TOKEN_ENCRYPTION_KEY } = gmailOAuthEnv();
   const state = signGmailOAuthState(user.id, TOKEN_ENCRYPTION_KEY);
-  const url = gmailProvider.authorizationUrl(state, redirectUri);
+  const url = new URL(gmailProvider.authorizationUrl(state, redirectUri));
+  // Reconnecting one mailbox (the account menu's Check mail, plan #3019.1)
+  // names it, so Google offers that account first.
+  const hint = request.nextUrl.searchParams.get('login_hint');
+  if (hint && /^[^\s@]+@[^\s@]+$/.test(hint)) url.searchParams.set('login_hint', hint);
 
   console.info('gmail oauth connect', { redirectUri, userId: user.id, returnTo });
   return NextResponse.redirect(url);

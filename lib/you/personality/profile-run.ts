@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
@@ -8,7 +9,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { loadVaultRules } from '@/lib/vault/map/vault-rules';
 import { relatedNotesStore, vectorForText } from '@/lib/vault/notes/related';
@@ -122,14 +123,11 @@ async function write(you: YouSupabaseClient, userId: string, client?: Anthropic)
       model: MODEL,
       max_tokens: 6144 + THINKING_ROOM,
       system: PROFILE_SYSTEM,
-      tools: [
-        {
-          name: PROFILE_TOOL,
-          description: 'Report the analysis across all the tests: a summary, agreements, tensions and patterns to watch.',
-          input_schema: PROFILE_TOOL_SCHEMA,
-        },
-      ],
-      tool_choice: forceTool(PROFILE_TOOL, MODEL),
+      ...reportRequest({
+        name: PROFILE_TOOL,
+        description: 'Report the analysis across all the tests: a summary, agreements, tensions and patterns to watch.',
+        input_schema: PROFILE_TOOL_SCHEMA,
+      }, MODEL),
       messages: [{ role: 'user', content: profilePrompt(results, record, notes) }],
     });
     reports.push({ model: MODEL, usage: usageFrom(response.usage) });
@@ -137,9 +135,9 @@ async function write(you: YouSupabaseClient, userId: string, client?: Anthropic)
     await recordSpendReports(core, userId, { module: 'you', operation: 'personality-profile' }, reports);
   }
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === PROFILE_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const profile = profileFrom(block.input, notes);
+  const report = readReport(response, PROFILE_TOOL, MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const profile = profileFrom(report.value, notes);
   if (!profile) return { ok: false, detail: 'The analysis came back in the wrong shape.' };
 
   const { error } = await you.from('personality_profiles').insert({

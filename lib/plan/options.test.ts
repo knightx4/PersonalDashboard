@@ -98,6 +98,29 @@ describe('planOptions', () => {
     expect(first.label.endsWith('…')).toBe(true);
     expect(first.label).not.toContain(' …');
   });
+
+  // Note c7bd5b0d: decision #2829 lettered its options inside one paragraph,
+  // and the plan offered no buttons for them.
+  it('reads (A) (B) (C) written inline in a paragraph', () => {
+    const detail =
+      'Merging conflicts in over 100 files. Options: (A) Keep the Council as main has it, and rebase onto /you/council. ' +
+      '(B) Keep the tab named Advisors, as you asked. (C) Run both: Advisors for the board, Council for mentors, as two tabs. ' +
+      'Recommended: A, since it is the least rework.';
+
+    const options = planOptions(detail);
+    expect(options).toEqual([
+      { letter: 'A', label: 'Keep the Council as main has it, and rebase onto /you/council' },
+      { letter: 'B', label: 'Keep the tab named Advisors, as you asked' },
+      { letter: 'C', label: 'Run both: Advisors for the board, Council for mentors, as two tabs' },
+    ]);
+    expect(recommendedLetter(detail, options)).toBe('A');
+  });
+
+  it('leaves inline letters that skip or mix case as prose', () => {
+    expect(planOptions('It does (a) one thing and (c) another.')).toEqual([]);
+    expect(planOptions('Either (A) this or (b) that.')).toEqual([]);
+    expect(planOptions('Only (A) one option here.')).toEqual([]);
+  });
 });
 
 describe('optionAnswer', () => {

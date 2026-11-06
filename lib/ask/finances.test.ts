@@ -298,6 +298,15 @@ describe('spend_by_merchant from transactions', () => {
     expect(result.ok && result.note).toMatch(/^From order emails/);
   });
 
+  it('answers a long span from order emails when Finances holds no transactions', async () => {
+    const result = await executeAskTool(
+      'spend_by_merchant',
+      { from: '2015-01-01' },
+      context({ 'public.orders': [], 'public.returns': [] }),
+    );
+    expect(result.ok && result.note).toMatch(/^From order emails/);
+  });
+
   it('is offered in Finances and in Shopping; accounts and balance_history only in Finances', () => {
     expect(lookupInScope('spend_by_merchant', 'finances')).toBe(true);
     expect(lookupInScope('spend_by_merchant', 'shopping')).toBe(true);

@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 
 /**
  * "In this video" on a Learn now card (note cde86a10): what the lecture clip
@@ -94,21 +94,18 @@ export async function writeClipNote(
       model: CLIP_NOTE_MODEL,
       max_tokens: 400,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Say what the clip says and why it fits the card.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              said: { type: 'string', description: 'What the speaker says, in one sentence.' },
-              why: { type: 'string', description: "Why it bears on the card's idea, in one sentence." },
-            },
-            required: ['said', 'why'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Say what the clip says and why it fits the card.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            said: { type: 'string', description: 'What the speaker says, in one sentence.' },
+            why: { type: 'string', description: "Why it bears on the card's idea, in one sentence." },
           },
+          required: ['said', 'why'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, CLIP_NOTE_MODEL),
+      }, CLIP_NOTE_MODEL),
       messages: [{ role: 'user', content: clipNotePrompt(input) }],
     });
   } catch (error) {
@@ -117,9 +114,9 @@ export async function writeClipNote(
 
   input.onSpend?.({ model: CLIP_NOTE_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const read = readClipNote(block.input);
+  const report = readReport(response, TOOL_NAME, CLIP_NOTE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const read = readClipNote(report.value);
   if (typeof read === 'string') return { ok: false, detail: read };
   return { ok: true, ...read };
 }

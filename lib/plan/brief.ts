@@ -84,6 +84,25 @@ export const FOLLOW_ON_RULE =
   'saying what it will decide.';
 
 /**
+ * Every step's detail has to stand alone, said in the instruction itself.
+ *
+ * A builder reads only the step's brief, never the idea or its comments.
+ * Shaping condensed the idea, and what was worked out in the comment thread
+ * (a file, an example, an edge case, a decision) never reached the step, so a
+ * builder met the step cold and guessed. Carried by shaping and re-shaping
+ * the same way FOLLOW_ON_RULE is, for the same reason: a rule only one of
+ * them had would leave half the plan with thin steps.
+ */
+export const COMPLETE_DETAIL_RULE =
+  "Write every step's detail so it can be built from without reading the idea or " +
+  "its comments, because the builder sees only the step's brief. Carry every " +
+  "constraint, file, example, edge case and decision from the idea, its comment " +
+  "thread and the person's instructions into the steps they apply to, and do not " +
+  "summarise specifics away. Settled decisions and the feature's done-when already " +
+  'reach the brief as "Decided so far" and "Destination", so they need not be ' +
+  "repeated; anything still open belongs in the step's own detail.";
+
+/**
  * Which questions are worth the person's time, said in the instruction itself.
  *
  * Sessions were writing a decision for every choice with two defensible
@@ -616,7 +635,7 @@ export function planBrief(
   // that produced it is the first thing worth knowing about it.
   const origin = reshapeOrigin(node.comment, outlines);
   if (origin) {
-    out.push(`From ${origin.ref}'s answer: ${readable(origin.gist)}`);
+    out.push(`From ${origin.ref}'s ${origin.source}: ${readable(origin.gist)}`);
   }
 
   // What the workspace is for, above where the feature is going: the layer a

@@ -1,4 +1,5 @@
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
+import { areaNamesById } from '@/lib/you/areas';
 import { firedFrom, type FiredTripwire } from '@/lib/you/insight-fired';
 
 /**
@@ -42,7 +43,12 @@ export type PredictionCheck = {
   checkedAt: string | null;
 };
 
-export type InsightLayer = { depth: InsightDepth; text: string };
+/**
+ * One level of a card. headline is the level in one sentence, the line the tab
+ * shows largest; text is the evidence or reasoning under it. A card written
+ * before headlines (November 2026) has none, and the tab shows its text alone.
+ */
+export type InsightLayer = { depth: InsightDepth; headline: string | null; text: string };
 
 /** One piece of evidence: the table or vault path, the row, the words or number relied on, and a link. */
 export type InsightReceipt = {
@@ -75,6 +81,9 @@ export type Insight = {
   question: string | null;
   answer: string | null;
   answeredAt: string | null;
+  /** The Goals area it is about and that area's name; null before a run tags it (you 0036). */
+  areaId: string | null;
+  areaName: string | null;
 };
 
 export type InsightRun = {
@@ -90,7 +99,7 @@ export type InsightRun = {
 
 export const INSIGHT_COLUMNS =
   'id, run_id, kind, claim, layers, receipts, confidence, live_ref, status, superseded_by, created_at, ' +
-  'check_on, outcome, outcome_note, checked_at, question, answer, answered_at, ' +
+  'area_id, check_on, outcome, outcome_note, checked_at, question, answer, answered_at, ' +
   'insight_verdicts(verdict, note, decided_at), ' +
   'insight_tripwires(kind, last_fired_at, fired_evidence)';
 
@@ -119,7 +128,10 @@ export function safeLink(value: unknown): string | null {
   }
 }
 
-/** The layers in depth order, saw first; one of an unknown depth or with no text is dropped. */
+/**
+ * The layers in depth order, saw first, each with its headline when the run
+ * wrote one; one of an unknown depth or with no text is dropped.
+ */
 export function layersOf(value: unknown): InsightLayer[] {
   if (!Array.isArray(value)) return [];
   const layers = value.flatMap((entry) => {
@@ -127,7 +139,7 @@ export function layersOf(value: unknown): InsightLayer[] {
     const row = entry as Record<string, unknown>;
     const depth = oneOf(INSIGHT_DEPTHS, row.depth);
     const body = text(row.text).trim();
-    return depth && body ? [{ depth, text: body }] : [];
+    return depth && body ? [{ depth, headline: textOrNull(row.headline), text: body }] : [];
   });
   // A stable sort, so two layers at one depth keep the order they were written in.
   return layers
@@ -192,6 +204,8 @@ export function insightFromRow(row: Record<string, unknown>): Insight | null {
     question: textOrNull(row.question),
     answer: textOrNull(row.answer),
     answeredAt: textOrNull(row.answered_at),
+    areaId: textOrNull(row.area_id),
+    areaName: null,
   };
 }
 
@@ -239,10 +253,12 @@ export async function listInsights(
     .in('status', [...statuses])
     .order('created_at', { ascending: false });
   if (error) throw new Error(`Reading your insights failed: ${error.message}`);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).flatMap((row) => {
+  const insights = ((data ?? []) as unknown as Record<string, unknown>[]).flatMap((row) => {
     const insight = insightFromRow(row);
     return insight ? [insight] : [];
   });
+  const names = await areaNamesById(client, userId, insights.map((i) => i.areaId));
+  return insights.map((i) => ({ ...i, areaName: i.areaId ? (names.get(i.areaId) ?? null) : null }));
 }
 
 /** Their newest run, or null before the first. */

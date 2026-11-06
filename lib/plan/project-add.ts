@@ -293,6 +293,8 @@ export async function addDevProject(input: {
     );
   } catch (error) {
     const why = error instanceof Error ? error.message : String(error);
+    // A session proxy's refusal already says what to do, and it is not the token.
+    if (why.startsWith('This session does not have')) return { ok: false, error: why };
     // refusalFor names this app's repository, which is not the one asked about.
     if (/\((403|404)\)/.test(why)) {
       return {

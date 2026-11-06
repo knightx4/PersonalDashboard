@@ -57,11 +57,14 @@ export const REACTION_LABELS: Record<Reaction, string> = {
   ignored: 'No answer',
 };
 
-/** A suggestion's kind: a kind of weekly help, or a step Dash suggests (goals migration 0071). */
-export type SuggestionKind = HelpKind | 'step';
+/**
+ * A suggestion's kind: a kind of weekly help, a step Dash suggests (goals
+ * migration 0071), or a dashboard tile a question run suggests (0092).
+ */
+export type SuggestionKind = HelpKind | 'step' | 'tile';
 
 export function isSuggestionKind(value: unknown): value is SuggestionKind {
-  return value === 'step' || isHelpKind(value);
+  return value === 'step' || value === 'tile' || isHelpKind(value);
 }
 
 export type Suggestion = {
@@ -82,6 +85,10 @@ export type Suggestion = {
   reaction: Reaction | null;
   attended: boolean | null;
   createdAt: string;
+  /** The run that wrote it; a question run's suggestions show with its result (plan #2778.8). */
+  runId?: string | null;
+  /** The tile a tile suggestion adds to the goal's dashboard; null for every other kind. */
+  tile?: Record<string, unknown> | null;
 };
 
 export type SuggestionRow = {
@@ -99,10 +106,12 @@ export type SuggestionRow = {
   reaction: string | null;
   attended: boolean | null;
   created_at: string;
+  run_id?: string | null;
+  tile?: Record<string, unknown> | null;
 };
 
 export const SUGGESTION_COLUMNS =
-  'id, item_id, kind, accepted_step_id, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at';
+  'id, item_id, kind, accepted_step_id, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at, run_id, tile';
 
 export function toSuggestion(row: SuggestionRow): Suggestion {
   return {
@@ -122,6 +131,8 @@ export function toSuggestion(row: SuggestionRow): Suggestion {
       : null,
     attended: row.attended,
     createdAt: row.created_at,
+    runId: row.run_id ?? null,
+    tile: row.tile ?? null,
   };
 }
 
@@ -231,6 +242,8 @@ export function goalSuggestions(
 ): Suggestion[] {
   return all
     .filter((s) => s.itemId !== null && itemIds.has(s.itemId))
+    // A suggested tile waits on the result of the run that suggested it (plan #2778.8).
+    .filter((s) => s.kind !== 'tile')
     .filter((s) => s.acceptedStepId === null && s.attended === null)
     .filter((s) => s.reaction === null || (s.reaction === 'going' && s.kind !== 'step'))
     .filter((s) => s.happensOn === null || s.happensOn >= today)

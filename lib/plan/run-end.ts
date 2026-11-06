@@ -54,7 +54,8 @@ export type RunJob =
   | 'spec_change'
   | 'overhaul'
   | 'audit'
-  | 'unstick';
+  | 'unstick'
+  | 'land';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -83,6 +84,7 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   overhaul: 'An overhaul run',
   audit: 'A spec audit',
   unstick: 'A look at why a feature stalled',
+  land: 'A run landing built steps',
 };
 
 /**
@@ -112,6 +114,7 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   overhaul: 'overhaul run',
   audit: 'spec audit',
   unstick: 'stall diagnosis',
+  land: 'landing run',
 };
 
 /**

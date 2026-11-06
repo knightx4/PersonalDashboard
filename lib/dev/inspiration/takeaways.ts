@@ -2,9 +2,10 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { MODELS } from '@/lib/core/models';
 
@@ -285,34 +286,31 @@ export async function extractVideoTakeaways(input: {
       model: TAKEAWAY_MODEL,
       max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the takeaways for this app, or none.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              takeaways: {
-                type: 'array',
-                maxItems: MAX_TAKEAWAYS,
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    body: { type: 'string' },
-                    module: { type: 'string', enum: [...MODULE_IDS, WHOLE_APP] },
-                    quote: { type: 'string' },
-                    at: { type: 'string', description: 'm:ss or h:mm:ss' },
-                  },
-                  required: ['title', 'body', 'module', 'quote', 'at'],
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the takeaways for this app, or none.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            takeaways: {
+              type: 'array',
+              maxItems: MAX_TAKEAWAYS,
+              items: {
+                type: 'object',
+                properties: {
+                  title: { type: 'string' },
+                  body: { type: 'string' },
+                  module: { type: 'string', enum: [...MODULE_IDS, WHOLE_APP] },
+                  quote: { type: 'string' },
+                  at: { type: 'string', description: 'm:ss or h:mm:ss' },
                 },
+                required: ['title', 'body', 'module', 'quote', 'at'],
               },
             },
-            required: ['takeaways'],
           },
+          required: ['takeaways'],
         },
-      ],
-      tool_choice: forceTool(TOOL, TAKEAWAY_MODEL),
+      }, TAKEAWAY_MODEL),
       messages: [{ role: 'user', content: prompt }],
     });
   } catch (error) {
@@ -321,9 +319,9 @@ export async function extractVideoTakeaways(input: {
 
   input.onSpend?.({ model: TAKEAWAY_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  const takeaways = readTakeawayReply(block.input, input.video.cues);
+  const report = readReport(response, TOOL, TAKEAWAY_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
+  const takeaways = readTakeawayReply(report.value, input.video.cues);
   if (!takeaways) return { outcome: 'failed', detail: 'The takeaways came back malformed.' };
   return { outcome: 'read', takeaways, cut };
 }

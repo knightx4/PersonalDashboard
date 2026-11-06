@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { COURSE_DEPTHS, TOPICS_PER_COURSE, type Candidate, type CourseDepth } from './course-bands';
 
 /**
@@ -71,30 +71,27 @@ export async function nameCourseTopicsCall(input: {
       model,
       max_tokens: 400,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL,
-          description: 'Report the course depth and the topics it taught.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              depth: { type: 'string', enum: [...COURSE_DEPTHS] },
-              picks: {
-                type: 'array',
-                items: { type: 'string', description: 'A candidate key, such as T3.' },
-                description: `The candidate topics the course taught, most central first, at most ${TOPICS_PER_COURSE}.`,
-              },
-              others: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Up to three central topics missing from the list, by exact encyclopedia article title.',
-              },
+      ...reportRequest({
+        name: TOOL,
+        description: 'Report the course depth and the topics it taught.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            depth: { type: 'string', enum: [...COURSE_DEPTHS] },
+            picks: {
+              type: 'array',
+              items: { type: 'string', description: 'A candidate key, such as T3.' },
+              description: `The candidate topics the course taught, most central first, at most ${TOPICS_PER_COURSE}.`,
             },
-            required: ['depth', 'picks'],
+            others: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Up to three central topics missing from the list, by exact encyclopedia article title.',
+            },
           },
+          required: ['depth', 'picks'],
         },
-      ],
-      tool_choice: forceTool(TOOL, model),
+      }, model),
       messages: [{ role: 'user', content: courseTopicsPrompt(input.text, input.candidates) }],
     });
   } catch (error) {
@@ -103,9 +100,9 @@ export async function nameCourseTopicsCall(input: {
 
   input.onSpend?.({ model, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const parsed = replySchema.safeParse(block.input);
+  const report = readReport(response, TOOL, model);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const parsed = replySchema.safeParse(report.value);
   if (!parsed.success) return { ok: false, detail: 'The course topics came back malformed.' };
   return { ok: true, reply: { depth: parsed.data.depth, picks: parsed.data.picks, others: parsed.data.others.slice(0, 3) } };
 }

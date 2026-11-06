@@ -84,7 +84,7 @@ export const RADII: readonly { name: string; px: number; where: string }[] = [
     px: 8,
     where: 'Buttons, inputs, chips, menu rows, the hover ground on a list row.',
   },
-  { name: 'rounded-pill', px: 0, where: 'Chips, toggle chips and badges. Square in Poster, like everything else.' },
+  { name: 'rounded-pill', px: 0, where: 'Chips, toggle chips and badges. Fully round in every theme.' },
   { name: 'rounded-full', px: 0, where: 'Counts, avatars, dots and the sigil: round in every theme.' },
 ];
 

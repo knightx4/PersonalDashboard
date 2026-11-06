@@ -28,6 +28,39 @@ describe('commitOnMain', () => {
     vi.unstubAllEnvs();
   });
 
+  // What a cloud session's proxy answered for knightx4/music-pipeline on
+  // 4 November 2026, word for word up to the link it ends with.
+  it('says a session proxy refused, and does not blame the token', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const landing = await commitOnMain({
+      sha: 'a405587',
+      repo: WEBSITE,
+      fetch: answering(
+        {
+          message:
+            'GitHub access to this repository is not enabled for this session. Use add_repo to request access.',
+        },
+        403,
+      ) as never,
+    });
+    expect(landing.onMain).toBeNull();
+    expect(landing.error).toContain('example-owner/alexrivera-site');
+    expect(landing.error).toContain('add_repo');
+    expect(landing.error).not.toContain('missing a permission');
+    vi.unstubAllEnvs();
+  });
+
+  it("still blames the token for GitHub's own 403", async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const landing = await commitOnMain({
+      sha: 'a405587',
+      repo: WEBSITE,
+      fetch: answering({ message: 'Resource not accessible by personal access token' }, 403) as never,
+    });
+    expect(landing.error).toContain('GITHUB_READ_TOKEN is missing a permission (403)');
+    vi.unstubAllEnvs();
+  });
+
   it('asks GitHub to compare main with the commit, with the key on it', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const fetchFn = answering({ status: 'behind' });

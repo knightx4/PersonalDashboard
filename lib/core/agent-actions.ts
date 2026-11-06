@@ -36,7 +36,7 @@ export const coreActions: ModuleActions = {
     readFinishNotice: none('setting'),
     saveFinishNotice: none('setting'),
   },
-  'app/ask/actions.ts': {
+  'app/chat/dash/actions.ts': {
     askDashPageLabel: none('page'),
     recentAskQuestions: none('page'),
     openAskQuestion: none(
@@ -55,6 +55,15 @@ export const coreActions: ModuleActions = {
     archiveDashChat: none('setting', 'Clears a chat out of the person\'s own list; nothing is lost.'),
     searchDashChats: none('page'),
     rateDashAnswer: none('theirs', "The person's verdict on a Dash answer."),
+  },
+  'app/chat/dash/session-actions.ts': {
+    startSessionThreadAction: none('own', 'The person opening a conversation with a Claude Code session.'),
+    sendSessionMessageAction: none('own', "The person's own words to a Claude Code session."),
+    answerSessionMessageAction: none('theirs', "The person's answer to a session's question."),
+    pickSessionMockupAction: none('theirs', "The person's choice among a session's mockups."),
+    chatSessionOptionsAction: none('page'),
+    startSessionFromChatAction: none('own', 'The person taking their own chat to a Claude Code session.'),
+    commentOnSessionMockupAction: none('own', "The person's own note to a session on a mockup."),
   },
   'app/home/actions.ts': {
     openBriefPick: none('page'),

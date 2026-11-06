@@ -6,6 +6,7 @@ import Link from '@/components/ui/link';
 import { useCallback, useMemo } from 'react';
 import { ClipboardCheck } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { sectionSubject } from '@/lib/core/section-path';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
@@ -113,6 +114,8 @@ export function ReviewQueue({
   return (
     <SelectionProvider rows={selectionRows} onKey={onKey}>
       <PageHeader
+        // Under Now since the review queue folded into it (plan #1496.8).
+        subject={sectionSubject('/shopping/orders/review', 'Review')}
         title="Review"
         description="Orders we could not read with confidence, and emails that never became an order. Confirm, discard, or dismiss — nothing is dropped silently."
         bulk={<ReviewBulkBar rows={rows} />}

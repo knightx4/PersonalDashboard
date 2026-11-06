@@ -122,6 +122,57 @@ export function checkProgressEntry(entry: NewProgressEntry): Parsed<NewProgressE
   };
 }
 
+/** What a person may change on a logged entry (plan #2907.1): the fields left out stay as they are. */
+export type ProgressChange = {
+  text?: string;
+  /** The amount, in the entry's unit (or the unit given with it). Null takes the amount off. */
+  quantity?: number | null;
+  unit?: string | null;
+  /** YYYY-MM-DD. */
+  happenedOn?: string;
+};
+
+/**
+ * Check a change to a logged entry: the entry as it would read after the
+ * change goes through checkProgressEntry, and a day the change moves it to
+ * has to be a real date that is not after today. A day left alone is not
+ * checked against today, so a note can still be fixed on an old entry.
+ * Returns the columns to write.
+ */
+export function checkProgressChange(
+  current: ProgressEntry,
+  change: ProgressChange,
+  today: string,
+): Parsed<{ text: string; quantity: number | null; unit: string | null; happenedOn: string }> {
+  const checked = checkProgressEntry({
+    itemId: current.itemId,
+    text: change.text ?? current.text,
+    quantity: change.quantity === undefined ? current.quantity : change.quantity,
+    unit: change.unit === undefined ? current.unit : change.unit,
+    estimate: current.estimate,
+    happenedOn: change.happenedOn ?? current.happenedOn,
+  });
+  if (!checked.ok) return checked;
+
+  const happenedOn = checked.value.happenedOn ?? current.happenedOn;
+  if (change.happenedOn !== undefined && change.happenedOn !== current.happenedOn) {
+    const real = new Date(`${happenedOn}T00:00:00Z`);
+    if (Number.isNaN(real.getTime()) || real.toISOString().slice(0, 10) !== happenedOn) {
+      return { ok: false, error: 'The day has to be a date.' };
+    }
+    if (happenedOn > today) return { ok: false, error: 'The day cannot be in the future.' };
+  }
+  return {
+    ok: true,
+    value: {
+      text: checked.value.text,
+      quantity: checked.value.quantity ?? null,
+      unit: checked.value.unit ?? null,
+      happenedOn,
+    },
+  };
+}
+
 /** Newest first: by the day it happened, then by when it was written. */
 export function sortProgressEntries(entries: readonly ProgressEntry[]): ProgressEntry[] {
   return [...entries].sort(

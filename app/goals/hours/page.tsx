@@ -46,7 +46,7 @@ export default async function HoursPage() {
           description="Add a metric that counts Hours logged to a goal, and it shows here with the others."
         />
       ) : (
-        <HoursView page={hoursPage(metrics, today)} />
+        <HoursView page={hoursPage(metrics, today)} earliest={earliestProgressDay(today)} />
       )}
     </PageColumn>
   );

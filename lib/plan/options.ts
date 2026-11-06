@@ -76,12 +76,42 @@ export function planOptions(detail: string | null): PlanOption[] {
     found.push({ letter, label: labelOf(rest) });
   }
 
-  if (found.length < 2) return [];
+  if (inOrder(found)) return found;
+  return inlineOptions(detail);
+}
 
-  const sequential = found.every(
-    (option, index) => option.letter.toLowerCase() === String.fromCharCode(97 + index),
+/** Two at the least, lettered in order from A. */
+function inOrder(found: readonly PlanOption[]): boolean {
+  return (
+    found.length >= 2 &&
+    found.every((option, index) => option.letter.toLowerCase() === String.fromCharCode(97 + index))
   );
-  return sequential ? found : [];
+}
+
+/**
+ * `(A) …` inside a paragraph: "Options: (A) Keep the Council. (B) Keep the tab
+ * named Advisors. (C) Run both." Note c7bd5b0d found decision #2829 written
+ * this way, with no buttons under it, because the line-start reading above
+ * found nothing. Only the bracketed form counts here, since a bare "A." in a
+ * sentence is prose, and only when the letters run in order from A in one
+ * case. Each option runs to the next marker, and its label is its first
+ * sentence as above.
+ */
+const INLINE_MARKER = /(?:^|\s)\(([A-Za-z])\)\s+(?=\S)/g;
+
+function inlineOptions(detail: string): PlanOption[] {
+  const marks = [...detail.matchAll(INLINE_MARKER)];
+  const found: PlanOption[] = [];
+  for (const [index, mark] of marks.entries()) {
+    const start = (mark.index ?? 0) + mark[0].length;
+    const end = index + 1 < marks.length ? (marks[index + 1].index ?? detail.length) : detail.length;
+    const rest = detail.slice(start, end).replace(/\s+/g, ' ').trim();
+    if (!rest) return [];
+    found.push({ letter: mark[1], label: labelOf(rest) });
+  }
+  const oneCase = found.every((o) => o.letter === o.letter.toUpperCase()) ||
+    found.every((o) => o.letter === o.letter.toLowerCase());
+  return oneCase && inOrder(found) ? found : [];
 }
 
 /** What a quick answer records: the letter that was chosen, and what it was. */

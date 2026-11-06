@@ -29,7 +29,7 @@ function returnsHref(
   const group = opts?.group ?? 'items';
   if (group === 'orders') params.set('group', 'orders');
   if (opts?.merchant) params.set('merchant', opts.merchant);
-  return `/shopping/returns?${params.toString()}`;
+  return `/shopping/inventory/returns?${params.toString()}`;
 }
 
 /**
@@ -97,7 +97,9 @@ export function ReturnsPageView({
     .join(' · ');
 
   // The heading and its one action, with no line under it: the count at the
-  // foot says what the list holds (plan #1785).
+  // foot says what the list holds (plan #1785). No path above it: Returns
+  // sits under Inventory (plan #1496.8), whose tab is lit, and a path with
+  // its back link took two lines on a phone to say Inventory twice.
   const header = (
     <PageHeader
       title="Returns"

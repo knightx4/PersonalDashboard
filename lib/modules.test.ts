@@ -46,7 +46,12 @@ describe('modulesFor', () => {
 
 describe('switchableModules', () => {
   it('keeps the account to what it switched on', () => {
-    expect(switchableModules(['shopping', 'todo'], true)).toEqual(['shopping', 'todo']);
+    expect(switchableModules(['shopping', 'todo'], true)).toEqual(['chat', 'shopping', 'todo']);
+  });
+
+  it('always offers Chat, which has no checkbox (plan #2748.1)', () => {
+    expect(switchableModules(['todo'], false)).toEqual(['chat', 'todo']);
+    expect(switchableModules(['todo', 'chat'], false)).toEqual(['todo', 'chat']);
   });
 
   it('offers every allowed workspace when the settings are not known yet', () => {
@@ -58,7 +63,7 @@ describe('switchableModules', () => {
     // enabled_modules is a text[] written before the rule existed, so somebody
     // else's row can still name dev. The list is intersected rather than
     // trusted.
-    expect(switchableModules(['shopping', 'dev'], false)).toEqual(['shopping']);
-    expect(switchableModules(['shopping', 'dev'], true)).toEqual(['shopping', 'dev']);
+    expect(switchableModules(['shopping', 'dev'], false)).toEqual(['chat', 'shopping']);
+    expect(switchableModules(['shopping', 'dev'], true)).toEqual(['chat', 'shopping', 'dev']);
   });
 });

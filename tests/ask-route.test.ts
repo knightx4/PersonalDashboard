@@ -11,10 +11,19 @@ import { readAskStream, type LookupWire } from '@/lib/talk/lookups';
 
 const session = vi.fn<() => Promise<{ id: string } | null>>();
 const ask = vi.fn();
+const later: Promise<unknown>[] = [];
+const notify = vi.fn(async () => {});
 
 vi.mock('@/lib/auth/server', () => ({ getUser: () => session() }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/talk/ask-request', () => ({ askDashInRequest: (input: unknown) => ask(input) }));
+vi.mock('next/server', async (load) => ({
+  ...(await load<typeof import('next/server')>()),
+  // What the platform waits on after the response: the answer (plan #2854.4).
+  after: (work: () => Promise<unknown>) => later.push(work()),
+}));
+vi.mock('@/lib/core/auth/server', () => ({ createCoreClient: async () => ({}) }));
+vi.mock('@/lib/talk/reply-state-store', () => ({ notifyPerson: (...args: unknown[]) => notify(...(args as [])) }));
 
 const { POST } = await import('@/app/api/ask/route');
 
@@ -33,6 +42,8 @@ function post(body: unknown, type = 'application/json') {
 beforeEach(() => {
   session.mockReset();
   ask.mockReset();
+  notify.mockClear();
+  later.length = 0;
 });
 
 describe('POST /api/ask', () => {
@@ -94,6 +105,50 @@ describe('POST /api/ask', () => {
     const result = await readAskStream(res.body!, () => {});
     expect(result.error).toBe('That conversation is not there any more.');
     expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('keeps answering when the page goes, and announces the reply (plan #2854.4)', async () => {
+    session.mockResolvedValue({ id: 'u' });
+    let finish: () => void = () => {};
+    let signal: AbortSignal | undefined;
+    ask.mockImplementation(async (input: { signal?: AbortSignal }) => {
+      signal = input.signal;
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      return {
+        conversation: { ref: REF, title: 'q' },
+        turns: [{ id: 'a', role: 'assistant', body: 'All done.', createdAt: '' }],
+        stop: 'answered',
+      };
+    });
+    const leaving = new AbortController();
+    const res = await POST(
+      new Request('http://localhost/api/ask', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ question: 'hi' }),
+        signal: leaving.signal,
+      }),
+    );
+    // The page goes: the stream is dropped and the request ends.
+    await res.body!.cancel();
+    leaving.abort();
+    expect(signal).toBeUndefined();
+    expect(later).toHaveLength(1);
+    finish();
+    await Promise.all(later);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0]).toMatchObject([{}, 'u', { title: 'Dash answered', url: `/chat/dash/${REF}` }]);
+  });
+
+  it('passes Try again through, and announces nothing while the page reads the stream', async () => {
+    session.mockResolvedValue({ id: 'u' });
+    ask.mockResolvedValue({ conversation: { ref: REF, title: 'q' }, turns: [], stop: 'answered' });
+    await readAskStream((await post({ question: 'hi', conversationRef: REF, retry: true })).body!, () => {});
+    expect(ask.mock.calls[0][0]).toMatchObject({ retry: true });
+    await Promise.all(later);
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('says it could not ask when the answer throws', async () => {
