@@ -6,6 +6,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import type { DashHandoff, SessionHandoffInput } from '@/lib/talk/handoff';
 import { startSessionHandoff } from '@/lib/talk/session-handoff';
+import { BOT_HANDOFF_RULES, HAND_TO_BOT, HAND_TO_BOT_TOOL_NAME, type BotPasser } from '@/lib/talk/hand-to-bot';
 import { DASH_MODELS } from './models';
 import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
@@ -382,7 +383,12 @@ export async function answerQuestion(input: {
    * Keeps a hand-off and returns what to tell the model. Absent: every
    * hand-off is refused. `seen` says whether Dash has seen the row it names.
    */
-  handOff?: (input: unknown, seen: DashSeen) => Promise<AskToolResult>;
+  handOff?: (input: unknown, seen: DashSeen, tool: { name: string }) => Promise<AskToolResult>;
+  /**
+   * Offers hand_to_bot (plan #3003.2), with its rules after Ask's: passing a
+   * request to a bot on People, sent to `handOff` by its name.
+   */
+  passToBot?: boolean;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -406,11 +412,14 @@ export async function answerQuestion(input: {
    */
   think?: ThinkDeps | null;
 }): Promise<AskAnswer> {
-  const { page, scope, model, think, execute, ...rest } = input;
+  const { page, scope, model, think, execute, passToBot, ...rest } = input;
+  const voice = think ? thinkVoice(scope) : scopedVoice(scope, model);
   return runDash({
     ...rest,
     execute: think ? (name, args) => (isThinkTool(name) ? runThinkTool(name, args, think) : execute(name, args)) : execute,
-    voice: think ? thinkVoice(scope) : scopedVoice(scope, model),
+    voice: passToBot
+      ? { ...voice, system: `${voice.system}\n\n${BOT_HANDOFF_RULES}`, tools: [...voice.tools, HAND_TO_BOT] }
+      : voice,
     context: {
       surface: 'ask',
       subject: null,
@@ -457,6 +466,11 @@ export type AskStores = {
   attachHandoffs?: (ids: readonly string[], turnId: string) => Promise<void>;
   /** Removes the hand-offs of an answer that was not kept. */
   discardHandoffs?: (ids: readonly string[]) => Promise<void>;
+  /**
+   * Passes a request to a bot on People (plan #3003.2), offered as
+   * hand_to_bot. Absent: Ask Dash cannot pass things to a bot.
+   */
+  passToBot?: BotPasser;
   /** Starts the backup routine on one hand-off and records the outcome; returns its new status. */
   fireHandoff?: (handoff: DashHandoff) => Promise<{ status: DashHandoff['status']; error?: string }>;
   /**
@@ -780,7 +794,7 @@ export async function askDash(
   // question: a session starts once the answer is kept (startHandoffs), and
   // only for a row this answer made.
   const askedTurn = asked[asked.length - 1];
-  const handOff =
+  const sessionHandOff =
     saveHandoff && stores.fireHandoff && askedTurn
       ? async (args: unknown, seen: (table: string, ref: string) => boolean) => {
           const result = await startSessionHandoff(
@@ -797,6 +811,27 @@ export async function askDash(
           );
           if (result.kept?.created) handed.push(result.kept.handoff);
           return result.told;
+        }
+      : undefined;
+  // A request for a bot on People is kept for that bot (plan #3003.2), keyed by the question's words.
+  const passBot = askedTurn ? stores.passToBot : undefined;
+  const handOff =
+    sessionHandOff || passBot
+      ? (args: unknown, seen: (table: string, ref: string) => boolean, tool: { name: string }): Promise<AskToolResult> => {
+          if (tool.name === HAND_TO_BOT_TOOL_NAME && passBot && askedTurn) {
+            return passBot(
+              {
+                fromBot: null,
+                source: { kind: 'ask', conversationId: subject.ref },
+                messageId: askedTurn.id,
+                asked: askedTurn.body,
+              },
+              args,
+              seen,
+            );
+          }
+          if (!sessionHandOff) return Promise.resolve({ ok: false, error: `There is no tool called ${tool.name}.` });
+          return sessionHandOff(args, seen);
         }
       : undefined;
   const discard = async () => {
@@ -836,6 +871,7 @@ export async function askDash(
     write,
     queue,
     handOff,
+    passToBot: Boolean(passBot),
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     now: input.now,

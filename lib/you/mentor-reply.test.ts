@@ -15,6 +15,7 @@ import { sendMentorText } from './mentor-send';
 import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
+import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -581,6 +582,60 @@ describe('replyToMentor', () => {
     expect(JSON.stringify(back[0].content)).toContain('on it');
     expect(outcome.rounds[0]?.ok).toBe(true);
     expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it("passes a request to another bot with hand_to_bot, as this mentor in this one-on-one, and texts 'Passed to Bob.' (plan #3003.2)", async () => {
+    const tables = world();
+    tables['you.advisor_messages'][0].text = 'OK, tell Bob to build it this way';
+    const streamed: { tools: { name: string }[]; system: { text: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const call = {
+      content: [{ type: 'tool_use', id: 'b1', name: 'hand_to_bot', input: { to: 'Bob', summary: 'Fish Audio over ElevenLabs.' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = 'Passed to Bob.';
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? call : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const passToBot = vi.fn(async () => ({ ok: true as const, rows: [], note: passedNote('Bob') }));
+
+    const outcome = await run(tables, stub, { ackAfterMs: 60_000, passToBot }).promise;
+
+    expect(streamed[0].tools.map((t) => t.name)).toContain('hand_to_bot');
+    expect(streamed[0].system.map((b) => b.text).join('\n')).toContain(BOT_HANDOFF_RULES);
+    expect(passToBot).toHaveBeenCalledTimes(1);
+    const [asker, input] = passToBot.mock.calls[0] as unknown as [Record<string, unknown>, unknown];
+    expect(asker).toEqual({
+      fromBot: ADVISOR,
+      source: { kind: 'direct', chatId: CHAT, botKey: 'money' },
+      messageId: tables['you.advisor_messages'][0].id,
+      asked: 'OK, tell Bob to build it this way',
+    });
+    expect(input).toEqual({ to: 'Bob', summary: 'Fish Audio over ElevenLabs.' });
+    const back = streamed[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(JSON.stringify(back[0].content)).toContain('Passed to Bob.');
+    expect(outcome.rounds[0]?.ok).toBe(true);
+    expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it('offers no hand_to_bot without a passer', async () => {
+    const { stub, streamed } = anthropicStub(['Sure.']);
+    await run(world(), stub).promise;
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('hand_to_bot');
   });
 
   it('offers no hand_off without a way to start a session', async () => {
