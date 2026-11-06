@@ -117,7 +117,7 @@ import { PageHeaderSurface } from './page-header-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface, VoiceUsageSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
@@ -12261,6 +12261,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendByModuleSurface open="jobs" />,
+  },
+  {
+    id: 'account-spend-voice',
+    label: 'Account · Spend, spoken replies this month',
+    module: 'learn',
+    width: 'page',
+    render: () => <VoiceUsageSurface />,
+  },
+  {
+    id: 'account-spend-voice-paused',
+    label: 'Account · Spend, spoken replies at the monthly cap',
+    module: 'learn',
+    width: 'page',
+    render: () => <VoiceUsageSurface paused />,
   },
   {
     id: 'usage-day-bars-empty',
