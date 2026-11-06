@@ -13,11 +13,12 @@ import { createPortal } from 'react-dom';
 import Link, { linkVariants } from '@/components/ui/link';
 import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
+import { ChevronDown, History, Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
+import { DashWelcome } from '@/components/talk/dash-welcome';
+import { PersonMark } from '@/components/patterns/messaging';
+import { personInitials, threadHref } from '@/lib/you/chat-threads-model';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
@@ -50,7 +51,9 @@ import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
+  type AskBot,
   type OpenedAsk,
+  askDashBots,
   askDashCosts,
   askDashPageLabel,
   confirmDashChange,
@@ -128,6 +131,11 @@ export type AskSource = ChangePresses & {
     more?: AskMore,
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
+  /**
+   * The bots for the row under the sheet's heading (plan #2976). A source
+   * that leaves it out draws no row.
+   */
+  bots?: typeof askDashBots;
   open: typeof openAskQuestion;
   poll: typeof pollAskQuestion;
   costs: typeof askDashCosts;
@@ -276,6 +284,7 @@ async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> 
 const ACTIONS: AskSource = {
   ask: askLive,
   recent: recentAskQuestions,
+  bots: askDashBots,
   open: openAskQuestion,
   poll: pollAskQuestion,
   costs: askDashCosts,
@@ -1076,6 +1085,8 @@ export function AskDashPanel({
             </div>
           </div>
 
+          <BotSwitcher source={source} onSwitch={onClose} />
+
           {/* A column, so a thread fills it and its box docks at the foot,
               as on the Dash page. */}
           <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
@@ -1131,8 +1142,6 @@ function NewQuestion({
   const [asked, setAsked] = useState(Boolean(ask));
   const handle = useAskDash();
   const draft = handle?.draft;
-  // A starter pressed: the thread is drawn again with it as its question.
-  const [starter, setStarter] = useState<string | null>(null);
   const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
     null,
   );
@@ -1171,7 +1180,7 @@ function NewQuestion({
       {/* Grows to the sheet's foot once a question is out, so the box docks there. */}
       <div className={asked ? 'flex flex-1 flex-col' : undefined}>
         <AskThread
-          key={starter ?? 'new'}
+          key="new"
           id="ask-dash"
           conversationRef={null}
           page={page}
@@ -1181,28 +1190,87 @@ function NewQuestion({
           label={asked ? 'Ask a follow-up' : 'Ask a question'}
           placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'Ask about your money, jobs, todos or notes'}
           dock
-          ask={starter ?? ask}
+          ask={ask}
           initialDraft={draft}
           above={lookingAt}
           onSend={() => setAsked(true)}
         />
       </div>
-      {!asked && !list && (
-        <DashStarters
-          compact
-          workspaces={handle?.workspaces}
-          onAsk={(question) => {
-            setAsked(true);
-            setStarter(question);
-          }}
-        />
-      )}
       {!asked && <Earlier recent={recent} onReopen={onReopen} />}
     </>
   );
 }
 
-/** The last few questions, under a new one, each reopening in the sheet. */
+/**
+ * The row of bots under the sheet's heading (plan #2976): Dash first, as the
+ * one you are talking to, then each bot, the one you messaged last first,
+ * scrolling sideways. A press opens that bot's thread in Chat and closes the
+ * sheet. Nothing is drawn until the bots are read, or when there are none.
+ */
+function BotSwitcher({ source, onSwitch }: { source: AskSource; onSwitch: () => void }) {
+  const [bots, setBots] = useState<AskBot[] | null>(null);
+
+  useEffect(() => {
+    if (!source.bots) return;
+    let live = true;
+    source
+      .bots()
+      .catch(() => ({ bots: [] as AskBot[] }))
+      .then((found) => {
+        if (live) setBots(found.bots);
+      });
+    return () => {
+      live = false;
+    };
+  }, [source]);
+
+  if (!bots || bots.length === 0) return null;
+  return <BotRow bots={bots} onSwitch={onSwitch} />;
+}
+
+/** The row itself, in the order given; exported for tests. */
+export function BotRow({ bots, onSwitch }: { bots: readonly AskBot[]; onSwitch: () => void }) {
+  return (
+    <nav aria-label="Switch to a bot" className="border-b border-border">
+      <ul className="flex items-start gap-1 overflow-x-auto px-2 py-2 [scrollbar-width:none]">
+        <li className="shrink-0">
+          <span
+            aria-current="page"
+            className="flex w-[4.5rem] flex-col items-center gap-1 rounded-control px-1 py-1"
+          >
+            <span className="rounded-full ring-2 ring-accent ring-offset-2 ring-offset-raised">
+              <ModuleMark module="dash" size="lg" />
+            </span>
+            <span className="w-full text-center text-small font-medium leading-tight text-ink">Dash</span>
+          </span>
+        </li>
+        {bots.map((bot) => (
+          <li key={bot.key} className="shrink-0">
+            <Link
+              href={threadHref(bot.key)}
+              onClick={onSwitch}
+              aria-label={bot.unread ? `Chat with ${bot.name}, unread` : `Chat with ${bot.name}`}
+              className="press flex w-[4.5rem] flex-col items-center gap-1 rounded-control px-1 py-1 transition-colors duration-quick hover:bg-sunken"
+            >
+              <span className="relative">
+                <PersonMark initials={personInitials(bot.name)} colour={bot.colour} photo={bot.photo} />
+                {bot.unread && (
+                  <span className="absolute right-0 top-0 size-2.5 rounded-full bg-accent ring-2 ring-raised" />
+                )}
+              </span>
+              <span className="line-clamp-2 w-full break-words text-center text-small leading-tight text-ink-muted">{bot.name}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * The last few questions, under a new one, folded into one button (plan
+ * #2976); open, each reopens in the sheet.
+ */
 function Earlier({
   recent,
   onReopen,
@@ -1211,23 +1279,31 @@ function Earlier({
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const now = useClockNow();
+  const [open, setOpen] = useState(false);
   if (!recent) return null;
   if (recent.error) return <p className="text-ui text-danger">{recent.error}</p>;
   // A first visit has nothing earlier, and says nothing about it.
   if (recent.conversations.length === 0) return null;
   return (
-    <section aria-labelledby="ask-dash-earlier" className="pt-2">
-      <SectionHeading
-        as="h3"
-        id="ask-dash-earlier"
-        title="Earlier questions"
-        action={
-          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
-            All of them
-          </Link>
-        }
-      />
-      <ul className="-mx-2 mt-1 space-y-0.5">
+    <section className="pt-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="ask-dash-earlier"
+        onClick={() => setOpen((was) => !was)}
+        className="press -mx-2 flex min-h-11 items-center gap-2 rounded-control px-2 text-ui text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink sm:min-h-9"
+      >
+        <History className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+        Earlier questions
+        <ChevronDown
+          className={cn('size-4 shrink-0 transition-transform duration-quick', open && 'rotate-180')}
+          strokeWidth={1.75}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <div id="ask-dash-earlier">
+          <ul className="-mx-2 mt-1 space-y-0.5">
         {recent.conversations.map((conversation) => (
           <li key={conversation.id}>
             <button
@@ -1245,7 +1321,15 @@ function Earlier({
             </button>
           </li>
         ))}
-      </ul>
+          </ul>
+          <Link
+            href="/chat/dash"
+            className={cn(linkVariants({ tone: 'inline' }), 'press-area mt-1 inline-block text-small')}
+          >
+            All of them
+          </Link>
+        </div>
+      )}
     </section>
   );
 }
