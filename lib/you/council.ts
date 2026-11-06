@@ -21,16 +21,20 @@ import {
   REPLY_STALE_AFTER_MS,
   unreadNotes,
   UNREAD_MAX,
+  watchOf,
   type CouncilChat,
   type CouncilMemory,
   type CouncilMessage,
   type CouncilNote,
   type Mentor,
+  type MentorWatch,
   type Reaction,
 } from '@/lib/you/council-model';
 import { unreadTextsOf, type TextRow, type TextThread } from '@/lib/you/council-texts';
 import { canTalkOf } from '@/lib/you/people-cards-model';
 import { dueBriefLines, loadReachOutDue, readRulePeople, type DuePerson, type SchemaReader } from '@/lib/you/reach-out-due';
+import type { AskContext } from '@/lib/ask/db';
+import { commitWatchRuns, mergeDue, runDueWatches, type WatchCommit } from '@/lib/you/advisor-watch-run';
 
 export * from '@/lib/you/council-model';
 
@@ -149,6 +153,8 @@ export type MentorPage = {
   chat: CouncilChat | null;
   messages: CouncilMessage[];
   memory: CouncilMemory[];
+  /** Watches Dash wrote for this mentor that run, are paused or were stopped (plan #3030.1.4). */
+  watches: MentorWatch[];
 };
 
 /** One mentor's page by key, or null when no such mentor is theirs. */
@@ -162,7 +168,7 @@ export async function loadMentorPage(
   const advisor = roster.find((a) => a.key === key);
   if (!advisor) return null;
 
-  const [brainRow, notes, chat, memory] = await Promise.all([
+  const [brainRow, notes, chat, memory, watches] = await Promise.all([
     client.from('board_advisors').select('brain').eq('user_id', userId).eq('id', advisor.id).maybeSingle(),
     client
       .from('council_notes')
@@ -187,8 +193,16 @@ export async function loadMentorPage(
       .is('retired_at', null)
       .order('created_at', { ascending: false })
       .limit(60),
+    client
+      .from('advisor_watches')
+      .select('id, about, sends_when, every_days, status, last_run_at, last_error')
+      .eq('user_id', userId)
+      .eq('advisor_id', advisor.id)
+      .in('status', ['active', 'paused', 'stopped'])
+      .order('created_at', { ascending: false })
+      .limit(40),
   ]);
-  for (const r of [brainRow, notes, chat, memory]) {
+  for (const r of [brainRow, notes, chat, memory, watches]) {
     if (r.error) throw new Error(`Reading ${advisor.name} failed: ${r.error.message}`);
   }
   const chatRow = chat.data ? chatOf(chat.data as Record<string, unknown>) : null;
@@ -225,7 +239,29 @@ export async function loadMentorPage(
       const m = memoryOf(row as Record<string, unknown>);
       return m ? [m] : [];
     }),
+    watches: (watches.data ?? []).flatMap((row) => {
+      const w = watchOf(row as Record<string, unknown>);
+      return w ? [w] : [];
+    }),
   };
+}
+
+/** Stop a watch: it runs nothing from now on. Only a running or paused one of the person's own changes. */
+export async function stopWatch(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+  now: number = Date.now(),
+): Promise<void> {
+  const { data, error } = await client
+    .from('advisor_watches')
+    .update({ status: 'stopped', decided_at: new Date(now).toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .in('status', ['active', 'paused'])
+    .select('id');
+  if (error) throw new Error(`Stopping the watch failed: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('That watch is not running.');
 }
 
 // ---------------------------------------------------------------------------
@@ -503,6 +539,27 @@ export function decideAdviceRun(input: {
   /** The person's quiet hours, when no mentor texts them. */
   quiet?: boolean;
 }): AdviceDecision {
+  const gate = roundGate(input);
+  if (!gate.start) return gate;
+  if ((input.episodesDue ?? 0) > 0) return { start: true };
+  if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} mentor texts are unread` };
+  if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has sent its texts for today' };
+  if (input.free <= 0 && (input.due ?? 0) <= 0) {
+    return { start: false, skipped: 'nobody is free to text: every mentor without a rule has an unread text, and nobody is due by their rule' };
+  }
+  return { start: true };
+}
+
+/**
+ * The first three of decideAdviceRun's checks: no round open, none in the
+ * last day, not quiet hours. The watches Dash wrote (plan #3030.1.3) run only
+ * past it, so a failing one is not counted on every five-minute tick.
+ */
+export function roundGate(input: {
+  now: number;
+  latest: { status: string; requestedAt: string } | null;
+  quiet?: boolean;
+}): AdviceDecision {
   const asked = input.latest ? Date.parse(input.latest.requestedAt) : NaN;
   if (input.latest && (input.latest.status === 'queued' || input.latest.status === 'running')) {
     if (!Number.isFinite(asked) || input.now - asked <= ADVICE_STALE_AFTER_MS) {
@@ -513,12 +570,6 @@ export function decideAdviceRun(input: {
     return { start: false, skipped: 'a council round was asked for in the last day' };
   }
   if (input.quiet) return { start: false, skipped: 'it is quiet hours for the person' };
-  if ((input.episodesDue ?? 0) > 0) return { start: true };
-  if (input.unread >= UNREAD_MAX) return { start: false, skipped: `${input.unread} mentor texts are unread` };
-  if (input.writtenToday >= NOTES_PER_DAY) return { start: false, skipped: 'the council has sent its texts for today' };
-  if (input.free <= 0 && (input.due ?? 0) <= 0) {
-    return { start: false, skipped: 'nobody is free to text: every mentor without a rule has an unread text, and nobody is due by their rule' };
-  }
   return { start: true };
 }
 
@@ -537,6 +588,11 @@ export async function maybeStartAdviceRun(input: {
    * rule stay silent.
    */
   db?: SchemaReader;
+  /**
+   * The owner's lookup context, to run the watches Dash wrote
+   * (you.advisor_watches, plan #3030.1.3). Without it they do not run.
+   */
+  ask?: AskContext;
 }): Promise<{ skipped: string } | { started: true; runId: string }> {
   const { client, userId } = input;
   const now = input.now ?? Date.now();
@@ -584,13 +640,22 @@ export async function maybeStartAdviceRun(input: {
   const ruled = new Set(reach.people.map((p) => p.advisorId));
   const free = ((roster.data ?? []) as { id: string }[]).filter((r) => !unreadBy.has(r.id) && !ruled.has(r.id)).length;
   const latestRow = latest.data as { status: string; requested_at: string } | null;
+  const latestRun = latestRow ? { status: latestRow.status, requestedAt: latestRow.requested_at } : null;
+  // The watches Dash wrote run only when a round could start (plan #3030.1.3).
+  let due = reach.due;
+  let pending: WatchCommit[] = [];
+  if (input.ask && roundGate({ now, latest: latestRun, quiet: input.quiet }).start) {
+    const watched = await runDueWatches({ you: client, ask: input.ask, userId, unreadBy, now });
+    due = mergeDue(due, watched.due);
+    pending = watched.pending;
+  }
   const decision = decideAdviceRun({
     now,
-    latest: latestRow ? { status: latestRow.status, requestedAt: latestRow.requested_at } : null,
+    latest: latestRun,
     unread: (unread.data ?? []).length,
     writtenToday: today.count ?? 0,
     free,
-    due: reach.due.length,
+    due: due.length,
     quiet: input.quiet,
     episodesDue: ((episodes.data ?? []) as { ended_at: string; summarised_at: string | null }[]).filter((e) =>
       episodeDue({ endedAt: e.ended_at, summarisedAt: e.summarised_at }, now),
@@ -603,12 +668,21 @@ export async function maybeStartAdviceRun(input: {
     userId,
     kind: 'advice',
     routine: input.routine,
-    brief: (runId) => adviceBrief({ runId, userId, due: reach.due }),
+    brief: (runId) => adviceBrief({ runId, userId, due }),
     staleAfterMs: ADVICE_STALE_AFTER_MS,
     now,
     fetch: input.fetch,
   });
-  if (started.started) return started;
+  if (started.started) {
+    // The rows are in the brief now, so the watches' runs can be kept.
+    try {
+      await commitWatchRuns(client, userId, pending);
+    } catch (error) {
+      // Unkept, the same rows are listed again at the next round.
+      console.error('council round: keeping the watches failed', error instanceof Error ? error.message : error);
+    }
+    return started;
+  }
   if (started.reason === 'running') return { skipped: 'a council round is already queued or running' };
   if (started.reason === 'no_routine') return { skipped: 'the board routine is not set up on this deployment' };
   throw new Error(`The council round did not start: ${started.error}`);

@@ -521,6 +521,7 @@ import {
   ChatGroupSurface,
   ChatPeopleSurface,
   ChatThreadChangesSurface,
+  ChatThreadWatchSurface,
   ChatThreadWorkingSurface,
   ChatThreadBuildsSurface,
   ChatThreadSurface,
@@ -9239,6 +9240,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadChangesSurface />,
+  },
+  {
+    /* Watches Dash wrote when asked to text about something no fixed watch reads (plan #3030.1.2): one approved, and one waiting with what it checks, how often, the tables it reads, a sample text, and Approve and Decline. */
+    id: 'chat-people-thread-watch',
+    label: 'Chat · A thread, a watch waiting for your OK',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadWatchSurface />,
   },
   {
     /* The live card (plan #2854.3): you asked for two things, both are made and the reply is still coming, so a small card at the foot says the newest, where the typing would be. */

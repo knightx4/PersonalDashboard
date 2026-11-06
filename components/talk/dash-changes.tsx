@@ -19,6 +19,8 @@ import { DeleteDialog } from './delete-dialog';
 import { PaidCard, type PaidChange } from './paid-card';
 import { LiveStatus } from './live-card';
 import { buildLine, buildRunId, type BuildRun } from '@/lib/you/live-cards';
+import type { WatchDecision } from '@/lib/you/watch-card-model';
+import { WatchProposal } from './watch-card';
 
 /**
  * The changes Dash made or proposed in one answer, drawn under it (plan
@@ -40,6 +42,12 @@ export type ChangePresses = {
   /** The toast's Undo on Decline (plan #1957.3): proposed again. */
   reopen?: (id: string) => Promise<ChangeOutcome>;
   undo: (id: string) => Promise<ChangeOutcome>;
+  /**
+   * Approve or decline the watch a set_reach_out change proposed, by the
+   * change's id (plan #3030.1.2). A People thread hands it in; left out, a
+   * watch's card says what it is with no presses.
+   */
+  watch?: (id: string, decision: WatchDecision) => Promise<ChangeOutcome>;
 };
 
 /**
@@ -86,10 +94,13 @@ export function DashChanges({
   // In a People thread a finished change is one quiet line under its bubble
   // (plan #2854.2.2); what still waits on a press, or was declined or taken
   // back, keeps a card, in the fill of their bubbles.
-  const lines = inThread ? free.filter((change) => change.status === 'done' && !(builds && buildRunId(change))) : [];
+  // A watch Dash wrote keeps its card (plan #3030.1.2): it waits on Approve, then says where it stands.
+  const lines = inThread ? free.filter((change) => change.status === 'done' && !(builds && buildRunId(change)) && !change.watch) : [];
   const cards = inThread ? free.filter((change) => !lines.includes(change)) : free;
-  const verb = cards.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
-  const row = (change: DashChange, line = false) => (
+  const verb = cards.some((change) => change.status === 'proposed' || change.watch?.status === 'proposed') ? 'proposed' : 'made';
+  const row = (change: DashChange, line = false) => change.watch ? (
+    <WatchProposal change={change} watch={change.watch} press={presses.watch} onChanged={onChanged} />
+  ) : (
     <DashChangeRow
       change={change}
       presses={presses}
@@ -128,7 +139,7 @@ export function DashChanges({
   );
 }
 
-type Press = Exclude<keyof ChangePresses, 'reopen'>;
+type Press = Exclude<keyof ChangePresses, 'reopen' | 'watch'>;
 
 /**
  * One change and its buttons. Keeps the change it was given until a press

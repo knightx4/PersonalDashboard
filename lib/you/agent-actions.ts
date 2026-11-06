@@ -125,6 +125,7 @@ export const youActions: ModuleActions = {
     paneThread: none('page', 'Reads one chat for the Ask Dash sheet, as its Messages page does; it serves the sheet.'),
     readThread: none('own', "Having a thread open is the person's own reading of what a mentor wrote."),
     retryReply: none('own', "Asking a mentor to answer again after a failed reply is the person's own press on their thread (plan #2854.4)."),
+    decideThreadWatch: none('theirs', "Approving or declining a watch Dash wrote for a mentor is the person's word on what Dash may run for them (plan #3030.1.2)."),
     threadChanges: none('page', 'Reads the cards for what a person did in a thread; it serves the page (plan #2854.2.1).'),
     threadBuilds: none('page', 'Reads where the builds confirmed in a thread stand; it serves the page (plan #2854.3).'),
     savePersonCard: none(
@@ -166,6 +167,7 @@ export const youActions: ModuleActions = {
       "Sends the person's own message to a mentor and starts a Dash session on the board routine to write the reply.",
     ),
     setCommitment: none('own', 'Saying a commitment made to a mentor is done is the person\'s own account of what they did.'),
+    stopMentorWatch: none('theirs', "Stopping a watch Dash wrote for a mentor is the person's word on what Dash may keep running (plan #3030.1.4)."),
     forgetMentorMemory: none('theirs', 'Having a mentor forget something is the person correcting what Dash noted about them.'),
   },
   'app/you/council/actions.ts': {

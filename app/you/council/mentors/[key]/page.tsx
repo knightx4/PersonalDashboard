@@ -11,6 +11,7 @@ import {
   readMentor,
   sendMentorMessage,
   setCommitment,
+  stopMentorWatch,
 } from '../../council-actions';
 import { loadAvatarSprite } from '@/lib/you/advisor-avatar-draw';
 import { AdvisorAvatars } from '../../advisor-avatar';
@@ -63,6 +64,7 @@ export default async function Page({
         chat={page.chat}
         messages={page.messages}
         memory={page.memory}
+        watches={page.watches}
         about={aboutNote && aboutNote.advisorId === page.mentor.id ? aboutNote : null}
         timezone={settings.timezone}
         now={now}
@@ -82,6 +84,7 @@ export default async function Page({
           send: sendMentorMessage,
           commitment: setCommitment,
           forget: forgetMentorMemory,
+          stopWatch: stopMentorWatch,
         }}
       />
     </AdvisorAvatars>
