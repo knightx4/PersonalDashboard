@@ -1,19 +1,21 @@
 import type { ModuleId } from '@/lib/modules';
 
 /**
- * Checking for new mail now, from the account menu (plan #3019).
+ * Checking for new mail now, from the account menu (plans #3019, #3019.1).
  *
  * The rules the menu and its route share, with no database in them, so a test
  * can read them. The route that starts a check and reads its state is
  * app/api/inbox/check; the section that draws it is
  * components/shell/mail-check.tsx.
  *
- * There is one sync, and it serves every workspace: one pass over each
- * connected mailbox offers every message to each workspace's linker
- * (inngest/core/inbox-sync.ts). So a workspace's button and Check all start
- * the same pass, the one the daily job runs, and differ in which result the
- * menu puts first. Narrowing the pass to one workspace would move the
- * mailbox's history cursor past mail the others never saw.
+ * The menu has a button per connected mailbox, and Check all. A sync already
+ * runs one mailbox at a time and serves every workspace: one pass over the
+ * mailbox offers each message to every workspace's linker
+ * (inngest/core/inbox-sync.ts; startIncrementalSync takes the mailbox). So a
+ * mailbox's button starts the pass the daily job runs, for that mailbox
+ * alone, and Check all starts it for each. Narrowing a pass to one workspace
+ * would move the mailbox's history cursor past mail the others never saw,
+ * which is why the menu has no workspace buttons.
  */
 
 /** What one linker made of a job's messages, added up over its batches. */
@@ -26,7 +28,8 @@ export type LinkedCounts = Record<string, LinkedCount>;
 type FanOutEntry = { claimed: number; linked: number; failed: number } | { error: string };
 
 /**
- * A workspace that reads mail, and the linkers that read it for it.
+ * A workspace that reads mail, and the linkers that read it for it. The menu
+ * uses these to say what a mailbox's check found for each workspace.
  *
  * Plain data with no functions in it, so the gallery (a server page) can hand
  * it to the menu, which is a client component.
@@ -35,22 +38,20 @@ export type MailWorkspace = {
   id: ModuleId;
   label: string;
   domains: readonly string[];
-  /** What its linked records are, for one and for many: "1 order updated", "2 orders updated". */
-  linkedAs: readonly [one: string, many: string];
 };
 
 /**
- * Every workspace with a linker in the sync, in the order the menu lists them.
+ * Every workspace with a linker in the sync, in the order results name them.
  *
  * News is not here: newsletters reach it by Mailgun forwarding them as they
  * arrive (app/api/news/inbound), so there is nothing in Gmail for it to check.
  * The mailroom linker is core's own sorting and belongs to no workspace.
  */
 export const MAIL_WORKSPACES: readonly MailWorkspace[] = [
-  { id: 'jobs', label: 'Jobs', domains: ['jobs'], linkedAs: ['linked to a role', 'linked to a role'] },
-  { id: 'shopping', label: 'Shopping', domains: ['commerce'], linkedAs: ['order updated', 'orders updated'] },
-  { id: 'finances', label: 'Finances', domains: ['recurring'], linkedAs: ['bill filed', 'bills filed'] },
-  { id: 'todo', label: 'Todo', domains: ['appointments', 'replies'], linkedAs: ['added to Todo', 'added to Todo'] },
+  { id: 'jobs', label: 'Jobs', domains: ['jobs'] },
+  { id: 'shopping', label: 'Shopping', domains: ['commerce'] },
+  { id: 'finances', label: 'Finances', domains: ['recurring'] },
+  { id: 'todo', label: 'Todo', domains: ['appointments', 'replies'] },
 ];
 
 /** The mail workspaces this account has switched on, in the menu's order. */
@@ -58,7 +59,7 @@ export function mailWorkspacesFor(enabled: readonly ModuleId[]): MailWorkspace[]
   return MAIL_WORKSPACES.filter((w) => enabled.includes(w.id));
 }
 
-/** How long after a check starts the next may start. */
+/** How long after a mailbox's check starts the next check of it may start. */
 export const CHECK_COOLDOWN_MS = 60_000;
 
 /** A queued or running job older than this is taken as dead (startIncrementalSync's rule). */
@@ -103,23 +104,6 @@ export function addFanOut(prev: unknown, batch: Record<string, FanOutEntry> | un
   return out;
 }
 
-/** Add several jobs' counts together: one check runs a job per mailbox. */
-export function sumLinked(all: readonly unknown[]): LinkedCounts {
-  const out: LinkedCounts = {};
-  for (const one of all) {
-    for (const [domain, c] of Object.entries(readLinked(one))) {
-      const was = out[domain] ?? { claimed: 0, linked: 0, failed: 0, errors: 0 };
-      out[domain] = {
-        claimed: was.claimed + c.claimed,
-        linked: was.linked + c.linked,
-        failed: was.failed + c.failed,
-        errors: was.errors + c.errors,
-      };
-    }
-  }
-  return out;
-}
-
 /** One workspace's share of a check. */
 export function workspaceCount(workspace: MailWorkspace, linked: LinkedCounts): LinkedCount {
   const total = { claimed: 0, linked: 0, failed: 0, errors: 0 };
@@ -134,14 +118,48 @@ export function workspaceCount(workspace: MailWorkspace, linked: LinkedCounts): 
   return total;
 }
 
-/** The result line beside a workspace: "2 new, 1 linked to a role", or "Nothing new". */
-export function resultLine(workspace: MailWorkspace, c: LinkedCount): string {
+/**
+ * The longest line under a mailbox that fits the menu's narrowest width (18rem
+ * less its padding) in small text, in characters. Past it the breakdown is
+ * left off, so the line never ends in a cut workspace name.
+ */
+export const MAILBOX_LINE_FITS = 46;
+
+/**
+ * The line under a mailbox: when it was checked, then what the check found,
+ * with the per-workspace breakdown only when the whole line fits.
+ */
+export function mailboxLine(when: string, workspaces: readonly MailWorkspace[], linked: LinkedCounts | null): string {
+  if (!linked) return when;
+  const [head, breakdown] = mailboxResult(workspaces, linked).split(' · ');
+  const short = `${when} · ${head}`;
+  if (!breakdown) return short;
+  const full = `${short} · ${breakdown}`;
+  return full.length <= MAILBOX_LINE_FITS ? full : short;
+}
+
+/**
+ * What a mailbox's check found: "3 new · 2 in Jobs, 1 in Shopping", or "Nothing
+ * new". The breakdown names each switched-on workspace that took mail, in the
+ * menu's order.
+ */
+export function mailboxResult(workspaces: readonly MailWorkspace[], linked: LinkedCounts): string {
+  let claimed = 0;
+  let failed = 0;
+  let errors = 0;
   const parts: string[] = [];
-  if (c.claimed > 0) parts.push(`${c.claimed} new`);
-  if (c.linked > 0) parts.push(`${c.linked} ${workspace.linkedAs[c.linked === 1 ? 0 : 1]}`);
-  if (c.failed > 0) parts.push(`${c.failed} could not be read`);
-  if (c.errors > 0 && parts.length === 0) return 'Could not finish sorting the mail';
-  return parts.length === 0 ? 'Nothing new' : parts.join(', ');
+  for (const workspace of workspaces) {
+    const c = workspaceCount(workspace, linked);
+    claimed += c.claimed;
+    failed += c.failed;
+    errors += c.errors;
+    if (c.claimed > 0) parts.push(`${c.claimed} in ${workspace.label}`);
+  }
+  if (claimed === 0 && failed === 0) return errors > 0 ? 'Could not finish sorting the mail' : 'Nothing new';
+  const head = [claimed > 0 ? `${claimed} new` : null, failed > 0 ? `${failed} could not be read` : null]
+    .filter(Boolean)
+    .join(', ');
+  return parts.length > 0 ? `${head} · ${parts.join(', ')}` : head;
 }
 
 /** When the next check may start, or null when it may start now. */
@@ -151,8 +169,13 @@ export function nextCheckAt(lastStartedAt: string | null, now: number): string |
   return Number.isFinite(next) && next > now ? new Date(next).toISOString() : null;
 }
 
-/** What went wrong with a check, said for the person. */
-export type MailProblem = { kind: 'reconnect' | 'quota' | 'failed' | 'importing'; message: string; email?: string };
+/**
+ * What went wrong with a mailbox, said for the person. The line sits under
+ * the mailbox's address, so it does not repeat it.
+ */
+export type MailProblem = { kind: 'reconnect' | 'quota' | 'failed' | 'importing'; message: string };
+
+const RECONNECT: MailProblem = { kind: 'reconnect', message: 'Gmail stopped letting the app read this mailbox.' };
 
 /**
  * A sync job's stored error in plain words.
@@ -161,36 +184,40 @@ export type MailProblem = { kind: 'reconnect' | 'quota' | 'failed' | 'importing'
  * person can act on are a token Google no longer honours, which takes a
  * reconnect, and Gmail's rate limit, which takes waiting.
  */
-export function plainProblem(raw: string, email?: string): MailProblem {
+export function plainProblem(raw: string): MailProblem {
   const text = raw.toLowerCase();
   if (/invalid_grant|unauthori[sz]ed|401|token (has been )?(expired|revoked)|reconnect|consent/.test(text)) {
-    return {
-      kind: 'reconnect',
-      email,
-      message: `Gmail stopped letting the app read ${email ?? 'this mailbox'}. Reconnect it to check again.`,
-    };
+    return RECONNECT;
   }
   if (/quota|rate ?limit|429|too many requests|user-rate/.test(text)) {
-    return { kind: 'quota', email, message: 'Gmail is limiting how fast it answers. Try again in a few minutes.' };
+    return { kind: 'quota', message: 'Gmail is limiting how fast it answers. Try again in a few minutes.' };
   }
-  return {
-    kind: 'failed',
-    email,
-    message: `The last check of ${email ?? 'your mail'} stopped part way: ${raw.slice(0, 140)}`,
-  };
+  return { kind: 'failed', message: `The last check stopped part way: ${raw.slice(0, 140)}` };
 }
+
+/** One connected mailbox, as its row in the menu draws it. */
+export type MailboxCheck = {
+  id: string;
+  email: string;
+  /** Active and past its first import, so a check can run at all. */
+  checkable: boolean;
+  /** A check of this mailbox, pressed or scheduled, is under way. */
+  running: boolean;
+  /** The last time this mailbox finished a sync, scheduled or pressed. */
+  lastCheckedAt: string | null;
+  /** When this mailbox may be checked again, or null when it may now. */
+  nextAllowedAt: string | null;
+  /** What its latest finished check found. Null before any recorded result. */
+  linked: LinkedCounts | null;
+  problem: MailProblem | null;
+};
 
 /** What the menu needs to draw the section. */
 export type MailCheckStatus = {
-  /** Mailboxes connected, whatever their state. None draws the Connect Gmail link. */
-  mailboxes: number;
+  /** Every connected mailbox, whatever its state. None draws the Connect Gmail link. */
+  mailboxes: MailboxCheck[];
+  /** Any mailbox is being checked. */
   running: boolean;
-  /** The last time any mailbox finished a sync, scheduled or pressed. */
-  lastCheckedAt: string | null;
-  nextAllowedAt: string | null;
-  /** What the latest check of each mailbox found, added up. Null before any recorded result. */
-  linked: LinkedCounts | null;
-  problems: MailProblem[];
 };
 
 /** A sync job as the route reads it. */
@@ -212,11 +239,54 @@ export type CheckAccount = {
   backfill_completed_at: string | null;
 };
 
+/** A mailbox a press would start a check of now. */
+export function canStart(mailbox: MailboxCheck): boolean {
+  return mailbox.checkable && !mailbox.running && !mailbox.nextAllowedAt;
+}
+
+function mailboxCheck(account: CheckAccount, job: CheckJob | undefined, now: number): MailboxCheck {
+  const base: MailboxCheck = {
+    id: account.id,
+    email: account.email_address,
+    checkable: false,
+    running: false,
+    lastCheckedAt: account.last_synced_at,
+    nextAllowedAt: null,
+    linked: null,
+    problem: null,
+  };
+  if (account.status === 'needs_reauth') return { ...base, problem: RECONNECT };
+  if (account.status !== 'active') {
+    return { ...base, problem: { kind: 'reconnect', message: 'This mailbox stopped syncing.' } };
+  }
+  if (!account.backfill_completed_at) {
+    return {
+      ...base,
+      problem: { kind: 'importing', message: 'Still on its first import. Checking starts once that finishes.' },
+    };
+  }
+  if (!job) return { ...base, checkable: true };
+
+  const running =
+    (job.status === 'queued' || job.status === 'running') &&
+    now - new Date(job.updated_at).getTime() < RUNNING_STALE_MS;
+  const finished = job.status === 'completed' || job.status === 'failed';
+  return {
+    ...base,
+    checkable: true,
+    running,
+    nextAllowedAt: nextCheckAt(job.started_at ?? job.created_at, now),
+    linked: finished ? readLinked(job.linked) : null,
+    problem: job.status === 'failed' && job.error ? plainProblem(job.error) : null,
+  };
+}
+
 /**
  * The section's state from the account's mailboxes and their recent jobs.
  *
- * `jobs` is newest first. For each mailbox the latest incremental job is the
- * latest check; its counts make the results and its error the problem.
+ * `jobs` is newest first. For each mailbox the latest incremental job is its
+ * latest check, scheduled or pressed; its counts make the result and its
+ * error the problem.
  */
 export function mailCheckStatus(
   accounts: readonly CheckAccount[],
@@ -225,56 +295,44 @@ export function mailCheckStatus(
 ): MailCheckStatus {
   const latest = new Map<string, CheckJob>();
   for (const job of jobs) if (!latest.has(job.email_account_id)) latest.set(job.email_account_id, job);
+  const mailboxes = accounts.map((account) => mailboxCheck(account, latest.get(account.id), now));
+  return { mailboxes, running: mailboxes.some((m) => m.running) };
+}
 
-  const problems: MailProblem[] = [];
-  let running = false;
-  let lastCheckedAt: string | null = null;
-  let lastStartedAt: string | null = null;
-  const finished: unknown[] = [];
+/** What a press asks the route to do. */
+export type CheckPlan =
+  /** Start a check of these mailboxes; `joined` when others asked for are already under way. */
+  | { kind: 'start'; ids: string[]; joined: boolean }
+  /** Nothing to start: every mailbox asked for is already being checked. */
+  | { kind: 'joined' }
+  /** Nothing to start: checked under a minute ago. */
+  | { kind: 'wait'; message: string }
+  /** Nothing that can be checked: not connected, needing a reconnect, or importing. */
+  | { kind: 'none'; message: string };
 
-  for (const account of accounts) {
-    if (account.last_synced_at && (!lastCheckedAt || account.last_synced_at > lastCheckedAt)) {
-      lastCheckedAt = account.last_synced_at;
-    }
-    if (account.status === 'needs_reauth') {
-      problems.push({
-        kind: 'reconnect',
-        email: account.email_address,
-        message: `Gmail stopped letting the app read ${account.email_address}. Reconnect it to check again.`,
-      });
-      continue;
-    }
-    if (account.status !== 'active') continue;
-    if (!account.backfill_completed_at) {
-      problems.push({
-        kind: 'importing',
-        email: account.email_address,
-        message: `${account.email_address} is still on its first import. Checking starts once that finishes.`,
-      });
-      continue;
-    }
-    const job = latest.get(account.id);
-    if (!job) continue;
-    const started = job.started_at ?? job.created_at;
-    if (!lastStartedAt || started > lastStartedAt) lastStartedAt = started;
-    const live =
-      (job.status === 'queued' || job.status === 'running') &&
-      now - new Date(job.updated_at).getTime() < RUNNING_STALE_MS;
-    if (live) running = true;
-    else if (job.status === 'completed') finished.push(job.linked);
-    else if (job.status === 'failed' && job.error) {
-      finished.push(job.linked);
-      problems.push(plainProblem(job.error, account.email_address));
-    }
+/**
+ * Which mailboxes a press starts. A mailbox's button names it; Check all
+ * names none and takes every mailbox that can start, joining those already
+ * under way.
+ */
+export function planCheck(status: MailCheckStatus, mailboxId: string | null): CheckPlan {
+  const asked = mailboxId ? status.mailboxes.filter((m) => m.id === mailboxId) : status.mailboxes;
+  if (asked.length === 0) return { kind: 'none', message: 'That mailbox is not connected.' };
+  const checkable = asked.filter((m) => m.checkable);
+  if (checkable.length === 0) {
+    return {
+      kind: 'none',
+      message: mailboxId ? (asked[0].problem?.message ?? 'This mailbox cannot be checked now.') : 'No mailbox can be checked now.',
+    };
   }
-
-  const linked = finished.length > 0 ? sumLinked(finished) : null;
+  const ids = checkable.filter(canStart).map((m) => m.id);
+  const joined = checkable.some((m) => m.running);
+  if (ids.length > 0) return { kind: 'start', ids, joined };
+  if (joined) return { kind: 'joined' };
   return {
-    mailboxes: accounts.length,
-    running,
-    lastCheckedAt,
-    nextAllowedAt: nextCheckAt(lastStartedAt, now),
-    linked,
-    problems,
+    kind: 'wait',
+    message: mailboxId
+      ? `${asked[0].email} was checked under a minute ago.`
+      : 'Every mailbox was checked under a minute ago.',
   };
 }
