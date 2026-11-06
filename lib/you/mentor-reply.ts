@@ -38,6 +38,7 @@ import {
   wholeBubbles,
 } from '@/lib/you/mentor-reply-model';
 import { keepRenewing, waitForQuiet, waitingLast } from '@/lib/you/reply-turn';
+import type { DashChange } from '@/lib/talk/changes';
 
 export * from '@/lib/you/mentor-reply-model';
 
@@ -115,6 +116,30 @@ export type MentorReplyInput = {
   sleep?: (ms: number) => Promise<void>;
   /** For tests: ACK_AFTER_MS. */
   ackAfterMs?: number;
+};
+
+/**
+ * A turn that answers a request another bot passed on (plan #3003.3), not
+ * a text of the person's. The hand-off's line in the thread is the text the
+ * reply hangs from: its changes are kept under it, with their Undo.
+ */
+export type MentorHandoffTurn = {
+  /** The receiving bot's line in its own thread saying what it was passed (you.advisor_messages). */
+  anchor: { id: string; createdAt: string };
+  /** The hand-off as the reply's last turn: the person's words and the sender's packet. */
+  brief: string;
+  /** What the bot is told about acting on a hand-off, after its own rules. */
+  rules: string;
+};
+
+/** What a hand-off turn did: the reply's words and every change it made or proposed. */
+export type HandoffReplyOutcome = {
+  ok: boolean;
+  /** Why it did not reply, when it did not. */
+  error: string | null;
+  /** The reply's text, bubbles joined by blank lines; empty when none was written. */
+  reply: string;
+  changes: DashChange[];
 };
 
 export type MentorReplyOutcome = {
@@ -278,10 +303,55 @@ export async function replyToMentor(input: MentorReplyInput): Promise<MentorRepl
   return { rounds };
 }
 
-type Once = { answered: string | null; error: string | null; round: RoundOutcome | null };
+/**
+ * The bot answering a request another bot passed it (plan #3003.3), in its
+ * own thread, while the caller holds the typing dots: one reply, with its
+ * own tools and rules and the hand-off as the last turn. Releases the dots.
+ * Never throws.
+ */
+export async function replyToHandoff(input: MentorReplyInput & { handoff: MentorHandoffTurn }): Promise<HandoffReplyOutcome> {
+  const { client, userId, chatId } = input;
+  const now = input.now ?? Date.now;
+  const renewing = keepRenewing(() => renewTyping(client, userId, chatId, now()), TYPING_RENEW_MS);
+  let outcome: Once | null = null;
+  let failure: string | null = null;
+  try {
+    outcome = await replyOnce(input, input.handoff);
+    failure = outcome.error;
+    if (outcome.round) {
+      console.info(
+        `bot-handoff-reply chat=${chatId} model=${input.model} bubbles=${outcome.round.bubbles} ` +
+          `cost_usd=${(outcome.round.costMicros / 1e6).toFixed(4)} ok=${outcome.round.ok}`,
+      );
+    }
+  } catch (error) {
+    failure = error instanceof Error ? error.message : 'The reply failed.';
+    console.error('bot hand-off reply failed', error);
+  } finally {
+    await renewing.stop();
+  }
+  try {
+    await releaseTyping(client, userId, chatId, failure);
+  } catch (error) {
+    console.error('bot hand-off reply could not stop typing', error);
+  }
+  return { ok: !failure, error: failure, reply: outcome?.reply ?? '', changes: outcome?.changes ?? [] };
+}
 
-/** One reply to the newest of the person's messages, while the caller holds the typing dots. */
-async function replyOnce(input: MentorReplyInput): Promise<Once> {
+type Once = {
+  answered: string | null;
+  error: string | null;
+  round: RoundOutcome | null;
+  /** The reply's text and the changes it made, for a hand-off turn. */
+  reply?: string;
+  changes?: DashChange[];
+};
+
+/**
+ * One reply to the newest of the person's messages, while the caller holds
+ * the typing dots; or, with `handoff`, to a request another bot passed on.
+ */
+async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | null = null): Promise<Once> {
   const { client, userId, chatId, timeZone } = input;
   const now = input.now ?? Date.now;
   const sleep = input.sleep ?? realSleep;
@@ -299,23 +369,30 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   // What no reply has read yet goes last, wherever it was saved (plan #2988).
   const ctx = { ...read, messages: waitingLast(read.messages, new Set(waiting.map((w) => w.id))) };
   const prompt = chatPrompt(ctx, { now: at, timeZone });
-  const answering = newestFromPerson(ctx.messages);
+  // A hand-off is the last turn, after whatever the thread holds (plan #3003.3).
+  if (handoff) withLastTurn(prompt.messages, handoff.brief);
+  const answering = handoff
+    ? { id: handoff.anchor.id, createdAt: handoff.anchor.createdAt, text: handoff.brief }
+    : newestFromPerson(ctx.messages);
   if (!answering || prompt.messages[prompt.messages.length - 1]?.role !== 'user') {
     return { answered: null, error: null, round: null };
   }
 
   // The person's messages reached the mentor, who is reading them now: only
-  // those read here, so one saved since is left for the next round.
+  // those read here, so one saved since is left for the next round. A
+  // hand-off turn answers none of theirs, so it marks none.
   const seen = new Date(started).toISOString();
-  const readIds = ctx.messages.filter((m) => m.role === 'person').map((m) => m.id);
-  await Promise.all([
-    client.from('advisor_messages').update({ delivered_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('delivered_at', null),
-    client.from('advisor_messages').update({ read_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('read_at', null),
-  ]);
+  const readIds = handoff ? [] : ctx.messages.filter((m) => m.role === 'person').map((m) => m.id);
+  if (readIds.length > 0) {
+    await Promise.all([
+      client.from('advisor_messages').update({ delivered_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('delivered_at', null),
+      client.from('advisor_messages').update({ read_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('read_at', null),
+    ]);
+  }
 
   // What was sent with the messages being answered; a reply still goes when they cannot be read.
   let files: DashFile[] | undefined;
-  if (input.readFiles) {
+  if (input.readFiles && !handoff) {
     try {
       const read = await input.readFiles(unansweredFromPerson(ctx.messages));
       if (read.length > 0) files = read;
@@ -363,7 +440,8 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   let acked = false;
   const acking = new AbortController();
   const ackTimer = setTimeout(() => {
-    if (draft || queued > 0) return;
+    // A hand-off has nobody waiting on a first text.
+    if (handoff || draft || queued > 0) return;
     void firstText(anthropic, ctx.layers.persona.text, prompt.messages, acking.signal, spent['mentor-ack']).then((text) => {
       if (!text || closed || draft || queued > 0) return;
       acked = true;
@@ -436,6 +514,7 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       ...(makePage ? [PAGE_RULES] : []),
       ...(handOn ? [SESSION_RULES] : []),
       ...(passBot ? [BOT_HANDOFF_RULES] : []),
+      ...(handoff ? [handoff.rules] : []),
     ].join('\n\n'),
     tools: [
       ...(acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS),
@@ -512,10 +591,18 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
 
   const ok = answer.ok && bubbles.length > 0 && !saveError;
   const round: RoundOutcome = { bubbles: saved, acked, firstBubbleMs, costMicros, ok };
-  if (saveError) return { answered: answering.createdAt, error: saveError, round };
-  if (!answer.ok) return { answered: answering.createdAt, error: replyFailed(name, answer.detail), round };
-  if (bubbles.length === 0) return { answered: answering.createdAt, error: replyFailed(name, 'the reply came back empty.'), round };
-  return { answered: answering.createdAt, error: null, round };
+  const did = { reply: bubbles.join('\n\n'), changes: acting ? [...acting.changes] : [] };
+  if (saveError) return { answered: answering.createdAt, error: saveError, round, ...did };
+  if (!answer.ok) return { answered: answering.createdAt, error: replyFailed(name, answer.detail), round, ...did };
+  if (bubbles.length === 0) return { answered: answering.createdAt, error: replyFailed(name, 'the reply came back empty.'), round, ...did };
+  return { answered: answering.createdAt, error: null, round, ...did };
+}
+
+/** Adds a user turn at the end, joined to the last one when that is the person's. */
+function withLastTurn(messages: PromptMessage[], text: string): void {
+  const last = messages[messages.length - 1];
+  if (last?.role === 'user') last.content = `${last.content}\n\n${text}`;
+  else messages.push({ role: 'user', content: text });
 }
 
 /**

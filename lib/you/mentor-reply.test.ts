@@ -8,6 +8,7 @@ import {
   MENTOR_LOOKUPS,
   REPLY_MAX_TOKENS,
   REPLY_RULES,
+  replyToHandoff,
   replyToMentor,
   type MentorSpendOperation,
 } from './mentor-reply';
@@ -630,6 +631,89 @@ describe('replyToMentor', () => {
     expect(JSON.stringify(back[0].content)).toContain('Passed to Bob.');
     expect(outcome.rounds[0]?.ok).toBe(true);
     expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
+  });
+
+  it('answers a hand-off another bot passed on with its own tools, hanging the change from its line (plan #3003.3)', async () => {
+    const tables = world();
+    // The person's text was answered long ago; the hand-off's line is the bot's own.
+    tables['you.advisor_messages'][0].delivered_at = '2026-11-01T09:00:00Z';
+    tables['you.advisor_messages'].push(
+      { id: 'a0', user_id: USER, chat_id: CHAT, role: 'advisor', kind: 'reply', text: 'Wait six weeks.', created_at: iso() },
+      { id: 'h0', user_id: USER, chat_id: CHAT, role: 'advisor', kind: 'reply', text: 'Zena passed this on to me from your chat: “build it this way”', created_at: iso() },
+    );
+    const streamed: { tools: { name: string }[]; system: { text: string }[]; messages: Anthropic.MessageParam[] }[] = [];
+    const call = {
+      content: [{ type: 'tool_use', id: 'w1', name: 'add_plan_step', input: { title: 'Speak chat replies with Fish Audio' } }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 3_000, output_tokens: 40 },
+    };
+    const reply = "Zena filled me in on the voice chat update and I've sent it to be built now: #3010.";
+    const stub = {
+      messages: {
+        create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+        stream: (params: (typeof streamed)[number]) => {
+          streamed.push(structuredClone(params));
+          const round = streamed.length;
+          return {
+            on() {
+              return this;
+            },
+            async finalMessage() {
+              return round === 1 ? call : answerMessage(reply);
+            },
+          };
+        },
+      },
+    } as unknown as Anthropic;
+    const kept = { id: 'ch1', kind: 'add_plan_step', status: 'done', writtenTable: 'public.plan_items', writtenRef: 'p-3010', summary: 'Added #3010.' };
+    const act = {
+      apply: vi.fn(async () => ({
+        ok: true as const,
+        kind: 'add_plan_step',
+        input: { title: 'Speak chat replies with Fish Audio' },
+        subjectRef: 'public.plan_items:p-3010',
+        op: 'insert' as const,
+        before: null,
+        after: { id: 'p-3010' },
+        summary: 'Added #3010.',
+        row: { table: 'public.plan_items', ref: 'p-3010' },
+      })),
+      saveChange: vi.fn(async () => kept),
+      propose: vi.fn(),
+      queue: vi.fn(),
+      saveProposal: vi.fn(),
+    };
+    const client = fakeClient(tables);
+    const outcome = await replyToHandoff({
+      client,
+      userId: USER,
+      chatId: CHAT,
+      timeZone: 'Europe/London',
+      model: 'claude-sonnet-5-5',
+      anthropicApiKey: 'k',
+      anthropic: stub,
+      execute: vi.fn(),
+      act: act as never,
+      recordSpend: async () => undefined,
+      now: () => clock,
+      sleep: async () => undefined,
+      ackAfterMs: 0,
+      handoff: { anchor: { id: 'h0', createdAt: iso() }, brief: '[A hand-off from Zena] build it with Fish Audio', rules: 'HAND-OFF RULES' },
+    });
+
+    expect(outcome).toEqual({ ok: true, error: null, reply, changes: [kept] });
+    // The hand-off is the last turn, after the bot's own line, and its rules follow the bot's.
+    const last = streamed[0].messages.at(-1);
+    expect(last).toMatchObject({ role: 'user' });
+    expect(JSON.stringify(last?.content)).toContain('[A hand-off from Zena] build it with Fish Audio');
+    expect(streamed[0].system.map((b) => b.text).join('\n')).toContain('HAND-OFF RULES');
+    expect(streamed[0].tools.map((t) => t.name)).toContain('add_plan_step');
+    // The change is kept under the hand-off's line, as this bot in this thread.
+    expect(act.saveChange.mock.calls[0]).toEqual([expect.anything(), { advisorId: ADVISOR, chatId: CHAT, messageId: 'h0', href: '/chat/people/money' }]);
+    // No first text, and the person's old text is left as it was.
+    expect(mentorRows(tables).map((m) => m.text).slice(2)).toEqual([reply]);
+    expect(tables['you.advisor_messages'][0].read_at).toBeUndefined();
+    expect(tables['you.advisor_chats'][0]).toMatchObject({ typing_until: null, reply_status: 'idle' });
   });
 
   it('offers no hand_to_bot without a passer', async () => {

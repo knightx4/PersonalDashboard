@@ -32,6 +32,20 @@ describe('placeAfterReplies', () => {
   });
 });
 
+describe('placeAfterReplies, from one of their own texts (plan #3003.3)', () => {
+  it("draws a card hung from a hand-off's line after the last of their texts in that run", () => {
+    const thread = [m('p1', 'person'), m('a1', 'advisor'), m('h1', 'advisor'), m('a2', 'advisor'), m('p2', 'person')];
+    expect(placeAfterReplies(thread, [card('c', 'h1')], at).get('a2')?.map((c) => c.id)).toEqual(['c']);
+  });
+
+  it('places one on a thread that opens with their line, and still places yours as before', () => {
+    const thread = [m('h1', 'advisor'), m('a1', 'advisor'), m('p1', 'person'), m('a2', 'advisor')];
+    const placed = placeAfterReplies(thread, [card('x', 'h1'), card('y', 'p1')], at);
+    expect(placed.get('a1')?.map((c) => c.id)).toEqual(['x']);
+    expect(placed.get('a2')?.map((c) => c.id)).toEqual(['y']);
+  });
+});
+
 describe('withItem', () => {
   it('replaces by id, or adds a new one at the end', () => {
     const list = [{ id: 'a', v: 1 }];

@@ -142,6 +142,20 @@ const READ_GRACE_MS = 8_000;
 async function replyAndAnnounce(userId: string, chatId: string, mentor: { key: string; name: string }): Promise<void> {
   const since = new Date().toISOString();
   await replyInRequest(userId, chatId);
+  await announceUnreadReply(userId, chatId, mentor, since);
+}
+
+/**
+ * Tells the person a mentor's reply written since `since` came, when it is
+ * still unread a few seconds later; a hand-off's reply is announced the same
+ * way (plan #3003.3). Never throws.
+ */
+export async function announceUnreadReply(
+  userId: string,
+  chatId: string,
+  mentor: { key: string; name: string },
+  since: string,
+): Promise<void> {
   try {
     await new Promise((resolve) => setTimeout(resolve, READ_GRACE_MS));
     const client = await createYouClient();
