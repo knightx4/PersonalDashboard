@@ -32,6 +32,7 @@ import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, 
 import { notePositionsLookup } from './positions';
 import { postPicturesLookup } from '@/lib/dash/post-pictures';
 import { dashModelLookup } from '@/lib/dash/model-lookup';
+import { sessionHandoffsLookup } from './session-handoffs';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
@@ -77,6 +78,7 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'post_pictures',
   'dash_model',
+  'session_handoffs',
   'search_mail',
   'read_mail',
   'read_job_board',
@@ -100,6 +102,7 @@ export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = [
   'find_places',
   'show_chart',
   'dash_model',
+  'session_handoffs',
 ];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
@@ -586,6 +589,12 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'session_handoffs',
+    description:
+      'Say how the requests handed to a Claude Code session are going, read from the hand-offs themselves. Returns the person\'s hand-offs from every chat, still-open ones first, each with who sent it, what it is for, its state (Waiting to start, Working, Done or Stopped), how long it has been in that state and a sentence saying how it is going. Use it for "how\'s it going?", "is that done yet?" or "what are the sessions doing?" and answer from the row, never from memory of what you handed on; with none, say nothing has been handed on.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'search_mail',
     description:
       'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
@@ -675,6 +684,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   post_pictures: { run: postPicturesLookup, module: null },
   // Reads the account's own setting; no workspace has to be on.
   dash_model: { run: dashModelLookup, module: null },
+  // Reads the person's own hand-offs; no workspace has to be on.
+  session_handoffs: { run: sessionHandoffsLookup, module: null },
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },

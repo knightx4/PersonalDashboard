@@ -248,6 +248,8 @@ export function lookupLabel(name: string, input: unknown): string {
       return 'Looking at the post pictures';
     case 'dash_model':
       return 'Checking which model Dash is using';
+    case 'session_handoffs':
+      return 'Checking how the session is going';
     case 'search_mail': {
       const from = quoted(field(input, 'from'));
       const words = quoted(field(input, 'words'));
