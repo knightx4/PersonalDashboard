@@ -34,6 +34,7 @@ import {
   TYPING_RENEW_MS,
   wholeBubbles,
 } from '@/lib/you/mentor-reply-model';
+import { keepRenewing, waitForQuiet, waitingLast } from '@/lib/you/reply-turn';
 
 export * from '@/lib/you/mentor-reply-model';
 
@@ -49,6 +50,11 @@ export * from '@/lib/you/mentor-reply-model';
  * (plan #2854.2, lib/you/people-actions.ts); without it, only the lookups. Typing is renewed while it works and cleared when it
  * is done. A message sent while the mentor is typing is saved and answered
  * when the reply in hand is finished, by the same run.
+ *
+ * Texts sent in a row are one turn (plan #2988, lib/you/reply-turn.ts): the
+ * run waits, typing, until the person has stopped sending for a moment, then
+ * answers every message of theirs no reply has read yet (`delivered_at`
+ * empty), wherever it sits in the thread.
  *
  * The claim is the lock: an update that only succeeds when nobody is typing,
  * and a run that dies stops holding it once its lease runs out, so a thread
@@ -146,12 +152,14 @@ export async function claimTyping(client: YouSupabaseClient, userId: string, cha
   return Array.isArray(data) && data.length > 0;
 }
 
+/** Renew the dots while they are held: a renewal never puts back a lease already let go (plan #2988). */
 async function renewTyping(client: YouSupabaseClient, userId: string, chatId: string, now: number): Promise<void> {
   await client
     .from('advisor_chats')
     .update({ typing_until: new Date(now + TYPING_LEASE_MS).toISOString() })
     .eq('user_id', userId)
-    .eq('id', chatId);
+    .eq('id', chatId)
+    .not('typing_until', 'is', null);
 }
 
 async function releaseTyping(
@@ -167,17 +175,37 @@ async function releaseTyping(
     .eq('id', chatId);
 }
 
-/** Whether the person has written since `after` (an ISO time). */
-async function personWroteSince(client: YouSupabaseClient, userId: string, chatId: string, after: string): Promise<boolean> {
+/** The person's messages in this chat that no reply has read yet, oldest first (plan #2988). */
+export async function waitingFromPerson(client: YouSupabaseClient, userId: string, chatId: string): Promise<{ id: string; createdAt: string }[]> {
   const { data, error } = await client
     .from('advisor_messages')
-    .select('id')
+    .select('id, created_at')
     .eq('user_id', userId)
     .eq('chat_id', chatId)
     .eq('role', 'person')
-    .gt('created_at', after)
-    .limit(1);
-  return !error && Array.isArray(data) && data.length > 0;
+    .is('delivered_at', null)
+    .order('created_at', { ascending: true })
+    .limit(50);
+  if (error || !Array.isArray(data)) return [];
+  return (data as Record<string, unknown>[]).flatMap((r) =>
+    typeof r.id === 'string' ? [{ id: r.id, createdAt: typeof r.created_at === 'string' ? r.created_at : '' }] : [],
+  );
+}
+
+/** When the person last wrote in this chat, for the wait before a reply reads it. */
+async function newestFromPersonAt(client: YouSupabaseClient, userId: string, chatId: string): Promise<string | null> {
+  const { data, error } = await client
+    .from('advisor_messages')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('chat_id', chatId)
+    .eq('role', 'person')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  const at = (data as Record<string, unknown>).created_at;
+  return typeof at === 'string' ? at : null;
 }
 
 /**
@@ -200,7 +228,10 @@ export async function replyToMentor(input: MentorReplyInput): Promise<MentorRepl
     claimed = false;
     let answered: string | null = null;
     let failure: string | null = null;
+    // The dots are renewed from the claim to the release, the wait for the person included.
+    const renewing = keepRenewing(() => renewTyping(client, userId, chatId, now()), TYPING_RENEW_MS);
     try {
+      await waitForQuiet(() => newestFromPersonAt(client, userId, chatId), { now, sleep: input.sleep ?? realSleep });
       const outcome = await replyOnce(input);
       answered = outcome.answered;
       failure = outcome.error;
@@ -214,6 +245,8 @@ export async function replyToMentor(input: MentorReplyInput): Promise<MentorRepl
     } catch (error) {
       failure = error instanceof Error ? error.message : 'The reply failed.';
       console.error('mentor reply failed', error);
+    } finally {
+      await renewing.stop();
     }
     try {
       await releaseTyping(client, userId, chatId, failure);
@@ -221,7 +254,8 @@ export async function replyToMentor(input: MentorReplyInput): Promise<MentorRepl
       console.error('mentor reply could not stop typing', error);
     }
     if (failure) return { rounds, error: failure };
-    if (!answered || !(await personWroteSince(client, userId, chatId, answered))) break;
+    // Anything they sent that this round did not read is answered by the next.
+    if (!answered || (await waitingFromPerson(client, userId, chatId)).length === 0) break;
   }
   return { rounds };
 }
@@ -240,18 +274,25 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     return { answered: null, error: 'This deployment has no ANTHROPIC_API_KEY, so mentors cannot reply.', round: null };
   }
 
-  const ctx = await loadChatContext(client, userId, chatId, { now: at, timeZone });
+  const [read, waiting] = await Promise.all([
+    loadChatContext(client, userId, chatId, { now: at, timeZone }),
+    waitingFromPerson(client, userId, chatId),
+  ]);
+  // What no reply has read yet goes last, wherever it was saved (plan #2988).
+  const ctx = { ...read, messages: waitingLast(read.messages, new Set(waiting.map((w) => w.id))) };
   const prompt = chatPrompt(ctx, { now: at, timeZone });
   const answering = newestFromPerson(ctx.messages);
   if (!answering || prompt.messages[prompt.messages.length - 1]?.role !== 'user') {
     return { answered: null, error: null, round: null };
   }
 
-  // The person's messages reached the mentor, who is reading them now.
+  // The person's messages reached the mentor, who is reading them now: only
+  // those read here, so one saved since is left for the next round.
   const seen = new Date(started).toISOString();
+  const readIds = ctx.messages.filter((m) => m.role === 'person').map((m) => m.id);
   await Promise.all([
-    client.from('advisor_messages').update({ delivered_at: seen }).eq('user_id', userId).eq('chat_id', chatId).eq('role', 'person').is('delivered_at', null),
-    client.from('advisor_messages').update({ read_at: seen }).eq('user_id', userId).eq('chat_id', chatId).eq('role', 'person').is('read_at', null),
+    client.from('advisor_messages').update({ delivered_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('delivered_at', null),
+    client.from('advisor_messages').update({ read_at: seen }).eq('user_id', userId).eq('chat_id', chatId).in('id', readIds).is('read_at', null),
   ]);
 
   // What was sent with the messages being answered; a reply still goes when they cannot be read.
@@ -297,10 +338,6 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
       await renewTyping(client, userId, chatId, lastSavedAt).catch(() => undefined);
     });
   };
-
-  const renewing = setInterval(() => {
-    renewTyping(client, userId, chatId, now()).catch(() => undefined);
-  }, TYPING_RENEW_MS);
 
   // The first text, when nothing is written three seconds in.
   let draft = '';
@@ -382,7 +419,6 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
   closed = true;
   acking.abort();
   await chain;
-  clearInterval(renewing);
 
   await Promise.all(
     (Object.keys(spent) as MentorSpendOperation[])
