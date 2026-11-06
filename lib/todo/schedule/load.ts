@@ -49,6 +49,12 @@ export interface ScheduleOptions {
   /** The reader's zone and workspaces, when the caller already has them. */
   timezone?: string;
   enabledModules?: readonly ModuleId[];
+  /**
+   * Only what holds a place in the day: events, calendars, booking emails and
+   * interviews. The agenda reads todos and reminders itself, as rows to act
+   * on (plan #3027.1), so it asks for these alone rather than reading them twice.
+   */
+  bookedOnly?: boolean;
 }
 
 /** The agenda sources whose items fall on a day, each with the workspace it reads. */
@@ -92,8 +98,10 @@ export async function loadSchedule(
       },
     },
     { label: 'Booking emails', run: () => appointmentEntries(userId, range, clients) },
-    { label: 'Todos', run: async () => taskEntries(await loadOpenTasks(userId, todo), range, zone, now) },
   ];
+  if (!options.bookedOnly) {
+    reads.push({ label: 'Todos', run: async () => taskEntries(await loadOpenTasks(userId, todo), range, zone, now) });
+  }
 
   if (on('jobs')) {
     reads.push({
@@ -109,7 +117,7 @@ export async function loadSchedule(
     });
   }
 
-  const dated = DATED_SOURCES.filter((source) => on(source.module));
+  const dated = options.bookedOnly ? [] : DATED_SOURCES.filter((source) => on(source.module));
   if (dated.length > 0) {
     reads.push({
       label: 'Reminders and deadlines',
