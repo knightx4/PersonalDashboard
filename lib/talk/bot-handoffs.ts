@@ -222,3 +222,51 @@ export async function loadSourceBotHandoffs(
   if (error) throw new Error(`Reading the hand-offs failed: ${error.message}`);
   return ((data ?? []) as DbRow[]).map(toBotHandoff);
 }
+
+/** A hand-off the sending bot flagged in its thread as failed or unanswered (plan #3003.4). */
+export type FlaggedBotHandoff = BotHandoff & { flaggedAt: string };
+
+/** How far back Dev home lists flagged hand-offs. */
+export const FLAGGED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * The flagged hand-offs that ended since `since`, newest first: the rows the
+ * watch (core.watch_bot_handoffs, migration 0310) dropped or found failed and
+ * told the source thread about. Reads bot_handoffs_flagged_idx.
+ */
+export async function loadFlaggedBotHandoffs(
+  core: CoreSupabaseClient,
+  userId: string,
+  since: string,
+  limit = 20,
+): Promise<FlaggedBotHandoff[]> {
+  const { data, error } = await core
+    .from('bot_handoffs')
+    .select(`${SELECT}, flagged_at`)
+    .eq('user_id', userId)
+    .in('status', ['failed', 'dropped'])
+    .not('flagged_at', 'is', null)
+    .gte('done_at', since)
+    .order('done_at', { ascending: false })
+    .limit(limit);
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Reading the flagged hand-offs failed: ${error.message}`);
+  return ((data ?? []) as (DbRow & { flagged_at: string })[]).map((row) => ({
+    ...toBotHandoff(row),
+    flaggedAt: row.flagged_at,
+  }));
+}
+
+/**
+ * Sends a flagged hand-off again (plan #3003.4): the same row, so the same
+ * dedupe key, goes back to sent (core.resend_bot_handoff). Only one the
+ * receiver never picked up moves, so whatever it may have done is never done
+ * twice, and a second press finds it sent and moves nothing. True when it
+ * moved.
+ */
+export async function resendBotHandoff(core: CoreSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await core.rpc('resend_bot_handoff', { p_handoff: id });
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Sending the hand-off again failed: ${error.message}`);
+  return typeof data === 'string' && data === id;
+}

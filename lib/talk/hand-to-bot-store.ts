@@ -31,7 +31,7 @@ export function botPassPorts(you: YouSupabaseClient, core: CoreSupabaseClient, u
     bots: () => listBotEntries(you, userId),
     keep: async (input) => {
       const kept = await keepBotHandoff(core, userId, input);
-      if (kept.ok && kept.created) startReceiver(userId, kept.handoff.id);
+      if (kept.ok && kept.created) startBotHandoffReceiver(userId, kept.handoff.id);
       return kept;
     },
   };
@@ -41,9 +41,9 @@ export function botPassPorts(you: YouSupabaseClient, core: CoreSupabaseClient, u
  * The receiving bot's run, after the sending bot's reply is out. Loaded
  * when it starts, since the run reads Ask Dash's tools, whose request file
  * hands out this passer. Outside a request there is no `after`, so it runs
- * alongside instead.
+ * alongside instead. Dev home's Resend starts it the same way (plan #3003.4).
  */
-function startReceiver(userId: string, handoffId: string): void {
+export function startBotHandoffReceiver(userId: string, handoffId: string): void {
   const run = async () => {
     try {
       const { answerBotHandoffInRequest } = await import('@/lib/you/bot-handoff-reply-request');
