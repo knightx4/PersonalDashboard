@@ -108,6 +108,9 @@ export const devActions: ModuleActions = {
     reopenRaise: none('theirs'),
     markConversationRead: none('page'),
   },
+  'app/dev/raised/bot-handoff-actions.ts': {
+    resendFlaggedHandoff: none('theirs', 'Sends a hand-off nobody answered again, at their word.'),
+  },
   'app/dev/raised/check-back-actions.ts': {
     dropCheckBack: none('theirs'),
     restoreCheckBack: none('theirs', 'Undo: takes back their own drop.'),
