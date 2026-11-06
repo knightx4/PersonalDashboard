@@ -72,8 +72,10 @@ function asText(value: unknown): string | null {
 
 /** "142.50", from cents. Currency signs are left to the text. */
 export function money(cents: number): string {
-  const units = Math.abs(cents) / 100;
-  return units.toLocaleString('en-GB', { minimumFractionDigits: units % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const whole = Math.floor(Math.abs(Math.round(cents)) / 100);
+  const pence = Math.abs(Math.round(cents)) % 100;
+  const grouped = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return pence ? `${grouped}.${String(pence).padStart(2, '0')}` : grouped;
 }
 
 export function plusDays(day: string, days: number): string {
