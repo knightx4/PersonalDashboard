@@ -6,9 +6,9 @@
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import {
   ORDER_SENTENCE_SCHEMA,
   ORDER_SENTENCE_TOOL,
@@ -40,19 +40,16 @@ export async function readOrderSentence(
       model: MODEL,
       max_tokens: 800,
       system: SYSTEM,
-      tools: [
-        {
-          name: ORDER_SENTENCE_TOOL,
-          description: 'Report the order the sentence describes.',
-          input_schema: ORDER_SENTENCE_SCHEMA as unknown as Anthropic.Tool['input_schema'],
-        },
-      ],
-      tool_choice: forceTool(ORDER_SENTENCE_TOOL, MODEL),
+      ...reportRequest({
+        name: ORDER_SENTENCE_TOOL,
+        description: 'Report the order the sentence describes.',
+        input_schema: ORDER_SENTENCE_SCHEMA as unknown as Anthropic.Tool['input_schema'],
+      }, MODEL),
       messages: [{ role: 'user', content: orderSentenceMessage(sentence, today) }],
     });
     options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === ORDER_SENTENCE_TOOL);
-    return block && block.type === 'tool_use' ? readOrderSentenceReply(block.input, today) : null;
+    const block = readReport(response, ORDER_SENTENCE_TOOL, MODEL);
+    return block.ok ? readOrderSentenceReply(block.value, today) : null;
   } catch (error) {
     console.error('order sentence: the read failed', error);
     return null;

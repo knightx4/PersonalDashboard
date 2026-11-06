@@ -10,7 +10,6 @@ import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { HOME_MARK, MODULES, moduleById, type AppModule, type ModuleId } from '@/lib/modules';
 import { Tooltip } from '@/components/ui/tooltip';
-import { isAskPath } from '@/lib/ask/page-name';
 
 export type WorkspaceId = ModuleId;
 
@@ -19,21 +18,20 @@ export type SwitcherCounts = Partial<Record<ModuleId, string>>;
 
 const LAST_PATH_KEY = 'pt_last_path';
 
-/** One row of the switcher: Home, Dash, or a workspace. */
+/** One row of the switcher: Home, or a workspace. */
 type SwitcherRow = {
   key: string;
   id: ModuleId | null;
-  dash?: true;
   href: string;
   label: string;
   description: string;
 };
 
-/** Home and Dash, the two rows above the workspaces. */
-const TOP_ROWS: readonly SwitcherRow[] = [
-  { key: 'home', id: null, href: '/home', label: 'Home', description: '' },
-  { key: 'dash', id: null, dash: true, href: '/ask', label: 'Dash', description: 'Your chats with Dash' },
-];
+/**
+ * Home, the row above the workspaces. Dash had a row here too until it moved
+ * into Chat's Dash tab (plan #2748.1); Chat is a workspace, listed first.
+ */
+const TOP_ROWS: readonly SwitcherRow[] = [{ key: 'home', id: null, href: '/home', label: 'Home', description: '' }];
 
 function switcherRows(modules: readonly AppModule[]): SwitcherRow[] {
   return [
@@ -48,10 +46,8 @@ function switcherRows(modules: readonly AppModule[]): SwitcherRow[] {
   ];
 }
 
-/** Whether a row is where you are standing: Dash on /ask, Home on any other page outside a workspace. */
-function rowIsCurrent(row: SwitcherRow, current: ModuleId | null, onDash: boolean): boolean {
-  if (row.dash) return onDash;
-  if (row.id === null) return current === null && !onDash;
+/** Whether a row is where you are standing: Home on any page outside a workspace. */
+function rowIsCurrent(row: SwitcherRow, current: ModuleId | null): boolean {
   return row.id === current;
 }
 
@@ -133,11 +129,8 @@ export function WorkspaceSwitcher({
   counts = {},
   onShell = false,
   compact = false,
-  dash,
 }: {
   current: WorkspaceId | null;
-  /** Standing on Dash's page; read from the address when left out. */
-  dash?: boolean;
   enabled?: readonly ModuleId[];
   counts?: SwitcherCounts;
   /**
@@ -179,8 +172,7 @@ export function WorkspaceSwitcher({
   // Home first, then the modules. One flat list so the arrow keys do not have
   // to know about sections. Memoised because the keyboard effect depends on it.
   const rows = useMemo(() => switcherRows(visible), [visible]);
-  const onDash = dash ?? (current === null && isAskPath(pathname ?? ''));
-  const activeLabel = workspace?.label ?? (onDash ? 'Dash' : HOME_MARK.label);
+  const activeLabel = workspace?.label ?? HOME_MARK.label;
 
   // Remember where we are, so switching back returns here.
   useEffect(() => {
@@ -245,7 +237,7 @@ export function WorkspaceSwitcher({
           onClick={() => {
             // Start on the current workspace rather than at the top, so the
             // first arrow press moves somewhere useful.
-            if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => rowIsCurrent(row, current, onDash))));
+            if (!open) setActiveIndex(Math.max(0, rows.findIndex((row) => rowIsCurrent(row, current))));
             setOpen((v) => !v);
           }}
           aria-haspopup="menu"
@@ -268,7 +260,7 @@ export function WorkspaceSwitcher({
                 : 'hover:bg-sunken',
           )}
         >
-          <ModuleMark module={onDash ? 'dash' : current} size="md" />
+          <ModuleMark module={current} size="md" />
           <span
             className={cn(
               'font-display min-w-0 flex-1 truncate text-left text-body font-semibold tracking-tight',
@@ -306,7 +298,7 @@ export function WorkspaceSwitcher({
           className="w-72"
         >
           {rows.map((row, index) => {
-            const isCurrent = rowIsCurrent(row, current, onDash);
+            const isCurrent = rowIsCurrent(row, current);
             const count = row.id ? counts[row.id] : undefined;
             return (
               <Link
@@ -314,7 +306,7 @@ export function WorkspaceSwitcher({
                 ref={(node) => {
                   itemRefs.current[index] = node;
                 }}
-                href={row.dash ? row.href : hrefFor(row.id, row.href)}
+                href={hrefFor(row.id, row.href)}
                 role="menuitem"
                 tabIndex={index === activeIndex ? 0 : -1}
                 aria-current={isCurrent ? 'true' : undefined}
@@ -327,7 +319,6 @@ export function WorkspaceSwitcher({
               >
                 <WorkspaceRowBody
                   id={row.id}
-                  dash={row.dash}
                   label={row.label}
                   detail={count ?? row.description}
                   isCurrent={isCurrent}
@@ -349,20 +340,18 @@ export function WorkspaceSwitcher({
  */
 function WorkspaceRowBody({
   id,
-  dash,
   label,
   detail,
   isCurrent,
 }: {
   id: ModuleId | null;
-  dash?: boolean;
   label: string;
   detail: string;
   isCurrent: boolean;
 }) {
   return (
     <>
-      <ModuleMark module={dash ? 'dash' : id} size="sm" className="mt-0.5" />
+      <ModuleMark module={id} size="sm" className="mt-0.5" />
       <span className="min-w-0 flex-1">
         <span className={cn('block text-ui font-medium', isCurrent ? 'text-accent' : 'text-ink')}>
           {label}

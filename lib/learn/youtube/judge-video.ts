@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { segmentsFromCues, type Chapter, type TranscriptCue } from '@/lib/learn/catalogue/segment';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { clockTime } from './format';
 import { MODELS } from '@/lib/core/models';
 
@@ -207,40 +207,37 @@ export async function screenVideos(input: {
       model: JUDGE_VIDEO_MODEL,
       max_tokens: 2048,
       system: SCREEN_SYSTEM,
-      tools: [
-        {
-          name: SCREEN_TOOL,
-          description: 'Report skip or look, with the reason, for every video.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              videos: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    number: { type: 'integer' },
-                    decision: { type: 'string', enum: ['skip', 'look'] },
-                    why: { type: 'string' },
-                  },
-                  required: ['number', 'decision', 'why'],
+      ...reportRequest({
+        name: SCREEN_TOOL,
+        description: 'Report skip or look, with the reason, for every video.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            videos: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  number: { type: 'integer' },
+                  decision: { type: 'string', enum: ['skip', 'look'] },
+                  why: { type: 'string' },
                 },
+                required: ['number', 'decision', 'why'],
               },
             },
-            required: ['videos'],
           },
+          required: ['videos'],
         },
-      ],
-      tool_choice: forceTool(SCREEN_TOOL, JUDGE_VIDEO_MODEL),
+      }, JUDGE_VIDEO_MODEL),
       messages: [{ role: 'user', content: screenPrompt(input.profile, input.videos) }],
     });
   } catch (error) {
     return { ok: false, detail: error instanceof Error ? error.message : 'Screening the videos failed.' };
   }
   input.onSpend?.({ model: JUDGE_VIDEO_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === SCREEN_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, screened: readScreenReply(block.input, input.videos) };
+  const report = readReport(response, SCREEN_TOOL, JUDGE_VIDEO_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, screened: readScreenReply(report.value, input.videos) };
 }
 
 // ---------------------------------------------------------------------------
@@ -456,41 +453,38 @@ export async function judgeVideo(input: {
       model: JUDGE_VIDEO_MODEL,
       max_tokens: 1024,
       system: input.settled ? `${JUDGE_SYSTEM}\n\n${settledRules(input.settled)}` : JUDGE_SYSTEM,
-      tools: [
-        {
-          name: JUDGE_TOOL,
-          description: 'Report the verdict, the reason, and the windows it rests on.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              verdict: { type: 'string', enum: ['watch', 'card', 'skip'] },
-              why: { type: 'string' },
-              best_from: { type: 'integer', description: 'WATCH only: the first window of the best stretch.' },
-              best_to: { type: 'integer', description: 'WATCH only: the last window of the best stretch.' },
-              windows: {
-                type: 'array',
-                description: 'WATCH: the windows in the stretch. CARD: the windows worth a card. SKIP: empty.',
-                items: {
-                  type: 'object',
-                  properties: { window: { type: 'integer' }, point: { type: 'string' } },
-                  required: ['window', 'point'],
-                },
+      ...reportRequest({
+        name: JUDGE_TOOL,
+        description: 'Report the verdict, the reason, and the windows it rests on.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            verdict: { type: 'string', enum: ['watch', 'card', 'skip'] },
+            why: { type: 'string' },
+            best_from: { type: 'integer', description: 'WATCH only: the first window of the best stretch.' },
+            best_to: { type: 'integer', description: 'WATCH only: the last window of the best stretch.' },
+            windows: {
+              type: 'array',
+              description: 'WATCH: the windows in the stretch. CARD: the windows worth a card. SKIP: empty.',
+              items: {
+                type: 'object',
+                properties: { window: { type: 'integer' }, point: { type: 'string' } },
+                required: ['window', 'point'],
               },
             },
-            required: input.settled?.verdict === 'card' ? ['verdict'] : ['verdict', 'why'],
           },
+          required: input.settled?.verdict === 'card' ? ['verdict'] : ['verdict', 'why'],
         },
-      ],
-      tool_choice: forceTool(JUDGE_TOOL, JUDGE_VIDEO_MODEL),
+      }, JUDGE_VIDEO_MODEL),
       messages: [{ role: 'user', content: judgePrompt(input.profile, input.video) }],
     });
   } catch (error) {
     return { outcome: 'failed', detail: error instanceof Error ? error.message : 'Judging the video failed.' };
   }
   input.onSpend?.({ model: JUDGE_VIDEO_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === JUDGE_TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
-  return readJudgeReply(block.input, input.video.windows, input.video.durationSeconds, input.settled);
+  const report = readReport(response, JUDGE_TOOL, JUDGE_VIDEO_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
+  return readJudgeReply(report.value, input.video.windows, input.video.durationSeconds, input.settled);
 }
 
 // ---------------------------------------------------------------------------

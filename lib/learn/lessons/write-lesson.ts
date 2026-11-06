@@ -2,9 +2,10 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { IdeaCard } from '@/lib/learn/feed/write-card';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import type { LessonSource } from './closest-source';
 import { MODELS } from '@/lib/core/models';
 import { MAX_FIGURES_PER_LESSON, figureKindIds, figureWriterLines, readWrittenFigures } from '@/lib/learn/figures/registry';
@@ -411,67 +412,64 @@ export async function writeLesson(input: {
       model: WRITE_LESSON_MODEL,
       max_tokens: 3072 + THINKING_ROOM,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report whether the claim can be taught, what the source says about it, and the lesson.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              can_teach: { type: 'boolean' },
-              fit: {
-                type: 'string',
-                description: 'One sentence on whether the claim can be taught from what you know, and why not when it cannot.',
-              },
-              source_verdict: {
-                type: 'string',
-                enum: ['supports', 'contradicts', 'unrelated', 'none'],
-                description: 'What the source section is to the claim. None when no source was given.',
-              },
-              source_note: part('One sentence on what the source says about the claim. Null when no source was given.'),
-              claim: part('The claim as one plain sentence.'),
-              context: part('Only the terms and facts this claim needs, in two or three sentences.'),
-              evidence: part('Concrete support: a number, a case or a result.'),
-              why: part('Why the claim holds, in two or three sentences.'),
-              example: part('The idea applied to one specific case or a worked number.'),
-              predict: part('A short question, asked before the lesson, that a guess can answer.'),
-              predict_answer: part('What is in fact the case, in one or two sentences.'),
-              question: part('One question that makes them use the idea.'),
-              answer: part('The answer, with why, in two or three sentences.'),
-              figures: {
-                type: 'array',
-                maxItems: MAX_FIGURES_PER_LESSON,
-                description: 'A figure only where the idea compares, orders, quantifies or locates, or is a process, loop, hierarchy, trade-off or sequence in time. Empty for none.',
-                items: {
-                  type: 'object',
-                  properties: {
-                    kind: { type: 'string', enum: figureKindIds() },
-                    caption: { type: 'string', description: 'One sentence saying what the figure shows.' },
-                    spec: { type: 'object', description: 'The shape the kind takes, as the instructions give it.' },
-                  },
-                  required: ['kind', 'caption', 'spec'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report whether the claim can be taught, what the source says about it, and the lesson.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            can_teach: { type: 'boolean' },
+            fit: {
+              type: 'string',
+              description: 'One sentence on whether the claim can be taught from what you know, and why not when it cannot.',
+            },
+            source_verdict: {
+              type: 'string',
+              enum: ['supports', 'contradicts', 'unrelated', 'none'],
+              description: 'What the source section is to the claim. None when no source was given.',
+            },
+            source_note: part('One sentence on what the source says about the claim. Null when no source was given.'),
+            claim: part('The claim as one plain sentence.'),
+            context: part('Only the terms and facts this claim needs, in two or three sentences.'),
+            evidence: part('Concrete support: a number, a case or a result.'),
+            why: part('Why the claim holds, in two or three sentences.'),
+            example: part('The idea applied to one specific case or a worked number.'),
+            predict: part('A short question, asked before the lesson, that a guess can answer.'),
+            predict_answer: part('What is in fact the case, in one or two sentences.'),
+            question: part('One question that makes them use the idea.'),
+            answer: part('The answer, with why, in two or three sentences.'),
+            figures: {
+              type: 'array',
+              maxItems: MAX_FIGURES_PER_LESSON,
+              description: 'A figure only where the idea compares, orders, quantifies or locates, or is a process, loop, hierarchy, trade-off or sequence in time. Empty for none.',
+              items: {
+                type: 'object',
+                properties: {
+                  kind: { type: 'string', enum: figureKindIds() },
+                  caption: { type: 'string', description: 'One sentence saying what the figure shows.' },
+                  spec: { type: 'object', description: 'The shape the kind takes, as the instructions give it.' },
                 },
+                required: ['kind', 'caption', 'spec'],
               },
             },
-            required: [
-              'can_teach',
-              'fit',
-              'source_verdict',
-              'source_note',
-              'predict',
-              'predict_answer',
-              'claim',
-              'context',
-              'evidence',
-              'why',
-              'example',
-              'question',
-              'answer',
-            ],
           },
+          required: [
+            'can_teach',
+            'fit',
+            'source_verdict',
+            'source_note',
+            'predict',
+            'predict_answer',
+            'claim',
+            'context',
+            'evidence',
+            'why',
+            'example',
+            'question',
+            'answer',
+          ],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, WRITE_LESSON_MODEL),
+      }, WRITE_LESSON_MODEL),
       messages: [{ role: 'user', content: lessonPrompt(prepared) }],
     });
   } catch (error) {
@@ -485,13 +483,13 @@ export async function writeLesson(input: {
   // Before the reply is read: a malformed report still cost what it cost.
   input.onSpend?.({ model: WRITE_LESSON_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((piece) => piece.type === 'tool_use' && piece.name === TOOL_NAME);
+  const reportRead = readReport(response, TOOL_NAME, WRITE_LESSON_MODEL);
   // A reply with no report, or one that cannot be read, says nothing about
   // the concept: stored as dropped, it would hold the concept's lesson, and
   // every concept after it, back for good (note 727c77a2).
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
+  if (!reportRead.ok) return { outcome: 'failed', detail: reportRead.reason };
 
-  const report = readLessonReport(block.input, source !== null, prepared.sourceFigures ?? []);
+  const report = readLessonReport(reportRead.value, source !== null, prepared.sourceFigures ?? []);
   if (report.verdict === 'failed') return { outcome: 'failed', detail: report.reason };
   if (report.verdict === 'dropped') {
     return {

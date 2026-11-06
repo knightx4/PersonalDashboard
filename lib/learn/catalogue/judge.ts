@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { NearbySegment } from '@/lib/learn/catalogue/nearest';
@@ -345,22 +345,19 @@ export function anthropicJudge(options: {
         model: JUDGE_MODEL,
         max_tokens: 512,
         system: SYSTEM,
-        tools: [
-          {
-            name: TOOL_NAME,
-            description: 'Report whether this segment teaches this claim.',
-            input_schema: {
-              type: 'object',
-              properties: {
-                teaches: { type: 'boolean' },
-                basis: { type: ['string', 'null'] },
-                reason: { type: ['string', 'null'] },
-              },
-              required: ['teaches'],
+        ...reportRequest({
+          name: TOOL_NAME,
+          description: 'Report whether this segment teaches this claim.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              teaches: { type: 'boolean' },
+              basis: { type: ['string', 'null'] },
+              reason: { type: ['string', 'null'] },
             },
+            required: ['teaches'],
           },
-        ],
-        tool_choice: forceTool(TOOL_NAME, JUDGE_MODEL),
+        }, JUDGE_MODEL),
         messages: [
           {
             role: 'user',
@@ -390,12 +387,12 @@ export function anthropicJudge(options: {
     // refusal still read the segment and still cost what that cost.
     options.onSpend?.({ model: JUDGE_MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-    if (!block || block.type !== 'tool_use') {
-      return { outcome: 'failed', detail: whyNoReport(response) };
+    const report = readReport(response, TOOL_NAME, JUDGE_MODEL);
+    if (!report.ok) {
+      return { outcome: 'failed', detail: report.reason };
     }
 
-    const payload = block.input as { teaches?: unknown; basis?: unknown; reason?: unknown };
+    const payload = report.value as { teaches?: unknown; basis?: unknown; reason?: unknown };
     const reason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
 
     if (payload.teaches !== true) {

@@ -380,7 +380,10 @@ const ROLE_DEPENDENTS: Dependent[] = [
 
 const DEPENDENTS: Record<string, Dependent[]> = {
   'public.plan_items': [
-    { schema: 'public', table: 'plan_items', column: 'parent_id' },
+    // Steps written after the record. A feature proposed with its steps in
+    // one write (the connector's propose_feature, plan #2789.5) is recorded
+    // after them, so they go with it: parent_id cascades.
+    { schema: 'public', table: 'plan_items', column: 'parent_id', since: true },
     { schema: 'public', table: 'plan_dependencies', column: 'item_id' },
     { schema: 'public', table: 'plan_dependencies', column: 'depends_on_id' },
     { schema: 'public', table: 'plan_runs', column: 'plan_item_id' },
@@ -896,6 +899,14 @@ export type DashActionEntry = {
    * or a delete. Left out for an insert.
    */
   beforeValues?: Values | null;
+  /**
+   * The row after the write, when the writer keeps only the columns it
+   * changed (a goal's dashboard, plan #2778.9), with beforeValues kept the
+   * same way: the Undo then checks and puts back those columns alone, so a
+   * later edit to the row's other columns leaves it standing. Left out, the
+   * whole row is read here.
+   */
+  afterValues?: Values | null;
   /** What undoing needs beyond the row, kept in the `undo` column. */
   undo?: Values | null;
   /**
@@ -951,7 +962,7 @@ export async function recordDashAction(
   entry: DashActionEntry,
 ): Promise<string | null> {
   try {
-    const after = entry.op === 'delete' ? null : await readSubjectOrNull(deps, entry.subjectRef);
+    const after = entry.op === 'delete' ? null : (entry.afterValues ?? (await readSubjectOrNull(deps, entry.subjectRef)));
     const before = entry.op === 'insert' ? null : (entry.beforeValues ?? null);
     const now = deps.now ? deps.now() : new Date().toISOString();
     const { data, error } = await deps.core

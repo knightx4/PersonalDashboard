@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addsAsProposal,
+  buildStamp,
   currentSession,
   reshapeOrigin,
   reshapeStamp,
@@ -41,6 +42,7 @@ describe('reshapeOrigin', () => {
   it('reads back what the stamp wrote', () => {
     const origin = reshapeOrigin(reshapeStamp(63, 'On the server, not the client.'));
     expect(origin).toEqual({
+      source: 'answer',
       number: 63,
       written: '63',
       ref: '#63',
@@ -53,6 +55,7 @@ describe('reshapeOrigin', () => {
     const stamp = reshapeStamp('1073.4', 'Keep it.');
     expect(stamp).toBe("From #1073.4's answer: Keep it.");
     expect(reshapeOrigin(stamp, outlines)).toEqual({
+      source: 'answer',
       number: 1084,
       written: '1073.4',
       ref: '#1073.4',
@@ -71,6 +74,19 @@ describe('reshapeOrigin', () => {
       'Blocked 2026-09-09: waiting on the key.',
     ].join('\n');
     expect(reshapeOrigin(comment)?.number).toBe(63);
+  });
+
+  it('reads a stamp left by what building a step found', () => {
+    const outlines = new Map([[1085, '1073.1']]);
+    const stamp = buildStamp('1073.1', 'The rows already carry a date.\nMore detail.');
+    expect(stamp).toBe("From #1073.1's build: The rows already carry a date.");
+    expect(reshapeOrigin(stamp, outlines)).toEqual({
+      source: 'build',
+      number: 1085,
+      written: '1073.1',
+      ref: '#1073.1',
+      gist: 'The rows already carry a date.',
+    });
   });
 
   it('says nothing about a step nobody re-shaped', () => {

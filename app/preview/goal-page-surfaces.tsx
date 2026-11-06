@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { GoalsInboxView } from '@/app/goals/inbox/inbox-view';
 import { goalInboxGroups } from '@/lib/goals/inbox';
+import type { SessionQuestion } from '@/lib/core/session-questions';
 import { PageHeader } from '@/components/shell/page-header';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
@@ -11,7 +12,8 @@ import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
 import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
-import { FileLinks } from '@/components/files/file-links';
+import { PageFrame } from '@/components/files/page-frame';
+import { DRILL_PAGE } from './bot-page-fixture';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
@@ -38,7 +40,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
 import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import type { ActivitySwitchDrawn } from '@/app/goals/[goalId]/goal-activity-switch';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
-import { closedSteps, goalStages } from '@/lib/goals/goal-page';
+import { closedSteps } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
 import { BurnUpChart } from '@/components/ui/burn-up-chart';
 import { MONTH_DAYS } from './burn-up-surfaces';
@@ -46,6 +48,21 @@ import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
 import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 import { PageColumn } from '@/components/shell/page-width';
+import { DashboardTiles } from '@/app/goals/[goalId]/dashboard-tiles';
+import { GoalFilesTab, type TabFile, type TabWork } from '@/app/goals/[goalId]/goal-files-tab';
+import type { FileView, WaitingRow } from '@/lib/goals/goal-files-tab';
+import {
+  DashOnCard,
+  GoalDashboard,
+  GoalStripRow,
+  NoLayoutLine,
+  RecentFiles,
+} from '@/app/goals/[goalId]/goal-dashboard';
+import { GoalPageSkeleton } from '@/app/goals/[goalId]/goal-skeleton';
+import { AskDash } from '@/app/goals/ask-dash';
+import { QuestionResults } from '@/app/goals/[goalId]/question-results';
+import type { GoalStrip } from '@/lib/goals/goal-strip';
+import { LOANS_GOAL_ID, loansDashboardViews } from './goal-dashboard-surfaces';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -493,13 +510,45 @@ const FINISHED_NOTICES: TodayItem[] = [
   {
     kind: 'finished',
     id: 'finished-list',
-    title: 'Put together the list of research groups working on volatility models in London and Oxford',
+    title:
+      'Put together the list of research groups working on volatility models in London and Oxford',
     detail: null,
     goalId: job.id,
     goalTitle: job.title,
     action: 'Open',
     unblocks: 0,
     on: null,
+  },
+];
+
+/** Sessions that stopped to ask (plan #2800.4): one with choices, one in words, one with no way back. */
+const SESSION_QUESTIONS: SessionQuestion[] = [
+  {
+    id: '00000000-0000-4000-8000-0000000000a1',
+    about: 'Music pipeline: split the long tracks before import',
+    href: '/chat/dash/session/00000000-0000-4000-8000-0000000000b1',
+    body: 'The import found 14 tracks over 20 minutes. Split them at silence, or import them whole?',
+    options: ['Split at silence', 'Import whole'],
+    askedAt: '2026-11-04T11:42:00Z',
+    route: 'thread',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a2',
+    about: '#2800.4 Send what waits on you to the Inbox and your phone',
+    href: '/dev/plan/2800.4',
+    body: 'Which push title do you want when several sessions are waiting at once?',
+    options: null,
+    askedAt: '2026-11-04T10:15:00Z',
+    route: 'plan_run',
+  },
+  {
+    id: '00000000-0000-4000-8000-0000000000a3',
+    about: 'Project interactive-islm',
+    href: '/dev/projects/interactive-islm',
+    body: 'The deploy token for the staging site has expired. Add a new one in the project settings.',
+    options: null,
+    askedAt: '2026-11-03T18:00:00Z',
+    route: 'none',
   },
 ];
 
@@ -520,9 +569,12 @@ export function GoalsInboxSurface({
         groups={
           empty
             ? goalInboxGroups([], [])
-            : goalInboxGroups([...home.onYou, ...FINISHED_NOTICES], home.dash ?? [], [
-                GOAL_RUN_QUESTION,
-              ])
+            : goalInboxGroups(
+                [...home.onYou, ...FINISHED_NOTICES],
+                home.dash ?? [],
+                [GOAL_RUN_QUESTION],
+                SESSION_QUESTIONS,
+              )
         }
         laterOn={empty ? [] : (home.laterOn ?? [])}
         preparable={home.preparable ?? []}
@@ -829,6 +881,26 @@ export function FileSurface() {
   );
 }
 
+/** A page a bot had made (plan #2997): an html file, framed, with the link to open it full screen. */
+export function FilePageSurface() {
+  return (
+    <PageColumn>
+      <PageHeader
+        title="Accounting practice drill"
+        description={
+          <>
+            <DashCredit />
+            Written by Dash · updated Wed 4 Nov, 18:40
+          </>
+        }
+      />
+      <div className="space-y-6">
+        <PageFrame title="Accounting practice drill" src="/goals/files/f-drill/view" srcDoc={DRILL_PAGE} />
+      </div>
+    </PageColumn>
+  );
+}
+
 /** What Dash suggests on the cards goal (plan #1739). */
 const CARD_SUGGESTIONS: Suggestion[] = [
   {
@@ -896,6 +968,7 @@ export function GoalTopSurface({
     <GoalDetail
       goal={passive ? { ...cards, activity: 'passive' } : cards}
       activityDrawn={activityDrawn}
+      unreadFiles={1}
       areaName="Money"
       places={PLACES}
       review={cardsReview}
@@ -913,92 +986,105 @@ export function GoalTopSurface({
       {frameOnly ? (
         <GoalDoneWhen goal={cards} />
       ) : (
-        <div className="space-y-6">
-          <GoalDoneWhen goal={cards} />
-          <div className="space-y-4">
-            <GoalStatusCard
-              line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
-              brief={{
-                id: 'brief-1',
-                itemId: cards.id,
-                runId: null,
-                body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
-                createdAt: '2026-09-25T08:00:00Z',
-              }}
-              briefWhen="today"
-              current
-              change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
-              review={cardsReview}
+        <GoalDashboard
+          strip={<GoalStripRow strip={CARDS_STRIP} />}
+          top={<GoalDoneWhen goal={cards} />}
+          lead={
+            <NoLayoutLine
               ask={
-                <GoalShaping
-                  goalId={cards.id}
-                  approval={approvalLine({
-                    goalStatus: 'open',
-                    approvedAt: '2026-09-01T09:00:00Z',
-                    proposed: 0,
-                    questions: 1,
-                  })}
-                  runs={cardRuns}
-                  moreRuns={false}
-                  running={null}
-                  canRun
-                  quiet
+                <AskDash
+                  goals={[cards]}
+                  areas={[]}
+                  defaultAreaId={null}
+                  only
+                  label="Ask Dash to lay it out"
+                  defaultBody="Lay out this goal’s dashboard with the tiles that fit it."
                 />
               }
             />
-            <GoalLogDone goalId={cards.id} />
-            <GoalNumber
-              goalId={cards.id}
-              unit="$"
-              target={0}
-              dueOn={cards.dueOn}
-              duePrecision={cards.duePrecision}
-              readings={readings}
-              today={TODAY}
-            />
-            <WaitingOnYou
-              rows={[
-                {
-                  id: 'which',
-                  kind: 'question',
-                  label: 'Answer',
-                  title: 'Which card first?',
-                  href: '#step-which',
-                },
-                {
-                  id: 'compare',
-                  kind: 'read',
-                  label: 'Read Dash’s result',
-                  title: 'Compare the two cards’ rates',
-                  href: '#step-compare',
-                },
-                {
-                  id: 'call',
-                  kind: 'do',
-                  label: 'Do by 3 Oct',
-                  title: 'Call the card company',
-                  href: '#step-call',
-                },
-              ]}
-              flags={[]}
-              questions={{ which }}
-            />
-          </div>
-          <BurnUpChart days={MONTH_DAYS} />
-          <GoalSuggestions
-            goalId={cards.id}
-            suggestions={CARD_SUGGESTIONS}
-            helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
-          />
-          <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
-          <section aria-labelledby="files-heading" className="space-y-2">
-            <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
-              Files
-              <span className="ml-2 font-normal text-ink-muted">1 not read</span>
-            </h2>
-            <FileLinks files={cardFiles} />
-          </section>
-        </div>
+          }
+          main={
+            <>
+              <GoalStatusCard
+                line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
+                brief={{
+                  id: 'brief-1',
+                  itemId: cards.id,
+                  runId: null,
+                  body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+                  createdAt: '2026-09-25T08:00:00Z',
+                }}
+                briefWhen="today"
+                current
+                change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
+                review={cardsReview}
+                now={CARDS_STRIP.now}
+              />
+              <GoalLogDone goalId={cards.id} />
+              <GoalNumber
+                goalId={cards.id}
+                unit="$"
+                target={0}
+                dueOn={cards.dueOn}
+                duePrecision={cards.duePrecision}
+                readings={readings}
+                today={TODAY}
+              />
+              {/* The question is the Now card, so Waiting on you leaves it out, as the page does. */}
+              <WaitingOnYou
+                rows={[
+                  {
+                    id: 'compare',
+                    kind: 'read',
+                    label: 'Read Dash’s result',
+                    title: 'Compare the two cards’ rates',
+                    href: '#step-compare',
+                  },
+                  {
+                    id: 'call',
+                    kind: 'do',
+                    label: 'Do by 3 Oct',
+                    title: 'Call the card company',
+                    href: '#step-call',
+                  },
+                ]}
+                flags={[]}
+                questions={{ which }}
+              />
+              <BurnUpChart days={MONTH_DAYS} />
+            </>
+          }
+          side={
+            <>
+              <DashOnCard
+                items={[]}
+                latest={{ title: cardFiles[0].title, href: '#' }}
+                ask={<AskDash goals={[cards]} areas={[]} defaultAreaId={null} only />}
+              />
+              <RecentFiles
+                files={cardFiles.map((file, i) => ({
+                  ...file,
+                  summary: null,
+                  meta:
+                    i === 0
+                      ? 'Dash · 24 Sep · for “Compare the two cards’ rates”'
+                      : 'Dash · 20 Sep · for “Draft the letter asking for a lower rate”',
+                }))}
+                unread="1 unread"
+              />
+            </>
+          }
+          rest={
+            <>
+              <GoalSuggestions
+                goalId={cards.id}
+                suggestions={CARD_SUGGESTIONS}
+                helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
+              />
+              <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
+            </>
+          }
+        />
       )}
     </GoalDetail>
   );
@@ -1006,8 +1092,9 @@ export function GoalTopSurface({
 
 /**
  * A goal just added: not approved, nothing measured, no help asked for and
- * nothing linked, so the page has its done-when, the Claude card and one row
- * of add lines.
+ * nothing linked, so the Dashboard has its done-when, an empty strip, the line
+ * offering Dash lay it out, Dash's card with Map it out, and one row of add
+ * lines (plan #2778.4).
  */
 export function GoalBareSurface() {
   const number = { goalId: marathon.id, unit: null, target: null, readings: [], today: TODAY };
@@ -1024,33 +1111,63 @@ export function GoalBareSurface() {
       timeZone="UTC"
       pace={{ known: false, activeDays: 1, lastOn: '2026-10-08', daysSince: 3 }}
     >
-      <div className="space-y-6">
-        <GoalDoneWhen goal={marathon} />
-        <GoalShaping
-          goalId={marathon.id}
-          approval={approvalLine({
-            goalStatus: 'open',
-            approvedAt: null,
-            proposed: 0,
-            questions: 0,
-          })}
-          runs={[]}
-          moreRuns={false}
-          running={null}
-          canRun
-          quiet
-        />
-        <GoalAddRow
-          number={number}
-          help={{ goalId: marathon.id, helpKinds: [] }}
-          links={{
-            goalId: marathon.id,
-            links: { aims: [], jobSearch: null, jobs: [] },
-            aimChoices,
-            jobsOn: true,
-          }}
-        />
-      </div>
+      <GoalDashboard
+        strip={<GoalStripRow strip={{ now: null, next: null, later: null, laterMore: 0 }} />}
+        top={<GoalDoneWhen goal={marathon} />}
+        main={
+          <NoLayoutLine
+            ask={
+              <AskDash
+                goals={[marathon]}
+                areas={[]}
+                defaultAreaId={null}
+                only
+                label="Ask Dash to lay it out"
+                defaultBody="Lay out this goal’s dashboard with the tiles that fit it."
+              />
+            }
+          />
+        }
+        side={
+          <>
+            <DashOnCard
+              items={[]}
+              shaping={
+                <GoalShaping
+                  goalId={marathon.id}
+                  approval={approvalLine({
+                    goalStatus: 'open',
+                    approvedAt: null,
+                    proposed: 0,
+                    questions: 0,
+                  })}
+                  runs={[]}
+                  moreRuns={false}
+                  running={null}
+                  canRun
+                  workLabel="Map it out"
+                  quiet
+                  inCard
+                />
+              }
+              ask={<AskDash goals={[marathon]} areas={[]} defaultAreaId={null} only />}
+            />
+            <RecentFiles files={[]} unread={null} />
+          </>
+        }
+        rest={
+          <GoalAddRow
+            number={number}
+            help={{ goalId: marathon.id, helpKinds: [] }}
+            links={{
+              goalId: marathon.id,
+              links: { aims: [], jobSearch: null, jobs: [] },
+              aimChoices,
+              jobsOn: true,
+            }}
+          />
+        }
+      />
     </GoalDetail>
   );
 }
@@ -1339,9 +1456,12 @@ const tabbedGoal: Goal = {
 export function TabbedGoal({
   children,
   closed = false,
+  progress = goalProgress(tabbedMap.steps),
 }: {
   children: React.ReactNode;
   closed?: boolean;
+  /** The progress the frame shows, where it holds a plan of its own. */
+  progress?: ReturnType<typeof goalProgress>;
 }) {
   return (
     <GoalDetail
@@ -1349,7 +1469,7 @@ export function TabbedGoal({
       areaName={tabbedMap.areaName}
       places={PLACES}
       review={cardsReview}
-      progress={goalProgress(tabbedMap.steps)}
+      progress={progress}
       timeZone="UTC"
       pace={
         closed
@@ -1369,18 +1489,6 @@ export function TabbedGoal({
   );
 }
 
-/** A goal's page on its Steps tab: the step tree with its stages and rhythm. */
-export function GoalStepsTabSurface() {
-  return (
-    <>
-      <SetTab tab="steps" />
-      <TabbedGoal>
-        <StepTree map={tabbedMap} stages={goalStages(tabbedMap.steps)} todoOn={false} />
-      </TabbedGoal>
-    </>
-  );
-}
-
 /**
  * The same goal on its Activity tab: the steps closed, newest first, one of
  * them Dash's and one dropped, the goal's runs, and its comments.
@@ -1388,7 +1496,7 @@ export function GoalStepsTabSurface() {
 export function GoalActivitySurface() {
   return (
     <>
-      <SetTab tab="activity" />
+      <SetTab tab="history" />
       <TabbedGoal>
         <GoalActivity
           goalId={tabbedGoal.id}
@@ -1414,4 +1522,466 @@ export function GoalActivitySurface() {
       </TabbedGoal>
     </>
   );
+}
+
+/* ------------------------------------------------- the Dashboard (#2778.4) */
+
+/** The credit cards goal's strip: the question first, then the call, then what waits on the answer. */
+const CARDS_STRIP: GoalStrip = {
+  now: { id: 'which', title: 'Which card first?', line: null, href: '#step-which', action: 'Answer' },
+  next: { id: 'call', title: 'Call the card company', line: 'By 3 Oct', href: '#step-call' },
+  later: {
+    id: 'plan',
+    title: 'Set up the monthly payments',
+    line: 'After “Which card first?”',
+    href: '#step-plan',
+  },
+  laterMore: 2,
+};
+
+/**
+ * A made-up student loans goal, shaped like the one the mockups were drawn
+ * from: four loans with one servicer, a repayment-plan application waiting on
+ * its approval letter, and Dash working out whether to consolidate.
+ */
+const loansGoal = goal(LOANS_GOAL_ID, 'a-money', 'Pay off the student loans', {
+  acceptance: 'Every student loan paid off.',
+  createdAt: '2026-09-24T09:00:00Z',
+  dueOn: '2037-07-31',
+  duePrecision: 'month',
+});
+
+const loansProgress = progress({
+  bands: { on_you: 2, waiting: 2, with_dash: 1, done: 5 },
+  move: 'on_you',
+});
+
+const loansReview: GoalReview = {
+  id: 'rev-loans',
+  goalId: loansGoal.id,
+  verdict: 'on_track',
+  reason:
+    'The application went in on 2 Nov and the servicer confirmed no bill falls due while it is processed.',
+  nextMove:
+    'Nothing is needed from you until the approval letter arrives; autopay can wait until it does.',
+  nextOn: null,
+  stepId: null,
+  waitsOnId: null,
+  runId: null,
+  createdAt: '2026-11-03T08:00:00Z',
+};
+
+const LOANS_STRIP: GoalStrip = {
+  now: {
+    id: 'letter',
+    title: 'Save the approval letter showing the $0 payment',
+    line: 'Do by 20 Nov',
+    href: '#step-letter',
+    canClose: true,
+  },
+  next: {
+    id: 'autopay',
+    title: 'Turn on autopay for every loan',
+    line: 'By 18 Dec',
+    href: '#step-autopay',
+  },
+  later: {
+    id: 'extra',
+    title: 'Send extra payments to the highest-rate loan',
+    line: 'From 18 Dec',
+    href: '#step-extra',
+  },
+  laterMore: 2,
+};
+
+const LOANS_FILES = [
+  {
+    fileId: 'f-script',
+    title: 'Call script and email for the loan servicer',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Check with the servicer”',
+    byDash: true,
+    unread: true,
+  },
+  {
+    fileId: 'f-walk',
+    title: 'Walkthrough: apply for the repayment plan online',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Apply for the repayment plan”',
+    byDash: true,
+  },
+  {
+    fileId: 'f-compare',
+    title: 'Income-driven repayment or the standard schedule',
+    summary: null,
+    meta: 'Dash · 29 Oct · for “Which repayment plan?”',
+    byDash: true,
+    unread: true,
+  },
+];
+
+/** The goal page frame around the loans goal's Dashboard. */
+function LoansGoal({ children, unreadFiles = 2 }: { children: React.ReactNode; unreadFiles?: number }) {
+  return (
+    <GoalDetail
+      goal={loansGoal}
+      areaName="Money"
+      places={PLACES}
+      review={loansReview}
+      progress={loansProgress}
+      timeZone="UTC"
+      pace={{
+        known: true,
+        activeDays: 7,
+        typicalGap: 3,
+        lastOn: '2026-11-03',
+        daysSince: 1,
+        slower: false,
+      }}
+      unreadFiles={unreadFiles}
+    >
+      {children}
+    </GoalDetail>
+  );
+}
+
+/**
+ * The loans goal on its Dashboard (plan #2778.4): the strip, the status, the
+ * tiles, and Dash's card with a run going and the three newest files beside
+ * them. With `asking`, Ask Dash is open in Dash's card.
+ */
+/** The question handed from Ask Dash, and what the run suggested (plan #2778.8). */
+const ANSWERED_RUN = '7d1c2e40-5b8a-4c1e-9f3a-2a6b8c0d4e11';
+const ANSWERED_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'qs-step',
+    itemId: LOANS_GOAL_ID,
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Send this month’s extra payment to Grad PLUS 2024–25',
+    detail: 'At 9.08% it costs the most to carry; the extra goes further there than in a consolidated loan.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-11-04T10:40:00Z',
+    runId: ANSWERED_RUN,
+    tile: null,
+  },
+  {
+    id: 'qs-tile',
+    itemId: LOANS_GOAL_ID,
+    kind: 'tile',
+    acceptedStepId: null,
+    title: 'Interest saved by paying the Grad PLUS loans first',
+    detail: 'One figure beside Total owed, worked out from the rates on the loans list.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-11-04T10:40:00Z',
+    runId: ANSWERED_RUN,
+    tile: { type: 'number', title: 'Interest saved' },
+  },
+];
+
+export function GoalDashboardPageSurface({
+  asking = false,
+  answered = false,
+}: { asking?: boolean; answered?: boolean } = {}) {
+  const tiles = <DashboardTiles goalId={loansGoal.id} views={loansDashboardViews()} part="lead" />;
+  return (
+    <LoansGoal>
+      <GoalDashboard
+        strip={<GoalStripRow strip={LOANS_STRIP} />}
+        top={<GoalDoneWhen goal={loansGoal} />}
+        lead={
+          answered ? (
+            <>
+              {/* Opened from the notification: the answer first, marked as the one linked to. */}
+              <QuestionResults
+                goalId={loansGoal.id}
+                named={ANSWERED_RUN}
+                results={[
+                  {
+                    runId: ANSWERED_RUN,
+                    question: 'Should I consolidate my loans?',
+                    state: 'done',
+                    text: 'Not yet: a Direct Consolidation Loan would average your rates to about 8.9%, saving nothing, and would restart the count of payments toward forgiveness. Send extra payments to the two Grad PLUS loans instead.\n\n## Why\n…',
+                  },
+                ]}
+                suggestions={{ [ANSWERED_RUN]: ANSWERED_SUGGESTIONS }}
+              />
+              {tiles}
+            </>
+          ) : (
+            tiles
+          )
+        }
+        main={
+          <>
+            <GoalStatusCard
+              line="2 on you · Dash on 1 · by Jul 2037 · usually every 3 days, last yesterday"
+              brief={null}
+              briefWhen={null}
+              current
+              review={loansReview}
+            />
+            <DashboardTiles goalId={loansGoal.id} views={loansDashboardViews()} part="rest" />
+          </>
+        }
+        side={
+          <>
+            <DashOnCard
+              items={[
+                answered
+                  ? {
+                      stepId: LOANS_GOAL_ID,
+                      runId: ANSWERED_RUN,
+                      title: 'Should I consolidate my loans?',
+                      state: 'finished',
+                      line: 'Not yet: consolidating would save nothing on the rates.',
+                    }
+                  : {
+                      stepId: 'consolidate',
+                      runId: 'run-consolidate',
+                      title: 'Should I consolidate the loans or keep them separate?',
+                      state: 'running',
+                      line: 'reading the four loans and the repayment rules',
+                    },
+                {
+                  stepId: 'script',
+                  runId: 'run-script',
+                  title: 'Call script and email for the loan servicer',
+                  state: 'finished',
+                  line: 'Wrote the script and the follow-up email.',
+                },
+              ]}
+              ask={
+                <AskDash
+                  goals={[loansGoal]}
+                  areas={[]}
+                  defaultAreaId={null}
+                  only
+                  defaultOpen={asking}
+                  // Mid-typing, as the box is once you have started a question.
+                  defaultBody={asking ? 'What would refinancing the two Grad PLUS loans save?' : ''}
+                />
+              }
+            />
+            <RecentFiles files={LOANS_FILES} unread="2 unread" />
+          </>
+        }
+      />
+    </LoansGoal>
+  );
+}
+
+/** The loans goal's files on Work & files (plan #2778.7). Invented titles of the real shape. */
+const TAB_FILES: TabFile[] = [
+  {
+    fileId: 'f-script',
+    title: 'Call script and email for the loan servicer',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Check with the servicer”',
+    byDash: true,
+    unread: true,
+    updatedAt: '2026-11-02T15:00:00Z',
+    stepTitle: 'Check with the servicer',
+  },
+  {
+    fileId: 'f-walk',
+    title: 'Walkthrough: apply for the repayment plan online',
+    summary: null,
+    meta: 'Dash · 2 Nov · for “Apply for the repayment plan”',
+    byDash: true,
+    unread: false,
+    pinned: true,
+    updatedAt: '2026-11-02T10:00:00Z',
+    stepTitle: 'Apply for the repayment plan',
+  },
+  {
+    fileId: 'f-statement',
+    title: 'Servicer statement, October',
+    summary: null,
+    meta: 'You · 28 Oct · for “Log each loan balance”',
+    byDash: false,
+    unread: false,
+    contentType: 'application/pdf',
+    updatedAt: '2026-10-28T09:00:00Z',
+    stepTitle: 'Log each loan balance',
+  },
+  {
+    fileId: 'f-compare',
+    title: 'Income-driven repayment or the standard schedule',
+    summary: null,
+    meta: 'Dash · 29 Oct · for “Which repayment plan?”',
+    byDash: true,
+    unread: true,
+    updatedAt: '2026-10-29T12:00:00Z',
+    stepTitle: 'Which repayment plan?',
+  },
+  {
+    fileId: 'f-payoff',
+    title: 'Payoff schedule, highest rate first',
+    summary: null,
+    meta: 'Dash · 25 Sep · for “Choose the payoff order”',
+    byDash: true,
+    unread: false,
+    updatedAt: '2026-09-25T12:00:00Z',
+    stepTitle: 'Choose the payoff order',
+  },
+  {
+    fileId: 'f-options',
+    title: 'Refinancing, income-driven repayment and forgiveness: every option for the four loans compared',
+    summary: null,
+    meta: 'Dash · 25 Sep',
+    byDash: true,
+    unread: false,
+    updatedAt: '2026-09-25T11:00:00Z',
+    stepTitle: null,
+  },
+];
+
+/** The uploaded letter, as Yours lists it once it is added. */
+const UPLOADED: TabFile = {
+  fileId: 'f-letter',
+  title: 'Repayment plan approval letter',
+  summary: null,
+  meta: 'You · 4 Nov · for “Save the servicer’s approval showing the new payment”',
+  byDash: false,
+  unread: false,
+  contentType: 'application/pdf',
+  updatedAt: '2026-11-04T09:00:00Z',
+  stepTitle: 'Save the servicer’s approval showing the new payment',
+};
+
+const TAB_WAITING: WaitingRow[] = [
+  {
+    kindId: 'k-letter',
+    name: 'Repayment plan approval letter',
+    recognise: '',
+    stepId: 'save-letter',
+    stepTitle: 'Save the servicer’s approval showing the new payment',
+  },
+  {
+    kindId: 'k-autopay',
+    name: 'Autopay confirmation, all four loans',
+    recognise: '',
+    stepId: 'autopay',
+    stepTitle: 'Turn on autopay',
+  },
+];
+
+const TAB_WORK: TabWork[] = [
+  {
+    runId: 'run-consolidate',
+    title: 'Should I consolidate my loans or keep them separate?',
+    state: 'running',
+    startedFrom: 'From Ask Dash',
+    result: 'reading the four loans and the repayment rules',
+    file: null,
+    at: '2026-11-04T09:00:00Z',
+    day: '4 Nov',
+  },
+  {
+    runId: 'run-walk',
+    title: 'Apply for the repayment plan',
+    state: 'done',
+    startedFrom: 'On the step “Apply for the repayment plan”',
+    result:
+      'Ten steps for the federal site: pick the income-driven plan, consent to the tax data, report zero income for a $0 payment.',
+    file: { fileId: 'f-walk', title: 'Walkthrough: apply for the repayment plan online' },
+    at: '2026-11-02T10:00:00Z',
+    day: '2 Nov',
+  },
+  {
+    runId: 'run-script',
+    title: 'Can the servicer hold the bills while the plan is processed?',
+    state: 'done',
+    startedFrom: 'From a chat',
+    result: 'Asks the servicer to confirm no bill falls due on the four loans while the plan is processed.',
+    file: { fileId: 'f-script', title: 'Call script and email for the loan servicer' },
+    at: '2026-11-02T09:00:00Z',
+    day: '2 Nov',
+  },
+  {
+    runId: 'run-compare',
+    title: 'Which repayment plan?',
+    state: 'done',
+    startedFrom: 'On the step “Which repayment plan?”',
+    result: 'Recommended the income-driven plan, in place before the 18 Dec bill.',
+    file: { fileId: 'f-compare', title: 'Income-driven repayment or the standard schedule' },
+    at: '2026-10-29T12:00:00Z',
+    day: '29 Oct',
+  },
+  {
+    runId: 'run-map',
+    title: 'Mapped the goal',
+    state: 'done',
+    startedFrom: 'On the goal',
+    result: 'Laid out five stages and wrote the payoff schedule.',
+    file: null,
+    at: '2026-09-25T12:00:00Z',
+    day: '25 Sep',
+  },
+  {
+    runId: 'run-rates',
+    title: 'Check the loan rates against the servicer',
+    state: 'failed',
+    startedFrom: 'On the step “Check the loan rates against the servicer”',
+    result: 'The servicer’s statement was not in Gmail yet.',
+    file: null,
+    at: '2026-09-24T12:00:00Z',
+    day: '24 Sep',
+  },
+];
+
+/**
+ * The loans goal on Work & files (plan #2778.7): the files in their views,
+ * what the goal is waiting for, the drop zone, and Dash's work beside them.
+ */
+export function GoalFilesTabSurface({
+  view = 'all',
+  dragging = false,
+  uploading = false,
+  menu = false,
+  empty = false,
+  added = false,
+}: {
+  view?: FileView;
+  dragging?: boolean;
+  uploading?: boolean;
+  menu?: boolean;
+  empty?: boolean;
+  added?: boolean;
+}) {
+  return (
+    <>
+      <SetTab tab="files" />
+      <LoansGoal unreadFiles={empty ? 0 : 2}>
+        <GoalFilesTab
+          goalId={LOANS_GOAL_ID}
+          files={empty ? [] : added ? [UPLOADED, ...TAB_FILES] : TAB_FILES}
+          waiting={empty ? [] : added ? TAB_WAITING.slice(1) : TAB_WAITING}
+          work={empty ? [] : TAB_WORK}
+          defaultView={view}
+          defaultDragging={dragging}
+          defaultUploading={uploading ? { name: 'servicer-approval-letter-nov.pdf' } : null}
+          defaultMenuFor={menu ? 'f-statement' : null}
+        />
+      </LoansGoal>
+    </>
+  );
+}
+
+/** A goal's page while it loads, on any tab (plan #2778.4). */
+export function GoalPageLoadingSurface() {
+  return <GoalPageSkeleton />;
 }

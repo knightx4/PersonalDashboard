@@ -297,7 +297,6 @@ export async function transactionSpendLookup(ctx: AskContext, input: Input): Pro
   const to = optionalDate(input, 'to') ?? ctx.today;
   if (!from) throw new AskInputError('from is required.');
   if (from > to) throw new AskInputError('from is after to.');
-  if (daysBetween(from, to) > MAX_SPAN_DAYS) throw new AskInputError('Ask for two years or less at a time.');
   const merchantQuery = optionalString(input, 'merchant');
   const categoryQuery = optionalString(input, 'category');
   const accountQuery = optionalString(input, 'account');
@@ -307,6 +306,8 @@ export async function transactionSpendLookup(ctx: AskContext, input: Input): Pro
   const accounts: SpendAccount[] = rows.map((a) => ({ id: a.id, name: a.name, kind: a.kind, hidden: a.hidden, mask: a.mask }));
   const spendingIds = accounts.filter((a) => SPENDING_KINDS.includes(a.kind)).map((a) => a.id);
   if (spendingIds.length === 0) return null;
+  // After this check, so a long span falls back to order emails rather than failing when there are no transactions.
+  if (daysBetween(from, to) > MAX_SPAN_DAYS) throw new AskInputError('Ask for two years or less at a time.');
   const earliest = await earliestTransaction(client, ctx.userId, spendingIds);
   if (!earliest) return null;
 

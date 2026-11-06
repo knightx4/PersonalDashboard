@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { aimText, hoursPage, paceText, shadeOf, weekdaysThrough, type HoursMetric } from '@/lib/goals/hours';
+import {
+  aimText,
+  hoursDayEntries,
+  hoursPage,
+  paceText,
+  shadeOf,
+  weekdaysThrough,
+  type HoursMetric,
+} from '@/lib/goals/hours';
 import { hoursOf, loggedHourDays, metricInputError, sumDaysByPeriod } from '@/lib/goals/metrics';
 
 const metric = (days: HoursMetric['days'], extra: Partial<HoursMetric> = {}): HoursMetric => ({
@@ -172,5 +180,50 @@ describe('words and shades', () => {
     expect(shadeOf(0.1, 4)).toBe(1);
     expect(shadeOf(2, 4)).toBe(2);
     expect(shadeOf(4, 4)).toBe(4);
+  });
+});
+
+describe('hoursDayEntries', () => {
+  const row = (id: string, item: string, quantity: number | string, unit: string | null, at: string) => ({
+    id,
+    item_id: item,
+    text: `entry ${id}`,
+    quantity,
+    unit,
+    created_at: at,
+  });
+  const goals = [
+    { goalId: 'g1', goalTitle: 'Land your next role', steps: new Map([['s1', 'Apply to five roles']]) },
+    { goalId: 'g2', goalTitle: 'Clean the flat', steps: new Map([['s2', 'Clear the hallway']]) },
+  ];
+
+  it('lists the day by goal, in the order each was logged, with its step', () => {
+    const entries = hoursDayEntries(
+      [
+        row('a', 's2', 3, 'h', '2026-10-26T10:00:00Z'),
+        row('b', 's1', '90', 'min', '2026-10-26T12:00:00Z'),
+        row('c', 'g1', 0.5, 'hours', '2026-10-26T09:00:00Z'),
+      ],
+      goals,
+    );
+    expect(entries.map((e) => [e.id, e.goalTitle, e.stepTitle, e.hours])).toEqual([
+      ['c', 'Land your next role', null, 0.5],
+      ['b', 'Land your next role', 'Apply to five roles', 1.5],
+      ['a', 'Clean the flat', 'Clear the hallway', 3],
+    ]);
+    expect(entries[0].note).toBe('entry c');
+  });
+
+  it('leaves out what is not time and what is on no hours goal', () => {
+    const entries = hoursDayEntries(
+      [row('a', 's1', 2, 'bags', '2026-10-26T10:00:00Z'), row('b', 'other', 2, 'h', '2026-10-26T10:00:00Z')],
+      goals,
+    );
+    expect(entries).toEqual([]);
+  });
+
+  it('lists an entry under two hours goals once', () => {
+    const shared = [goals[0], { ...goals[1], steps: new Map([['s1', 'Apply to five roles']]) }];
+    expect(hoursDayEntries([row('a', 's1', 1, 'h', '2026-10-26T10:00:00Z')], shared)).toHaveLength(1);
   });
 });

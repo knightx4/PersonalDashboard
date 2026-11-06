@@ -9,8 +9,7 @@
     "targets": 1
   },
   "dev-ui": {
-    "targets": 55,
-    "contrast": 3
+    "targets": 55
   },
   "goals-all": {
     "targets": 3
@@ -30,13 +29,10 @@
   "goals-page-top": {
     "targets": 2
   },
-  "goals-steps-opened": {
-    "targets": 4
-  },
   "goals-steps-dash-row": {
     "targets": 4
   },
-  "jobs-interviews": {
+  "goals-steps-opened": {
     "targets": 4
   },
   "jobs-pipeline-dense": {

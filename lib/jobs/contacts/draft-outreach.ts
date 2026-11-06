@@ -15,12 +15,13 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { THINKING_ROOM, forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { loadSeeker } from '@/lib/jobs/suggest/run';
 import { loadVoiceSamples } from '@/lib/jobs/suggest/voice';
 import { MESSAGE_RULES, seekerText, type SeekerContext } from '@/lib/jobs/suggest/model';
@@ -214,21 +215,18 @@ export async function draftOutreach(
       model: MODEL,
       max_tokens: 1_500 + THINKING_ROOM,
       system: system(seeker),
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the message, ready to send.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              subject: { type: ['string', 'null'] },
-              message: { type: 'string' },
-            },
-            required: ['subject', 'message'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the message, ready to send.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            subject: { type: ['string', 'null'] },
+            message: { type: 'string' },
           },
+          required: ['subject', 'message'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: prompt }],
     });
   } catch (error) {
@@ -242,9 +240,9 @@ export async function draftOutreach(
   }
   options.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const report = toolBlockIn(response, TOOL_NAME);
-  if (!report || report.type !== 'tool_use') return { ok: false, error: whyNoReport(response) };
-  const input = report.input as { subject?: unknown; message?: unknown };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) return { ok: false, error: report.reason };
+  const input = report.value as { subject?: unknown; message?: unknown };
   const message = typeof input.message === 'string' ? input.message.trim() : '';
   if (!message) return { ok: false, error: 'Dash wrote nothing back. Try again.' };
   const subject =

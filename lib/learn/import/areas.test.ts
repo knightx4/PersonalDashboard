@@ -22,7 +22,9 @@ function areasFrom(count: number) {
 
 function clientReturning(input: unknown) {
   const create = vi.fn().mockResolvedValue({
-    content: [{ type: 'tool_use', name: 'report_areas', input }],
+    // Sonnet's report arrives as structured output, as JSON text (plan #2937.4).
+    content: [{ type: 'text', text: JSON.stringify(input) }],
+    stop_reason: 'end_turn',
     usage: { input_tokens: 300, output_tokens: 120 },
   });
   return { client: { messages: { create } } as never, create };
@@ -95,9 +97,10 @@ describe('naming the areas inside a broad topic', () => {
     const { client, create } = clientReturning({ areas: areasFrom(4) });
     await ask(client);
 
-    const tools = create.mock.calls[0][0].tools as { type?: string; name: string }[];
-    expect(tools).toHaveLength(1);
-    expect(tools[0].name).toBe('report_areas');
+    // Sonnet reports as structured output, so the request offers no tool at all (plan #2937.4).
+    const sent = create.mock.calls[0][0];
+    expect(sent.tools).toBeUndefined();
+    expect(sent.output_config.format.type).toBe('json_schema');
   });
 
   it('reports what it cost, under an operation the spend screen knows', async () => {

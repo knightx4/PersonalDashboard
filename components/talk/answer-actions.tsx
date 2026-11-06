@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState, useTransition } from 'react';
-import { BookmarkPlus, Check, Copy, ListPlus, Pencil, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { BookmarkPlus, Check, Copy, ListPlus, Pencil, RotateCcw, SquareTerminal, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -10,6 +10,7 @@ import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import type { DashChange } from '@/lib/talk/changes';
 import { RATING_NOTE_MAX, type AnswerRating, type RateAnswerOutcome } from '@/lib/talk/rate-answer';
 import type { SaveAnswerTo } from '@/lib/talk/save-answer';
+import { ToSessionForm, type ToSessionSource } from './to-session';
 
 /**
  * The row of presses under each of Dash's answers (plan #1899.7): copy it,
@@ -50,6 +51,8 @@ export function AnswerActions({
   onSaved,
   rated = UNRATED,
   rate,
+  toSession,
+  offerSession = false,
 }: {
   /** The answer as written, which Copy puts on the clipboard. */
   body: string;
@@ -66,6 +69,13 @@ export function AnswerActions({
   rated?: AnswerRated;
   /** Keeps a rating, or null to take it back; left out where the answer cannot be rated (plan #2285.2). */
   rate?: (rating: AnswerRating | null, note: string | null) => Promise<RateAnswerOutcome>;
+  /**
+   * Takes the chat to a session thread (plan #2789.8); left out where the chat
+   * is not kept yet or cannot reach one.
+   */
+  toSession?: ToSessionSource;
+  /** Dash said the request needs a code change: the press is written out, not an icon. */
+  offerSession?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState<SaveAnswerTo | null>(null);
@@ -76,6 +86,7 @@ export function AnswerActions({
   // the optimistic thumb falls back to it once the write is done.
   const [kept, setKept] = useState<AnswerRated>(rated);
   const [asking, setAsking] = useState(false);
+  const [sessionOpen, setSessionOpen] = useState(false);
   const [why, setWhy] = useState('');
   const whyId = useId();
   const { shown, run } = useOptimisticWrite<AnswerRated, AnswerRated>({
@@ -202,10 +213,29 @@ export function AnswerActions({
             </Tooltip>
           </>
         )}
+        {toSession && !offerSession && (
+          <Tooltip label="Take this chat to a session">
+            <IconButton
+              size="sm"
+              label="Take this chat to a session"
+              aria-expanded={sessionOpen}
+              active={sessionOpen}
+              onClick={() => setSessionOpen((open) => !open)}
+            >
+              <SquareTerminal strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
+        )}
         <span className="sr-only" aria-live="polite">
           {copied ? 'Copied' : ''}
         </span>
       </div>
+      {toSession && offerSession && !sessionOpen && (
+        <Button type="button" size="sm" variant="secondary" className="mt-1" onClick={() => setSessionOpen(true)}>
+          Take this to a session
+        </Button>
+      )}
+      {toSession && sessionOpen && <ToSessionForm source={toSession} onClose={() => setSessionOpen(false)} />}
       {asking && (
         <form
           id={whyId}

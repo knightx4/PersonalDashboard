@@ -71,7 +71,7 @@ export function OrderActionsMenu({
         router.refresh();
       },
     },
-    { id: 'review', label: 'Review queue', href: '/shopping/review' },
+    { id: 'review', label: 'Review queue', href: '/shopping/orders/review' },
   ];
 
   return (

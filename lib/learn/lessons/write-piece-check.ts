@@ -1,12 +1,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { AnswerSignals } from '@/lib/learn/confidence';
 import type { FirstTry } from '@/lib/learn/hint';
 import { gradeWrittenAnswer, OPENING_MODEL, type WrittenGrade } from '@/lib/learn/graph/opening-probe';
 import { openingQuestionSchema, toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { pieceCheckPrompt, pieceLines, type PieceForCheck } from './piece-check';
 
 /**
@@ -83,22 +83,19 @@ export async function writePieceCheck(input: {
       model: PIECE_CHECK_MODEL,
       max_tokens: 1024,
       system: WRITE_SYSTEM,
-      tools: [
-        {
-          name: WRITE_TOOL,
-          description: 'Report the question and the answer it expects.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              question: { type: 'string' },
-              expected: { type: 'string' },
-              unusable: { type: 'boolean' },
-            },
-            required: ['question', 'expected'],
+      ...reportRequest({
+        name: WRITE_TOOL,
+        description: 'Report the question and the answer it expects.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            expected: { type: 'string' },
+            unusable: { type: 'boolean' },
           },
+          required: ['question', 'expected'],
         },
-      ],
-      tool_choice: forceTool(WRITE_TOOL, PIECE_CHECK_MODEL),
+      }, PIECE_CHECK_MODEL),
       messages: [{ role: 'user', content: pieceCheckPrompt(input.piece, input.asked, WRITE_TOOL) }],
     });
   } catch (error) {
@@ -107,10 +104,10 @@ export async function writePieceCheck(input: {
 
   input.onSpend?.({ model: PIECE_CHECK_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === WRITE_TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
+  const report = readReport(response, WRITE_TOOL, PIECE_CHECK_MODEL);
+  if (!report.ok) return { outcome: 'failed', detail: report.reason };
 
-  const safe = openingQuestionSchema.safeParse(block.input);
+  const safe = openingQuestionSchema.safeParse(report.value);
   if (!safe.success) return { outcome: 'failed', detail: 'The question came back malformed.' };
 
   const checked = toWrittenQuestion(safe.data);

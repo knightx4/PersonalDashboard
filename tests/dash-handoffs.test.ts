@@ -7,6 +7,14 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-core';
+import {
+  CLOSE_SQL,
+  closeParameters,
+  SEEN_SQL,
+  SPEND_SQL,
+  spendParameter,
+  transcriptSpend,
+} from '@/lib/talk/handoff-session';
 
 let userA = '';
 let userB = '';
@@ -72,5 +80,118 @@ describe('a hand-off', () => {
       admin`insert into dash_handoffs (user_id, conversation_id, request, subject_ref)
             values (${userA}, ${CONVERSATION}, 'x', 'not a ref')`,
     ).rejects.toThrow();
+  });
+});
+
+describe('a session hand-off (plan #3005.1)', () => {
+  const KEY = `core.conversations:${CONVERSATION}#m1`;
+
+  it('keeps the words, summary and refs, and reads its state from status', async () => {
+    const [row] = await asUser(
+      userA,
+      (tx) => tx<{ id: string; state: string; refs: unknown }[]>`
+        insert into dash_handoffs (user_id, kind, conversation_id, request, asked, summary, refs, request_key)
+        values (${userA}, 'session', ${CONVERSATION}, 'Write #3001 in full', 'flesh out 3001',
+                'Planning hand-offs.', ${tx.json([{ ref: 'public.plan_items:abc' }])}, ${KEY})
+        returning id, state, refs`,
+    );
+    expect(row.state).toBe('queued');
+    expect(row.refs).toEqual([{ ref: 'public.plan_items:abc' }]);
+    await admin`update dash_handoffs set status = 'fired', cost_micros = 120000, last_seen_at = now() where id = ${row.id}`;
+    const [after] = await admin<{ state: string }[]>`select state from dash_handoffs where id = ${row.id}`;
+    expect(after.state).toBe('running');
+  });
+
+  it('keeps one row for a retried request with the same key', async () => {
+    const again = await asUser(
+      userA,
+      (tx) => tx`
+        insert into dash_handoffs (user_id, kind, conversation_id, request, asked, request_key)
+        values (${userA}, 'session', ${CONVERSATION}, 'Write #3001 in full', 'flesh out 3001', ${KEY})
+        on conflict (user_id, request_key) do nothing
+        returning id`,
+    );
+    expect(again).toHaveLength(0);
+    const rows = await admin`select id from dash_handoffs where request_key = ${KEY}`;
+    expect(rows).toHaveLength(1);
+  });
+
+  it('needs a key, the words and one thread', async () => {
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, conversation_id, request, asked)
+            values (${userA}, 'session', ${CONVERSATION}, 'x', 'x')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, conversation_id, request, request_key)
+            values (${userA}, 'session', ${CONVERSATION}, 'x', 'k-no-words')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into dash_handoffs (user_id, kind, request, asked, request_key)
+            values (${userA}, 'session', 'x', 'x', 'k-no-thread')`,
+    ).rejects.toThrow();
+  });
+});
+
+describe('a session working its hand-off (plan #3005.3)', () => {
+  const spend = transcriptSpend([
+    JSON.stringify({
+      type: 'assistant',
+      message: { id: 'msg_1', model: 'claude-opus-5-5', usage: { input_tokens: 10, output_tokens: 100 } },
+    }),
+  ]);
+
+  async function queued(key: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into dash_handoffs (user_id, kind, conversation_id, request, asked, request_key)
+      values (${userA}, 'session', ${CONVERSATION}, 'Write #3001 in full', 'flesh out 3001', ${key})
+      returning id`;
+    return row.id;
+  }
+
+  it("moves a queued hand-off to running when it reports, and only the owner's", async () => {
+    const id = await queued('k-seen');
+    expect(await admin.unsafe(SEEN_SQL, [id, userB])).toHaveLength(0);
+    const [seen] = await admin.unsafe(SEEN_SQL, [id, userA]);
+    expect(seen.state).toBe('running');
+    const [row] = await admin`select fired_at, last_seen_at from dash_handoffs where id = ${id}`;
+    expect(row.fired_at).not.toBeNull();
+    expect(row.last_seen_at).not.toBeNull();
+  });
+
+  it('closes done with its cost once, and counts that cost toward spend', async () => {
+    const id = await queued('k-close');
+    await admin.unsafe(SEEN_SQL, [id, userA]);
+    const [closed] = await admin.unsafe(CLOSE_SQL, closeParameters(id, userA, { outcome: 'done' }, spend) as never[]);
+    expect(closed.state).toBe('done');
+    expect(Number(closed.cost_micros)).toBe(spend[0].costMicros);
+    const rows = await admin.unsafe(SPEND_SQL, [userA, spendParameter(spend)]);
+    expect(rows).toHaveLength(1);
+    const [ledger] = await admin`
+      select module, operation, model, output_tokens, cost_micros from model_spend where id = ${rows[0].id}`;
+    expect(ledger).toMatchObject({
+      module: 'core',
+      operation: 'hand-off-session',
+      model: 'claude-opus-5-5',
+      output_tokens: 100,
+    });
+
+    const again = await admin.unsafe(
+      CLOSE_SQL,
+      closeParameters(id, userA, { outcome: 'failed', reason: 'late' }, spend) as never[],
+    );
+    expect(again).toHaveLength(0);
+  });
+
+  it('closes failed with the reason', async () => {
+    const id = await queued('k-fail');
+    const [closed] = await admin.unsafe(
+      CLOSE_SQL,
+      closeParameters(id, userA, { outcome: 'failed', reason: 'The table was not found.' }, []) as never[],
+    );
+    expect(closed.state).toBe('failed');
+    expect(closed.cost_micros).toBeNull();
+    const [row] = await admin`select error, finished_at from dash_handoffs where id = ${id}`;
+    expect(row.error).toBe('The table was not found.');
+    expect(row.finished_at).not.toBeNull();
   });
 });

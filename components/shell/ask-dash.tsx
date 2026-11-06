@@ -15,12 +15,12 @@ import { IconButton, iconButtonVariants } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
-import { Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
+import { ArrowLeft, History, Maximize2, MessageSquareText, SquarePen, X } from 'lucide-react';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { DashStarters, DashWelcome } from '@/components/talk/dash-welcome';
+import { DashWelcome } from '@/components/talk/dash-welcome';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
-import { Thread, type TalkSend, type ThreadCost } from '@/components/thread/thread';
+import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
@@ -44,6 +44,7 @@ import type { SearchHit } from '@/lib/search/sources';
 import { useAskBox, type AskBoxStart } from '@/components/talk/ask-box';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
+import type { ReplyState } from '@/lib/talk/reply-state';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { filesEstimate } from '@/lib/dash/file-cost';
 import { DASH_MODELS } from '@/lib/dash/models';
@@ -61,10 +62,30 @@ import {
   rateDashAnswer,
   saveDashAnswer,
   undoDashChange,
-} from '@/app/ask/actions';
+} from '@/app/chat/dash/actions';
+import { chatSessionOptionsAction, startSessionFromChatAction } from '@/app/chat/dash/session-actions';
+import { offersSession } from '@/lib/talk/chat-to-session';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ModelChip, modelLabel } from '@/components/talk/model-chip';
+import { SessionSentLine, ThinkSwitch, ThoughtLine } from '@/components/talk/think-switch';
 import { getDashModel, setDashModel, type SetDashModelResult } from '@/lib/dash/model-choice-actions';
+import { ChatRow, PaneChat, useChatEntries, type PaneChats } from '@/components/shell/ask-dash-chats';
+import { PersonMark } from '@/components/patterns/messaging';
+import { GroupMark } from '@/app/chat/group-parts';
+import {
+  olderGroupMessages,
+  olderMessages,
+  paneThread,
+  paneThreads,
+  readGroup,
+  readThread,
+  retryReply,
+  threadBuilds,
+  threadChanges,
+} from '@/app/chat/actions';
+import { groupHref } from '@/lib/you/group-chats-model';
+import { personInitials, threadHref } from '@/lib/you/chat-threads-model';
+import { DASH_PICK, pickId, pickOf, type PanePick } from '@/lib/you/pane-threads-model';
 import type { DashChoiceId } from '@/lib/core/models';
 
 /**
@@ -78,9 +99,15 @@ import type { DashChoiceId } from '@/lib/core/models';
  * view beside it.
  *
  * A question starts a conversation that is kept (core.conversations, kind
- * `ask`), so the sheet opens on the last few and /ask lists them all; either
- * reopens one to carry on. Following a link in an answer closes the sheet,
- * since the page it goes to is what was asked for.
+ * `ask`), so Earlier questions in the sheet's header lists the last few and
+ * Dash's page lists them all; either reopens one to carry on. Following a
+ * link in an answer closes the sheet, since the page it goes to is what was
+ * asked for.
+ *
+ * Since plan #2981 the sheet is also a quick way into every Messages chat: a
+ * row of marks under the header, Dash first, switches the sheet to that live
+ * thread in place (components/shell/ask-dash-chats.tsx). It always opens on
+ * Dash, and the words left in each chat's box wait there for its return.
  *
  * The state is in a provider for the same reason as capture's
  * (components/shell/capture.tsx): opening it must not re-render the page, and
@@ -91,10 +118,18 @@ import type { DashChoiceId } from '@/lib/core/models';
  * What else goes with a question (plan #1899.5): the signal that stops it,
  * the rows added with @, and the workspace its lookups are kept to.
  */
-export type AskMore = { signal?: AbortSignal; rows?: AskMention[]; scope?: ModuleId | null };
+export type AskMore = {
+  signal?: AbortSignal;
+  rows?: AskMention[];
+  scope?: ModuleId | null;
+  /** "Think it through" is on (plan #2789.10). */
+  think?: boolean;
+  /** Try again (plan #2854.4): answer the chat's last question instead of adding one. */
+  retry?: boolean;
+};
 
 /**
- * Where the sheet reads and writes: the server actions in app/ask/actions.ts,
+ * Where the sheet reads and writes: the server actions in app/chat/dash/actions.ts,
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
@@ -129,8 +164,22 @@ export type AskSource = ChangePresses & {
    * leave it out, and a pick there is kept on the page alone.
    */
   setModel?: (model: DashChoiceId) => Promise<SetDashModelResult>;
+  /**
+   * Take the chat to a session thread (plan #2789.8): the projects to pick
+   * from, and the start. The gallery's fixtures leave it out for the ones that
+   * do not draw the button.
+   */
+  toSession?: {
+    options: typeof chatSessionOptionsAction;
+    start: typeof startSessionFromChatAction;
+  };
   /** Read the saved model again, after Dash changed it in an answer (plan #2458.4). */
   getModel?: () => Promise<DashChoiceId>;
+  /**
+   * The Messages chats the sheet switches to (plan #2981). A source without
+   * them draws Dash alone, with no row.
+   */
+  chats?: PaneChats;
 };
 
 /**
@@ -149,20 +198,49 @@ async function askLive(
   onText?: (piece: string) => void,
   more: AskMore = {},
 ): Promise<AskDashResult> {
-  const { signal, rows, scope } = more;
+  const { signal, rows, scope, think, retry } = more;
   // The question as the route kept it, heard before Dash answers: what a
   // stopped answer is found again by (plan #1899.5).
   let asked: AskedWire | null = null;
+  // Stop is its own press (plan #2854.4): leaving the page no longer ends the
+  // answer, so the request is not cut. The chat is marked, the run ends the
+  // answer, and the stream brings back what was kept. Pressed before the
+  // question was kept, the mark goes as soon as its chat is known.
+  let stopPressed = false;
+  const sendStop = () => {
+    if (!asked) return;
+    void fetch('/api/ask/stop', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationRef: asked.conversation.ref }),
+    }).catch(() => {});
+  };
+  signal?.addEventListener(
+    'abort',
+    () => {
+      stopPressed = true;
+      sendStop();
+    },
+    { once: true },
+  );
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page, files, list, rows, scope }),
-      signal,
+      body: JSON.stringify({
+        question,
+        conversationRef,
+        page,
+        files,
+        list,
+        rows,
+        scope,
+        ...(think ? { think: true } : {}),
+        ...(retry ? { retry: true } : {}),
+      }),
     });
   } catch {
-    if (signal?.aborted) return keptWhenStopped(asked);
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   if (response.status === 401) return { turns: [], error: 'You are signed out. Sign in again to ask Dash.' };
@@ -176,12 +254,13 @@ async function askLive(
       (piece) => onText?.(piece),
       (heard) => {
         asked = heard;
+        if (stopPressed) sendStop();
       },
     );
-    if (signal?.aborted && result.error === STREAM_CUT) return keptWhenStopped(asked);
+    if (result.error === STREAM_CUT && asked) return keptWhenStopped(asked);
     return result;
   } catch {
-    if (signal?.aborted) return keptWhenStopped(asked);
+    if (asked) return keptWhenStopped(asked);
     return { turns: [], error: STREAM_CUT };
   }
 }
@@ -191,11 +270,11 @@ const STOPPED_LOOKS = 10;
 const STOPPED_LOOK_MS = 400;
 
 /**
- * The question and its answer as the route kept them after Stop (plan
- * #1899.5). Stopping cuts the stream, so the result line never arrives; the
- * conversation the `asked` line named is read back until the answer is in
- * it. A question stopped before it was kept comes back with no turns, which
- * puts the words back in the box.
+ * The question and its answer as the route kept them when the stream was
+ * cut before its result line (plan #1899.5): the conversation the `asked`
+ * line named is read back until the answer is in it. Since plan #2854.4 the
+ * answer carries on on the server when the stream goes, so one not in yet
+ * is said to be on its way, and reopening the chat shows it.
  */
 async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> {
   if (!asked) return { turns: [], error: 'Stopped before Dash had your question.' };
@@ -218,7 +297,7 @@ async function keptWhenStopped(asked: AskedWire | null): Promise<AskDashResult> 
   return {
     conversation: asked.conversation,
     turns: asked.turns,
-    error: 'Stopped. What Dash had written is being kept; reopen this chat in a moment to read it.',
+    error: 'The connection dropped, but Dash is still answering. Reopen this chat in a moment to read the reply.',
   };
 }
 
@@ -231,12 +310,22 @@ const ACTIONS: AskSource = {
   label: askDashPageLabel,
   save: saveDashAnswer,
   rate: rateDashAnswer,
+  toSession: { options: chatSessionOptionsAction, start: startSessionFromChatAction },
   setModel: setDashModel,
   getModel: getDashModel,
   confirm: confirmDashChange,
   decline: declineDashChange,
   reopen: reopenDashChange,
   undo: undoDashChange,
+  chats: {
+    list: paneThreads,
+    open: paneThread,
+    live: {
+      thread: { older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds },
+      group: { older: olderGroupMessages, read: readGroup },
+      presses: { confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange },
+    },
+  },
 };
 
 type AskDashHandle = {
@@ -468,7 +557,8 @@ export function useAskSend(
   useEffect(() => {
     heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list, more };
   });
-  return useCallback<TalkSend>(async (body, files) => {
+  return useCallback<TalkSend>(async (body, files, options) => {
+    const more = heard.current.more?.();
     const result = await source.ask(
       body,
       ref.current,
@@ -477,7 +567,7 @@ export function useAskSend(
       files,
       heard.current.list,
       (piece) => heard.current.onText?.(piece),
-      heard.current.more?.(),
+      options?.retry ? { ...more, retry: true } : more,
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -511,16 +601,20 @@ export function AskThread({
   turns,
   changes: initialChanges = [],
   openHandoffs = 0,
+  reply: initialReply = null,
   onConversation,
   onSend,
   onAnswered,
   boxStart,
+  bubbles = false,
   ...thread
 }: {
   id: string;
   conversationRef: string | null;
   /** Requests already with the backup routine and not yet replied to (plan #1402). */
   openHandoffs?: number;
+  /** The reply to the last question as the server held it when the chat was read (plan #2854.4). */
+  reply?: ReplyState;
   /** The app address each question is asked from; null tells Dash no page. */
   page?: string | null;
   /** The filter of a list sent with each question (plan #1658); null sends none. */
@@ -548,6 +642,11 @@ export function AskThread({
   pendingQuestion?: string;
   /** For the preview gallery: the box opens with rows added or a workspace chosen (plan #1899.5). */
   boxStart?: AskBoxStart;
+  /**
+   * Drawn as Chat's Dash tab draws it (plan #2748.12): questions in bubbles,
+   * and what Dash looked up folded under his name, above the answer.
+   */
+  bubbles?: boolean;
 }) {
   const handle = useAskDash();
   const source = handle?.source ?? ACTIONS;
@@ -563,10 +662,16 @@ export function AskThread({
     fixtureHits: handle?.searchHits,
     start: boxStart,
   });
+  // "Think it through" (plan #2789.10): on until pressed again.
+  const [think, setThink] = useState(boxStart?.think ?? false);
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
-  const incoming = useHandoffReplies(source, ref, open > 0, setOpen);
+  const handedBack = useHandoffReplies(source, ref, open > 0, setOpen);
+  // A reply still being written by a run this page did not start (plan #2854.4).
+  const [reply, setReply] = useState<ServerReply>(() => serverReplyOf(initialReply));
+  const answeredElsewhere = useReplyArrival(source, ref, reply?.state === 'answering', setReply);
+  const incoming = answeredElsewhere ?? handedBack;
   // What Dash is looking up for the answer on its way (plan #1438), emptied
   // on each question; the answer once landed shows its own, folded.
   const [live, setLive] = useState<LookupLine[]>([]);
@@ -589,7 +694,7 @@ export function AskThread({
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
     (piece) => setWritten((current) => current + piece),
-    () => ({ ...box.take(), signal: running.current?.signal }),
+    () => ({ ...box.take(), signal: running.current?.signal, think }),
   );
   const onChanged = useCallback(
     (next: DashChange) => {
@@ -600,6 +705,12 @@ export function AskThread({
     [refreshModel],
   );
   const [today] = useState(localToday);
+  // The chat's ref is stable once kept, so the source is too (plan #2789.8).
+  const sessionSource = useMemo(() => {
+    const to = source.toSession;
+    if (!to || !ref) return undefined;
+    return { options: () => to.options(ref), start: (projectId: string | null) => to.start({ ref, projectId }) };
+  }, [source.toSession, ref]);
 
   const byTurn = useMemo(() => {
     const map = new Map<string, DashChange[]>();
@@ -654,33 +765,48 @@ export function AskThread({
         )
       }
       boxStart={
-        handle?.model && handle.chooseModel ? (
-          <>
-            {box.thread.boxStart}
-            <ModelChip
-              model={handle.model}
-              onModel={handle.chooseModel}
-              initialOpen={handle.modelOpen}
-            />
-          </>
-        ) : (
-          box.thread.boxStart
-        )
+        <>
+          {box.thread.boxStart}
+          {/* On Chat's Dash tab they sit under the box as quiet words (plan #2863). */}
+          <ThinkSwitch on={think} onChange={setThink} quiet={bubbles} />
+          {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
+          {!think && handle?.model && handle.chooseModel ? (
+            <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} quiet={bubbles} />
+          ) : null}
+        </>
       }
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
       written={written}
       activity="searching"
       incoming={incoming}
+      serverReply={reply}
+      canRetry={Boolean(ref)}
+      bubbles={bubbles}
+      lead={bubbles ? (turn) => (turn.role === 'assistant' ? <LookupFold calls={turn.toolCalls} quiet /> : null) : undefined}
       below={(turn, thread) => {
         if (turn.role !== 'assistant') return null;
         const mine = byTurn.get(turn.id);
         return (
           <>
             {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
-            <LookupFold calls={turn.toolCalls} />
+            {!bubbles && <LookupFold calls={turn.toolCalls} />}
+            {/* What a thought-through answer cost (plan #2789.10). */}
+            <ThoughtLine calls={turn.toolCalls} />
+            {/* A question sent to a session thread, followed live (plan #2789.11). */}
+            <SessionSentLine calls={turn.toolCalls} />
             {/* Copy, ask again, and keep the answer elsewhere (plan #1899.7).
-                A todo or a note comes back as a change, drawn above with Undo. */}
+                A todo or a note comes back as a change, drawn above with Undo.
+                In a chat on the page they rest under every answer but the
+                latest until it is pointed at, from laptop width; a touch
+                screen, with nothing to point with, keeps them (plan #2748.12). */}
+            <div
+              className={
+                bubbles && !thread.latest
+                  ? 'min-[720px]:opacity-0 min-[720px]:transition-opacity min-[720px]:group-hover:opacity-100 min-[720px]:group-focus-within:opacity-100 pointer-coarse:opacity-100'
+                  : undefined
+              }
+            >
             <AnswerActions
               body={turn.body}
               question={thread.question}
@@ -694,7 +820,11 @@ export function AskThread({
               // Thumbs up and down (plan #2285.2), once the chat is kept and has a ref.
               rated={{ rating: turn.rating ?? null, note: turn.ratingNote ?? null }}
               rate={ref ? (rating, note) => source.rate(ref, turn.id, rating, note) : undefined}
+              // To a session thread on a project (plan #2789.8), once the chat is kept.
+              toSession={sessionSource}
+              offerSession={offersSession(turn.body)}
             />
+            </div>
           </>
         );
       }}
@@ -745,6 +875,58 @@ function useHandoffReplies(
     };
   }, [source, ref, waiting, setOpen]);
   return incoming;
+}
+
+/** The server's reply state as the thread draws it: when it started is the server's to know. */
+function serverReplyOf(reply: ReplyState | undefined): ServerReply {
+  if (!reply) return null;
+  return reply.state === 'answering' ? { state: 'answering' } : reply;
+}
+
+/** How often a thread whose reply is being written elsewhere checks for it (plan #2854.4). */
+const REPLY_POLL_MS = 3_000;
+/** A reply is read as failed by the server after REPLY_LOST_AFTER_MS, so checking stops a little after. */
+const REPLY_POLL_FOR_MS = 6 * 60_000;
+
+/**
+ * While the reply to the last question is being written by a run this page
+ * did not start (plan #2854.4: the page that asked was left, and this one
+ * opened the chat), reads the chat every three seconds and hands back its
+ * turns once the reply is in, or the failure once it has failed.
+ */
+function useReplyArrival(
+  source: AskSource,
+  ref: string | null,
+  waiting: boolean,
+  setReply: (reply: ServerReply) => void,
+): readonly TalkTurn[] | undefined {
+  const [arrived, setArrived] = useState<readonly TalkTurn[]>();
+  useEffect(() => {
+    if (!ref || !waiting) return;
+    const until = Date.now() + REPLY_POLL_FOR_MS;
+    let live = true;
+    const timer = setInterval(() => {
+      if (Date.now() > until) {
+        clearInterval(timer);
+        return;
+      }
+      source
+        .poll(ref)
+        .then((found) => {
+          if (!live || found.turns.length === 0) return;
+          const next = serverReplyOf(found.reply);
+          if (next?.state === 'answering') return;
+          setArrived(found.turns);
+          setReply(next);
+        })
+        .catch(() => {});
+    }, REPLY_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [source, ref, waiting, setReply]);
+  return arrived;
 }
 
 /**
@@ -815,6 +997,22 @@ export function AskDashPanel({
   // on the full page (plan #1899.2).
   const [chatRef, setChatRef] = useState<string | null>(null);
   const [costs, setCosts] = useState<PaidCosts>({});
+  // Which chat the sheet has open (plan #2981): Dash on every opening, and
+  // any Messages chat one press away in the row. Dash's own chat stays drawn,
+  // hidden, while another is open, so going back finds it as it was.
+  const [pick, setPick] = useState<PanePick>(DASH_PICK);
+  const { entries } = useChatEntries(source.chats);
+  // The words left unsent in each chat's box, kept while another is open.
+  // Written as they are typed and read when a chat opens, so a change to it
+  // needs no redraw.
+  const [drafts] = useState(() => new Map<string, string>());
+  // Earlier questions, open over Dash's chat in the sheet.
+  const [earlier, setEarlier] = useState(false);
+  const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(null);
+  const earlierOpen = useRef(earlier);
+  useEffect(() => {
+    earlierOpen.current = earlier;
+  }, [earlier]);
 
   useEffect(() => {
     let live = true;
@@ -849,8 +1047,11 @@ export function AskDashPanel({
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       // Escape in the box closes the box first (Thread), and marks the
-      // event handled; only a second Escape closes the sheet.
-      if (event.key === 'Escape' && !event.defaultPrevented) onClose();
+      // event handled; only a second Escape closes the sheet. Earlier
+      // questions open goes back to the chat first.
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (earlierOpen.current) setEarlier(false);
+      else onClose();
     }
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -860,7 +1061,24 @@ export function AskDashPanel({
     };
   }, [onClose]);
 
+  function openEarlier() {
+    setEarlier(true);
+    setRecent(null);
+    source
+      .recent()
+      .catch(() => ({ conversations: [], error: 'Your earlier questions could not be read.' }))
+      .then(setRecent);
+  }
+
+  function choose(next: PanePick) {
+    setPick(next);
+    setEarlier(false);
+  }
+
+  const openEntry = pick.kind === 'dash' ? null : entries.find((entry) => pickId(pickOf(entry)) === pickId(pick));
+
   function show(next: View) {
+    setEarlier(false);
     setView(next);
     setStarted(next.kind === 'earlier');
     setChatRef(next.kind === 'earlier' ? next.ref : null);
@@ -895,32 +1113,66 @@ export function AskDashPanel({
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
               <div className="flex min-h-8 items-center gap-2">
-                <ModuleMark module="dash" size="sm" />
-                <h2 id="ask-dash-title" className="text-ui font-semibold text-ink">
-                  Ask Dash
+                {pick.kind === 'dash' ? (
+                  <ModuleMark module="dash" size="sm" />
+                ) : openEntry?.kind === 'group' ? (
+                  <GroupMark members={openEntry.row.members} size="sm" />
+                ) : openEntry?.kind === 'person' ? (
+                  <PersonMark initials={personInitials(openEntry.row.name)} colour={openEntry.row.colour} photo={openEntry.row.photo} size="sm" />
+                ) : null}
+                <h2 id="ask-dash-title" className="min-w-0 truncate text-ui font-semibold text-ink">
+                  {pick.kind === 'dash'
+                    ? 'Ask Dash'
+                    : openEntry?.kind === 'group'
+                      ? openEntry.row.title
+                      : (openEntry?.row.name ?? 'Chat')}
                 </h2>
               </div>
-              {view.kind === 'earlier' && view.title && (
+              {pick.kind === 'dash' && !earlier && view.kind === 'earlier' && view.title && (
                 <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">
                   {view.title}
                 </p>
               )}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
-              <Tooltip label="Open on Dash's page" align="end">
-                <Link
-                  href={chatRef ? `/ask/${chatRef}` : '/ask'}
-                  aria-label="Open on Dash's page"
-                  className={iconButtonVariants()}
-                >
-                  <Maximize2 strokeWidth={1.75} aria-hidden />
-                </Link>
-              </Tooltip>
-              {started && (
-                <Tooltip label="New question" align="end">
-                  <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
-                    <SquarePen strokeWidth={1.75} aria-hidden />
-                  </IconButton>
+              {pick.kind === 'dash' ? (
+                <>
+                  <Tooltip label="Earlier questions" align="end">
+                    <IconButton
+                      label="Earlier questions"
+                      aria-pressed={earlier}
+                      onClick={() => (earlier ? setEarlier(false) : openEarlier())}
+                      className={earlier ? 'bg-sunken text-ink' : undefined}
+                    >
+                      <History strokeWidth={1.75} aria-hidden />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip label="Open on Dash's page" align="end">
+                    <Link
+                      href={chatRef ? `/chat/dash/${chatRef}` : '/chat/dash'}
+                      aria-label="Open on Dash's page"
+                      className={iconButtonVariants()}
+                    >
+                      <Maximize2 strokeWidth={1.75} aria-hidden />
+                    </Link>
+                  </Tooltip>
+                  {started && (
+                    <Tooltip label="New question" align="end">
+                      <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
+                        <SquarePen strokeWidth={1.75} aria-hidden />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </>
+              ) : (
+                <Tooltip label="Open in Messages" align="end">
+                  <Link
+                    href={pick.kind === 'person' ? threadHref(pick.key) : groupHref(pick.id)}
+                    aria-label="Open in Messages"
+                    className={iconButtonVariants()}
+                  >
+                    <Maximize2 strokeWidth={1.75} aria-hidden />
+                  </Link>
                 </Tooltip>
               )}
               <Tooltip label="Close Dash" align="end">
@@ -931,24 +1183,28 @@ export function AskDashPanel({
             </div>
           </div>
 
+          {source.chats && <ChatRow entries={entries} selected={pickId(pick)} onPick={choose} />}
+
           {/* A column, so a thread fills it and its box docks at the foot,
-              as on the Dash page. */}
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3">
+              as on the Dash page. Kept drawn while another chat or Earlier
+              questions is open, so nothing typed or asked here is lost. */}
+          <div
+            className={cn(
+              'flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-3',
+              (pick.kind !== 'dash' || earlier) && 'hidden',
+            )}
+          >
             {view.kind === 'new' ? (
               <NewQuestion
                 key={threadKey}
                 ask={view.ask}
                 page={page}
                 list={rows}
-                source={source}
                 lookingAt={lookingAt}
                 onStarted={(ref) => {
                   setStarted(true);
                   setChatRef(ref);
                 }}
-                onReopen={(conversation) =>
-                  show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })
-                }
               />
             ) : (
               <EarlierQuestion
@@ -960,6 +1216,24 @@ export function AskDashPanel({
               />
             )}
           </div>
+          {pick.kind === 'dash' && earlier && (
+            <Earlier
+              recent={recent}
+              onBack={() => setEarlier(false)}
+              onReopen={(conversation) => show({ kind: 'earlier', ref: conversation.ref, title: conversation.title })}
+            />
+          )}
+          {pick.kind !== 'dash' && source.chats && (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <PaneChat
+                key={pickId(pick)}
+                pick={pick}
+                chats={source.chats}
+                draft={drafts.get(pickId(pick)) ?? ''}
+                onDraft={(text) => drafts.set(pickId(pick), text)}
+              />
+            </div>
+          )}
         </PaidCostsProvider>
       </aside>
     </div>
@@ -970,41 +1244,18 @@ function NewQuestion({
   ask,
   page,
   list,
-  source,
   lookingAt,
   onStarted,
-  onReopen,
 }: {
   ask?: string;
   page: string | null;
   list?: AskRows;
-  source: AskSource;
   lookingAt: React.ReactNode;
   onStarted: (ref: string) => void;
-  onReopen: (conversation: ConversationSummary) => void;
 }) {
   const [asked, setAsked] = useState(Boolean(ask));
   const handle = useAskDash();
   const draft = handle?.draft;
-  // A starter pressed: the thread is drawn again with it as its question.
-  const [starter, setStarter] = useState<string | null>(null);
-  const [recent, setRecent] = useState<{ conversations: ConversationSummary[]; error?: string } | null>(
-    null,
-  );
-
-  useEffect(() => {
-    let live = true;
-    source
-      .recent()
-      .catch(() => ({ conversations: [], error: 'Your earlier questions could not be read.' }))
-      .then((found) => {
-        if (live) setRecent(found);
-      });
-    return () => {
-      live = false;
-    };
-  }, [source]);
-
   return (
     <>
       {/* The empty state, before the first question: Dash's mark and what he
@@ -1023,10 +1274,9 @@ function NewQuestion({
           />
         </div>
       )}
-      {/* Grows to the sheet's foot once a question is out, so the box docks there. */}
-      <div className={asked ? 'flex flex-1 flex-col' : undefined}>
+      {/* Grows to the sheet's foot, so the box docks there before the first question as after it. */}
+      <div className="flex flex-1 flex-col">
         <AskThread
-          key={starter ?? 'new'}
           id="ask-dash"
           conversationRef={null}
           page={page}
@@ -1036,71 +1286,80 @@ function NewQuestion({
           label={asked ? 'Ask a follow-up' : 'Ask a question'}
           placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'Ask about your money, jobs, todos or notes'}
           dock
-          ask={starter ?? ask}
+          ask={ask}
           initialDraft={draft}
           above={lookingAt}
           onSend={() => setAsked(true)}
         />
       </div>
-      {!asked && !list && (
-        <DashStarters
-          compact
-          workspaces={handle?.workspaces}
-          onAsk={(question) => {
-            setAsked(true);
-            setStarter(question);
-          }}
-        />
-      )}
-      {!asked && <Earlier recent={recent} onReopen={onReopen} />}
     </>
   );
 }
 
-/** The last few questions, under a new one, each reopening in the sheet. */
+/**
+ * Earlier questions, open in the sheet over Dash's chat (plan #2981): the
+ * last few, each reopening in the sheet, with the way back to the chat that
+ * was open and the way to all of them on Dash's page.
+ */
 function Earlier({
   recent,
+  onBack,
   onReopen,
 }: {
   recent: { conversations: ConversationSummary[]; error?: string } | null;
+  onBack: () => void;
   onReopen: (conversation: ConversationSummary) => void;
 }) {
   const now = useClockNow();
-  if (!recent) return null;
-  if (recent.error) return <p className="text-ui text-danger">{recent.error}</p>;
-  // A first visit has nothing earlier, and says nothing about it.
-  if (recent.conversations.length === 0) return null;
   return (
-    <section aria-labelledby="ask-dash-earlier" className="pt-2">
+    <section aria-labelledby="ask-dash-earlier" className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3">
+      <button
+        type="button"
+        onClick={onBack}
+        className="press-area -ml-1 flex w-fit items-center gap-1 rounded-control px-1 text-ui text-accent hover:underline"
+      >
+        <ArrowLeft className="size-4" strokeWidth={1.75} aria-hidden />
+        Back to the chat
+      </button>
       <SectionHeading
         as="h3"
         id="ask-dash-earlier"
         title="Earlier questions"
         action={
-          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+          <Link href="/chat/dash" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
             All of them
           </Link>
         }
       />
-      <ul className="-mx-2 mt-1 space-y-0.5">
-        {recent.conversations.map((conversation) => (
-          <li key={conversation.id}>
-            <button
-              type="button"
-              onClick={() => onReopen(conversation)}
-              className="press flex min-h-11 w-full items-center gap-3 rounded-control px-2 text-left transition-colors duration-quick hover:bg-sunken sm:min-h-9"
-            >
-              <MessageSquareText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-              <span className="min-w-0 flex-1 truncate text-ui text-ink">
-                {conversation.title ?? 'A question'}
-              </span>
-              <time dateTime={conversation.lastAt} className="tabular shrink-0 text-small text-ink-muted">
-                {commentWhen(conversation.lastAt, now)}
-              </time>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {!recent ? (
+        <p className="text-ui text-ink-muted" aria-live="polite">
+          Reading your earlier questions…
+        </p>
+      ) : recent.error ? (
+        <p className="text-ui text-danger">{recent.error}</p>
+      ) : recent.conversations.length === 0 ? (
+        <p className="text-ui text-ink-muted">Nothing asked yet. Your questions to Dash show here once you ask one.</p>
+      ) : (
+        <ul className="-mx-2 space-y-0.5">
+          {recent.conversations.map((conversation) => (
+            <li key={conversation.id}>
+              <button
+                type="button"
+                onClick={() => onReopen(conversation)}
+                className="press flex min-h-11 w-full items-center gap-3 rounded-control px-2 text-left transition-colors duration-quick hover:bg-sunken sm:min-h-9"
+              >
+                <MessageSquareText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-ui text-ink">
+                  {conversation.title ?? 'A question'}
+                </span>
+                <time dateTime={conversation.lastAt} className="tabular shrink-0 text-small text-ink-muted">
+                  {commentWhen(conversation.lastAt, now)}
+                </time>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -1150,6 +1409,7 @@ function EarlierQuestion({
           turns={loaded.turns}
           changes={loaded.changes}
           openHandoffs={loaded.openHandoffs}
+          reply={loaded.reply}
           label="Ask a follow-up"
           placeholder="Ask more about this"
           above={lookingAt}

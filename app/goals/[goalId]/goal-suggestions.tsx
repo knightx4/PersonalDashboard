@@ -15,6 +15,7 @@ import { HELP_KIND_LABELS, type HelpKindChoice } from '@/lib/goals/help-kinds';
 import type { Suggestion } from '@/lib/goals/suggestions';
 import {
   addSuggestedStepAction,
+  addSuggestedTileAction,
   reactToSuggestionAction,
   undoDeclineAction,
   type SuggestionActionState,
@@ -94,9 +95,18 @@ export function GoalSuggestions({
   );
 }
 
-function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: Suggestion }) {
+/**
+ * One suggestion with its answers. Also the rows under a question's result
+ * on the Dashboard (plan #2778.8), where a suggested tile has Add to
+ * dashboard.
+ */
+export function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: Suggestion }) {
   const step = s.kind === 'step';
-  const [added, add, adding] = useActionState(addSuggestedStepAction, initial);
+  const tile = s.kind === 'tile';
+  const [added, add, adding] = useActionState(
+    tile ? addSuggestedTileAction : addSuggestedStepAction,
+    initial,
+  );
   const [went, goGoing, going] = useActionState(reactToSuggestionAction, initial);
   const [declined, setDeclined] = useState<SuggestionActionState>(initial);
   const [declining, startDecline] = useTransition();
@@ -124,7 +134,8 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
   const error = added.error ?? went.error ?? declined.error;
   // A suggested step needs no label: the section says what it is.
   const facts = [
-    s.kind === 'step' ? null : HELP_KIND_LABELS[s.kind],
+    // A step or a tile needs no label: the section, or the button, says what it is.
+    s.kind === 'step' || s.kind === 'tile' ? null : HELP_KIND_LABELS[s.kind],
     s.happensOn ? formatDay(s.happensOn) : null,
     s.place,
     s.source,
@@ -132,6 +143,16 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
     .filter(Boolean)
     .join(' · ');
 
+  if (tile && added.done) {
+    return (
+      <li className="card-pad-x row-pad space-y-0.5">
+        <p className="text-body break-words text-ink">{s.title}</p>
+        <p className="text-small text-positive" role="status">
+          Added to the dashboard.
+        </p>
+      </li>
+    );
+  }
   if (added.stepId) {
     return (
       <li className="card-pad-x row-pad space-y-0.5">
@@ -179,11 +200,11 @@ function SuggestionRow({ goalId, suggestion: s }: { goalId: string; suggestion: 
         <p className="text-small text-ink-muted">You said you are going. It is on Todo on its day.</p>
       ) : (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          {step ? (
+          {step || tile ? (
             <form action={add}>
               <input type="hidden" name="id" value={s.id} />
               <Button type="submit" size="sm" pending={adding} disabled={busy}>
-                Add as step
+                {tile ? 'Add to dashboard' : 'Add as step'}
               </Button>
             </form>
           ) : (

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { probePayloadSchema, toProbe, type Probe } from '@/lib/learn/graph/probe-payload';
 import { MODELS } from '@/lib/core/models';
@@ -139,24 +139,21 @@ export async function writeProbe(input: {
       model: MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report one question testing this claim.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              question: { type: 'string' },
-              options: { type: 'array', items: { type: 'string' } },
-              correct_index: { type: 'integer' },
-              reason: { type: 'string' },
-              unusable: { type: 'boolean' },
-            },
-            required: ['question', 'options', 'correct_index', 'reason'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report one question testing this claim.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            question: { type: 'string' },
+            options: { type: 'array', items: { type: 'string' } },
+            correct_index: { type: 'integer' },
+            reason: { type: 'string' },
+            unusable: { type: 'boolean' },
           },
+          required: ['question', 'options', 'correct_index', 'reason'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -184,12 +181,12 @@ export async function writeProbe(input: {
 
   input.onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
-    return { ok: false, reason: 'error', detail: whyNoReport(response) };
+  const report = readReport(response, TOOL_NAME, MODEL);
+  if (!report.ok) {
+    return { ok: false, reason: 'error', detail: report.reason };
   }
 
-  const safe = probePayloadSchema.safeParse(block.input);
+  const safe = probePayloadSchema.safeParse(report.value);
   if (!safe.success) {
     return { ok: false, reason: 'rejected', detail: 'The question came back malformed.' };
   }

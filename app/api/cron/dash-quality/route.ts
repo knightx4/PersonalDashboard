@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { authorizeCron } from '@/inngest/cron/authorize';
-import { runDashQualityCheck } from '@/inngest/core/dash-quality';
+import { runDashQualityCheck, runModelReplyCheck } from '@/inngest/core/dash-quality';
 
 // A monthly run asks each case as a full Ask Dash answer, three at a time.
 export const maxDuration = 300;
 
-const TRIGGERS = new Set(['health', 'monthly', 'manual']);
+const TRIGGERS = new Set(['health', 'monthly', 'manual', 'models']);
 
 /** A case id as run_dash_quality(case) sends it; anything else is ignored. */
 const CASE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -17,7 +17,10 @@ const CASE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * and asks nothing, so it spends nothing. `?trigger=monthly`, on the 1st:
  * asks every active case in core.dash_eval_cases as well. `?trigger=manual`
  * from `select core.run_dash_quality(case)`: every case, or the one `case`
- * names (supabase/migrations/0277, 0279). A trigger it does not know runs
+ * names (supabase/migrations/0277, 0279). `?trigger=models`, daily from
+ * pg_cron: sends each model the app calls a few small probes and checks how
+ * the replies come back against lib/core/model-rules.ts, for under five
+ * cents (lib/dash/quality/model-replies.ts, migration 0297). A trigger it does not know runs
  * the free health read. The run is kept in core.dash_eval_runs, and anything
  * failed writes a Dev note. GET and POST both.
  *
@@ -29,9 +32,10 @@ async function run(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const asked = request.nextUrl.searchParams.get('trigger') ?? '';
-  const trigger = (TRIGGERS.has(asked) ? asked : 'health') as 'health' | 'monthly' | 'manual';
+  const trigger = (TRIGGERS.has(asked) ? asked : 'health') as 'health' | 'monthly' | 'manual' | 'models';
   const only = request.nextUrl.searchParams.get('case');
   try {
+    if (trigger === 'models') return NextResponse.json({ ok: true, ...(await runModelReplyCheck()) });
     return NextResponse.json({
       ok: true,
       ...(await runDashQualityCheck(trigger, trigger === 'manual' && only && CASE_ID.test(only) ? only : null)),

@@ -17,6 +17,8 @@ import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
 import type { CreateNotePorts } from '@/lib/vault/notes/create';
 import type { RoutineTarget } from '@/lib/feedback/routine';
+import type { TakeOnOrigin } from '@/lib/goals/take-on';
+import type { SlipWhere } from './slips';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -140,6 +142,18 @@ export type DashWriteContext = AskContext & {
    * the connector, and then those tools say so.
    */
   goalRoutine?: () => Promise<{ canRun: boolean; routine: RoutineTarget }>;
+  /**
+   * Where a question handed to a goal came from, for take_on_for_goal (plan
+   * #2778.8): Ask Dash with its conversation's id, which the reply line goes
+   * into, or a Claude chat through the connector, which has no reply.
+   */
+  origin?: { kind: TakeOnOrigin; ref: string | null };
+  /**
+   * The chat the write was asked in, for a refusal kept as a slip (plan
+   * #2999, lib/dash/slips.ts): Ask Dash's conversation or a People thread.
+   * Absent: a slip names no conversation.
+   */
+  slipWhere?: SlipWhere;
 };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */

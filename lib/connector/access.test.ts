@@ -107,7 +107,8 @@ describe('connectorAccess', () => {
 
     expect(access.caller).toMatchObject({ userId: ME, clientId: 'claude-client' });
     expect(access.ctx.userId).toBe(ME);
-    expect(access.ctx.enabledModules).toEqual(['todo', 'vault']);
+    // Chat is always on and never stored in enabled_modules (plan #2748.1).
+    expect(access.ctx.enabledModules).toEqual(['chat', 'todo', 'vault']);
     expect(access.ctx.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(access.ctx.searchSources.length).toBeGreaterThan(0);
 

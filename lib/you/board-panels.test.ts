@@ -15,7 +15,7 @@ describe('panels', () => {
     expect(cleanPanelName('x'.repeat(61)).ok).toBe(false);
   });
 
-  it('cleans members: once each, all on the board, at most twelve', () => {
+  it('cleans members: once each, all on the council, at most twelve', () => {
     const many = Array.from({ length: 12 }, (_, i) => `g${i}`);
     const roster = ['cfo', 'buffett', ...many];
     expect(cleanPanelMembers(['cfo', 'cfo', 'buffett'], roster)).toEqual({ ok: true, advisors: ['cfo', 'buffett'] });

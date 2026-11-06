@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MAX_IN_FLIGHT, mapWithCap } from '@/lib/learn/graph/opening-probe';
 import { toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
@@ -93,30 +94,28 @@ async function writeChunk(
       model: QUIZ_MODEL,
       max_tokens: 8_000, // room for Haiku 5.5's thinking as well as the answer
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the questions and the answer each one expects.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              questions: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    question: { type: 'string' },
-                    expected: { type: 'string' },
-                  },
-                  required: ['question', 'expected'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the questions and the answer each one expects.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            questions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  question: { type: 'string' },
+                  expected: { type: 'string' },
                 },
+                required: ['question', 'expected'],
               },
-              nothing_in_it: { type: 'boolean' },
             },
-            required: ['questions'],
+            nothing_in_it: { type: 'boolean' },
           },
+          required: ['questions'],
         },
-      ],
+      }, QUIZ_MODEL),
       messages: [
         {
           role: 'user',
@@ -140,12 +139,12 @@ async function writeChunk(
   // Before the answer is judged: a useless one still cost what it cost.
   input.onSpend?.({ model: QUIZ_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') {
+  const report = readReport(response, TOOL_NAME, QUIZ_MODEL);
+  if (!report.ok) {
     return { questions: [], empty: false, failed: true };
   }
 
-  const safe = quizChunkSchema.safeParse(block.input);
+  const safe = quizChunkSchema.safeParse(report.value);
   if (!safe.success) return { questions: [], empty: false, failed: true };
   if (safe.data.nothing_in_it) return { questions: [], empty: true, failed: false };
 

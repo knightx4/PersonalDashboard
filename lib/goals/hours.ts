@@ -1,3 +1,4 @@
+import { hoursOf } from '@/lib/goals/metrics';
 import { periodOf } from '@/lib/goals/rhythms';
 import { addDays } from '@/lib/todo/tasks/model';
 
@@ -161,6 +162,70 @@ export function hoursPage(metrics: HoursMetric[], today: string): HoursPage {
     },
     dayHigh: Math.max(0, ...rows.flatMap((row) => row.grid)),
   };
+}
+
+/**
+ * One entry of hours logged on a day, as the day's drawer lists it (plan
+ * #2907.2): its goal, the step it was logged on when it was not the goal
+ * itself, the hours and what was written.
+ */
+export type HoursEntry = {
+  id: string;
+  goalId: string;
+  goalTitle: string;
+  /** The step under the goal it was logged on, or null when on the goal. */
+  stepTitle: string | null;
+  hours: number;
+  note: string;
+};
+
+/** A progress entry as the day's read takes it from goals.progress_entries. */
+export type DayEntryRow = {
+  id: string;
+  item_id: string;
+  text: string;
+  quantity: number | string | null;
+  unit: string | null;
+  created_at: string;
+};
+
+/** An hours goal and the items under it, each with its title. */
+export type HoursGoalTree = {
+  goalId: string;
+  goalTitle: string;
+  /** Every step under the goal, by id, with its title. */
+  steps: Map<string, string>;
+};
+
+/**
+ * A day's entries across the hours goals, in the order the page lists the
+ * goals and then the order they were logged. An entry not in a unit of time
+ * is left out, as the totals leave it out; one on an item under two hours
+ * goals is listed once, under the first.
+ */
+export function hoursDayEntries(rows: DayEntryRow[], goals: HoursGoalTree[]): HoursEntry[] {
+  const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const seen = new Set<string>();
+  const out: HoursEntry[] = [];
+  for (const goal of goals) {
+    for (const row of sorted) {
+      if (seen.has(row.id)) continue;
+      const onGoal = row.item_id === goal.goalId;
+      if (!onGoal && !goal.steps.has(row.item_id)) continue;
+      const hours = hoursOf(row.quantity === null ? null : Number(row.quantity), row.unit);
+      if (hours === null) continue;
+      seen.add(row.id);
+      out.push({
+        id: row.id,
+        goalId: goal.goalId,
+        goalTitle: goal.goalTitle,
+        stepTitle: onGoal ? null : (goal.steps.get(row.item_id) ?? null),
+        hours: round(hours),
+        note: row.text,
+      });
+    }
+  }
+  return out;
 }
 
 /** "2.5 h", "0 h". */

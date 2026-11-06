@@ -37,6 +37,11 @@ export type ToastInput = {
   /** Offered for `duration`; when it runs, the toast says `undone`. */
   undo?: () => void | Promise<void>;
   undone?: string;
+  /**
+   * The way back's label, where "Undo" would read wrong: after an Undo, the
+   * way back is a Restore (plan #2907.3). Shown with an ellipsis while it runs.
+   */
+  undoLabel?: string;
   /** A way to what the toast reports, such as the note just written to. Pressing it dismisses the toast. */
   link?: { label: string; href: string };
   /** Milliseconds. Long enough to read and reach for; short enough to forget. */
@@ -167,7 +172,11 @@ function ToastItem({
           className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 font-sans text-ui font-semibold text-accent hover:bg-accent-tint disabled:opacity-50"
         >
           <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {pending ? 'Undoing…' : 'Undo'}
+          {toast.undoLabel
+            ? `${toast.undoLabel}${pending ? '…' : ''}`
+            : pending
+              ? 'Undoing…'
+              : 'Undo'}
         </button>
       )}
       {toast.link && toast.state === 'open' && (

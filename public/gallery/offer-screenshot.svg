@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420">
+  <rect width="640" height="420" fill="#f6f5f2"/>
+  <rect x="0" y="0" width="640" height="44" fill="#e7e4dd"/>
+  <circle cx="22" cy="22" r="6" fill="#d9706a"/>
+  <circle cx="42" cy="22" r="6" fill="#e0b25a"/>
+  <circle cx="62" cy="22" r="6" fill="#7bb36a"/>
+  <rect x="32" y="72" width="576" height="316" rx="10" fill="#ffffff"/>
+  <text x="56" y="112" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#22211f">Your offer from Northwind</text>
+  <text x="56" y="146" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#5b5953">Senior Product Manager · Start date 5 January</text>
+  <rect x="56" y="170" width="528" height="1" fill="#e4e1da"/>
+  <text x="56" y="206" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#22211f">Base salary</text>
+  <text x="584" y="206" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22211f">$132,000</text>
+  <text x="56" y="242" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#22211f">Signing bonus</text>
+  <text x="584" y="242" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22211f">$10,000</text>
+  <text x="56" y="278" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#22211f">Equity</text>
+  <text x="584" y="278" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22211f">4,000 units over 4 years</text>
+  <text x="56" y="314" font-family="Helvetica, Arial, sans-serif" font-size="16" fill="#22211f">Paid leave</text>
+  <text x="584" y="314" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#22211f">25 days</text>
+  <rect x="56" y="340" width="150" height="30" rx="6" fill="#3b5bdb"/>
+  <text x="131" y="360" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">Accept by 14 Nov</text>
+</svg>

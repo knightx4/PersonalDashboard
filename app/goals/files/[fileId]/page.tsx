@@ -1,8 +1,10 @@
 import { sectionSubject } from '@/lib/core/section-path';
 import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
+import { cn } from '@/lib/cn';
 import { Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
+import { PageFrame } from '@/components/files/page-frame';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
@@ -10,10 +12,11 @@ import { SectionFold } from '@/components/ui/disclosure';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { authorLine, fileHref, fileVersionHref, parseVersion } from '@/lib/files/files';
+import { authorLine, fileHref, fileVersionHref, fileViewHref, parseVersion } from '@/lib/files/files';
 import { loadFile, loadFileThread, loadVersionBody, loadVersions } from '@/lib/files/store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatInstant } from '@/lib/goals/dates';
+import { fileTypeLabel, sizeWords } from '@/lib/goals/goal-files-tab';
 import { loadFileUses, type FileUse } from '@/lib/goals/files-store';
 import type { DevComment } from '@/lib/comments/load';
 import { Thread } from '@/components/thread/thread';
@@ -89,9 +92,30 @@ export default async function FilePage({
             </p>
           </Banner>
         )}
-        <Card padding="standard">
-          <FileBody markdown={shown.body} />
-        </Card>
+        {file.stored ? (
+          // A file you added (plan #2778.7): the upload itself, opened through
+          // /goals/document, which signs a one-minute link to your own folder.
+          <Card padding="standard" className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-small text-ink-muted">
+              {fileTypeLabel(file.stored.contentType)} · {sizeWords(file.stored.sizeBytes)} · added by you
+            </p>
+            <a
+              href={`/goals/document?path=${encodeURIComponent(file.stored.path)}`}
+              target="_blank"
+              rel="noreferrer"
+              className={cn('press-area text-ui', linkVariants())}
+            >
+              Open the file
+            </a>
+          </Card>
+        ) : file.format === 'html' ? (
+          // A page a bot had made (plan #2997), served sandboxed and framed here.
+          <PageFrame title={shown.title} src={fileViewHref(file.id, older ? asked : null)} />
+        ) : (
+          <Card padding="standard">
+            <FileBody markdown={shown.body} />
+          </Card>
+        )}
         {/* Reading the newest version marks the file read, and the results that link to it. */}
         {!older && (
           <MarkFileRead

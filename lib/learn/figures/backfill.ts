@@ -1,8 +1,9 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { MODELS } from '@/lib/core/models';
 import { FIGURE_KINDS, readStoredFigures, readWrittenFigures } from './registry';
 import { resolveFigures } from './resolve';
@@ -100,24 +101,21 @@ export async function writeBackfillBlock(input: {
     response = await input.client.messages.create({
       model: BACKFILL_MODEL,
       max_tokens: 2048 + THINKING_ROOM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the figure, or that it cannot be made.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              can_draw: { type: 'boolean' },
-              reason: { type: ['string', 'null'], description: 'One sentence on why the figure cannot be made. Null when it can.' },
-              kind: { type: ['string', 'null'], enum: [...kinds, null] },
-              caption: { type: ['string', 'null'], description: 'One sentence saying what the figure shows.' },
-              spec: { type: ['object', 'null'], description: 'The shape the kind takes, as the instructions give it.' },
-            },
-            required: ['can_draw', 'reason', 'kind', 'caption', 'spec'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the figure, or that it cannot be made.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            can_draw: { type: 'boolean' },
+            reason: { type: ['string', 'null'], description: 'One sentence on why the figure cannot be made. Null when it can.' },
+            kind: { type: ['string', 'null'], enum: [...kinds, null] },
+            caption: { type: ['string', 'null'], description: 'One sentence saying what the figure shows.' },
+            spec: { type: ['object', 'null'], description: 'The shape the kind takes, as the instructions give it.' },
           },
+          required: ['can_draw', 'reason', 'kind', 'caption', 'spec'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, BACKFILL_MODEL),
+      }, BACKFILL_MODEL),
       messages: [{ role: 'user', content: backfillPrompt(input.lesson, input.wanted) }],
     });
   } catch (error) {
@@ -125,9 +123,9 @@ export async function writeBackfillBlock(input: {
   }
   input.onSpend?.({ model: BACKFILL_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find((piece) => piece.type === 'tool_use' && piece.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, failed: whyNoReport(response) };
-  const report = block.input as { can_draw?: unknown; reason?: unknown; kind?: unknown; caption?: unknown; spec?: unknown };
+  const reportRead = readReport(response, TOOL_NAME, BACKFILL_MODEL);
+  if (!reportRead.ok) return { ok: false, failed: reportRead.reason };
+  const report = reportRead.value as { can_draw?: unknown; reason?: unknown; kind?: unknown; caption?: unknown; spec?: unknown };
   if (report.can_draw !== true) {
     const reason = oneLine(typeof report.reason === 'string' ? report.reason : '');
     return { ok: false, reason: reason || 'The writer could not make the figure.' };

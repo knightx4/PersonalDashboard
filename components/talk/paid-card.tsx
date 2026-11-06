@@ -35,10 +35,13 @@ export function PaidCard({
   changes: given,
   presses,
   onChanged,
+  inThread = false,
 }: {
   changes: readonly PaidChange[];
   presses: ChangePresses;
   onChanged?: (change: DashChange) => void;
+  /** In a People thread the card takes the fill of their bubbles (plan #2854.2.2). */
+  inThread?: boolean;
 }) {
   const [changes, setChanges] = useState<readonly PaidChange[]>(given);
   // A newer copy from the owner (a reopened thread, the other surface) wins.
@@ -121,7 +124,7 @@ export function PaidCard({
   return (
     <section
       aria-label="What Dash will run, which costs money"
-      className={cn('mt-2 rounded-card bg-sunken px-3 pt-1 pb-3', declined && 'text-ink-muted')}
+      className={cn('px-3 pt-1 pb-3', inThread ? 'mt-0.5 rounded-pane bg-them [&_a]:text-current [&_a]:underline' : 'mt-2 rounded-card bg-sunken', declined && 'text-ink-muted')}
     >
       <ul className="divide-y divide-border">
         {lines.map(({ change, state }) => (

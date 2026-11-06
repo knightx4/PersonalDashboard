@@ -27,7 +27,7 @@ const QUEUES: Record<
     many: '{n} guesses from your mail to check',
     line: 'Orders and emails the mail sync was not sure of',
     verb: 'Review',
-    href: '/shopping/review',
+    href: '/shopping/orders/review',
     section: 'review',
   },
   'jobs-review': {
@@ -35,7 +35,7 @@ const QUEUES: Record<
     many: '{n} imports from your mail to check',
     line: 'Applications, messages and interviews the mail sync was not sure of',
     verb: 'Review',
-    href: '/jobs/review',
+    href: '/jobs/inbox',
     section: 'review',
   },
   'vault-triage': {
@@ -43,7 +43,8 @@ const QUEUES: Record<
     many: '{n} quick notes to file',
     line: 'Waiting in the Inbox folder',
     verb: 'File them',
-    href: '/vault/triage',
+    // On the Vault's Now page since its own page folded in (plan #1496.9).
+    href: '/vault#triage',
     section: 'actions',
   },
   'learn-read-now': {

@@ -94,7 +94,12 @@ const QUEUE_COUNTS: Partial<Record<AgendaInbox, { queue: InboxQueue; label: stri
  * row there; Home's Inbox still shows each as one. Jobs' review items are
  * drawn with their buttons by the Jobs Inbox page (plan #2502.2).
  */
-const LISTED_ON_THEIR_INBOX: readonly InboxQueue[] = ['jobs-review'];
+const LISTED_ON_THEIR_INBOX: readonly InboxQueue[] = [
+  'jobs-review',
+  // The Vault's Now page draws its Inbox and the triage deck together
+  // (plan #1496.9), so the quick notes are already listed one by one there.
+  'vault-triage',
+];
 
 /**
  * A workspace's queues as rows, with any queue that could not be counted

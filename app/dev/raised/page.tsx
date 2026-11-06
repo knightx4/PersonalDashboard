@@ -1,4 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadSlipCount } from '@/lib/dash/slips';
+import { loadOpenSessionCount } from '@/lib/talk/handoff-count';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
@@ -12,10 +15,15 @@ import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
+import { loadRunnerGoals } from '@/lib/goals/runner-status-load';
+import { planRoutine } from '@/lib/feedback/routine';
+import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadRecentScreenChanges } from '@/lib/plan/screen-change-load';
 import { planRefHref } from '@/lib/comments/refs';
+import { StatusGrid } from '@/components/dev/status-grid';
+import { scopeStatuses } from '@/lib/plan/scope-status';
 import { ShippedScreens, type ShippedScreen } from '@/components/dev/screen-change';
 import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
@@ -48,8 +56,11 @@ function readClock(): number {
  *
  * The strip of chips answers "is anything running, is main green, is anything
  * waiting on me" before anything is scrolled, each chip a link to the page
- * that holds the detail. The runner's controls are on Dev settings
- * (plan #1937.10). What is waiting on you is the Inbox tab, and Home carries only its count.
+ * that holds the detail. Under it is the runner's card, which moved here from
+ * /dev/plan (plan #578.12): starting, holding and following the runner is
+ * done from the page you open first. Dev settings keeps the same control as
+ * its Plan row (plan #1937.10). What is waiting on you is the Inbox tab, and
+ * Home carries only its count.
  *
  * The pictures are the after shots of the screens changed in the last two
  * days, because a changed screen is read faster from a picture than from its
@@ -79,14 +90,16 @@ export default async function DevRaisedPage() {
     mainCheck,
     recentScreens,
     snoozes,
+    slips,
+    sessions,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
     loadConversations(supabase, user.id),
     loadPlanForRequest(user.id),
-    // The runner's standing intention, and the presses its night has made:
-    // the same rows and the same loaders /dev/plan reads, so the two pages
-    // cannot come to different answers about what is running.
+    // The runner's standing intention, and the presses its night has made,
+    // for the strip and the runner's card: the same loaders Dev settings
+    // reads, so the two cannot come to different answers about what is running.
     loadOvernightRun(supabase, user.id),
     loadFeatureFires(supabase, user.id),
     loadLastRuns(supabase, user.id),
@@ -116,6 +129,14 @@ export default async function DevRaisedPage() {
     loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
     // Snoozed rows are out of the chip as they are out of the Inbox (plan #1843).
     loadSnoozeState(supabase, user.id),
+    // How often a chat with Dash slipped in the last seven days (plan #2999).
+    createCoreClient()
+      .then((core) => loadSlipCount(core, user.id, now))
+      .catch(() => null),
+    // Requests a bot handed to a Claude Code session still open (plan #3005.5).
+    createCoreClient()
+      .then((core) => loadOpenSessionCount(core, user.id))
+      .catch(() => null),
   ]);
 
   // The tree once, for the two things below that read it: how much is
@@ -134,7 +155,7 @@ export default async function DevRaisedPage() {
     withoutSnoozed(waitingOnYou(sections), (row) => planRowRef(row.id), snoozes).length +
     specChanges;
 
-  // The runner's card, read by the same function the plan page reads it with.
+  // The runner's card, read by the same function Dev settings reads it with.
   const card = runnerCard({
     run: overnight,
     fires,
@@ -142,6 +163,12 @@ export default async function DevRaisedPage() {
     sections,
     started,
     lastRuns: Object.values(lastRuns),
+  });
+  // The goals half, for the Goals Dash on the card (plan #1704).
+  const goals = await loadRunnerGoals({
+    userId: user.id,
+    nightStartedAt: overnight?.running ? overnight.startedAt : null,
+    now,
   });
 
   // What every "#494" on this page is called. Built once here rather than
@@ -176,9 +203,28 @@ export default async function DevRaisedPage() {
           openNotes={openNotes.count ?? 0}
           mainCheck={mainCheck}
           inbox={onYou}
+          slips={slips}
+          sessions={sessions}
         />
         <AskBox />
       </div>
+      <OvernightControl
+        run={overnight}
+        canSend={Boolean(planRoutine().token)}
+        night={card.night}
+        on={card.on}
+        sessions={card.sessions}
+        goals={goals}
+        progress={card.progress}
+        push={card.push}
+        ready={card.ready}
+        readySteps={card.readySteps}
+        next={card.next}
+        // Nothing else on Home asks GitHub for fresh pushes, which the plan
+        // page did for itself while the card was there.
+        refreshReadings
+      />
+      <StatusGrid statuses={scopeStatuses(sections)} />
       {shipped.some((screen) => screen.change.after) && (
         <Group title="Shipped lately">
           <ShippedScreens screens={shipped} />

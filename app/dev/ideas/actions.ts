@@ -4,16 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
-import { threadText } from '@/lib/comments/context';
-import { planRoutine } from '@/lib/feedback/routine';
 import { insertIdea } from '@/lib/ideas/insert';
 import { editIdea } from '@/lib/ideas/edit';
-import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
-import { withThreads } from '@/lib/thread/store';
-import { FOLLOW_ON_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
-import { MODULE_IDS, MODULES } from '@/lib/modules';
-import { startRoutineRun } from '@/lib/plan/runs';
-import { loadVisionBodies } from '@/lib/specs/vision';
+import { MODULE_IDS } from '@/lib/modules';
+import { shapeIdeaRun } from '@/lib/ideas/shape';
 
 export type IdeaActionState = {
   error?: string;
@@ -208,13 +202,8 @@ export async function deleteIdea(
 }
 
 /**
- * Hand an idea to Claude to be shaped into the plan.
- *
- * Not to be built. The session that wakes up reads the idea and the code and
- * writes a feature with its steps into the plan as *proposed* -- each with a
- * done-when and a size, waiting to be approved on the plan page. Nothing is
- * started until a person says so there. The same routine the notes queue
- * fires, with a different job in the extra turn.
+ * Hand an idea to Claude to be shaped into the plan (lib/ideas/shape.ts).
+ * A proposal only: nothing is built or approved.
  */
 // latency: pending
 export async function shapeIdea(
@@ -227,51 +216,7 @@ export async function shapeIdea(
   const id = z.string().uuid().safeParse(formData.get('id'));
   if (!id.success) return { error: 'Missing idea.' };
 
-  // The whole row rather than the four columns the turn used to name, because
-  // the thread comes with it. What was said underneath an idea is usually the
-  // half that says what it actually means -- the first sentence is a note to
-  // self, and the shape it should take was worked out in the replies.
-  const { data } = await supabase
-    .from('ideas')
-    .select(IDEA_COLUMNS)
-    .eq('user_id', user.id)
-    .eq('id', id.data)
-    .maybeSingle();
-  if (!data) return { error: 'That idea no longer exists.' };
-  const [withThread] = await withThreads(supabase, IDEAS_TABLE, [data as unknown as Record<string, unknown>], {
-    userId: user.id,
-  });
-  const idea = ideaRowFrom(withThread);
-  if (idea.planItem) return { error: 'This idea is already in the plan.' };
-
-  const scope = idea.module;
-  const label = scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
-  const said = threadText(idea.thread);
-  // The feature has to name the part of this vision it serves (shaping.md),
-  // chosen by the same rule as a step brief's: the workspace's, or the app's
-  // for an idea about the whole app, and none for a workspace without one.
-  const vision = visionFor({ module: scope }, await loadVisionBodies(supabase, user.id));
-
-  const text =
-    `Shape idea ${String(idea.id).slice(0, 8)} into the plan, following ` +
-    '.claude/skills/plan/reference/shaping.md, and .claude/skills/plan/reference/writing.md for ' +
-    'how every row is worded. Write a proposal only: a feature with its steps, ' +
-    'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
-    'Do not build anything and do not approve anything.\n\n' +
-    `${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${QUESTION_RULE}\n\n` +
-    (vision ? `## Vision\n\n${vision}\n\n` : '') +
-    `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
-    (said ? `\n${said}` : '');
-
-  const result = await startRoutineRun({
-    supabase,
-    userId: user.id,
-    job: 'shape',
-    routine: planRoutine(),
-    // No step: the proposal the session writes is what will carry the number,
-    // and it does not exist yet.
-    text,
-  });
+  const result = await shapeIdeaRun(supabase, user.id, id.data);
   if (!result.ok) return { error: result.error };
 
   revalidatePath('/dev/ideas');

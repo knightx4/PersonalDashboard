@@ -1,0 +1,652 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Loans Goal Page</title>
+<!-- Saved for the design check (plan #2778.2). The people, the lender, the balances and the account numbers in the example data are made up; sizes, colours and spacing are the mockup's own. -->
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: the app's own goal page, rebuilt as a dashboard. Main column of tiles, side column for Dash's work and files. */
+:root{
+  --canvas:#f7f4ed; --surface:#fdfbf5; --sunken:#f2f0ea; --border:#e8e5df; --border-strong:#d5d1c8;
+  --ink:#1a1a18; --muted:#6b6b66; --ghost:#85857e;
+  --goal:#05734e; --goal-tint:#e3f7ec; --goal-line:#9fd8bd;
+  --accent:#4a5fd0; --accent-tint:#eef1fe;
+  --caution:#a34a07; --caution-tint:#fdf3e3;
+  --example:#7c3aed; --example-tint:#f4f0fe;
+  --shadow:0 1px 2px rgba(26,26,24,.05),0 4px 16px rgba(26,26,24,.05);
+  --display:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif;
+  --sans:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --canvas:#141412; --surface:#1c1c19; --sunken:#181816; --border:#2c2b27; --border-strong:#3b3a35;
+  --ink:#ecebe6; --muted:#a4a39c; --ghost:#86857e;
+  --goal:#4fcf98; --goal-tint:#16302a; --goal-line:#2f7a5a;
+  --accent:#8f9df0; --accent-tint:#22263f;
+  --caution:#f0a63f; --caution-tint:#33261a;
+  --example:#b69af5; --example-tint:#29213d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --canvas:#141412; --surface:#1c1c19; --sunken:#181816; --border:#2c2b27; --border-strong:#3b3a35;
+  --ink:#ecebe6; --muted:#a4a39c; --ghost:#86857e;
+  --goal:#4fcf98; --goal-tint:#16302a; --goal-line:#2f7a5a;
+  --accent:#8f9df0; --accent-tint:#22263f;
+  --caution:#f0a63f; --caution-tint:#33261a;
+  --example:#b69af5; --example-tint:#29213d;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.25);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--canvas);color:var(--ink);font:14px/1.55 var(--sans);margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;font-weight:700}
+h2{font-size:15px;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:12px} .micro{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* mock banner */
+.mockbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;background:var(--example-tint);border:1px solid color-mix(in srgb,var(--example) 30%,transparent);border-radius:12px;padding:10px 14px;font-size:13px}
+.mockbar b{color:var(--example)}
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 12px;font-size:13px;font-weight:500}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--goal);border-color:var(--goal);color:var(--surface)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ex{background:var(--example);border-color:var(--example);color:var(--surface)}
+.btn.sm{padding:3px 9px;font-size:12px}
+
+/* header */
+.head{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.cover{height:84px;background:
+  repeating-linear-gradient(90deg,transparent 0 47px,color-mix(in srgb,var(--goal) 18%,transparent) 47px 48px),
+  linear-gradient(100deg,var(--goal-tint),color-mix(in srgb,var(--goal-tint) 40%,var(--surface)));position:relative}
+.cover::after{content:"$127,200.00 → $0";position:absolute;right:18px;bottom:10px;font:700 13px var(--display);color:var(--goal);opacity:.7;letter-spacing:.02em}
+.headin{padding:14px 18px 16px;display:grid;gap:10px}
+.crumb{font-size:12px;color:var(--muted)}
+.titlerow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.titlerow h1{font-size:28px;line-height:1.1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--sunken);color:var(--muted)}
+.chip.goal{background:var(--goal-tint);color:var(--goal);border-color:transparent}
+.chip.wait{background:var(--caution-tint);color:var(--caution);border-color:transparent}
+.chip.ex{background:var(--example-tint);color:var(--example);border-color:transparent}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.done-when{font-size:13px;color:var(--muted)} .done-when b{color:var(--ink);font-weight:600}
+.dashline{display:flex;gap:10px;align-items:flex-start;background:var(--sunken);border-radius:10px;padding:10px 12px;font-size:13px}
+.mark{flex:none;width:22px;height:22px;border-radius:7px;background:var(--goal);color:var(--surface);display:grid;place-items:center;font:700 12px var(--display)}
+
+/* moves strip */
+.moves{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.move{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:grid;gap:4px;min-width:0}
+.move.now{border-color:var(--goal-line);background:color-mix(in srgb,var(--goal-tint) 45%,var(--surface))}
+.move .t{font-weight:500}
+.move .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.lane{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.move.now .lane{color:var(--goal)} .move .lane{color:var(--muted)}
+
+/* main grid */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}
+.col{display:grid;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.cardhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.fig{font:700 32px/1.05 var(--display);letter-spacing:-.01em}
+.fig.sm{font-size:26px}
+.plus{border:1px dashed var(--border-strong);background:transparent;color:var(--muted);border-radius:8px;padding:3px 9px;font-size:12px}
+.plus:hover{color:var(--goal);border-color:var(--goal)}
+
+/* tracker */
+.track{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.track li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:start;position:relative;padding-bottom:12px}
+.track li:not(:last-child)::before{content:"";position:absolute;left:10px;top:20px;bottom:0;width:2px;background:var(--border)}
+.track li.ok:not(:last-child)::before{background:var(--goal-line)}
+.node{width:22px;height:22px;border-radius:50%;border:2px solid var(--border-strong);background:var(--surface);display:grid;place-items:center;font-size:11px;color:var(--surface)}
+.ok .node{background:var(--goal);border-color:var(--goal)}
+.wait .node{border-color:var(--caution);background:var(--caution-tint)}
+.wait .node::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--caution);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+.track .lbl{font-weight:500} .track .sub{font-size:12px;color:var(--muted)}
+
+/* chart */
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+/* table */
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.ord{width:22px;height:22px;border-radius:6px;background:var(--goal-tint);color:var(--goal);display:grid;place-items:center;font:700 12px var(--display)}
+.share{height:6px;border-radius:3px;background:var(--sunken);overflow:hidden;width:90px}
+.share i{display:block;height:100%;background:var(--goal)}
+
+/* Dash corner */
+.ws{border:1px solid var(--border);border-radius:12px;padding:12px;display:grid;gap:8px;background:var(--surface);transition:box-shadow .3s,border-color .3s}
+.ws.live{border-color:var(--goal-line)}
+.ws.flash{box-shadow:0 0 0 3px color-mix(in srgb,var(--goal) 35%,transparent)}
+.ws .q{font-weight:600;font-size:14px;line-height:1.35}
+.ws .meta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:12px;color:var(--muted);align-items:center}
+.ws .res{font-size:13px;background:var(--sunken);border-radius:8px;padding:10px 11px;display:grid;gap:8px}
+.sugg{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid var(--border);padding-top:8px;font-size:13px}
+.working{display:inline-flex;gap:3px} .working i{width:5px;height:5px;border-radius:50%;background:var(--goal);animation:pulse 1.2s infinite} .working i:nth-child(2){animation-delay:.2s}.working i:nth-child(3){animation-delay:.4s}
+.fin{display:grid;gap:0}
+.fin details{border-top:1px solid var(--border)}
+.fin summary{list-style:none;cursor:pointer;padding:10px 2px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:baseline}
+.fin summary::-webkit-details-marker{display:none}
+.fin summary .q{font-weight:500;font-size:13px}
+.fin .body{padding:0 2px 12px;font-size:13px;display:grid;gap:6px;color:var(--muted)}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;min-width:0;border:1px solid var(--border-strong);background:var(--canvas);color:var(--ink);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px}
+
+/* files */
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:0;background:transparent;color:var(--muted);padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--surface)}
+.files{list-style:none;margin:0;padding:0;display:grid}
+.file{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+.file:first-child{border-top:0}
+.ficon{width:34px;height:40px;border-radius:5px;border:1px solid var(--border-strong);background:var(--canvas);position:relative;display:grid;place-items:end center;padding-bottom:4px;font:700 8px var(--sans);letter-spacing:.05em;color:var(--muted)}
+.ficon::before{content:"";position:absolute;top:-1px;right:-1px;width:10px;height:10px;background:linear-gradient(225deg,var(--surface) 50%,var(--border-strong) 50%);border-radius:0 5px 0 0}
+.ficon.dash{color:var(--goal);border-color:var(--goal-line);background:var(--goal-tint)}
+.ficon.slot{border-style:dashed;background:transparent}
+.ficon.ex{color:var(--example);border-color:color-mix(in srgb,var(--example) 40%,transparent);background:var(--example-tint)}
+.file .ft{font-weight:500;font-size:13px;line-height:1.35}
+.file .fs{font-size:12px;color:var(--muted)}
+.unread{width:7px;height:7px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:6px;vertical-align:middle}
+.pin{color:var(--goal);font-size:11px;font-weight:600}
+.drop{border:1.5px dashed var(--border-strong);border-radius:10px;padding:14px;text-align:center;font-size:13px;color:var(--muted);display:grid;gap:4px;transition:background .2s,border-color .2s}
+.drop.over{background:var(--goal-tint);border-color:var(--goal)}
+.drop input{display:none}
+.drop label{color:var(--accent);cursor:pointer;font-weight:500}
+
+/* plan fold */
+.plan summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.plan summary::-webkit-details-marker{display:none}
+.stage{display:grid;gap:4px;padding:10px 0;border-top:1px solid var(--border)}
+.stage .sh{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:13px}
+.stage ul{margin:0;padding:0 0 0 18px;font-size:13px;color:var(--muted);display:grid;gap:2px}
+.stage li.d{text-decoration:line-through;text-decoration-color:var(--ghost)}
+
+/* story */
+.story{list-style:none;margin:0;padding:0;display:grid}
+.story li{display:grid;grid-template-columns:58px 1fr;gap:10px;padding:7px 0;border-top:1px solid var(--border);font-size:13px}
+.story li:first-child{border-top:0}
+.story .d{color:var(--muted);font-size:12px}
+.story .who{font-size:11px;font-weight:600;color:var(--goal)}
+
+/* chat demo */
+.scrim{position:fixed;inset:0;background:rgba(10,10,8,.45);display:grid;place-items:center;z-index:50;padding:16px}
+.phone{width:min(380px,100%);height:min(640px,calc(100% - 20px));background:var(--surface);border-radius:26px;border:1px solid var(--border-strong);box-shadow:0 20px 60px rgba(0,0,0,.35);display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+.phone header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.msgs{padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.msg{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;animation:rise .35s ease both}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--surface);border-bottom-right-radius:4px}
+.msg.dash{align-self:flex-start;background:var(--sunken);border-bottom-left-radius:4px}
+.wscard{margin-top:8px;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:9px 10px;display:grid;gap:4px}
+.wscard .k{font-size:11px;color:var(--goal);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+.phone footer{padding:10px;border-top:1px solid var(--border);display:flex;gap:8px}
+.phone footer input{flex:1;min-width:0;border:1px solid var(--border-strong);border-radius:999px;padding:8px 12px;background:var(--canvas);color:var(--ink);font:inherit}
+.toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:min(380px,calc(100% - 32px));background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:12px 14px;display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;z-index:60;animation:drop .4s ease both}
+@keyframes drop{from{opacity:0;transform:translate(-50%,-12px)}}
+.toast .mark{width:30px;height:30px;border-radius:9px;font-size:14px}
+
+@media (max-width:960px){.grid{display:flex;flex-direction:column;gap:16px}.col{display:contents}
+.tiles{order:1}.o-ibr{order:2}#dashcorner{order:3}#recentfiles{order:4}.chart{order:5}.o-loans{order:6}}
+@media (max-width:720px){.tiles{grid-template-columns:minmax(0,1fr)}.moves{grid-template-columns:minmax(0,1fr)}.titlerow h1{font-size:24px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<style>
+/* goal tabs */
+.gtabs{display:flex;gap:2px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;margin-top:-4px}
+.gtab{border:0;background:transparent;color:var(--muted);padding:10px 14px;font-size:14px;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;display:inline-flex;gap:6px;align-items:center}
+.gtab:hover{color:var(--ink)}
+.gtab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--goal)}
+.gtab .n{font-size:11px;background:var(--sunken);color:var(--muted);border-radius:999px;padding:0 7px;font-variant-numeric:tabular-nums}
+.gtab .custom{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--goal);background:var(--goal-tint);border-radius:4px;padding:1px 5px}
+.view{display:grid;gap:16px}
+/* plan */
+.planbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--sunken);border-radius:9px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:5px 12px;border-radius:7px;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.pgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
+.sect{display:grid;gap:10px}
+.sect>h3{font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-family:var(--sans);font-weight:700;display:flex;gap:8px;align-items:center}
+.sect.nowsect>h3{color:var(--goal)}
+.pstep{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:28px minmax(0,1fr);gap:4px 12px}
+.pstep.now{border-color:var(--goal-line);box-shadow:0 0 0 3px color-mix(in srgb,var(--goal-tint) 70%,transparent)}
+.pnum{width:28px;height:28px;border-radius:50%;border:2px solid var(--border-strong);display:grid;place-items:center;font:700 12px var(--display);color:var(--muted);grid-row:span 3}
+.pstep.now .pnum{border-color:var(--goal);background:var(--goal);color:var(--surface)}
+.pstep .pt{font-weight:600;font-size:15px;line-height:1.35}
+.pstep .pm{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--muted);align-items:center}
+.pstep .pwhy{font-size:13px;color:var(--muted)}
+.pstep .pact{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.howto{grid-column:2;background:var(--sunken);border-radius:8px;padding:10px 12px;font-size:13px}
+.howto ol{margin:6px 0 0;padding-left:18px;display:grid;gap:3px}
+.waitchip{font-size:11px;font-weight:600;border-radius:999px;padding:1px 8px;background:var(--sunken);color:var(--muted)}
+.waitchip.date{background:var(--accent-tint);color:var(--accent)}
+.waitchip.dep{background:var(--caution-tint);color:var(--caution)}
+.later{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.later li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border)}
+.later li:first-child{border-top:0}
+.later .pnum{grid-row:auto;width:24px;height:24px;font-size:11px}
+.donefold{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px}
+.donefold summary{cursor:pointer;font-weight:500;font-size:13px;color:var(--muted)}
+.donefold ul{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:3px}
+.pside{display:grid;gap:16px}
+.mini{display:grid;gap:8px}
+.bar{height:8px;border-radius:4px;background:var(--sunken);overflow:hidden}.bar i{display:block;height:100%;background:var(--goal)}
+.seestage{display:grid;gap:0}
+.more{font-size:13px;font-weight:500}
+@media (max-width:960px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+<div class="wrap">
+  <div class="mockbar">
+    <span><b>Mockup.</b> Example loans, files and history on "Pay off student debt". Anything purple is an example of the new parts.</span>
+    <button class="btn ex" id="play" type="button">Play the chat flow</button>
+  </div>
+
+  <section class="head" aria-label="Goal">
+    <div class="cover" aria-hidden="true"></div>
+    <div class="headin">
+      <div class="crumb">Goals › Money</div>
+      <div class="titlerow">
+        <h1>Pay off student debt</h1>
+        <div class="chips">
+          <span class="chip goal"><span class="dot"></span>Active</span>
+          <span class="chip wait"><span class="dot"></span>Waiting on IBR approval</span>
+          <span class="chip">Started 24 Sep</span>
+        </div>
+      </div>
+      <div class="done-when">Done when <b>the student debt is paid off.</b></div>
+      <div class="dashline"><span class="mark">D</span><span><b>This week:</b> your IBR application went in on 2 Nov and Northfield Lending confirmed no bill falls due while it's processed. Nothing is needed from you until the approval letter arrives. Autopay can wait until it does.</span></div>
+    </div>
+  </section>
+
+  <nav class="gtabs" role="tablist" aria-label="Goal sections">
+    <button class="gtab" role="tab" data-v="dashboard" aria-selected="true">Dashboard <span class="custom">This goal</span></button>
+    <button class="gtab" role="tab" data-v="plan" aria-selected="false">Plan <span class="n">5 left</span></button>
+    <button class="gtab" role="tab" data-v="work" aria-selected="false">Work &amp; files <span class="n" id="worknum">2 unread</span></button>
+    <button class="gtab" role="tab" data-v="history" aria-selected="false">History</button>
+  </nav>
+
+  <!-- ===== DASHBOARD (custom per goal) ===== -->
+  <div class="view" id="v-dashboard">
+    <section class="moves" aria-label="Your next moves">
+      <div class="move now">
+        <span class="lane">Now</span>
+        <span class="t">Save Northfield Lending's IBR approval showing the $0 payment</span>
+        <div class="row"><span class="small muted">When the letter arrives · goes in Files</span><button class="btn sm primary" type="button">Done</button></div>
+      </div>
+      <div class="move">
+        <span class="lane">Next</span>
+        <span class="t">Turn on autopay for every loan</span>
+        <div class="row"><span class="small muted">Before 18 Dec · about 15 min</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+      <div class="move">
+        <span class="lane">Later</span>
+        <span class="t">Send extra payments to Grad PLUS 2024–25</span>
+        <div class="row"><span class="small muted">From 18 Dec · +2 more</span><a class="small" href="#plan" data-go="plan">See the plan</a></div>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="col">
+        <div class="tiles">
+          <div class="card">
+            <div class="micro">Total owed</div>
+            <div class="fig num">$127,200</div>
+            <div class="small muted">4 federal loans at Northfield Lending · from your list, 25 Sep</div>
+            <div><button class="plus" type="button">+ Log balances</button></div>
+          </div>
+          <div class="card">
+            <div class="micro">First bill</div>
+            <div class="fig num">45 days</div>
+            <div class="small muted">18 Dec for the Grad PLUS loans, 19 Dec for the Direct Unsubsidized</div>
+          </div>
+          <div class="card">
+            <div class="micro">Payment under IBR</div>
+            <div class="fig num">$0<span class="small muted" style="font-family:var(--sans);font-weight:400"> /mo</span></div>
+            <div class="small muted">Expected with zero income reported. Default schedule ≈ $1,560/mo.</div>
+          </div>
+        </div>
+
+        <div class="card o-ibr">
+          <div class="cardhead"><h2>Income-driven repayment</h2><span class="chip wait"><span class="dot"></span>Waiting on Northfield Lending</span></div>
+          <ol class="track">
+            <li class="ok"><span class="node">✓</span><div><div class="lbl">Chose IBR over the default schedule</div><div class="sub">Dash's comparison · 29 Oct</div></div><span class="small muted">29 Oct</span></li>
+            <li class="ok"><span class="node">✓</span><div><div class="lbl">Applied on studentaid.gov, zero income</div><div class="sub">Deadline was 18 Nov · used Dash's walkthrough</div></div><span class="small muted">2 Nov</span></li>
+            <li class="ok"><span class="node">✓</span><div><div class="lbl">Northfield Lending confirmed no bill during processing</div><div class="sub">Used Dash's call script</div></div><span class="small muted">3 Nov</span></li>
+            <li class="wait"><span class="node"></span><div><div class="lbl">Approval letter with the $0 payment</div><div class="sub">Dash watches your Gmail for it and files it here</div></div><span class="small muted">waiting</span></li>
+            <li><span class="node"></span><div><div class="lbl">Recertify income</div><div class="sub">Yearly, before the anniversary of the approval</div></div><span class="small muted">2027</span></li>
+          </ol>
+        </div>
+
+        <div class="card chart">
+          <div class="cardhead"><h2>Balance to zero</h2><button class="plus" type="button">+ Log balances</button></div>
+          <svg id="chart" viewBox="0 0 640 230" role="img" aria-label="Projected balance from 127 thousand dollars in December 2026 to zero in July 2037 on the default schedule"></svg>
+          <div class="legend">
+            <span><span class="sw" style="background:var(--goal)"></span>Default schedule, minimum payments: paid off Jul 2037 (Dash's projection)</span>
+            <span><span class="sw" style="background:var(--accent)"></span>With $500/mo extra, highest rate first: paid off <span id="bEnd"></span></span>
+          </div>
+          <div class="small muted">No balances logged yet. Each one you log draws here as a dot against the line.</div>
+        </div>
+
+        <div class="card o-loans">
+          <div class="cardhead"><h2>Loans</h2><span class="small muted">Paid in this order: highest rate first (your choice, 24 Sep)</span></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th></th><th>Loan</th><th class="r">Rate</th><th class="r">Balance</th><th>Share</th><th>First bill</th></tr></thead>
+              <tbody id="loans"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card" id="dashcorner">
+          <div class="cardhead"><h2>Dash is on</h2><span class="small muted" id="dashcount">1 thing</span></div>
+          <div class="ws live" id="ws-consolidate">
+            <div class="meta"><span class="chip ex">Example</span><span>From your chat · today</span></div>
+            <div class="q">Should I consolidate my loans or keep them separate?</div>
+            <div class="meta" id="ws-status"><span class="working" aria-hidden="true"><i></i><i></i><i></i></span><span>Reading your four loans and the IBR rules</span></div>
+            <div class="res" id="ws-result" hidden>
+              <div><b>Keep them separate.</b> A consolidation loan made now counts as a new federal loan, which takes it off IBR and leaves only RAP. The new rate would be the weighted average of your four, about 8.79%, rounded up to 8.875%, so it saves nothing on interest.</div>
+              <div class="small"><a>Consolidate or keep separate · file</a> · <a>Back to the chat</a></div>
+              <div class="sugg"><span>Add a note to the Loans list: don't consolidate while on IBR</span><span><button class="btn sm" type="button">Add</button> <button class="btn sm" type="button">No</button></span></div>
+            </div>
+          </div>
+          <div class="small muted">Last finished: <b style="color:var(--ink);font-weight:500">Call script and email for Northfield Lending</b>, 2 Nov · <a href="#work" data-go="work">All of Dash's work</a></div>
+          <form class="ask" onsubmit="event.preventDefault()">
+            <input id="askbox" aria-label="Ask Dash about this goal" placeholder="Ask Dash to figure something out…">
+            <button class="btn primary" type="submit">Ask</button>
+          </form>
+        </div>
+
+        <div class="card" id="recentfiles">
+          <div class="cardhead"><h2>Recent files</h2><a class="small" href="#work" data-go="work">All files</a></div>
+          <ul class="files" id="files-recent"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PLAN (same on every goal) ===== -->
+  <div class="view" id="v-plan" hidden>
+    <div class="planbar">
+      <div class="seg" role="group" aria-label="Show the plan">
+        <button type="button" data-p="next" aria-pressed="true">What's next</button>
+        <button type="button" data-p="stage" aria-pressed="false">By stage</button>
+      </div>
+      <button class="btn sm" type="button">Help me plan this</button>
+    </div>
+
+    <div class="pgrid">
+      <div id="p-next" class="sect" style="gap:20px">
+        <div class="sect nowsect">
+          <h3>Now</h3>
+          <div class="pstep now">
+            <span class="pnum">1</span>
+            <span class="pt">Save Northfield Lending's IBR approval showing the $0 payment</span>
+            <span class="pm"><span class="waitchip dep">Waiting on the letter</span><span>Yours</span><span>Stage 4 · Set up the payments</span></span>
+            <span class="pwhy">The application went in on 2 Nov. When the letter lands in Gmail, Dash files it under Work &amp; files and asks you to tick this.</span>
+            <span class="pact" style="grid-column:2"><button class="btn sm primary" type="button">Done</button><button class="btn sm" type="button">Add the letter</button><button class="btn sm" type="button">Not now</button></span>
+          </div>
+        </div>
+
+        <div class="sect">
+          <h3>Up next</h3>
+          <div class="pstep">
+            <span class="pnum">2</span>
+            <span class="pt">Turn on autopay for every loan</span>
+            <span class="pm"><span class="waitchip date">Before 18 Dec</span><span>Yours · about 15 min</span><span>Stage 4</span></span>
+            <span class="pwhy">Autopay usually takes 0.25% off the rate. Best done once the approval sets the payment.</span>
+            <details class="howto"><summary class="small" style="cursor:pointer;font-weight:600;color:var(--goal)">Dash's how-to</summary>
+              <ol>
+                <li>Sign in at edfinancial.com.</li>
+                <li>Open Make a Payment, then Autopay.</li>
+                <li>Choose the checking account and the monthly amount.</li>
+                <li>Repeat for each loan if the site sets autopay one at a time (ending 0000P25, 0000P26, 0000U25, 0000U26).</li>
+                <li>Keep the confirmation. It goes under Waiting for in Files.</li>
+              </ol>
+            </details>
+          </div>
+        </div>
+
+        <div class="sect">
+          <h3>Later</h3>
+          <ul class="later">
+            <li><span class="pnum">3</span><div><div style="font-weight:500">Send the extra payment to Grad PLUS 2024–25</div><div class="small muted">Highest rate first · 9.08% on $52,000</div></div><span class="waitchip date">Starts 18 Dec</span></li>
+            <li><span class="pnum">4</span><div><div style="font-weight:500">Log each loan balance</div><div class="small muted">Monthly · draws the dots on the chart</div></div><span class="waitchip">Monthly</span></li>
+            <li><span class="pnum">5</span><div><div style="font-weight:500">Recertify income for IBR</div><div class="small muted">Before the yearly deadline</div></div><span class="waitchip dep">After the approval</span></li>
+          </ul>
+        </div>
+
+        <details class="donefold"><summary>15 done</summary>
+          <ul>
+            <li>Check with Northfield Lending that no bill comes due while IBR is processed · 3 Nov</li>
+            <li>Apply for IBR on all four Northfield Lending loans · 3 Nov</li>
+            <li>Apply for IBR on studentaid.gov, reporting zero income · 2 Nov</li>
+            <li>Decide: income-driven repayment or the default schedule · 29 Oct</li>
+            <li>Do you still want to refinance? No · 3 Oct</li>
+            <li>Build the month-by-month payoff schedule · 25 Sep</li>
+            <li>Check refinancing, IDR and forgiveness options · 25 Sep</li>
+            <li>List your loan balances, rates and minimum payments · 25 Sep</li>
+            <li>Highest interest first, or smallest balance first? Highest · 24 Sep</li>
+            <li>and 6 more</li>
+          </ul>
+        </details>
+      </div>
+
+      <div id="p-stage" class="sect" hidden>
+        <div class="card seestage">
+          <div class="stage" style="border-top:0"><div class="sh"><span>1. Get the numbers</span><span class="small muted">Done</span></div><ul><li class="d">List your loan balances, rates and minimum payments</li><li class="d">Check refinancing, IDR and forgiveness options</li></ul></div>
+          <div class="stage"><div class="sh"><span>2. Choose the payoff order</span><span class="small muted">Done</span></div><ul><li class="d">Highest interest first or smallest balance first? Highest rate.</li><li class="d">Refinance once income qualifies (dropped 3 Oct)</li></ul></div>
+          <div class="stage"><div class="sh"><span>3. Build the schedule</span><span class="small muted">Done</span></div><ul><li class="d">Month-by-month payoff schedule</li></ul></div>
+          <div class="stage"><div class="sh"><span>4. Set up the payments</span><span class="small muted">2 open</span></div><ul><li class="d">Apply for IBR on all four loans</li><li>Save the IBR approval <b style="color:var(--goal)">· now</b></li><li>Turn on autopay for every loan</li></ul></div>
+          <div class="stage"><div class="sh"><span>5. Keep it on track</span><span class="small muted">3 open</span></div><ul><li>Send the extra payment to the first loan</li><li>Log each loan balance, monthly</li><li>Recertify income for IBR yearly</li></ul></div>
+        </div>
+      </div>
+
+      <div class="pside">
+        <div class="card mini">
+          <div class="micro">Progress</div>
+          <div class="fig sm num">15 of 20</div>
+          <div class="bar"><i style="width:75%"></i></div>
+          <div class="small muted">Stages 1 to 3 done · stage 4 has 2 left</div>
+        </div>
+        <div class="card mini">
+          <div class="micro">Coming up</div>
+          <div class="small"><b>18 Dec</b> · first bill on the Grad PLUS loans</div>
+          <div class="small"><b>19 Dec</b> · first bill on the Direct Unsubsidized</div>
+          <div class="small muted">Autopay before then.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== WORK & FILES (same on every goal) ===== -->
+  <div class="view" id="v-work" hidden>
+    <div class="grid">
+      <div class="col">
+        <div class="card" id="filescard">
+          <div class="cardhead"><h2>Files</h2><span class="small muted" id="filecount"></span></div>
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-f="all">All</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="dash">Dash wrote</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="mine">Yours</button>
+            <button class="tab" role="tab" aria-selected="false" data-f="slot">Waiting for</button>
+          </div>
+          <ul class="files" id="files"></ul>
+          <div class="drop" id="drop">
+            <span>Drop a PDF, a screenshot or an email here</span>
+            <span><label for="fileinput">or choose a file</label>. Dash reads it and puts it on the right step.</span>
+            <input type="file" id="fileinput" multiple>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <div class="cardhead"><h2>Dash's work</h2><span class="small muted">6 pieces · 1 going</span></div>
+          <div class="fin">
+            <details open><summary><span class="q">Should I consolidate my loans or keep them separate? <span class="chip ex" style="margin-left:4px">Example</span></span><span class="small muted">today</span></summary><div class="body"><span>Started from your chat. See it on the Dashboard while it's going.</span></div></details>
+            <details><summary><span class="q">Walkthrough for the IBR application</span><span class="small muted">2 Nov</span></summary><div class="body"><span>Ten steps for studentaid.gov: pick IBR rather than RAP, consent to IRS data, report zero income for a $0 payment.</span><span>Started from: the step "Apply for IBR" · <a>file</a></span></div></details>
+            <details><summary><span class="q">Call script and email for Northfield Lending</span><span class="small muted">2 Nov</span></summary><div class="body"><span>Asks Northfield Lending to confirm no bill falls due on the four loans while IBR is processed.</span><span>Started from: the goal page · <a>file</a></span></div></details>
+            <details><summary><span class="q">IBR or the default schedule?</span><span class="small muted">29 Oct</span></summary><div class="body"><span>Recommended IBR, in place before the 18 Dec bill. Apply by about 18 Nov, and don't consolidate or take a new federal loan.</span><span>Added the step "Apply for IBR" · <a>file</a></span></div></details>
+            <details><summary><span class="q">Refinancing, IDR and forgiveness options</span><span class="small muted">25 Sep</span></summary><div class="body"><span>Private refinancing quotes start near 4%, but it gives up IBR, PSLF and federal protections for good, and needs an income to underwrite. Not one to act on yet.</span><span><a>file</a></span></div></details>
+            <details><summary><span class="q">Month-by-month payoff schedule</span><span class="small muted">25 Sep</span></summary><div class="body"><span>Minimum payments clear everything by July 2037 with $64,000 in interest. Drew the chart on the Dashboard.</span><span><a>file</a></span></div></details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HISTORY (same on every goal) ===== -->
+  <div class="view" id="v-history" hidden>
+    <div class="card" style="max-width:760px">
+      <div class="cardhead"><h2>Story so far</h2><span class="small muted">Everything that happened on this goal</span></div>
+      <ul class="story" id="story"></ul>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="phone" role="dialog" aria-label="Chat with Dash">
+    <header><b>Dash</b><button class="btn sm" id="closechat" type="button">Close</button></header>
+    <div class="msgs" id="msgs"></div>
+    <footer><input id="chatin" aria-label="Message" placeholder="Message Dash" readonly><button class="btn primary sm" type="button">Send</button></footer>
+  </div>
+</div>
+<div id="toastslot"></div>
+
+<script>
+(function(){
+  // Tabs, routed on the hash
+  const views=['dashboard','plan','work','history'];
+  function show(v){if(!views.includes(v))v='dashboard';views.forEach(n=>document.getElementById('v-'+n).hidden=n!==v);document.querySelectorAll('.gtab').forEach(t=>t.setAttribute('aria-selected',t.dataset.v===v))}
+  document.querySelectorAll('.gtab').forEach(t=>t.addEventListener('click',()=>{location.hash=t.dataset.v}));
+  document.querySelectorAll('[data-go]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();location.hash=a.dataset.go;window.scrollTo({top:0})}));
+  window.addEventListener('hashchange',()=>show(location.hash.slice(1)));
+  show(location.hash.slice(1));
+  // Plan view switch
+  document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.seg button').forEach(o=>o.setAttribute('aria-pressed',o===b));document.getElementById('p-next').hidden=b.dataset.p!=='next';document.getElementById('p-stage').hidden=b.dataset.p!=='stage'}));
+
+  // Loans, from Dash's payoff step (25 Sep) and the extra-payment step.
+  const loans=[
+    {n:'Grad PLUS 2024–25',r:9.08,b:52000.00,due:'18 Dec'},
+    {n:'Grad PLUS 2025–26',r:8.94,b:47500.00,due:'18 Dec'},
+    {n:'Direct Unsubsidized 2024–25',r:8.08,b:14800.00,due:'19 Dec'},
+    {n:'Direct Unsubsidized 2025–26',r:7.94,b:12900.00,due:'19 Dec'}];
+  const total=loans.reduce((s,l)=>s+l.b,0);
+  const fmt=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('loans').innerHTML=loans.map((l,i)=>`<tr><td><span class="ord">${i+1}</span></td><td>${l.n}</td><td class="r num">${l.r.toFixed(2)}%</td><td class="r num">${fmt(l.b)}</td><td><div class="share"><i style="width:${(l.b/total*100).toFixed(1)}%"></i></div></td><td class="small muted">${l.due}</td></tr>`).join('');
+
+  // Projection: Grad PLUS over 127 months, Direct Unsub at the 10-year stand-ins Dash used.
+  const pay=(b,r,n)=>{const m=r/1200;return b*m/(1-Math.pow(1+m,-n))};
+  const pays=[pay(loans[0].b,9.08,127),pay(loans[1].b,8.94,127),180.00,165.00];
+  function sim(extra){
+    let bal=loans.map(l=>l.b),pts=[];
+    for(let m=0;m<130;m++){
+      const t=bal.reduce((a,b)=>a+b,0); pts.push(t); if(t<1)break;
+      let spare=extra;
+      bal=bal.map((b,i)=>{if(b<=0){spare+=pays[i];return 0}const nb=b*(1+loans[i].r/1200)-pays[i];if(nb<0){spare+=-nb;return 0}return nb});
+      for(let i=0;i<4&&spare>0;i++){const d=Math.min(spare,bal[i]);bal[i]-=d;spare-=d}
+    }
+    return pts;
+  }
+  const a=sim(0),b=sim(500);
+  const W=640,H=230,L=48,R=12,T=12,B=28,maxM=128;
+  const x=m=>L+(W-L-R)*m/maxM, y=v=>T+(H-T-B)*(1-v/210000);
+  const path=pts=>pts.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' ');
+  let s='';
+  [0,50000,100000,150000,200000].forEach(v=>{s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)" stroke-width="1"/><text x="${L-8}" y="${y(v)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${v?('$'+v/1000+'k'):'$0'}</text>`});
+  [[0,'Dec 2026'],[25,'2029'],[49,'2031'],[73,'2033'],[97,'2035'],[121,'2037']].forEach(([m,t])=>{s+=`<text x="${x(m)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)">${t}</text>`});
+  s+=`<path d="${path(a)} L ${x(a.length-1)} ${y(0)} L ${x(0)} ${y(0)} Z" fill="var(--goal-tint)" stroke="none" opacity=".7"/>`;
+  s+=`<path d="${path(a)}" fill="none" stroke="var(--goal)" stroke-width="2.2"/>`;
+  s+=`<path d="${path(b)}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  s+=`<circle cx="${x(0)}" cy="${y(a[0])}" r="4.5" fill="var(--goal)"/>`;
+  const bEnd=b.length-1;
+  s+=`<circle cx="${x(a.length-1)}" cy="${y(0)}" r="3.5" fill="var(--goal)"/><circle cx="${x(bEnd)}" cy="${y(0)}" r="3.5" fill="var(--accent)"/>`;
+  const end=new Date(2026,11,1);end.setMonth(end.getMonth()+bEnd);
+  document.getElementById('bEnd').textContent=end.toLocaleString('en-GB',{month:'short',year:'numeric'});
+  document.getElementById('chart').innerHTML=s;
+
+  // Files
+  const files=[
+    {k:'ex',t:'Consolidate or keep separate',s:'Dash · today · from your chat',ty:'NOTE',hide:true},
+    {k:'dash',t:'Northfield Lending call script and email',s:'Dash · 2 Nov · for "Check with Northfield Lending"',u:true,ty:'NOTE'},
+    {k:'dash',t:'Walkthrough: apply for IBR on studentaid.gov',s:'Dash · 2 Nov · for "Apply for IBR"',pin:true,ty:'NOTE'},
+    {k:'dash',t:'Income-driven repayment or the default schedule',s:'Dash · 29 Oct · for "IBR or the default schedule?"',u:true,ty:'NOTE'},
+    {k:'dash',t:'Payoff schedule, highest rate first',s:'Dash · 25 Sep · draws the chart',ty:'TABLE'},
+    {k:'dash',t:'Refinancing, IDR and forgiveness options',s:'Dash · 25 Sep',ty:'NOTE'},
+    {k:'slot',t:'IBR approval letter from Northfield Lending',s:'Waiting · Dash files it from Gmail when it lands',ty:'PDF'},
+    {k:'slot',t:'Autopay confirmation, all four loans',s:'Waiting · for "Turn on autopay"',ty:'PDF'}];
+  let filter='all';
+  const row=f=>`<li class="file"><span class="ficon ${f.k==='dash'?'dash':f.k==='slot'?'slot':f.k==='ex'?'ex':''}">${f.ty}</span><div style="min-width:0"><div class="ft">${f.u?'<span class="unread" title="Unread"></span>':''}${f.t}</div><div class="fs">${f.s}</div></div>${f.pin?'<span class="pin">Pinned</span>':f.k==='slot'?'<button class="btn sm" type="button">Add</button>':''}</li>`;
+  function drawFiles(){
+    const list=files.filter(f=>!f.hide&&(filter==='all'||f.k===filter||(filter==='dash'&&f.k==='ex')));
+    document.getElementById('files').innerHTML=list.length?list.map(row).join(''):`<li class="file"><span class="ficon slot">+</span><div><div class="ft">Nothing of yours yet</div><div class="fs">Statements, letters and screenshots you add land here.</div></div><span></span></li>`;
+    document.getElementById('files-recent').innerHTML=files.filter(f=>!f.hide&&f.k!=='slot').slice(0,3).map(row).join('')+files.filter(f=>f.k==='slot').slice(0,1).map(row).join('');
+    const shown=files.filter(f=>!f.hide&&f.k!=='slot').length, unread=files.filter(f=>!f.hide&&f.u).length;
+    document.getElementById('filecount').textContent=`${shown} files · ${unread} unread`;
+    document.getElementById('worknum').textContent=`${unread} unread`;
+  }
+  document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.tab').forEach(o=>o.setAttribute('aria-selected',o===t));filter=t.dataset.f;drawFiles()}));
+  drawFiles();
+  const drop=document.getElementById('drop'),fi=document.getElementById('fileinput');
+  function addFiles(list){[...list].forEach(f=>files.splice(1,0,{k:'mine',t:f.name,s:'You · just now · Dash is reading it',ty:(f.name.split('.').pop()||'FILE').slice(0,4).toUpperCase()}));filter='all';document.querySelectorAll('.tab').forEach(o=>o.setAttribute('aria-selected',o.dataset.f==='all'));drawFiles()}
+  ['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',ev=>addFiles(ev.dataTransfer.files));
+  fi.addEventListener('change',()=>addFiles(fi.files));
+
+  // History
+  const story=[
+    ['3 Nov','you','Confirmed with Northfield Lending that no bill falls due while IBR is processed'],
+    ['2 Nov','you','Applied for IBR on studentaid.gov, reporting zero income'],
+    ['2 Nov','Dash','Wrote the IBR walkthrough and the Northfield Lending call script'],
+    ['29 Oct','Dash','Recommended IBR over the default schedule'],
+    ['3 Oct','you','Decided against refinancing for now'],
+    ['25 Sep','Dash','Built the payoff schedule and checked refinancing, IDR and PSLF'],
+    ['25 Sep','you','Listed the four loans and chose highest rate first'],
+    ['24 Sep','you','Started the goal']];
+  document.getElementById('story').innerHTML=story.map(([d,w,t])=>`<li><span class="d">${d}</span><span><span class="who" style="${w==='you'?'color:var(--accent)':''}">${w==='you'?'You':'Dash'}</span> · ${t}</span></li>`).join('');
+
+  // Chat flow demo
+  const scrim=document.getElementById('scrim'),msgs=document.getElementById('msgs'),chatin=document.getElementById('chatin');
+  const ws=document.getElementById('ws-consolidate'),wsStatus=document.getElementById('ws-status'),wsRes=document.getElementById('ws-result');
+  let timers=[];
+  const later=(ms,fn)=>timers.push(setTimeout(fn,ms));
+  function reset(){timers.forEach(clearTimeout);timers=[];msgs.innerHTML='';chatin.value='';document.getElementById('toastslot').innerHTML='';
+    wsStatus.innerHTML='<span class="working" aria-hidden="true"><i></i><i></i><i></i></span><span>Reading your four loans and the IBR rules</span>';wsRes.hidden=true;ws.classList.add('live');files[0].hide=true;drawFiles();document.getElementById('dashcount').textContent='1 thing'}
+  function say(cls,html){const d=document.createElement('div');d.className='msg '+cls;d.innerHTML=html;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight}
+  function typeIn(text,done){let i=0;const step=()=>{chatin.value=text.slice(0,++i);if(i<text.length)later(22,step);else later(350,done)};step()}
+  function finish(){
+    wsStatus.innerHTML='<span class="chip goal"><span class="dot"></span>Done</span><span>Just now · you were sent a notification</span>';
+    wsRes.hidden=false;ws.classList.remove('live');files[0].hide=false;files[0].u=true;drawFiles();document.getElementById('dashcount').textContent='1 new result';
+  }
+  document.getElementById('play').addEventListener('click',()=>{
+    reset();scrim.hidden=false;
+    later(300,()=>typeIn('can you help me figure out if i should consolidate my student loans',()=>{
+      chatin.value='';say('me','can you help me figure out if i should consolidate my student loans');
+      later(900,()=>say('dash','I\'ll take this on under <b>Pay off student debt</b>. I\'ll compare consolidating with keeping your four Northfield Lending loans separate, given the IBR application you sent on 2 Nov. I\'ll message you here when it\'s done.<div class="wscard"><span class="k">Working on it</span><b>Should I consolidate my loans or keep them separate?</b><a>Open in Goals</a></div>'));
+      later(3600,()=>{scrim.hidden=true;
+        document.getElementById('toastslot').innerHTML='<div class="toast" role="status"><span class="mark">D</span><div><b style="font-size:13px">Done: consolidate or keep separate?</b><div class="small muted">Keep them separate. Tap to see why.</div></div><button class="btn sm primary" id="opentoast" type="button">Open</button></div>';
+        finish();
+        document.getElementById('opentoast').addEventListener('click',()=>{document.getElementById('toastslot').innerHTML='';location.hash='dashboard';show('dashboard');ws.scrollIntoView({behavior:'smooth',block:'center'});ws.classList.add('flash');setTimeout(()=>ws.classList.remove('flash'),1800)});
+      });
+    }));
+  });
+  document.getElementById('closechat').addEventListener('click',()=>{scrim.hidden=true});
+})();
+</script>
+
+</body></html>

@@ -1,41 +1,10 @@
-import { BarChart3 } from 'lucide-react';
-import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/shell/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
-import { loadPipeline, toFunnelApplications } from '@/lib/jobs/applications/load';
-import { AnalyticsView } from './view';
-import { PageWide } from '@/components/shell/page-width';
+import { redirect } from 'next/navigation';
 
-export const metadata = { title: 'Analytics' };
-
-const DESCRIPTION = 'How far applications from each channel got, and where they stopped.';
-
-export default async function AnalyticsPage() {
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const rows = await loadPipeline(supabase, user.id);
-  const applications = toFunnelApplications(rows);
-  const sent = applications.filter((a) => a.submittedAt !== null);
-
-  if (sent.length === 0) {
-    return (
-      <PageWide>
-        <PageHeader title="Analytics" description={DESCRIPTION} />
-        <EmptyState
-          icon={BarChart3}
-          title="Nothing to measure yet"
-          description="These numbers need applications with a submission date. They start being useful at about fifteen, and trustworthy at about forty."
-          action={{ label: 'Add a role', aim: { kind: 'job-role' } }}
-        />
-      </PageWide>
-    );
-  }
-
-  return (
-    <PageWide>
-      <PageHeader title="Analytics" description={DESCRIPTION} />
-      <AnalyticsView applications={applications} />
-    </PageWide>
-  );
+/**
+ * Analytics was retired in plan #1496.7.1, after nobody opened it in a month
+ * (plan #1496.3). The funnel on Now covers how far applications got. The
+ * address keeps working for bookmarks and old links.
+ */
+export default function AnalyticsRedirect() {
+  redirect('/jobs');
 }

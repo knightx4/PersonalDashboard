@@ -225,7 +225,7 @@ function clock(at: number): string {
 function Timestamp() {
   const now = useNow();
   if (now === null) return null;
-  return <span className="tabular shrink-0">{clock(now)}</span>;
+  return <span className="tabular shrink-0" data-wall-clock="">{clock(now)}</span>;
 }
 
 /**

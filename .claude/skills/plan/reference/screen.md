@@ -62,13 +62,30 @@ registered; working offline, read the line and `REFERENCES` yourself.
   reference whose surface is not in the gallery or whose pictures are missing.
 - **Send a registered reference to the critic on every round** on its
   surface, in this step and every later one, as the prompt's `reference`
-  (4 below). A surface with none is sent "none".
+  (4 below). A surface with none is sent "none", and its verdict has no `layout`.
+- **Check the layout before wiring (plan #2966.5).** Round 1 on a surface
+  with a reference asks the critic one more question than the laws: does the
+  layout match the reference, meaning the panes, where the list and the
+  content sit, and what each row holds. The answer comes back as `layout`
+  (`{ "answer": "...", "ok": true|false }`) in the verdict, and the recorder
+  refuses a verdict without it on a surface that has a reference. A no fails
+  the round whatever the laws say, and the screen is not wired to real data
+  until a round answers yes: moving panes is cheap on fixtures and costly
+  after wiring. `ui-guard` keeps refusing the step until a later round on the
+  surface answers yes. Settling does not clear it; only a round that answers
+  yes or the person's answer does. (On 4 November 2026 the People tab passed
+  review as a full-width list while its mockup was a two-pane messenger.)
 - **Never scope the critic away from the reference.** Do not ask it to leave
   a difference unraised because a shared component draws it or a later step
   will. A shared component that makes the screen differ from its reference is
   this step's to change. A difference no law requires and that you cannot
   close goes in the close note by name, as an open difference from the
   reference, where the person can overrule it.
+
+**Stage 0, once the screens are drawn and before the first critic round:** run
+`npm run ui-guard -- <step> --compare` (**Compare with main first**, below).
+It settles every surface with no visible change from main, and prints how many
+it settled and how many go on. The loop that follows is for those that go on.
 
 **The loop, for each surface:**
 
@@ -170,7 +187,9 @@ pictures yourself in its place.
 **Three rounds, then settle it yourself.** If round 3 comes back `fix`, stop
 the loop: no fourth round. Design checks are not questions for the person.
 They said so on 12 October 2026, after a week of "accept it as it is"
-blocks, and that answer replaces decision #1535's A. So:
+blocks, and that answer replaces decision #1535's A. The one exception, a
+fix that cites the mockup, the done-when or a regression, is the next
+paragraph. For every other fix:
 
 1. Record round 3 like any other (below).
 2. Make any of the open fixes you can make cheaply, without another round.
@@ -183,14 +202,68 @@ blocks, and that answer replaces decision #1535's A. So:
    settled and the fixes still open, in a line, so the person can overrule
    it from the step's row.
 
-**Surfaces a shared file reaches.** The close guard lists every surface a
-changed file serves, so a change to a shared row or folder can name dozens
-of screens nobody sent to the critic. Send the surfaces the step meant to
-change to the critic. Settle the rest with the same command, naming in the
-reason that the step did not set out to change them, and do not block on
+**A screen that misses its mockup goes to the person (plan #2966.4).** Three
+kinds of fix are never settled: one whose `breaks` is `reference` (it reads
+worse than its mockup), `done-when` (it does not do what the step says) or
+`regression` (it is worse than it was). On 5 November 2026 the person agreed
+that a screen still failing one of these after three rounds comes to them,
+with the shot beside the mockup. Their rule of 12 October 2026 still holds
+for every other kind of fix: a law, a preference, the pattern, a craft check
+or a spec rule left open after round 3 is settled as above, and never put to
 them.
 
-The settle lets one of those through only when it looks the same as on main
+`--settle` and `--compare` leave such a surface out, whatever round it is on,
+and print why. The close guard and `land` hold it until a later round passes
+or the person answers; a settle written past it does not clear it. Before
+round 3, fix it and run the next round. After round 3:
+
+1. Shoot the surface again, so `.preview-shots/<surface>--laptop-light.png`
+   is the screen as it stands.
+2. Run `npm run ui-guard -- <step> --ask` (`<feature> --feature --ask` in the
+   land review). For each held surface it writes
+   `.preview-shots/asks/<step>--<surface>.html`: option A is the shot as
+   built, and option B is the reference picture from `docs/references/<surface>/`
+   (main's shot from `.preview-shots/before/` for a regression with no
+   reference; the critic's findings alone for a done-when with neither),
+   with the held fixes listed under it. It prints the two commands below
+   with the question, the options and the page's `/preview?s=<id>` link
+   filled in.
+3. Write the decision under the feature:
+   `npx tsx scripts/plan.ts add "<question>" --parent <feature> --kind decision --detail "<options>" --mockup .preview-shots/asks/<step>--<surface>.html`.
+   `--mockup` takes one HTML file and photographs each `data-option`
+   element at 390 and 1280, so the shot and the mockup show side by side
+   beside the options on the Inbox and on the plan page. Merge the gallery
+   drawing to main first, so the `/preview` link in the detail opens it.
+4. Block on it: `npx tsx scripts/plan.ts block <step> --on <the decision> --ask "<the ask it printed>"`.
+   In the land review, block each step `land` names as held by that
+   surface. The ask names the page and its options, never the critic or a
+   design check, which `block` refuses (`lib/plan/block-ask.ts`).
+5. When the person answers A, keep it as built: `npm run ui-guard -- <step>
+   --accept` (or `<feature> --feature --accept`). It takes the answer to a
+   question with pictures that the step waits on, or that sits under the
+   feature, answered after the surface's last round, and writes an
+   `accepted` round quoting it. When they answer B, make the change and run
+   the critic again; the next round has to pass.
+
+**Compare with main first (plan #2966.2).** Before any round goes to the
+critic, run `npm run ui-guard -- <step> --compare`. It is the first stage: a
+screen that looks the same as on main is signed off by comparison, and only a
+screen whose shots differ is sent to the critic. It covers every surface the
+step's files serve that has not passed: the ones the step lists as its own
+(its title, detail or done-when links as `/preview?s=<id>`, or the critic has
+judged them) and the ones a shared file reaches (a change to a shared row or
+folder can name dozens of screens nobody meant to change). It shoots each on
+this checkout and on origin/main, settles those whose four shots match with
+the reason `SAME_AS_MAIN_REASON`, and prints how many it settled and how many
+go to the critic, then lists those, with the time each part took. A surface
+main does not have is new, and goes to the critic from round 1. It builds what
+is not running: the branch's preview on `PREVIEW_PORT` (a running one is used
+only when built after the step's last change) and main's in a worktree under
+the temp folder on `PREVIEW_PORT` + 1000, kept for the next run. `--workers
+<n>` sets how many shooters a side, three by default. Do not block on these
+surfaces.
+
+`--settle` lets a surface through that the critic has not passed only when it looks the same as on main
 (plan #2215.4). For every surface still waiting that the critic has not
 judged through three rounds, it compares the four shots in `.preview-shots/`
 with main's in `.preview-shots/before/` pixel by pixel, and refuses the whole
@@ -258,4 +331,61 @@ any surface those files serve is not a `pass`, and names each such surface
 (plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <outline>` runs
 the same check from your branch, and prints the SQL for the connector where
 there is no `DATABASE_URL`. Run it before you report a screen step: a
-surface it names is a round still to run or record.
+surface it names is a round still to run or record. A step built in a batch
+is closed by `land` instead, from the feature's land review below.
+
+## The land review: each screen once, at the feature's head
+
+A feature in a batch is reviewed once, when it lands (plan #2966.3). The
+rounds a builder records on its own step are its working checks: they show it
+the screen is right before it reports, and they no longer close anything.
+What closes the feature's screen steps is one set of rounds recorded under the
+feature's number, taken on the feature branch head once every step is built,
+for every surface the branch reaches. A page two steps both changed is judged
+once, in the state that goes to main.
+
+`land` reads those rounds (`lib/plan/ui-feature-review.ts`). A round counts
+only when it was taken at a commit that holds every built step's commit, so a
+round from before the last step merged does not. A step that changed no screen
+closes on its commit alone; a screen step closes once every surface it
+reaches has passed in the feature's rounds; one that has not stays open, and
+`land` names the surfaces holding it.
+
+The session landing the feature runs the review on the branch head after the
+gate and before the merge to main, since after the merge origin/main already
+has the feature and every surface would compare the same:
+
+1. `npm run ui-guard -- <feature> --feature --compare`. It shoots every
+   surface the branch serves that has not passed at the head, on the head and
+   on origin/main, and settles those that look the same, recording the head
+   on each settled round.
+2. `npm run ui-guard -- <feature> --feature --sheets`. It groups what is left
+   by page (the first route in `SURFACE_ROUTES`) and prints, for each page,
+   the main state's four shots, a strip of the page's other states, the round
+   to run and the command that records it. Shoot any state it lists as not
+   shot yet, then run it again.
+3. **One critic round a page.** The critic gets the main state's four shots
+   and the strip (`.preview-shots/sheets/<main>--states.png`, each other state
+   at phone width in the light theme) and judges the page as a whole: a fix
+   on a state names it in `where`. Everything else in the prompt is as in the
+   loop above, with the feature's done-when in place of a step's.
+4. **Record it for the whole page:** `npm run ui-check -- <feature> <main>
+   <round> --commit <head> --states <id>,<id>`. The one verdict is written for
+   the main state and for each state, each with its own shots kept beside it.
+5. On `fix`, make the changes on the branch, commit them against the step that
+   drew the screen, and run the next round at the new head. A round taken
+   before a commit that changed a screen file the branch changed no longer
+   counts, so `--feature` alone tells you what is still to judge.
+6. Three rounds, then settle as above: `npm run ui-guard -- <feature> --feature
+   --settle "<why>"`. A layout the critic said differs from its reference is
+   never settled (plan #2966.5), and nor is a surface whose last round cites
+   the mockup, the done-when or a regression: that one goes to the person as
+   **A screen that misses its mockup goes to the person** says, with
+   `--feature --ask`.
+
+`--feature --compare` refuses once the head is already on origin/main (or
+`--base`): after the merge every surface looks the same as main and would be
+settled without being looked at. Run it on the branch head before the merge.
+
+`npm run ui-guard -- <feature> --feature` with no other flag says whether the
+feature may land, and exits 1 naming each surface not yet passed at the head.

@@ -5,6 +5,7 @@ import { periodOf } from '@/lib/goals/rhythms';
 import { countTowards } from '@/lib/goals/rhythms-store';
 import { RHYTHM_PERIODS, type RhythmPeriod } from '@/lib/goals/steps';
 import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
+import { loadDashboardTiles, saveGoalDashboard } from '@/lib/goals/dashboard-store';
 import {
   PAST_LIMIT,
   SHOWN_FOR_MS,
@@ -43,6 +44,8 @@ export async function loadRecentSuggestions(
   let query = client
     .from('suggestions')
     .select(SUGGESTION_COLUMNS)
+    // A suggested tile is only ever answered on the goal (plan #2778.8).
+    .neq('kind', 'tile')
     .gte('created_at', new Date(now - SHOWN_FOR_MS).toISOString());
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query.order('created_at', { ascending: false });
@@ -130,6 +133,28 @@ export async function loadGoalSuggestions(
 }
 
 /**
+ * What these runs suggested and nobody has answered yet, steps and tiles, for
+ * a question's result on the goal's Dashboard (plan #2778.8).
+ */
+export async function loadRunSuggestions(
+  client: GoalsSupabaseClient,
+  runIds: readonly string[],
+): Promise<Suggestion[]> {
+  if (runIds.length === 0) return [];
+  const { data, error } = await client
+    .from('suggestions')
+    .select(SUGGESTION_COLUMNS)
+    .in('run_id', [...runIds])
+    .in('kind', ['step', 'tile'])
+    .is('accepted_step_id', null)
+    .is('reaction', null)
+    .order('created_at', { ascending: true })
+    .limit(60);
+  if (error) throw new Error(`Could not read the run's suggestions: ${error.message}`);
+  return rows(data);
+}
+
+/**
  * Add as step (plan #1739): a suggested step becomes a step of yours under
  * what it was suggested for, and the suggestion records the step. The step
  * is not put on Todo; it gets there only when it is sent. Returns the new
@@ -173,6 +198,42 @@ export async function acceptStepSuggestion(
   }
 
   return stepId;
+}
+
+/**
+ * Add to dashboard (plan #2778.8): a tile a question run suggested goes on the
+ * end of the goal's dashboard, checked as any layout is, and the suggestion
+ * records the yes as `going` and settled as `attended`, so it is closed
+ * everywhere (Todo lists only a going one not yet attended). Null when it
+ * was added, else the sentence saying why not.
+ */
+export async function acceptTileSuggestion(
+  client: GoalsSupabaseClient,
+  userId: string,
+  id: string,
+): Promise<string | null> {
+  const { data: found, error: readError } = await client
+    .from('suggestions')
+    .select('item_id, tile')
+    .eq('id', id)
+    .eq('kind', 'tile')
+    .is('reaction', null)
+    .maybeSingle();
+  if (readError) throw new Error(readError.message);
+  const row = found as { item_id: string | null; tile: Record<string, unknown> | null } | null;
+  if (!row?.item_id || !row.tile) return 'That suggestion is gone. Reload to see the list.';
+
+  const tiles = (await loadDashboardTiles(client, userId, row.item_id)) ?? [];
+  const saved = await saveGoalDashboard(client, userId, row.item_id, [...tiles, row.tile]);
+  if (!saved.ok) return `The tile could not be added: ${saved.error}`;
+
+  const { error } = await client
+    .from('suggestions')
+    .update({ reaction: 'going', reacted_at: new Date().toISOString(), attended: true })
+    .eq('id', id)
+    .is('reaction', null);
+  if (error) throw new Error(error.message);
+  return null;
 }
 
 /**

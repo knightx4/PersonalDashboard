@@ -16,6 +16,7 @@ import {
 import { overhaulRefusal, overhaulTurn } from '@/lib/plan/overhaul-run';
 import {
   DISMISSAL_RULE,
+  COMPLETE_DETAIL_RULE,
   FOLLOW_ON_RULE,
   PLAIN_ENGLISH_RULE,
   QUESTION_RULE,
@@ -1567,7 +1568,7 @@ async function startReshape(
     'Do not approve anything, do not ' +
     'answer a decision, do not start or build a step, and do not add again something the ' +
     'feature already holds. Report what you added and which of it is proposed, and what you dropped and why.' +
-    `\n\n${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
+    `\n\n${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${COMPLETE_DETAIL_RULE}\n\n${QUESTION_RULE}\n\n${DISMISSAL_RULE}\n\nThe brief is below; it is the plan as the app holds it right ` +
     'now, and the plan is the source of truth. "Decided so far" is every answer settled ' +
     'beneath this feature.\n\n' +
     planBrief(sections, node, {

@@ -7,6 +7,7 @@ import {
   orderForClaim,
   tableMaterialStore,
   type ClaimMaterial,
+  type ConsumedReading,
   type MaterialStore,
 } from '@/lib/learn/catalogue/material';
 
@@ -54,6 +55,7 @@ function section(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     lengthChars: 5500,
     tStartSeconds: null,
     tEndSeconds: null,
+    openUrl: `${ARTICLE.canonicalUrl}#Money_creation`,
     item: ARTICLE,
     ...overrides,
   };
@@ -71,6 +73,7 @@ function clip(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     lengthChars: 4200,
     tStartSeconds: 724,
     tEndSeconds: 1110,
+    openUrl: `${LECTURE.canonicalUrl}&t=724`,
     item: LECTURE,
     ...overrides,
   };
@@ -89,6 +92,7 @@ function whole(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     lengthChars: 240,
     tStartSeconds: null,
     tEndSeconds: null,
+    openUrl: LECTURE.canonicalUrl,
     item: LECTURE,
     ...overrides,
   };
@@ -102,6 +106,7 @@ function ids(rows: readonly ClaimMaterial[]): string[] {
 function memoryStore(input: {
   links?: ClaimMaterial[];
   searchable?: boolean;
+  consumed?: ConsumedReading[];
 }): { store: MaterialStore; asked: string[] } {
   const asked: string[] = [];
 
@@ -111,6 +116,10 @@ function memoryStore(input: {
       async forClaim(conceptId) {
         asked.push(`forClaim:${conceptId}`);
         return input.links ?? [];
+      },
+      async consumed(openUrls) {
+        asked.push('consumed');
+        return (input.consumed ?? []).filter((reading) => openUrls.includes(reading.openUrl));
       },
       async anySearchable() {
         asked.push('anySearchable');
@@ -256,7 +265,74 @@ describe('a claim with nothing found for it', () => {
 
     expect(view.absence).toBeNull();
     expect(ids(view.material)).toEqual(['segment-section']);
-    expect(asked).toEqual(['forClaim:concept-1']);
+    expect(asked).toEqual(['forClaim:concept-1', 'consumed']);
+  });
+});
+
+/** A finished or abandoned reading of a segment, as the store hands it back. */
+function readingOf(row: ClaimMaterial, overrides: Partial<ConsumedReading> = {}): ConsumedReading {
+  return {
+    catalogueItemId: row.item.id,
+    canonicalUrl: row.item.canonicalUrl,
+    openUrl: row.openUrl,
+    ...overrides,
+  };
+}
+
+describe('material you have already been through', () => {
+  it('leaves out a segment you finished or gave up on', () => {
+    const order = orderForClaim('recognise', [whole(), clip(), section()], [readingOf(clip())]);
+    expect(ids(order)).toEqual(['segment-section', 'segment-whole']);
+  });
+
+  it('keeps another part of the same work you have not read', () => {
+    // The lecture's whole segment and its clip are one source; only the clip's
+    // address was read, so the rest of the lecture is still offered.
+    const order = orderForClaim('apply', [clip(), whole()], [readingOf(clip())]);
+    expect(ids(order)).toEqual(['segment-whole']);
+  });
+
+  it('counts a work you held before the catalogue did, by its URL', () => {
+    const pasted = readingOf(section(), { catalogueItemId: null });
+    expect(ids(orderForClaim('recognise', [section(), clip()], [pasted]))).toEqual(['segment-clip']);
+  });
+
+  it('does not count a different work that happens to open at the same address', () => {
+    const other = readingOf(section(), { catalogueItemId: 'item-other', canonicalUrl: 'https://example.org' });
+    expect(ids(orderForClaim('recognise', [section()], [other]))).toEqual(['segment-section']);
+  });
+
+  it('keeps a segment whose reading is still queued or in progress', async () => {
+    // The store is asked for read and abandoned readings only, so a queued one
+    // never reaches the filter, and the segment stays on the list.
+    const { store } = memoryStore({ links: [section(), clip()], searchable: true, consumed: [] });
+
+    const view = await materialForClaim(store, {
+      conceptId: 'concept-1',
+      rung: 'recognise',
+      searchedAt: '2026-09-20T09:00:00Z',
+    });
+
+    expect(view.absence).toBeNull();
+    expect(ids(view.material)).toEqual(['segment-section', 'segment-clip']);
+  });
+
+  it('says so when everything linked to the claim has been read', async () => {
+    const { store, asked } = memoryStore({
+      links: [section(), clip()],
+      searchable: true,
+      consumed: [readingOf(section()), readingOf(clip())],
+    });
+
+    await expect(
+      materialForClaim(store, {
+        conceptId: 'concept-1',
+        rung: 'recognise',
+        searchedAt: '2026-09-20T09:00:00Z',
+      }),
+    ).resolves.toEqual({ material: [], absence: 'all-consumed' });
+    // The catalogue's contents do not change what this claim says.
+    expect(asked).toEqual(['forClaim:concept-1', 'consumed']);
   });
 });
 
@@ -281,6 +357,10 @@ function recordingClient(replies: Record<string, Reply>) {
         },
         eq(column: string, value: unknown) {
           call.filters.push([column, value]);
+          return builder;
+        },
+        in(column: string, values: unknown[]) {
+          call.filters.push([column, values]);
           return builder;
         },
         not(column: string, operator: string, value: unknown) {
@@ -387,6 +467,76 @@ describe('the live store', () => {
     const rows = await tableMaterialStore(client, 'user-1').forClaim('concept-1');
 
     expect(rows[0]).toMatchObject({ shape: 'section', where: 'Money creation', lengthChars: 37 });
+  });
+
+  it('gives each row the address queueing it would open at', async () => {
+    const { client } = recordingClient({
+      catalogue_links: {
+        data: [
+          {
+            basis: 'Works the multiplier through.',
+            confidence: 'verified',
+            model: null,
+            catalogue_segments: {
+              id: 'segment-clip',
+              ordinal: 3,
+              heading: null,
+              section_anchor: null,
+              t_start_seconds: 724,
+              t_end_seconds: 1110,
+              text: '…',
+              catalogue_items: {
+                id: 'item-lecture',
+                title: LECTURE.title,
+                author: LECTURE.author,
+                kind: 'video',
+                canonical_url: LECTURE.canonicalUrl,
+                duration_seconds: 4800,
+              },
+            },
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const rows = await tableMaterialStore(client, 'user-1').forClaim('concept-1');
+    expect(rows[0].openUrl).toBe(clip().openUrl);
+  });
+
+  it('reads only this account’s finished and abandoned readings at these addresses', async () => {
+    const { client, calls } = recordingClient({
+      readings: {
+        data: [
+          {
+            open_url: clip().openUrl,
+            sources: { catalogue_item_id: 'item-lecture', canonical_url: LECTURE.canonicalUrl },
+          },
+          // A reading whose source is gone cannot be matched to a work.
+          { open_url: section().openUrl, sources: null },
+        ],
+        error: null,
+      },
+    });
+
+    const consumed = await tableMaterialStore(client, 'user-1').consumed([
+      clip().openUrl,
+      clip().openUrl,
+      section().openUrl,
+    ]);
+
+    expect(calls[0].filters).toEqual([
+      ['user_id', 'user-1'],
+      ['status', ['read', 'abandoned']],
+      ['open_url', [clip().openUrl, section().openUrl]],
+    ]);
+    expect(consumed).toEqual([readingOf(clip())]);
+  });
+
+  it('asks nothing when there are no addresses to look for', async () => {
+    const { client, calls } = recordingClient({});
+    await expect(tableMaterialStore(client, 'user-1').consumed([])).resolves.toEqual([]);
+    expect(calls).toEqual([]);
   });
 
   it('counts only embedded segments as something a claim could reach', async () => {

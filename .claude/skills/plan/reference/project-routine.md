@@ -12,6 +12,11 @@ A project whose row names a routine of its own, with that routine's id set
 on the deployment, goes to that routine instead; the website keeps one until
 a step of its has been built end to end through this routine (#2553.4).
 
+A project with no routine of its own is not sent to a routine at all: its
+run is queued for the projects dispatcher, which starts a session on the
+project's repository (project-dispatch.md beside this file). What follows
+is the brief that session gets, and the old shared routine's prompt.
+
 The routine checks out this repository, not the project's. The turn the app
 sends opens with `projectPreamble` (`lib/plan/handover.ts`), which names the
 project's repository and tells the session to add it. The plan rows stay in
@@ -29,6 +34,25 @@ checkout's HEAD, which is the dashboard's. Close a project's step with
 `npx tsx scripts/plan.ts done <n> --commit <sha> --note "…"`, naming the
 commit on the project's branch that holds the step. `done` asks GitHub
 whether that commit is on the project's branch and refuses one that is not.
+
+`done` finds the repository through the step's root feature. A step built in a
+project's repository under a feature about the app as a whole (plan #2800.8,
+built in music-pipeline under #2800) needs `--repo <project id>` as well, or
+`done` asks this repository about a commit it has never seen.
+
+### A 403 from a cloud session is not the token
+
+A cloud session's proxy replaces the token on every api.github.com request and
+refuses, with a 403, any repository not attached to the session. Its body says
+"not enabled for this session. Use add_repo". That refusal says nothing about
+GITHUB_READ_TOKEN, so never raise it, or tell the person, as the token lacking
+access. Call add_repo for the repository with read access and ask again. A
+routine run has no add_repo; there, write the setup step that **The prompt**
+below names ("Add <owner/repo> to the Plan step builder routine"), never a
+token raise. Only when add_repo itself is refused is there something for the
+person to do, and it is what add_repo's answer names. On 4 November 2026 a run
+raised this as the token's fault, and the person was sent to change a token
+that already read every repository they own.
 
 ## Setting up a new project
 
@@ -67,7 +91,8 @@ ready step, "Make <owner>/<repo> ready for Dash to build in"
    (name it and where it goes), or the GitHub App not installed on the
    repository. One setup step each, with the detail saying exactly where to
    go. When one of these stops the CLAUDE.md commit, the step waits on it
-   instead of closing.
+   instead of closing. Never write one asking the person to try, listen to
+   or check what a step built: put what is unverified in the closing note.
 6. **Close the step** with `done <n> --commit <sha>` naming the CLAUDE.md
    commit, or the head of the branch you read when it already had one, and a
    note saying what the check command is and what could not be settled.
@@ -97,12 +122,12 @@ You build plan steps for the Dev projects of this repository: repositories other
 The turn after this one names the project's repository, the step and the file to follow. Read that file and follow it. Where this prompt and that file disagree, the file is right.
 
 Before anything else:
-1. Call add_repo for the repository the turn names, asking for push access.
-2. Clone it beside this checkout, not inside it.
+1. Find the repository the turn names. When it is one of this routine's repositories it is already checked out under /home/user/<repo>: use that checkout and skip to 4.
+2. Otherwise call add_repo for it, asking for push access, and clone it beside this checkout, not inside it.
 3. Call register_repo_root on the clone.
 4. Build there: the code, the commits, the checks and the merge to its main branch are that repository's. Its own plan skill, which the turn names, says how a step is built in it.
 
-If add_repo is refused, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "<the remedy, as one line>" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
+If the repository is not checked out and add_repo is refused or not among your tools, build nothing, here or anywhere else. Write a setup step for the person with npx tsx scripts/plan.ts needs "Add <owner/repo> to the Plan step builder routine" --for <the step's outline> --detail "<what the tool returned, and where the person goes to fix it>", then end the run as the turn's note says. The remedy the tool names (installing the GitHub app on the repository, granting it access, adding the repository to the environment) is the person's to do; never work around it by building the step in this repository.
 
 Keep this checkout for the plan rows: claim, close, block and write run lines with npx tsx scripts/plan.ts here, which reads the database for every project. Never commit to this repository from a project's run.
 
@@ -114,6 +139,7 @@ Every turn ends with an "Ending this run" note and a "Dash run id:" line. As you
 
 ## Environment (Claude Code on the web)
 
+- If this repository (knightx4/PersonalDashboard) is not checked out, clone it first.
 - If this checkout's node_modules is empty, run `npm ci` here first: scripts/plan.ts needs it.
 - scripts/plan.ts reaches the database over HTTPS with SUPABASE_SERVICE_ROLE_KEY. If it cannot, send the SQL in .claude/skills/plan/reference/offline.md through npx tsx scripts/sql.ts. The plan belongs to the owner; always filter by `user_id = :owner`, which scripts/sql.ts fills in.
 - Use plain git fetch origin in each repository.
