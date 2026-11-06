@@ -121,6 +121,7 @@ import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModu
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
+import { AgendaScheduleSurface } from './agenda-schedule-surfaces';
 import { UiStandard, WorkspaceMoments } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -12564,6 +12565,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <AgendaTaggedMoreSurface />,
+  },
+  /* The agenda's days from the one schedule (plan #3027.1): a thing told
+   * twice shown once with where else it is, and a time two copies disagree
+   * on asked as a question. */
+  {
+    id: 'todo-agenda-schedule',
+    label: 'Todo · The agenda’s days from the one schedule',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <AgendaScheduleSurface />,
   },
   {
     id: 'todo-agenda-tagged-empty',

@@ -181,6 +181,14 @@ export interface DayContext {
   label: string;
   detail: string | null;
   link: AgendaItemLink | null;
+  /**
+   * The other places holding the same thing at the same time, in words
+   * ("Booking email"), when the one schedule folded copies into this row
+   * (lib/todo/schedule, plan #3027.1).
+   */
+  alsoIn?: string[];
+  /** Which time is right, asked when another copy disagrees on it. */
+  question?: string | null;
 }
 
 export interface AgendaSource {
