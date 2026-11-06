@@ -65,7 +65,14 @@ export type RulePerson = {
 export type SentRef = { watchKey: string; refTable: string; refId: string; sentAt: string };
 
 /** A row a watch may name. */
-export type CandidateRow = { table: string; ref: string; title: string; at: string | null };
+export type CandidateRow = {
+  table: string;
+  ref: string;
+  title: string;
+  at: string | null;
+  /** A watch Dash wrote saw this row before and it has changed since (plan #3030.1.3). */
+  changed?: boolean;
+};
 
 export type DueWatch = {
   key: string;
@@ -75,6 +82,12 @@ export type DueWatch = {
   everyDays: number;
   repeatAfterDays: number | null;
   candidates: CandidateRow[];
+  /**
+   * A watch Dash wrote itself (you.advisor_watches, plan #3030.1.3): its
+   * candidates are the rows new or changed since its last run, so it has no
+   * no-repeat window.
+   */
+  custom?: boolean;
 };
 
 export type DuePerson = { advisorId: string; key: string; name: string; watches: DueWatch[] };
@@ -180,12 +193,16 @@ export function dueBriefLines(due: readonly DuePerson[]): string[] {
   for (const person of due) {
     lines.push(`- ${person.name} (${person.key}, advisor ${person.advisorId})`);
     for (const watch of person.watches) {
-      const repeat = watch.repeatAfterDays === null ? 'never repeat' : `repeat after ${watch.repeatAfterDays} days`;
+      const repeat = watch.custom
+        ? 'new or changed since its last run'
+        : watch.repeatAfterDays === null
+          ? 'never repeat'
+          : `repeat after ${watch.repeatAfterDays} days`;
       const form = watch.form ? `, ${watch.form}` : '';
       lines.push(`  - watch ${watch.key} [${watch.mode}${form}, every ${watch.everyDays} days, ${repeat}]: ${oneLine(watch.about)}`);
       for (const row of watch.candidates) {
         if (listed >= BRIEF_CANDIDATES_MAX) break;
-        lines.push(`    - ${row.table} ${row.ref} | ${clipTitle(row.title)}`);
+        lines.push(`    - ${row.table} ${row.ref} | ${clipTitle(row.title)}${row.changed ? ' (changed)' : ''}`);
         listed += 1;
       }
     }
