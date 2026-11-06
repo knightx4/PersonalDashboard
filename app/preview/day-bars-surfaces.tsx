@@ -5,6 +5,8 @@ import { SpendOverview } from '@/app/account/spend/spend-overview';
 import { SpendByModule } from '@/app/account/spend/spend-by-module';
 import { byModule, type FunctionTotal } from '@/lib/core/spend/summary';
 import { spendTotal } from '@/lib/usage/per-day';
+import { VoiceUsage } from '@/components/talk/voice-usage';
+import { speechUsageFrom } from '@/lib/talk/speech/usage';
 
 /**
  * The per-day bar chart drawn from fixtures for the gallery (plan #2036.1):
@@ -111,4 +113,15 @@ const SPEND_FUNCTIONS: FunctionTotal[] = [
  */
 export function SpendByModuleSurface({ open = null }: { open?: string | null }) {
   return <SpendByModule groups={byModule(SPEND_FUNCTIONS)} open={open} />;
+}
+
+/**
+ * Spoken replies on the Spend page (plan #3006.2): part way through November,
+ * and a month that has reached the 330,000 cap and paused voice.
+ */
+export function VoiceUsageSurface({ paused = false }: { paused?: boolean }) {
+  const usage = paused
+    ? speechUsageFrom('2026-11-01', { bytes: 330_000, replies: 641 })
+    : speechUsageFrom('2026-11-01', { bytes: 48_212, replies: 97 });
+  return <VoiceUsage usage={usage} />;
 }

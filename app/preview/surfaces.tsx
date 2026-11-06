@@ -117,7 +117,7 @@ import { PageHeaderSurface } from './page-header-surface';
 import { AimedCaptureSurface, CaptureBoxSurface } from './capture-surfaces';
 import { ShoppingAimedCameraSurface, ShoppingAimedSurface, ShoppingListAddsSurface } from './shopping-capture-surfaces';
 import { AimedJobsLearnSurface, AimedPlaceSurface } from './capture-surfaces';
-import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface } from './day-bars-surfaces';
+import { DayBarsEmptySurface, DayBarsReadoutSurface, DayBarsSurface, SpendByModuleSurface, SpendOverviewSurface, VoiceUsageSurface } from './day-bars-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { TaskTagsHoverSurface, TaskTagsPickerSurface, TaskTagsSurface } from './task-tags-surfaces';
 import { AgendaTaggedEmptySurface, AgendaTaggedMoreSurface, AgendaTaggedSurface } from './tag-filter-surfaces';
@@ -511,6 +511,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
+import { AskSpeakSurface, ChatThreadSpeakSurface } from './speak-surfaces';
 import {
   ChatArrivalMomentSurface,
   ChatBuilderTextSurface,
@@ -8893,6 +8894,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashPageSurface />,
   },
   {
+    /* Replies read aloud (plan #3006.1): Speaking on under the box, and the
+     * latest answer playing, its press showing Stop. */
+    id: 'ask-page-speaking',
+    label: 'Dash · An answer read aloud',
+    module: 'chat',
+    width: 'page',
+    render: () => <AskSpeakSurface state="playing" />,
+  },
+  {
+    /* The month's voice used up (plan #3006.1): the answer stays as written,
+     * and the line under it says voice is paused until next month. */
+    id: 'ask-page-speak-paused',
+    label: 'Dash · Voice paused for the month',
+    module: 'chat',
+    width: 'page',
+    render: () => <AskSpeakSurface state="paused" />,
+  },
+  {
     /* A reply still being written after the page that asked was left (plan
      * #2854.4): the chat opened again shows Dash at work under the question,
      * and the answer lands in place when it is in. */
@@ -9095,6 +9114,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface />,
+  },
+  {
+    /* A mentor's replies read aloud (plan #3006.1): the speaker on in the
+     * header, Read aloud under each run of theirs, and under the last one
+     * the line saying voice is not set up yet. */
+    id: 'chat-people-thread-speak',
+    label: 'Chat · A thread, replies read aloud',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSpeakSurface />,
   },
   {
     /* What they did when asked (plan #2854.2.1): a todo they added, as a card with Undo after their reply, and a build and a delete they proposed, each with Confirm and nothing written until it is pressed. */
@@ -12261,6 +12290,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendByModuleSurface open="jobs" />,
+  },
+  {
+    id: 'account-spend-voice',
+    label: 'Account · Spend, spoken replies this month',
+    module: 'learn',
+    width: 'page',
+    render: () => <VoiceUsageSurface />,
+  },
+  {
+    id: 'account-spend-voice-paused',
+    label: 'Account · Spend, spoken replies at the monthly cap',
+    module: 'learn',
+    width: 'page',
+    render: () => <VoiceUsageSurface paused />,
   },
   {
     id: 'usage-day-bars-empty',
