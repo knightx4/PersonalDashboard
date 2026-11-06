@@ -6,13 +6,12 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { cn } from '@/lib/cn';
-import { clipOf, listenForUnlock, unlockSpeechOutput } from '@/lib/talk/speech/output';
+import { clipOf, linkClip, listenForUnlock, unlockSpeechOutput } from '@/lib/talk/speech/output';
 import {
   createSpeechPlayer,
   readSpeaking,
   rememberSpeaking,
   SPEAKING_KEY,
-  type SpeechAudio,
   type SpeechItem,
   type SpeechState,
 } from '@/lib/talk/speech/player';
@@ -30,7 +29,9 @@ import {
  *   stays as it was.
  *
  * One player serves the whole page (lib/talk/speech/player.ts), so starting
- * one reply stops another. The gallery draws a state with `SpeechFixture`
+ * one reply stops another. A chat's send press calls `unlockSpeechOutput`
+ * (lib/talk/speech/output.ts) in its own handler, so iPhone Safari lets the
+ * replies that arrive afterwards play (plan #3036). The gallery draws a state with `SpeechFixture`
  * and plays nothing.
  */
 
@@ -52,13 +53,8 @@ function thePlayer() {
     fetch: (url, init) => fetch(url, init),
     // Decoded and played through one Web Audio context, so no word is lost off the start (plan #3028).
     audio: clipOf,
-    audioUrl: (url) => {
-      const element = new Audio(url);
-      const audio: SpeechAudio = { play: () => element.play(), pause: () => element.pause(), onended: null, onerror: null };
-      element.onended = () => audio.onended?.();
-      element.onerror = () => audio.onerror?.();
-      return { audio, release: () => element.removeAttribute('src') };
-    },
+    // Through the page's one <audio> element, which a press opened for iPhone Safari (plan #3036).
+    audioUrl: linkClip,
   });
   return player;
 }
@@ -113,6 +109,10 @@ function useSpeech(): SpeechState {
 export function useSpeakArrivals(replies: readonly { id: string; text: string; bot?: string | null }[], thread: string) {
   const speaking = useSpeaking();
   const fixture = useContext(SpeechFixture);
+  // Listening from the moment the thread opens, so the first press opens the sound (plan #3036).
+  useEffect(() => {
+    if (!fixture) listenForUnlock();
+  }, [fixture]);
   useEffect(() => {
     if (!speaking || fixture) return;
     for (const reply of replies) thePlayer().speakOnce(reply.id, reply.text, { bot: reply.bot });
