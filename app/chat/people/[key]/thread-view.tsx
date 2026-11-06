@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -47,6 +47,7 @@ import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
 import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
+import { SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals } from '@/components/talk/speak-reply';
 import type { DashChange } from '@/lib/talk/changes';
 import { followedRuns, workingCard, type BuildRun } from '@/lib/you/live-cards';
 
@@ -531,6 +532,17 @@ export function ThreadView({
 
   const typing = typingNow;
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
+  // Their messages that arrived while the thread was open play aloud once,
+  // in order, while the speaking switch is on (plan #3006.1).
+  const arrived = useMemo(
+    () =>
+      messages.flatMap((m) => {
+        const words = m.role === 'advisor' && !openingIds.has(m.id) && !olderIds.has(m.id) ? bubbleText(m) : null;
+        return words ? [{ id: m.id, text: words }] : [];
+      }),
+    [messages, openingIds, olderIds],
+  );
+  useSpeakArrivals(arrived);
   const receipt = pending.length === 0 ? receiptOf(messages) : null;
   // What they have done for a reply still coming is the live card's, at the foot, until the reply settles it.
   const working = workingCard(messages, changes, awaitingReply, today);
@@ -552,9 +564,13 @@ export function ThreadView({
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: person.name, href: `/chat/people/${person.key}` }]}
       actions={
-        <Link href={editHref(person.key)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          Edit
-        </Link>
+        <>
+          {/* Their new messages read aloud while on (plan #3006.1). */}
+          <SpeakSwitch look="icon" />
+          <Link href={editHref(person.key)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Edit
+          </Link>
+        </>
       }
       scrollRef={scroller}
       onScroll={onScroll}
@@ -672,6 +688,7 @@ export function ThreadView({
               );
             })}
             {receipt && block.messages.at(-1)?.id === receipt.id && <MessageNote>{receipt.label}</MessageNote>}
+            {block.from === 'them' && <SpeakRun messages={block.messages} />}
           </MessageGroup>
         ),
       )}
@@ -718,6 +735,28 @@ export function ThreadView({
       )}
       {working ? <LiveWorking card={working} name={person.name} /> : typing && <TypingBubble name={person.name} />}
     </MessagingThread>
+  );
+}
+
+/**
+ * Read aloud under a run of their messages (plan #3006.1): the press reads
+ * the run together, and shows Stop while any of it plays, including a
+ * message playing by itself as it arrived. Why it was not read is said under
+ * it.
+ */
+function SpeakRun({ messages }: { messages: readonly ThreadMessage[] }) {
+  const said = messages.flatMap((m) => {
+    const words = m.role === 'advisor' ? bubbleText(m) : null;
+    return words ? [{ id: m.id, text: words }] : [];
+  });
+  const last = said.at(-1);
+  if (!last) return null;
+  const ids = said.map((m) => m.id);
+  return (
+    <div className="flex flex-col items-start">
+      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} />
+      <SpeakNote ids={ids} className="px-1" />
+    </div>
   );
 }
 
