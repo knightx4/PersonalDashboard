@@ -21,11 +21,13 @@ import {
   REPLY_STALE_AFTER_MS,
   unreadNotes,
   UNREAD_MAX,
+  watchOf,
   type CouncilChat,
   type CouncilMemory,
   type CouncilMessage,
   type CouncilNote,
   type Mentor,
+  type MentorWatch,
   type Reaction,
 } from '@/lib/you/council-model';
 import { unreadTextsOf, type TextRow, type TextThread } from '@/lib/you/council-texts';
@@ -149,6 +151,8 @@ export type MentorPage = {
   chat: CouncilChat | null;
   messages: CouncilMessage[];
   memory: CouncilMemory[];
+  /** Watches Dash wrote for this mentor that run, are paused or were stopped (plan #3030.1.4). */
+  watches: MentorWatch[];
 };
 
 /** One mentor's page by key, or null when no such mentor is theirs. */
@@ -162,7 +166,7 @@ export async function loadMentorPage(
   const advisor = roster.find((a) => a.key === key);
   if (!advisor) return null;
 
-  const [brainRow, notes, chat, memory] = await Promise.all([
+  const [brainRow, notes, chat, memory, watches] = await Promise.all([
     client.from('board_advisors').select('brain').eq('user_id', userId).eq('id', advisor.id).maybeSingle(),
     client
       .from('council_notes')
@@ -187,8 +191,16 @@ export async function loadMentorPage(
       .is('retired_at', null)
       .order('created_at', { ascending: false })
       .limit(60),
+    client
+      .from('advisor_watches')
+      .select('id, about, sends_when, every_days, status, last_run_at, last_error')
+      .eq('user_id', userId)
+      .eq('advisor_id', advisor.id)
+      .in('status', ['active', 'paused', 'stopped'])
+      .order('created_at', { ascending: false })
+      .limit(40),
   ]);
-  for (const r of [brainRow, notes, chat, memory]) {
+  for (const r of [brainRow, notes, chat, memory, watches]) {
     if (r.error) throw new Error(`Reading ${advisor.name} failed: ${r.error.message}`);
   }
   const chatRow = chat.data ? chatOf(chat.data as Record<string, unknown>) : null;
@@ -225,7 +237,29 @@ export async function loadMentorPage(
       const m = memoryOf(row as Record<string, unknown>);
       return m ? [m] : [];
     }),
+    watches: (watches.data ?? []).flatMap((row) => {
+      const w = watchOf(row as Record<string, unknown>);
+      return w ? [w] : [];
+    }),
   };
+}
+
+/** Stop a watch: it runs nothing from now on. Only a running or paused one of the person's own changes. */
+export async function stopWatch(
+  client: YouSupabaseClient,
+  userId: string,
+  id: string,
+  now: number = Date.now(),
+): Promise<void> {
+  const { data, error } = await client
+    .from('advisor_watches')
+    .update({ status: 'stopped', decided_at: new Date(now).toISOString() })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .in('status', ['active', 'paused'])
+    .select('id');
+  if (error) throw new Error(`Stopping the watch failed: ${error.message}`);
+  if (!data || data.length === 0) throw new Error('That watch is not running.');
 }
 
 // ---------------------------------------------------------------------------

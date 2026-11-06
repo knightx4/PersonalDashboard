@@ -14,6 +14,7 @@ import Link, { linkVariants } from '@/components/ui/link';
 import { LinkedText } from '@/components/ui/linked-text';
 import { cn } from '@/lib/cn';
 import { whenAgo, whenDay } from '@/lib/core/when';
+import { cadenceWords } from '@/lib/you/advisor-watch-words';
 import type { Brain } from '@/lib/you/board-brain';
 import { threadHref } from '@/lib/you/chat-threads-model';
 import {
@@ -24,6 +25,7 @@ import {
   type CouncilMessage,
   type CouncilNote,
   type Mentor,
+  type MentorWatch,
 } from '@/lib/you/council-model';
 import { MentorMark } from '../../mentor-mark';
 import { NoteCard, type NoteActions } from '../../note-card';
@@ -46,6 +48,7 @@ export type MentorActions = NoteActions & {
   send: (advisorId: string, text: string, noteId?: string | null) => Promise<{ error: string | null; saved: boolean }>;
   commitment: (id: string, done: boolean, key: string) => Promise<{ error: string | null }>;
   forget: (id: string, key: string) => Promise<{ error: string | null }>;
+  stopWatch: (id: string, key: string) => Promise<{ error: string | null }>;
 };
 
 const MEMORY_LABELS: Record<Exclude<CouncilMemory['kind'], 'commitment'>, string> = {
@@ -61,6 +64,7 @@ export function MentorView({
   chat,
   messages,
   memory,
+  watches,
   about,
   timezone,
   now,
@@ -74,6 +78,8 @@ export function MentorView({
   chat: CouncilChat | null;
   messages: readonly CouncilMessage[];
   memory: readonly CouncilMemory[];
+  /** Watches Dash wrote for this mentor (plan #3030.1.4). */
+  watches: readonly MentorWatch[];
   /** The note the talk was opened from, by Talk about this. */
   about: CouncilNote | null;
   timezone: string;
@@ -114,7 +120,9 @@ export function MentorView({
   const commitments = memory.filter((m) => m.kind === 'commitment');
   const open = commitments.filter((c) => !c.doneAt);
   const done = commitments.filter((c) => c.doneAt);
-  const known = memory.filter((m) => m.kind !== 'commitment');
+  const running = watches.filter((w) => w.status !== 'stopped');
+  const stopped = watches.filter((w) => w.status === 'stopped');
+  const known =memory.filter((m) => m.kind !== 'commitment');
   const [latest, ...earlier] = notes;
   const author = { key: mentor.key, name: mentor.name, kind: mentor.kind };
 
@@ -252,6 +260,29 @@ export function MentorView({
           )}
         </CardSection>
 
+        {watches.length > 0 && (
+          <CardSection title={`What Dash watches for ${mentor.name}`}>
+            {running.length > 0 && (
+              <ul>
+                {running.map((w) => (
+                  <WatchRow key={w.id} item={w} mentorKey={mentor.key} timezone={timezone} now={now} actions={actions} />
+                ))}
+              </ul>
+            )}
+            {stopped.length > 0 && (
+              <div className="card-pad-x pb-2">
+                <Disclosure title="Stopped" meta={`${stopped.length}`}>
+                  <ul>
+                    {stopped.map((w) => (
+                      <WatchRow key={w.id} item={w} mentorKey={mentor.key} timezone={timezone} now={now} actions={actions} />
+                    ))}
+                  </ul>
+                </Disclosure>
+              </div>
+            )}
+          </CardSection>
+        )}
+
         {known.length > 0 && (
           <CardSection title={`What ${mentor.name} knows about you`}>
             <ul>
@@ -340,6 +371,61 @@ function CommitmentRow({
         <span className={cn('tabular shrink-0 text-small', late ? 'text-caution' : 'text-ink-muted')}>
           {whenDay(item.dueOn, { timeZone: timezone, now })}
         </span>
+      )}
+    </li>
+  );
+}
+
+function WatchRow({
+  item,
+  mentorKey,
+  timezone,
+  now,
+  actions,
+}: {
+  item: MentorWatch;
+  mentorKey: string;
+  timezone: string;
+  now: number;
+  actions: MentorActions;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const state =
+    item.status === 'stopped'
+      ? 'Stopped'
+      : item.status === 'paused'
+        ? 'Paused after errors'
+        : item.lastRunAt
+          ? `Running, last checked ${whenAgo(item.lastRunAt, { timeZone: timezone, now })}`
+          : 'Running, not checked yet';
+  return (
+    <li className="card-pad-x row-pad flex min-h-11 items-center gap-3">
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-ui', item.status === 'stopped' ? 'text-ink-muted' : 'text-ink')}>{item.about}</span>
+        <span className="block text-small text-ink-muted">
+          Checked {cadenceWords(item.everyDays)}. {state}.
+        </span>
+        {item.status === 'paused' && item.lastError && <span className="block text-small text-caution">{item.lastError}</span>}
+        <FieldError>{error}</FieldError>
+      </span>
+      {item.status !== 'stopped' && (
+        <Button
+          type="button"
+          size="xs"
+          variant="ghost"
+          pending={pending}
+          aria-label={`Stop watching: ${item.about}`}
+          onClick={() =>
+            startTransition(async () => {
+              setError(null);
+              const result = await actions.stopWatch(item.id, mentorKey);
+              if (result.error) setError(result.error);
+            })
+          }
+        >
+          Stop
+        </Button>
       )}
     </li>
   );

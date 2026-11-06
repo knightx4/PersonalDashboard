@@ -18,6 +18,7 @@ import {
   reactToNote,
   setCommitmentDone,
   setNoteTask,
+  stopWatch,
   todoTitleFromNote,
   type Reaction,
 } from '@/lib/you/council';
@@ -175,5 +176,19 @@ export async function forgetMentorMemory(memoryId: string, key: string): Promise
     return { error: null };
   } catch (error) {
     return failed(error, 'That was not forgotten. Try again.');
+  }
+}
+
+/** Stop a watch Dash wrote for a mentor, from the mentor's page (plan #3030.1.4). */
+// latency: pending
+export async function stopMentorWatch(watchId: string, key: string): Promise<CouncilResult> {
+  if (!id.safeParse(watchId).success) return { error: 'That is not a watch.' };
+  try {
+    const user = await requireUser();
+    await stopWatch(await createYouClient(), user.id, watchId);
+    refresh(key);
+    return { error: null };
+  } catch (error) {
+    return failed(error, 'That was not stopped. Try again.');
   }
 }
