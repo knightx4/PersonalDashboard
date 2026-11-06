@@ -9,6 +9,7 @@ import { budgetSlip } from '@/lib/dash/slips';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
 import type { ContextMessage } from '@/lib/you/chat-context-model';
+import { loadCarryOver } from '@/lib/you/carry-over';
 import {
   PEOPLE_ACTION_RULES,
   PEOPLE_TOOLS,
@@ -332,7 +333,18 @@ async function replyOnce(input: MentorReplyInput): Promise<Once> {
     // A reply that reaches a limit gets one more stretch to make the change it was asked for.
     extend: acting !== null,
   };
-  const rest = (['memory', 'episodes', 'recall', 'live'] as const).map((layer) => ctx.layers[layer].text).filter(Boolean);
+  // What the mentor heard in its groups and has not yet folded into memory (plan #2983); a reply still goes without it.
+  let carried = '';
+  try {
+    carried = (await loadCarryOver(client, userId, [ctx.mentor.id], chatId, { where: 'direct', now: at, timeZone })).get(ctx.mentor.id) ?? '';
+  } catch (error) {
+    console.error('a mentor reply could not read its other chats', error);
+  }
+  const rest = [
+    ...(['memory', 'episodes'] as const).map((layer) => ctx.layers[layer].text),
+    carried,
+    ...(['recall', 'live'] as const).map((layer) => ctx.layers[layer].text),
+  ].filter(Boolean);
 
   let answer: Awaited<ReturnType<typeof runDash>>;
   try {

@@ -4,6 +4,7 @@ import { after } from 'next/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { dashModelFor } from '@/lib/dash/model-choice';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { cleanMessage } from '@/lib/you/council-model';
 import { BURST_REQUEST_MS, MAX_REPLY_ROUNDS, runGroupBurst } from '@/lib/you/group-burst';
@@ -55,11 +56,12 @@ export async function continueBurstInRequest(userId: string, chatId: string, rou
 async function burstInRequest(userId: string, chatId: string, from: { claimed: boolean; round: number | undefined }, chainTo: ChainTo): Promise<void> {
   const client = await createYouClient();
   try {
-    const core = await createCoreClient();
+    const [core, settings] = await Promise.all([createCoreClient(), loadAccountSettings(userId)]);
     await runGroupBurst({
       client,
       userId,
       chatId,
+      timeZone: settings.timezone,
       model: await dashModelFor(core, userId),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),

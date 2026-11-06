@@ -7,6 +7,7 @@ import { readBrain } from '@/lib/you/board-brain';
 import { memoryLayer, personaLayer, READ_LIMITS, type ContextMentor } from '@/lib/you/chat-context-model';
 import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { loadGroup } from '@/lib/you/group-chats';
+import { loadCarryOver } from '@/lib/you/carry-over';
 import {
   asksPerson,
   BURST_REQUEST_MS,
@@ -79,6 +80,8 @@ export type GroupBurstInput = {
    * speakers write with no tools at all.
    */
   findPlaces?: PlacesFinder;
+  /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
+  timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
   claimed?: boolean;
   /** The round a chained request carries on from. */
@@ -171,12 +174,24 @@ async function releaseLease(client: YouSupabaseClient, userId: string, chatId: s
   ]);
 }
 
-/** Each member's persona and memory, as a speaker's system prompt, and a one-line card for the director. */
+/**
+ * Each member's persona, memory and what it heard in its other chats since
+ * the nightly run (plan #2983), as a speaker's system prompt, and a one-line
+ * card for the director. The memory is the same page a one-on-one reply
+ * reads, cut to its layer's budget.
+ */
 async function loadCast(
   client: YouSupabaseClient,
   userId: string,
+  chatId: string,
   memberIds: readonly string[],
+  timeZone: string,
+  now: Date,
 ): Promise<Map<string, { system: string; card: string }>> {
+  const carried = loadCarryOver(client, userId, memberIds, chatId, { where: 'group', now, timeZone }).catch((error) => {
+    console.error('a group could not read its bots\' other chats', error);
+    return new Map<string, string>();
+  });
   const [advisors, memory] = await Promise.all([
     client
       .from('board_advisors')
@@ -203,6 +218,7 @@ async function loadCast(
     if (list.length < READ_LIMITS.memory) list.push(m);
     memoryBy.set(id, list);
   }
+  const elsewhere = await carried;
   const out = new Map<string, { system: string; card: string }>();
   for (const row of (advisors.data ?? []) as Record<string, unknown>[]) {
     const mentor: ContextMentor = {
@@ -218,7 +234,7 @@ async function loadCast(
     };
     const remembered = memoryLayer(memoryBy.get(mentor.id) ?? []).text;
     const card = (mentor.focus ?? mentor.question ?? '').replace(/\s+/g, ' ').slice(0, 200);
-    out.set(mentor.id, { system: [personaLayer(mentor).text, remembered].filter(Boolean).join('\n\n'), card });
+    out.set(mentor.id, { system: [personaLayer(mentor).text, remembered, elsewhere.get(mentor.id) ?? ''].filter(Boolean).join('\n\n'), card });
   }
   return out;
 }
@@ -362,7 +378,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     if (!group || group.members.length === 0) return;
     const members: BurstMember[] = group.members.map((m) => ({ id: m.id, key: m.key, name: m.name }));
     const formerNames = new Map(group.former.map((m) => [m.id, m.name]));
-    const cast = await loadCast(client, userId, members.map((m) => m.id));
+    const cast = await loadCast(client, userId, chatId, members.map((m) => m.id), input.timeZone ?? 'UTC', new Date(now()));
     const withCards = members.map((m) => ({ ...m, card: cast.get(m.id)?.card ?? '' }));
 
     let carriedRound = input.round ?? null;
