@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
 import { Play, Square, Volume2, VolumeX } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
-import { ToggleChip } from '@/components/ui/chip';
 import { Tooltip } from '@/components/ui/tooltip';
 import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { cn } from '@/lib/cn';
@@ -114,8 +113,12 @@ export function useSpeakArrivals(replies: readonly { id: string; text: string }[
 const SWITCH_TIP_ON = 'New replies are read aloud. Press to stop reading them.';
 const SWITCH_TIP_OFF = 'Read new replies aloud as they arrive.';
 
-/** Speaking on or off: quiet words under Dash's box, a chip in its foot, or an icon in a thread's header. */
-export function SpeakSwitch({ look = 'chip' }: { look?: 'quiet' | 'chip' | 'icon' }) {
+/**
+ * Speaking on or off: quiet words under the box on Chat's Dash tab, or an
+ * icon in a header (the Dash sheet's, a mentor thread's), since the sheet's
+ * box foot has no room for another press at 390.
+ */
+export function SpeakSwitch({ look }: { look: 'quiet' | 'icon' }) {
   const on = useSpeaking();
   const fixture = useContext(SpeechFixture);
   const toggle = () => {
@@ -131,32 +134,17 @@ export function SpeakSwitch({ look = 'chip' }: { look?: 'quiet' | 'chip' | 'icon
       </Tooltip>
     );
   }
-  if (look === 'quiet') {
-    return (
-      <Tooltip label={on ? SWITCH_TIP_ON : SWITCH_TIP_OFF} className="shrink-0">
-        <button
-          type="button"
-          aria-pressed={on}
-          onClick={toggle}
-          className={cn(QUIET_PICKER, on && 'text-accent hover:text-accent')}
-        >
-          <Icon strokeWidth={1.75} aria-hidden />
-          {on ? 'Speaking' : 'Speak'}
-        </button>
-      </Tooltip>
-    );
-  }
   return (
     <Tooltip label={on ? SWITCH_TIP_ON : SWITCH_TIP_OFF} className="shrink-0">
-      <ToggleChip
-        on={on}
-        aria-label="Read replies aloud"
+      <button
+        type="button"
+        aria-pressed={on}
         onClick={toggle}
-        className={on ? 'h-5.5 px-2' : 'h-5.5 w-7 justify-center px-0'}
+        className={cn(QUIET_PICKER, on && 'text-accent hover:text-accent')}
       >
         <Icon strokeWidth={1.75} aria-hidden />
-        {on && <span>Speaking</span>}
-      </ToggleChip>
+        {on ? 'Speaking' : 'Speak'}
+      </button>
     </Tooltip>
   );
 }

@@ -790,8 +790,8 @@ export function AskThread({
           {box.thread.boxStart}
           {/* On Chat's Dash tab they sit under the box as quiet words (plan #2863). */}
           <ThinkSwitch on={think} onChange={setThink} quiet={bubbles} />
-          {/* New answers read aloud while on (plan #3006.1). */}
-          <SpeakSwitch look={bubbles ? 'quiet' : 'chip'} />
+          {/* New answers read aloud while on (plan #3006.1). In the sheet the switch is in its header. */}
+          {bubbles && <SpeakSwitch look="quiet" />}
           {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
           {!think && handle?.model && handle.chooseModel ? (
             <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} quiet={bubbles} />
@@ -1162,6 +1162,8 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               {pick.kind === 'dash' ? (
                 <>
+                  {/* New answers read aloud while on (plan #3006.1): here, not in the box's crowded foot. */}
+                  <SpeakSwitch look="icon" />
                   <Tooltip label="Earlier questions" align="end">
                     <IconButton
                       label="Earlier questions"
