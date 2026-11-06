@@ -6,6 +6,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
+import { countUnreadChats } from '@/lib/you/chat-threads';
 import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
 import { countOpenTasks } from '@/lib/todo/tasks/load';
 import { NOTES_WORK_KINDS, NOT_MOVED_TO_IDEAS, OUTSTANDING_STATUSES } from '@/lib/feedback/load';
@@ -36,16 +38,17 @@ async function safe<T>(query: PromiseLike<T>, fallback: T): Promise<T> {
 }
 
 export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
-  const [supabase, jobs, vault, learn, news, goals] = await Promise.all([
+  const [supabase, jobs, vault, learn, news, goals, you] = await Promise.all([
     createClient(),
     createJobsClient(),
     createVaultClient(),
     createLearnClient(),
     createNewsClient(),
     createGoalsClient(),
+    createYouClient(),
   ]);
 
-  const [items, pursuits, notes, tasks, toRead, unread, openNotes, openGoals] = await Promise.all([
+  const [items, pursuits, notes, tasks, toRead, unread, openNotes, openGoals, unreadChats] = await Promise.all([
     safe(
       supabase
         .from('inventory_items')
@@ -119,6 +122,9 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
         .then((r) => r.count),
       null,
     ),
+    // Chats with a bot's message you have not read, as a messaging app
+    // counts them (note b31eae56). The Messages tab shows it as its badge.
+    safe(countUnreadChats(you, userId), null),
   ]);
 
   return {
@@ -130,6 +136,7 @@ export async function loadModuleCounts(userId: string): Promise<ModuleCounts> {
     news: { value: unread, noun: 'unread newsletter' },
     goals: { value: openGoals, noun: 'open goal' },
     dev: { value: openNotes, noun: 'open note' },
+    chat: { value: unreadChats, noun: 'unread chat' },
   };
 }
 

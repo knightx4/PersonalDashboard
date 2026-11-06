@@ -728,7 +728,7 @@ export function excerpt(text: string, words: readonly string[], chars = EXCERPT_
   return `${start > 0 ? '… ' : ''}${flat.slice(start, end).trim()}${end < flat.length ? ' …' : ''}`;
 }
 
-type TextHit = { key: string; at: string; row: AskRow };
+type TextHit = { key: string; at: string; row: AskRow; /** The plan step a shaped idea became. */ step?: string };
 
 /** One column's matches: the rows whose text holds every word, as hits. */
 type ColumnRead = {
@@ -741,6 +741,11 @@ type ColumnRead = {
   field: string;
   narrow: (query: Filter) => Filter;
   hit: (row: Row, outlines: OutlineIndex) => { title: string; href: string; writtenBy: string | null };
+  /**
+   * Where the row stands, so a question about the status of what was asked
+   * is answered from the search without opening each row (note 8913d747).
+   */
+  state?: (row: Row) => string | null;
 };
 
 type Row = Record<string, unknown> & { id: string };
@@ -764,6 +769,19 @@ function stepHit(row: Row, outlines: OutlineIndex): { title: string; href: strin
 }
 
 const notDismissed = (q: Filter) => q.is('dismissed_at', null);
+
+/** A row's own status column, with underscores read as spaces: "in progress". */
+const plainState = (row: Row): string | null => (str(row.status) ? str(row.status).replace(/_/g, ' ') : null);
+
+/**
+ * Where an idea stands. An idea has no status column: it is waiting for
+ * triage, triaged, or shaped into a plan step, whose own status
+ * findDevTextLookup adds once it has read the step.
+ */
+function ideaState(row: Row): string {
+  if (typeof row.plan_item_id === 'string') return 'shaped into the plan';
+  return row.triage && typeof row.triage === 'object' ? 'triaged, not yet on the plan' : 'waiting for triage';
+}
 const openRaise = (q: Filter) => q.neq('status', 'dismissed').is('goal_id', null);
 const asIs = (q: Filter) => q;
 const STEP_SELECT = 'id, number, title, kind, status, updated_at';
@@ -776,19 +794,22 @@ const STEP_SELECT = 'id, number, title, kind, status, updated_at';
  */
 const COLUMN_READS: ColumnRead[] = [
   {
-    kind: 'idea', table: 'ideas', column: 'body', select: 'id, body, source, updated_at', date: 'updated_at', field: 'idea',
+    kind: 'idea', table: 'ideas', column: 'body', select: 'id, body, source, triage, plan_item_id, updated_at', date: 'updated_at', field: 'idea',
     narrow: notDismissed,
     hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/ideas#idea-${row.id}`, writtenBy: writer(row.source as string | null) }),
+    state: ideaState,
   },
   {
-    kind: 'note', table: 'feedback_items', column: 'body', select: 'id, body, updated_at', date: 'updated_at', field: 'note',
+    kind: 'note', table: 'feedback_items', column: 'body', select: 'id, body, status, updated_at', date: 'updated_at', field: 'note',
     narrow: asIs,
     hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/bugs#note-${row.id}`, writtenBy: 'me' }),
+    state: plainState,
   },
   {
-    kind: 'note', table: 'feedback_items', column: 'resolution_note', select: 'id, body, resolution_note, updated_at', date: 'updated_at', field: 'resolution',
+    kind: 'note', table: 'feedback_items', column: 'resolution_note', select: 'id, body, status, resolution_note, updated_at', date: 'updated_at', field: 'resolution',
     narrow: asIs,
     hit: (row) => ({ title: firstLine(str(row.body)), href: `/dev/bugs#note-${row.id}`, writtenBy: 'Dash' }),
+    state: plainState,
   },
   ...(
     [
@@ -802,6 +823,7 @@ const COLUMN_READS: ColumnRead[] = [
       kind: 'step', table: 'plan_items', column, select: `${STEP_SELECT}, ${column}`, date: 'updated_at', field,
       narrow: notDismissed,
       hit: (row, outlines) => ({ ...stepHit(row, outlines), writtenBy }),
+      state: plainState,
     }),
   ),
   ...(
@@ -811,9 +833,10 @@ const COLUMN_READS: ColumnRead[] = [
     ] as const
   ).map(
     ([column, field]): ColumnRead => ({
-      kind: 'raise', table: 'raised_items', column, select: `id, title, ${column}, created_at`, date: 'created_at', field,
+      kind: 'raise', table: 'raised_items', column, select: `id, title, status, ${column}, created_at`, date: 'created_at', field,
       narrow: openRaise,
       hit: (row) => ({ title: str(row.title), href: `/dev/inbox#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
+      state: plainState,
     }),
   ),
 ];
@@ -850,11 +873,33 @@ async function readColumn(
             field: read.field,
             written_by: writtenBy,
             on: str(row[read.date]).slice(0, 10),
+            ...(read.state ? { status: read.state(row) } : {}),
             excerpt: excerpt(readableRefs(str(row[read.column]), outlines), words),
           },
         },
+        ...(typeof row.plan_item_id === 'string' ? { step: row.plan_item_id } : {}),
       };
     });
+}
+
+/**
+ * Names the plan step each shaped idea became, with that step's status:
+ * "shaped into the plan as #2833, in progress". A step dismissed since, or
+ * not found, leaves the plain "shaped into the plan".
+ */
+async function withStepStates(client: SchemaClient, ctx: AskContext, hits: TextHit[], outlines: OutlineIndex): Promise<void> {
+  const ids = [...new Set(hits.map((hit) => hit.step).filter((id): id is string => !!id))];
+  if (ids.length === 0) return;
+  const { data, error } = await start(client, ctx, 'plan_items', 'id, number, status')
+    .in('id', ids)
+    .is('dismissed_at', null);
+  if (error) throw new Error(`plan_items: ${error.message}`);
+  const steps = new Map(((data ?? []) as unknown as Row[]).map((row) => [row.id, row]));
+  for (const hit of hits) {
+    const step = hit.step ? steps.get(hit.step) : undefined;
+    if (!step || !hit.row.detail) continue;
+    hit.row.detail.status = `shaped into the plan as ${refFor(Number(step.number), outlines)}, ${plainState(step) ?? 'status unknown'}`;
+  }
 }
 
 /** The read that finds a kind's rows, reused to fetch the row a comment sits on. */
@@ -1035,7 +1080,9 @@ export async function findDevTextLookup(ctx: AskContext, input: Input): Promise<
     else if (hit.key.startsWith('comment:') && hit.at > kept.at) seen.set(hit.key, hit);
   }
   const rows = [...seen.values()].sort((a, b) => b.at.localeCompare(a.at));
-  const shown = rows.slice(0, MAX_DEV_TEXT_HITS).map((hit) => hit.row);
+  const kept = rows.slice(0, MAX_DEV_TEXT_HITS);
+  await withStepStates(client, ctx, kept, outlines);
+  const shown = kept.map((hit) => hit.row);
 
   if (shown.length === 0 && specs.length === 0) {
     return { ok: true, rows: [], note: `Nothing in the Dev rows or specs has the words "${words.join(' ')}".` };

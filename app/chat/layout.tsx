@@ -1,6 +1,6 @@
 import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { shellFor } from '@/lib/shell/shell-for';
-import { tabsFor } from '@/lib/shell/tabs';
+import { tabsFor, withBadges } from '@/lib/shell/tabs';
 import { WRITING_STYLE_HREF } from './dash/view';
 
 /**
@@ -15,7 +15,10 @@ import { WRITING_STYLE_HREF } from './dash/view';
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   return shellFor({
     module: 'chat',
-    sections: ({ owner }) => tabsFor('chat', owner),
+    // Messages carries how many chats hold a bot's message you have not
+    // read, as a messaging app's badge does (note b31eae56).
+    sections: ({ owner, counts }) =>
+      withBadges(tabsFor('chat', owner), { '/chat': counts.chat?.value ?? undefined }),
     // Dash's page of how you write, read from your sent mail. It sat in the
     // column beside the chats until the column went.
     settingsHref: WRITING_STYLE_HREF,
