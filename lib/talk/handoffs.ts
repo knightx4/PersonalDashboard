@@ -3,7 +3,6 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { createCoreClient } from '@/lib/core/auth/server';
-import type { FireRoutineResult } from '@/lib/feedback/routine';
 import {
   runSubjectRefs,
   type GoingContext,
@@ -86,26 +85,13 @@ export async function discardHandoffs(core: CoreSupabaseClient, ids: readonly st
   if (error) throw new Error(`Removing the hand-off failed: ${error.message}`);
 }
 
-/** Records what starting the routine for one hand-off produced. */
-export async function markHandoffFired(
-  core: CoreSupabaseClient,
-  id: string,
-  fired: FireRoutineResult,
-): Promise<DashHandoff['status']> {
-  const status = fired.ok ? 'fired' : 'failed';
-  const { error } = await core
-    .from('dash_handoffs')
-    .update(
-      fired.ok
-        ? { status, run_id: fired.runId, fired_at: new Date().toISOString() }
-        : { status, error: fired.error.slice(0, 1000), finished_at: new Date().toISOString() },
-    )
-    .eq('id', id);
-  if (error) console.error('the hand-off was not marked', error.message);
-  return status;
-}
-
-/** The hand-offs of one conversation still waiting on the routine. */
+/**
+ * The hand-offs of one conversation still waiting on the routine. Ask's
+ * own rows only: a conversation id is set on Ask's request rows and on the
+ * session rows Ask Dash hands on (plan #3005.2), whose session writes its
+ * reply into this conversation, so the thread keeps checking for it. A
+ * People hand-off has no conversation id and is never read here.
+ */
 export async function loadOpenHandoffs(core: CoreSupabaseClient, conversationId: string): Promise<DashHandoff[]> {
   const { data, error } = await core
     .from('dash_handoffs')
@@ -261,6 +247,11 @@ function toSessionHandoff(row: SessionHandoffDbRow): SessionHandoff {
 
 /** The stored status a state was read from (handoffState, the other way). */
 const STATUS_OF: Record<HandoffState, DashHandoff['status']> = { queued: 'pending', running: 'fired', done: 'done', failed: 'failed' };
+
+/** The stored status of a state, as Ask's own hand-offs carry it. */
+export function handoffStatusOf(state: HandoffState): DashHandoff['status'] {
+  return STATUS_OF[state];
+}
 
 /**
  * An Ask Dash session hand-off as Ask's own hand-offs read (plan #3005.2):

@@ -146,20 +146,11 @@ export const NO_HANDOFF =
 
 /* What the model is told once a hand-off is kept is ON_IT, lib/talk/session-handoff.ts (plan #3005.2). */
 
-/**
- * The turn the routine is started with: which hand-off, whose, and in which
- * conversation, then the request itself. The skill reads the row by its id,
- * so the request here is only for the run's own title.
+/*
+ * Every bot's hand-off, Ask Dash's included, is started with the session
+ * brief (sessionHandoffBrief, lib/talk/handoff-session.ts) through
+ * fireSessionHandoff (lib/talk/handoff-fire.ts).
  */
-export function handoffBrief(handoff: Pick<DashHandoff, 'id' | 'conversationId' | 'request'>, userId: string): string {
-  return [
-    `Hand-off ${handoff.id}`,
-    `user_id ${userId}`,
-    `conversation ${handoff.conversationId}`,
-    '',
-    `Request: ${handoff.request}`,
-  ].join('\n');
-}
 
 /*
  * Hand-offs from any bot to a Claude Code session (plan #3005).
