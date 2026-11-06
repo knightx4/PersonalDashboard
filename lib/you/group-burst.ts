@@ -40,6 +40,8 @@ import { FIND_PLACES_DEFINITION, FIND_PLACES_TOOL, placesInput, placesToolResult
 import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 import type { AskToolResult } from '@/lib/ask/db';
 import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } from '@/lib/you/bot-pages';
+import { HAND_OFF_TOOL, HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
+import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -72,6 +74,8 @@ export type SpeakerInput = {
   transcript: string;
   /** Starts a page for this speaker, answering the person's newest message (plan #2997). Absent: no make_page. */
   page?: (input: unknown) => Promise<AskToolResult>;
+  /** Hands heavy work to a session for this speaker (plan #3005.2). Absent: no hand_off. */
+  handOn?: (input: unknown) => Promise<AskToolResult>;
 };
 
 export type GroupBurstInput = {
@@ -94,6 +98,12 @@ export type GroupBurstInput = {
    * speaker as make_page. Absent: no bot in the group can make pages.
    */
   makePage?: BotPageStarter;
+  /**
+   * Hands heavy work to a Claude Code session (plan #3005.2), offered to
+   * each speaker as hand_off. One hand-off per message of the person's,
+   * whichever bot calls it. Absent: no bot in the group can hand on.
+   */
+  handOn?: SessionStarter;
   /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
   timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
@@ -323,16 +333,29 @@ async function placesCall(findPlaces: PlacesFinder | undefined, block: Anthropic
   return { type: 'tool_result', tool_use_id: block.id, content, ...(isError ? { is_error: true } : {}) };
 }
 
-/** One make_page call run for a speaker (plan #2997), as the tool_result the model reads. */
-async function pageCall(page: NonNullable<SpeakerInput['page']>, block: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+/** One make_page (plan #2997) or hand_off (plan #3005.2) call run for a speaker, as the tool_result the model reads. */
+async function handOffCall(
+  start: (input: unknown) => Promise<AskToolResult>,
+  block: Anthropic.ToolUseBlock,
+  failed: string,
+): Promise<Anthropic.ToolResultBlockParam> {
   try {
-    const result = await page(block.input);
+    const result = await start(block.input);
     if (result.ok) return { type: 'tool_result', tool_use_id: block.id, content: result.note ?? 'Started.' };
     return { type: 'tool_result', tool_use_id: block.id, content: result.error, is_error: true };
   } catch (error) {
-    console.error('group page start failed', error);
-    return { type: 'tool_result', tool_use_id: block.id, content: 'The page could not be started. Say so plainly.', is_error: true };
+    console.error(`group ${block.name} failed`, error);
+    return { type: 'tool_result', tool_use_id: block.id, content: failed, is_error: true };
   }
+}
+
+/** One call of a speaker's, run by its name. */
+function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, call: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  if (call.name === MAKE_PAGE_TOOL_NAME && input.page) return handOffCall(input.page, call, 'The page could not be started. Say so plainly.');
+  if (call.name === HAND_OFF_TOOL_NAME && input.handOn) {
+    return handOffCall(input.handOn, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
+  }
+  return placesCall(findPlaces, call);
 }
 
 /**
@@ -349,8 +372,18 @@ export async function speakWithModel(
   findPlaces?: PlacesFinder,
 ): Promise<string | null> {
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
-  const rules = `${SPEAKER_RULES}${findPlaces ? `\n\n${SPEAKER_PLACES_RULES}` : ''}${input.page ? `\n\n${PAGE_RULES}` : ''}\n\nIn this group with the person: ${others.join(', ')}.`;
-  const tools: Anthropic.Tool[] = [...(findPlaces ? [FIND_PLACES_DEFINITION] : []), ...(input.page ? [MAKE_PAGE_TOOL] : [])];
+  const rules = [
+    SPEAKER_RULES,
+    ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
+    ...(input.page ? [PAGE_RULES] : []),
+    ...(input.handOn ? [SESSION_RULES] : []),
+    `In this group with the person: ${others.join(', ')}.`,
+  ].join('\n\n');
+  const tools: Anthropic.Tool[] = [
+    ...(findPlaces ? [FIND_PLACES_DEFINITION] : []),
+    ...(input.page ? [MAKE_PAGE_TOOL] : []),
+    ...(input.handOn ? [HAND_OFF_TOOL] : []),
+  ];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
   ];
@@ -375,13 +408,7 @@ export async function speakWithModel(
       return cleanSpeech(text, input.speaker.name);
     }
     messages.push({ role: 'assistant', content: response.content });
-    const page = input.page;
-    messages.push({
-      role: 'user',
-      content: await Promise.all(
-        calls.map((call) => (call.name === MAKE_PAGE_TOOL_NAME && page ? pageCall(page, call) : placesCall(findPlaces, call))),
-      ),
-    });
+    messages.push({ role: 'user', content: await Promise.all(calls.map((call) => speakerCall(input, findPlaces, call))) });
   }
 }
 
@@ -491,8 +518,28 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                     args,
                   )
               : undefined;
+            const startSession = input.handOn;
+            const handOn = startSession
+              ? (args: unknown) =>
+                  startSession(
+                    {
+                      thread: { kind: 'chat', chatId, advisorId },
+                      messageId: anchor.id,
+                      asked: anchor.text,
+                      botName: member.name,
+                      href: `/chat/groups/${chatId}`,
+                    },
+                    args,
+                  )
+              : undefined;
             text = await speak(
-              { speaker: { ...member, system: persona.system }, members, transcript: transcriptOf(thread, members, formerNames), ...(page ? { page } : {}) },
+              {
+                speaker: { ...member, system: persona.system },
+                members,
+                transcript: transcriptOf(thread, members, formerNames),
+                ...(page ? { page } : {}),
+                ...(handOn ? { handOn } : {}),
+              },
               spent['group-speaker'],
             );
             if (text) {

@@ -45,7 +45,7 @@ export const MAX_HANDOFF_REQUEST = 4000;
 export const HAND_OFF_TOOL: Anthropic.Tool = {
   name: HAND_OFF_TOOL_NAME,
   description:
-    "Pass a request on when the person asks you to do or change something and none of your other tools can do it: creating a goal, editing or completing a todo, adding a job application, filing a note, and the like. A routine with full access to their data does it within a few minutes and writes its reply into this conversation. Use it only for a request they actually made, never for a question you could answer by looking things up, and not for deleting anything, sending email or spending money. Write the request so it can be done without this conversation: what to create or change, with every name, date and detail they gave, and the refs of any rows a lookup returned for it.",
+    "Hand a request to a Claude Code session, which has far more room than this reply. Use it when the person asks you to do or change something none of your other tools can do (creating a goal, adding a job application, filing a note), and for any work that needs more than a quick reply: long writing such as a plan step with its full detail, a vault note, a prep doc or a cover letter; building something such as a practice page; research; changes across many rows. Use it too as soon as you see this turn will not fit what they asked, rather than stopping part-way. The session does it within a few minutes and what it did comes back in this thread. Use it only for a request they actually made, never for a question you could answer by looking things up, and not for deleting anything, sending email or spending money. Write the request so it can be done without this thread: what to create, change or find, with every name, date and detail they gave. Call it once per message of theirs, with everything they asked for in that one request.",
   input_schema: {
     type: 'object',
     properties: {
@@ -53,6 +53,26 @@ export const HAND_OFF_TOOL: Anthropic.Tool = {
         type: 'string',
         description:
           'What to do, complete on its own: "Create a goal \\"Make a new song and publish it on Spotify\\" in their Music area".',
+      },
+      summary: {
+        type: 'string',
+        description:
+          'Two to five sentences on the thread so far that bear on the request: what they are working towards, what was said or decided, what they want back.',
+      },
+      refs: {
+        type: 'array',
+        description:
+          'The rows the session should read, as lookups returned them, each with a few words on why it matters. Leave it out when none do.',
+        items: {
+          type: 'object',
+          properties: {
+            table: { type: 'string', description: 'The table the lookup returned, such as job_search.roles.' },
+            ref: { type: 'string', description: 'The ref the lookup returned for the row.' },
+            note: { type: 'string', description: 'Why it matters: "the role the interview is for".' },
+          },
+          required: ['table', 'ref'],
+          additionalProperties: false,
+        },
       },
       about: {
         type: 'object',
@@ -109,7 +129,7 @@ export function handoffRequest(
   return { ok: true, request, subjectRef: subjectRefOf(args.about, seen) };
 }
 
-function subjectRefOf(about: unknown, seen: (table: string, ref: string) => boolean): string | null {
+export function subjectRefOf(about: unknown, seen: (table: string, ref: string) => boolean): string | null {
   if (!about || typeof about !== 'object') return null;
   const { table, ref } = about as Record<string, unknown>;
   if (typeof table !== 'string' || typeof ref !== 'string') return null;
@@ -124,9 +144,7 @@ function subjectRefOf(about: unknown, seen: (table: string, ref: string) => bool
 export const NO_HANDOFF =
   'Nothing can be handed on from here: the backup routine is not set up on this deployment. Tell them in a sentence that you cannot do this yet.';
 
-/** Said to the model once a hand-off is kept. */
-export const HANDED_OFF =
-  'Handed on. Tell them in a sentence that you have passed it on and the reply will appear in this conversation in a few minutes. Do not say it is done.';
+/* What the model is told once a hand-off is kept is ON_IT, lib/talk/session-handoff.ts (plan #3005.2). */
 
 /**
  * The turn the routine is started with: which hand-off, whose, and in which

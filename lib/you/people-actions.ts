@@ -34,8 +34,10 @@ import type { DashSlip } from '@/lib/dash/slips';
  * person confirms it (confirmChange in lib/ask/changes.ts, which takes a
  * People proposal by the text it hangs from).
  *
- * Not Ask's hand-off: what it starts replies in an Ask conversation, which a
- * People thread is not. And not the chart, which only an Ask answer draws.
+ * Not the hand-off from the registry list: a person on People is handed it
+ * only with a session starter (plan #3005.2, lib/talk/session-handoff.ts),
+ * whose session replies in their own thread. And not the chart, which only
+ * an Ask answer draws.
  *
  * No clients here: lib/talk/ask-request.ts binds a PeopleDash to the request,
  * and the tests hand in stubs.
@@ -67,19 +69,27 @@ from and give its link, since nothing is shown under a text.`;
  * the texting rules: their focus is a lean, not a wall, and then Ask's rules
  * for every change, word for word.
  */
-export const PEOPLE_ACTION_RULES = `YOU CAN DO THINGS, NOT ONLY TALK. You have the same tools Dash has in Ask
+const ACTING_OPENING = `YOU CAN DO THINGS, NOT ONLY TALK. You have the same tools Dash has in Ask
 Dash, and the same rules for them, below. When they ask you to do something
 ("add a todo to call the bank Friday", "add a step for X", "note that on the
 role"), do it with the tool, whatever your own focus is: your focus is what
 you notice and bring up, never a reason to refuse or to send them elsewhere.
 Only act when they ask, or when they plainly agree to something you offered.
 Then say in one short text what you did, in your own voice, and nothing about
-tools. Each change shows in the thread with its Undo.
+tools. Each change shows in the thread with its Undo.`;
 
-There is no hand_off here. When they ask for something none of your tools can
-do, say so in a sentence and that Ask Dash can pass it on.
+const NO_HAND_OFF = `There is no hand_off here. When they ask for something none of your tools can
+do, say so in a sentence and that Ask Dash can pass it on.`;
 
-${ASK_ACTION_RULES}`;
+/**
+ * The acting rules, for a person who can hand work to a session (plan
+ * #3005.2, SESSION_RULES in lib/talk/session-handoff.ts) or cannot.
+ */
+export function peopleActionRules(canHandOn: boolean): string {
+  return [ACTING_OPENING, ...(canHandOn ? [] : [NO_HAND_OFF]), ASK_ACTION_RULES].join('\n\n');
+}
+
+export const PEOPLE_ACTION_RULES = peopleActionRules(false);
 
 /** What acting on People needs from the request: Ask's writes, proposals and paid presses, bound to the person. */
 export type PeopleDash = {

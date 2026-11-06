@@ -5,7 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { ListContext } from '@/lib/ask/filtered-list';
 import { whyNoReport } from '@/lib/learn/graph/tool-call';
 import { forceTool, requestShape, systemMessage } from '@/lib/core/model-call';
-import { NO_HANDOFF } from '@/lib/talk/handoff';
+import { HAND_OFF_TOOL_NAME, NO_HANDOFF } from '@/lib/talk/handoff';
 import { LOOKUP_NOT_RUN, MAX_TURN, stoppedBody, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
@@ -382,11 +382,13 @@ export const EXTRA_BUDGET = 75_000;
 export const EXTRA_TIME_MS = 30_000;
 
 /** Said to the model when a limit is reached and it is given one more stretch (plan #2999). */
-export function keepGoing(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>): string {
+export function keepGoing(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>, canHandOn = false): string {
   const what = stop === 'lookups' ? 'its lookups' : stop === 'budget' ? 'its reading budget' : 'its time';
   return (
     `This turn has used ${what}. You have one short stretch more, and no other: if they asked for a change you have not made yet, ` +
     `make it now with the tool, in full, then give your answer through the answer tool. If you were only looking things up, answer now from what you found. ` +
+    // A voice with the session hand-off passes on what will not fit (plan #3005.2).
+    (canHandOn ? `If what they asked will not fit in this stretch, call hand_off with it now and say you are on it. ` : '') +
     `Never ask them to say "try again".`
   );
 }
@@ -1132,7 +1134,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       lastRound += EXTRA_LOOKUPS;
       const first = limit;
       limit = reached();
-      if (!limit) tellModel(messages, model, keepGoing(first));
+      if (!limit) tellModel(messages, model, keepGoing(first, Boolean(input.handOff) && voice.tools.some((tool) => tool.name === HAND_OFF_TOOL_NAME)));
     }
     if (limit && extended && !toldAgain) {
       toldAgain = true;

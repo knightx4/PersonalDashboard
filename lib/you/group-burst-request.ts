@@ -13,6 +13,7 @@ import { lookUpPlaces } from '@/lib/you/places-lookup';
 import { claimTyping } from '@/lib/you/mentor-reply';
 import { isOwner } from '@/lib/dev/owner';
 import { botPageStarter } from '@/lib/you/bot-pages-store';
+import { sessionStarter } from '@/lib/talk/session-handoff-store';
 
 /**
  * Writing in a group from a request (plan #2879.1.2): POST
@@ -71,6 +72,8 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
       findPlaces: (search) => lookUpPlaces({ you: client, core, userId }, search),
       // Pages made in a session (plan #2997), for the owner, as in a direct chat.
       makePage: owner ? (botPageStarter(core, userId) ?? undefined) : undefined,
+      // Heavy work handed to a session (plan #3005.2), for the owner, as in a direct chat.
+      handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
       claimed: from.claimed,
       round: from.round,
       deadline: Date.now() + BURST_REQUEST_MS,

@@ -259,6 +259,27 @@ function toSessionHandoff(row: SessionHandoffDbRow): SessionHandoff {
   };
 }
 
+/** The stored status a state was read from (handoffState, the other way). */
+const STATUS_OF: Record<HandoffState, DashHandoff['status']> = { queued: 'pending', running: 'fired', done: 'done', failed: 'failed' };
+
+/**
+ * An Ask Dash session hand-off as Ask's own hand-offs read (plan #3005.2):
+ * the answer ties it to its turn, starts it and lists it as it always has.
+ */
+export function askHandoffOf(handoff: SessionHandoff): DashHandoff {
+  return {
+    id: handoff.id,
+    conversationId: handoff.conversationId ?? '',
+    turnId: null,
+    request: handoff.request,
+    subjectRef: handoff.subjectRef,
+    status: STATUS_OF[handoff.state],
+    runId: handoff.runId,
+    error: handoff.error,
+    createdAt: handoff.createdAt,
+  };
+}
+
 /** The session hand-off kept under one request key, or null. */
 export async function loadSessionHandoffByKey(
   core: CoreSupabaseClient,
