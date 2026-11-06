@@ -9,6 +9,7 @@ import type { DisposalMethod } from '@/lib/inventory/status-actions';
 import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import { TODO_CHANGE_KINDS, type TodoChangeInput, type TodoChangeKind } from '@/lib/ask/todo-changes';
 import { YOU_CHANGE_KINDS, type YouChangeInput, type YouChangeKind } from '@/lib/ask/you-changes';
+import type { WatchCard } from '@/lib/you/watch-card-model';
 import { NEWS_CHANGE_KINDS, type NewsChangeInput, type NewsChangeKind } from '@/lib/ask/news-changes';
 import { GOALS_CHANGE_KINDS, type GoalsChangeInput, type GoalsChangeKind } from '@/lib/ask/goals-changes';
 import { SHOPPING_CHANGE_KINDS, type ShoppingChangeInput, type ShoppingChangeKind } from '@/lib/ask/shopping-changes';
@@ -274,6 +275,12 @@ export type DashChange = NewDashChange & {
   advisorId?: string | null;
   advisorChatId?: string | null;
   advisorMessageId?: string | null;
+  /**
+   * The watch a set_reach_out change proposed, as it is now (plan
+   * #3030.1.2): a People thread reads it (withWatches), so the change's card
+   * offers Approve and Decline. Absent everywhere else.
+   */
+  watch?: WatchCard;
 };
 
 type DashChangeRow = {

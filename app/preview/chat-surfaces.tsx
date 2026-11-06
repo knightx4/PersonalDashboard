@@ -487,6 +487,77 @@ export function ChatThreadChangesSurface() {
   );
 }
 
+/** You ask Franklin to text about two things no fixed watch reads: one watch approved last week, one waiting on you. */
+const WATCHED: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('v1', 'person', 'Tell me whenever a new role at Northwind is posted', '2026-10-27T09:10:00Z'),
+  msg('v2', 'advisor', 'I wrote a watch for it. Approve it and I will text you when one appears.', '2026-10-27T09:10:30Z'),
+  msg('v3', 'person', 'And text me when a note in my vault mentions my sister Ruth, so I remember to call her back', '2026-11-03T08:52:00Z'),
+  msg('v4', 'advisor', 'Below is what I would check and what a text would say. Nothing runs until you approve it.', '2026-11-03T08:52:30Z'),
+];
+
+function watchChange(id: string, messageId: string, watch: NonNullable<DashChange['watch']>): DashChange {
+  return threadChange({
+    id,
+    kind: 'set_reach_out',
+    input: { verb: 'Wrote a watch for', what: FRANKLIN.name, rest: '', href: `/chat/people/${FRANKLIN.key}`, where: `Open ${FRANKLIN.name}`, paths: [] },
+    status: 'done',
+    subjectRef: `you.advisor_watches:${watch.id}`,
+    writtenTable: 'you.advisor_watches',
+    writtenRef: watch.id,
+    doneAt: '2026-11-03T08:52:20Z',
+    advisorMessageId: messageId,
+    watch,
+  });
+}
+
+const WATCHED_CHANGES: DashChange[] = [
+  watchChange('v-roles', 'v1', {
+    id: 'w-roles',
+    about: 'New roles posted at Northwind',
+    sendsWhen: 'A role at Northwind appears on Jobs that was not there at the last check.',
+    sample: 'Northwind just posted a Senior Product Manager role. It is on Jobs now.',
+    everyDays: 1,
+    mode: 'each',
+    tables: ['job_search.roles'],
+    status: 'active',
+    matched: 2,
+  }),
+  watchChange('v-ruth', 'v3', {
+    id: 'w-ruth',
+    about: 'Vault notes that mention your sister Ruth',
+    sendsWhen: 'A note in your vault that names Ruth is new or changed since the last check.',
+    sample: 'Your note from Tuesday mentions Ruth and a call you meant to return. Worth ringing her this week?',
+    everyDays: 1,
+    mode: 'roundup',
+    tables: ['obsidian.notes'],
+    status: 'proposed',
+    matched: 0,
+  }),
+];
+
+/** Watches Dash wrote in a thread (plan #3030.1.2): one approved, one waiting with Approve and Decline. */
+export function ChatThreadWatchSurface() {
+  const rows = CHAT_PEOPLE.map((r) => (r.id === FRANKLIN.id ? { ...r, unread: false } : r));
+  return (
+    <ChatShell path={`/chat/people/${FRANKLIN.key}`}>
+      <PeopleView rows={rows} current={FRANKLIN.key} timezone={ZONE} now={NOW} live={false}>
+        <ChangeThreadDemo
+          person={FRANKLIN}
+          chatId={FRANKLIN.chatId}
+          page={{ messages: WATCHED, hasOlder: false }}
+          typingUntil={null}
+          timezone={ZONE}
+          now={NOW}
+          live={false}
+          changes={WATCHED_CHANGES}
+          today="2026-11-03"
+        />
+      </PeopleView>
+    </ChatShell>
+  );
+}
+
 /** You ask Franklin for two things and he is still on it: the todo is made, the reply is not in yet. */
 const WORKING: ThreadMessage[] = [
   ...THREAD.slice(3, 7),
