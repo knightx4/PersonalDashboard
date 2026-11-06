@@ -116,6 +116,11 @@ For each watch give:
 Use at most ${REACH_OUT_LIMITS.watches} watches. Split an ask into two watches when the parts differ in
 mode or cadence.
 
+A watch hands the person on People every new row of its tables, and they
+choose what to say. An ask only for rows holding a given word, name or amount
+("a note that mentions my sister", "a charge over 100") is not a watch: put it
+under cannot_watch.
+
 cannot_watch: each thing they asked for that none of the tables holds, in a
 few of their own words. Leave nothing they asked for out of both lists.
 
@@ -128,7 +133,12 @@ export function reachOutPrompt(input: { name: string; brief: string }): string {
   return `The person on their list is ${input.name}.\n\nWhat they wrote:\n${input.brief}`;
 }
 
-export type MadeReachOut = { ok: true; rule: ReachOutRule; summary: string } | { ok: false; error: string };
+/**
+ * `uncovered` marks a refusal because nothing they asked for is in a table a
+ * fixed watch reads, which set_reach_out answers with a watch Dash writes
+ * itself (lib/you/advisor-watch.ts, plan #3030.1.1).
+ */
+export type MadeReachOut = { ok: true; rule: ReachOutRule; summary: string } | { ok: false; error: string; uncovered?: true };
 
 const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
@@ -189,6 +199,7 @@ export function readReachOutReply(reply: unknown): MadeReachOut {
   if (!watches.length) {
     return {
       ok: false,
+      uncovered: true,
       error: cannotWatch.length
         ? `Dash cannot watch anything you asked for: ${listed(cannotWatch)}.`.slice(0, REACH_OUT_LIMITS.summary)
         : 'Dash found nothing in what you wrote that it could watch. Say what they should text you about.',
