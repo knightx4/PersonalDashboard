@@ -1236,7 +1236,7 @@ export function BotRow({ bots, onSwitch }: { bots: readonly AskBot[]; onSwitch: 
         <li className="shrink-0">
           <span
             aria-current="page"
-            className="flex w-[4.5rem] flex-col items-center gap-1 rounded-control px-1 py-1"
+            className="flex w-16 flex-col sm:w-[4.5rem] items-center gap-1 rounded-control px-1 py-1"
           >
             <span className="rounded-full ring-2 ring-accent ring-offset-2 ring-offset-raised">
               <ModuleMark module="dash" size="lg" />
@@ -1250,7 +1250,7 @@ export function BotRow({ bots, onSwitch }: { bots: readonly AskBot[]; onSwitch: 
               href={threadHref(bot.key)}
               onClick={onSwitch}
               aria-label={bot.unread ? `Chat with ${bot.name}, unread` : `Chat with ${bot.name}`}
-              className="press flex w-[4.5rem] flex-col items-center gap-1 rounded-control px-1 py-1 transition-colors duration-quick hover:bg-sunken"
+              className="press flex w-16 flex-col sm:w-[4.5rem] items-center gap-1 rounded-control px-1 py-1 transition-colors duration-quick hover:bg-sunken"
             >
               <span className="relative">
                 <PersonMark initials={personInitials(bot.name)} colour={bot.colour} photo={bot.photo} />
