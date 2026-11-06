@@ -34,6 +34,7 @@ import {
   type DirectorPlan,
 } from '@/lib/you/group-burst-model';
 import { claimTyping, TYPING_LEASE_MS, TYPING_RENEW_MS } from '@/lib/you/mentor-reply';
+import { keepRenewing, waitForQuiet } from '@/lib/you/reply-turn';
 import { AskInputError } from '@/lib/ask/db';
 import { FIND_PLACES_DEFINITION, FIND_PLACES_TOOL, placesInput, placesToolResult } from '@/lib/ask/places';
 import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
@@ -137,13 +138,25 @@ async function readLines(client: YouSupabaseClient, userId: string, chatId: stri
     .reverse();
 }
 
-/** The thread from the person's newest message: that message, and the bots who have spoken since, in order. */
-function sinceAnchor(lines: readonly Line[]): { anchor: Line | null; spoken: string[]; lastBot: Line | null } {
+/**
+ * The thread from the person's newest message: that message, and the bots
+ * who have spoken since, in order. `said` is what the person sent in a row
+ * up to it, read as one message (plan #2988), so a bot named in the first of
+ * three texts is still the one asked.
+ */
+function sinceAnchor(lines: readonly Line[]): { anchor: Line | null; spoken: string[]; lastBot: Line | null; said: string } {
   let i = lines.length - 1;
   while (i >= 0 && lines[i].speakerId !== null) i--;
-  if (i < 0) return { anchor: null, spoken: [], lastBot: null };
+  if (i < 0) return { anchor: null, spoken: [], lastBot: null, said: '' };
+  let first = i;
+  while (first > 0 && lines[first - 1].speakerId === null) first--;
   const after = lines.slice(i + 1);
-  return { anchor: lines[i], spoken: after.map((l) => l.speakerId ?? '').filter(Boolean), lastBot: after[after.length - 1] ?? null };
+  return {
+    anchor: lines[i],
+    spoken: after.map((l) => l.speakerId ?? '').filter(Boolean),
+    lastBot: after[after.length - 1] ?? null,
+    said: lines.slice(first, i + 1).map((l) => l.text).join('\n'),
+  };
 }
 
 async function setMemberTyping(client: YouSupabaseClient, userId: string, chatId: string, advisorId: string, until: number | null) {
@@ -155,12 +168,14 @@ async function setMemberTyping(client: YouSupabaseClient, userId: string, chatId
     .eq('advisor_id', advisorId);
 }
 
+/** Renew the lease while it is held: a renewal never puts back a lease already let go (plan #2988). */
 async function renewLease(client: YouSupabaseClient, userId: string, chatId: string, now: number) {
   await client
     .from('advisor_chats')
     .update({ typing_until: new Date(now + TYPING_LEASE_MS).toISOString() })
     .eq('user_id', userId)
-    .eq('id', chatId);
+    .eq('id', chatId)
+    .not('typing_until', 'is', null);
 }
 
 async function releaseLease(client: YouSupabaseClient, userId: string, chatId: string, error: string | null) {
@@ -368,9 +383,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     input.speak ??
     ((d: SpeakerInput, s: SpendReport[]) => (anthropic ? speakWithModel(anthropic, input.model, d, s, input.findPlaces) : Promise.resolve(null)));
 
-  const renewing = setInterval(() => {
-    renewLease(client, userId, chatId, now()).catch(() => undefined);
-  }, TYPING_RENEW_MS);
+  const renewing = keepRenewing(() => renewLease(client, userId, chatId, now()), TYPING_RENEW_MS);
   let failure: string | null = null;
   let lastAnchorAt: string | null = null;
   const loop = async (): Promise<void> => {
@@ -384,8 +397,12 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     let carriedRound = input.round ?? null;
     let answered: string | null = null;
     for (let burst = 0; burst <= MAX_REPLANS; burst++) {
+      // Texts sent in a row are one turn: wait, the lease held, until the person stops (plan #2988).
+      if (input.round === undefined || burst > 0) {
+        await waitForQuiet(async () => (await readLines(client, userId, chatId)).findLast((l) => l.speakerId === null)?.createdAt ?? null, { now, sleep });
+      }
       const lines = await readLines(client, userId, chatId);
-      const { anchor, spoken, lastBot } = sinceAnchor(lines);
+      const { anchor, spoken, lastBot, said } = sinceAnchor(lines);
       if (!anchor || anchor.id === answered) break;
       if (lastBot && carriedRound === null && asksPerson(lastBot.text, lastBot.speakerId ?? '', members)) break;
       outcome.bursts += 1;
@@ -394,7 +411,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
       const spent: Record<GroupSpendOperation, SpendReport[]> = { 'group-director': [], 'group-speaker': [] };
       const state: BurstState = { round: carriedRound ?? (spoken.length > 0 ? 1 : 0), spoken: [...spoken] };
       carriedRound = null;
-      const mentioned = mentionedIn(anchor.text, members);
+      const mentioned = mentionedIn(said, members);
       const thread = [...lines];
       let interrupted = false;
       let over = false;
@@ -422,9 +439,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
           if (!member || !persona) continue;
           const turnStarted = now();
           await setMemberTyping(client, userId, chatId, advisorId, turnStarted + TYPING_LEASE_MS).catch(() => undefined);
-          const keepTyping = setInterval(() => {
-            setMemberTyping(client, userId, chatId, advisorId, now() + TYPING_LEASE_MS).catch(() => undefined);
-          }, TYPING_RENEW_MS);
+          const keepTyping = keepRenewing(() => setMemberTyping(client, userId, chatId, advisorId, now() + TYPING_LEASE_MS), TYPING_RENEW_MS);
           let text: string | null = null;
           try {
             text = await speak({ speaker: { ...member, system: persona.system }, members, transcript: transcriptOf(thread, members, formerNames) }, spent['group-speaker']);
@@ -442,7 +457,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
               outcome.messages += 1;
             }
           } finally {
-            clearInterval(keepTyping);
+            await keepTyping.stop();
             await setMemberTyping(client, userId, chatId, advisorId, null).catch(() => undefined);
           }
           if (await personWroteSince(client, userId, chatId, anchor.createdAt)) {
@@ -481,7 +496,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     failure = error instanceof Error ? error.message : 'The group could not reply.';
     console.error('group burst failed', error);
   } finally {
-    clearInterval(renewing);
+    await renewing.stop();
   }
   if (outcome.chained) return outcome;
   await releaseLease(client, userId, chatId, failure).catch((error) => console.error('group burst could not let go', error));
