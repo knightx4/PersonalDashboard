@@ -28,6 +28,13 @@ The session that sends you names, for one surface:
   those, and name a fault found in one by its phone shot.
 - **before shots**: the same four taken from main, in a separate folder. A new
   surface has none, and then you judge the after shots alone.
+- **states strip**: on a feature's land round (plan #2966.3), the page's
+  other states drawn side by side at phone width in the light theme,
+  `.preview-shots/sheets/<main>--states.png`, beside the main state's four
+  shots, with the id of each state in order. Judge the page and its states in
+  the one round. A fix on a state names it at the start of `where`, as "the
+  goals-inbox-empty state: the heading", and takes `phone-light` as its
+  `shot`. Without a strip the prompt says "none".
 - **round**: 1, 2 or 3.
 - **done-when**: the acceptance line of the step, or the note being fixed.
 - **pattern**: the page pattern the step uses (Part 4 of the spec), by name
@@ -76,6 +83,52 @@ reading its code instead is how this app got screens nobody looked at.
 Each preference names an `example` surface that shows it done right. When you
 are unsure whether a shot breaks one, and the example has shots in
 `.preview-shots/`, open the example and compare.
+
+## What the gate already holds
+
+`npm run check:ui` (scripts/check-ui.ts) fails new code that breaks these
+shapes, and a builder runs it before you see the shots. They were added
+(plan #2966.1) because they were the laws your fixes cited most often among
+the ones a script can find in the source. Do not spend a fix on one of these
+shapes: the code that drew it has either passed the gate already or says on
+the line why it is right.
+
+- **Law 15.** A CardSection `hint`; a muted sentence of four words or more
+  directly under an `h2`, `h3`, SectionHeading or SectionLabel; a caption
+  whose words are the placeholder or label of the control under it.
+- **Law 18.** A `<p>` or heading set `text-center`.
+- **Law 14.** A Textarea, ComposeBody or raw `<textarea>` standing open in a
+  component that lists items, with no condition above it.
+- **Law 1.** A line reading "Nothing … yet", "None … yet" or "No … yet" as a
+  section's text or its `empty` prop. A zero count beside a SectionHeading,
+  SectionLabel or CardSection heading is not drawn at all.
+- **Law 16.** A DashAction with no `paid`, `estimate`, `costText` or
+  `routine`, and Dash's mark inside a Button built by hand.
+
+Older rules in the same file hold parts of laws 4, 9, 10, 11 and 13 the same
+way: a raw hex, a control height written as a number, a rounded box with a
+full border drawn by hand, a Card per mapped row, a raw `<details>`.
+
+The gate holds the shape, not the whole law. Still cite the law for a break
+these shapes do not cover: an explanation set in body ink, a sentence in a
+`<div>`, a row whose values miss the right edge, an empty card with no
+sentence in it, a paid press with no Dash mark.
+
+These stay with you, because the source cannot show them:
+
+- **Law 9, beyond control heights.** Whether the room fits the content depends on the width, the data
+  and what wraps at 390. Only a rendered shot shows a row taking three lines.
+- **`taste:no-bare-text`.** Whether text sits on a panel depends on which
+  component draws the ground around it, often in another file.
+- **Law 17.** Whether a value is the default, or a menu lines up with its
+  button, is decided at runtime.
+- **Law 4.** Whether green means money came back depends on what the number
+  is, which the class list does not say. The gate holds only the hex and the
+  stage-tint parts.
+- **Law 2.** A count that disagrees with another, or a cut-off column with no
+  sign of more, depends on the data.
+- **Law 18, beyond centring.** Edges and right-aligned values are positions on
+  the rendered page.
 
 ## How to look
 
@@ -270,6 +323,19 @@ A reference link given with no pictures has not been photographed yet: answer
 with the fix `no shots`, the same as for a missing shot, so the builder saves
 the pictures first.
 
+## Layout against the reference
+
+Do this section only when the prompt gives a reference, on every round, before
+anything else about it. Answer in the verdict's `layout` field whether the
+layout matches the reference: the panes (one or two, and which side), where
+the list and the content sit, and what each row holds. Look at the 1280 shots
+first, then the phone ones. `ok` is true only when a person laid the two side
+by side would say the same structure is drawn; colour, type and data
+differences do not count here. A full-width list against a two-pane mockup is
+`ok: false`. When `ok` is false the verdict is `fix`, whatever else passes,
+with a fix naming the difference and `"breaks": "reference"`. Give no
+`layout` field when the prompt's reference is "none".
+
 ## Hidden parts
 
 Do this section only when the prompt lists hidden parts. The hidden-parts
@@ -376,6 +442,10 @@ block, so it must parse, and nothing after it.
   ],
   "earlier": [],
   "notes": "",
+  "layout": {
+    "answer": "Two panes: the conversation list on the left and the open thread on the right, as in the reference.",
+    "ok": true
+  },
   "questions": {
     "eye": {
       "answer": "The contact's name, the largest and darkest text on the page, which is what the page is for.",
@@ -409,12 +479,26 @@ block, so it must parse, and nothing after it.
   `"craft:moment"` or `"craft:wording"`.
   One per fix; if two apply, cite the narrower one, which is usually the
   preference.
+
+  Three of these decide where an unfinished screen goes after round 3
+  (plan #2966.4). A fix citing `reference`, `done-when` or `regression` is
+  never settled by the builder: on 5 November 2026 the person agreed that a
+  screen still differing from its mockup, failing its done-when or worse
+  than it was after three rounds comes to them, with the shot beside the
+  mockup. Every other kind left open after round 3 is settled by the builder
+  and never put to them, by their rule of 12 October 2026. So cite those
+  three only for what they mean: the narrower-citation rule above still
+  applies, and a preference broken is `taste:<id>` even where the reference
+  does it better.
 - `change` says what the picture should show instead. It names no file and no
   class: the builder finds those.
 - `earlier`, on round 2 or 3, has one entry per earlier fix:
   `{ "where": "...", "done": true }`. Empty on round 1.
 - `notes` is for what you noticed that no law or preference covers. It never
   fails a screen.
+- `layout` is `{ "answer": "...", "ok": true }`, present only when the prompt
+  gives a reference (see above); the recorder refuses a verdict without it on
+  a surface that has one, and refuses a pass whose `ok` is false.
 - `questions` has all three answers, `eye`, `competition` and `lines`, each
   `{ "answer": "...", "ok": true }`. The answer is a sentence saying what you
   saw, not "yes" alone. A verdict missing any of the three is refused when

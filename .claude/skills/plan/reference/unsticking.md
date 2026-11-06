@@ -10,6 +10,15 @@ work, the fix is to make that step workable and let the next build run do it.
 
 ## Read first
 
+- `npm run friction -- lessons`: the walls builders already know. When
+  the stop lines match one, its "Do" line is usually the way through, and
+  this run logs another hit under it (`npm run friction -- log … --lesson
+  <key>`) so the builder review sees the count rise.
+- For a step `land` or `done` refuses on design checks, its recorded
+  commit before anything else: `git show --stat <commit_sha>` should be the
+  step's own work. A step carrying a later step's commit asks for rounds on
+  screens it never changed; mark it built again with its own commit.
+
 - `show <feature>`: the brief, the open steps, what each waits on.
 - The thread and comment on each open step. Earlier sessions often wrote the
   reason there and never recorded it anywhere the app reads.

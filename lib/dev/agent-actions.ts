@@ -69,6 +69,9 @@ export const devActions: ModuleActions = {
     workPlanOverhaul: none('spends', DEV_SPENDS),
     setAutoApproveAction: none('setting'),
   },
+  'app/dev/plan/mockup-actions.ts': {
+    loadQuestionMockups: none('page', 'Signs the links for the pictures a question shows.'),
+  },
   'app/dev/plan/run-actions.ts': {
     acknowledgePlanRunAction: none('theirs'),
     answerPlanRunAction: none('theirs'),
@@ -104,6 +107,9 @@ export const devActions: ModuleActions = {
     dismissRaise: none('theirs'),
     reopenRaise: none('theirs'),
     markConversationRead: none('page'),
+  },
+  'app/dev/raised/bot-handoff-actions.ts': {
+    resendFlaggedHandoff: none('theirs', 'Sends a hand-off nobody answered again, at their word.'),
   },
   'app/dev/raised/check-back-actions.ts': {
     dropCheckBack: none('theirs'),

@@ -216,10 +216,10 @@ describe('what understanding a node looks like', () => {
   it('asks for them in the tool schema', async () => {
     const client = clientReturning(CHAIN);
     await ask(client);
-    const tool = createOf(client).mock.calls[0][0].tools[0];
-    const concept = tool.input_schema.properties.concepts.items;
+    const concept = createOf(client).mock.calls[0][0].output_config.format.schema.properties.concepts.items;
     expect(concept.required).toContain('mastery');
-    expect(concept.properties.mastery.maxItems).toBe(4);
+    // Structured output takes no maxItems, so the bound is said in the description (plan #2937.4).
+    expect(concept.properties.mastery.description).toContain('at most 4 items');
   });
 
   it('asks which of them are doors as well', async () => {
@@ -227,8 +227,7 @@ describe('what understanding a node looks like', () => {
     // and a path that skips the mark leaves nodes nobody judged.
     const client = clientReturning(CHAIN);
     await ask(client);
-    const tool = createOf(client).mock.calls[0][0].tools[0];
-    const concept = tool.input_schema.properties.concepts.items;
+    const concept = createOf(client).mock.calls[0][0].output_config.format.schema.properties.concepts.items;
     expect(concept.required).toContain('kind');
     expect(concept.properties.kind.enum).toEqual(['threshold', 'consequence']);
   });

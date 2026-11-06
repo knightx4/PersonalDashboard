@@ -87,6 +87,43 @@ export const devSources: ModuleSources = {
       section: POSTS,
       note: 'created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.',
     },
+    // The music pipeline's own tables (plan #2800.7). Its migrations live in
+    // knightx4/music-pipeline, so no file here creates them (see
+    // AWAITING_MIGRATION). Each carries user_id, so Dash's lookups stay
+    // scoped to the owner.
+    {
+      table: 'public.studio_songs',
+      module: 'Dev',
+      holds: 'Songs in the music pipeline’s studio: each one’s document (name, seed, starting tempo, key and form), its edit operations and its revision.',
+      weight: 'record',
+      search: ['doc'],
+      title: 'id',
+      facts: ['rev', 'ops'],
+      newest: 'updated_at',
+      note: 'doc.name is the song’s name; the id is the studio’s own key. rev counts saves.',
+    },
+    {
+      table: 'public.studio_tracks',
+      module: 'Dev',
+      holds: 'Tracks in the music pipeline’s studio: a named take built against a reference piece, with its edit history.',
+      weight: 'record',
+      search: ['doc', 'reference'],
+      title: 'name',
+      ref: 'name',
+      facts: ['reference', 'rev'],
+      newest: 'updated_at',
+      note: 'reference names the piece the track follows, such as work/bamboleo. rev counts saves.',
+    },
+    {
+      table: 'public.studio_maps',
+      module: 'Dev',
+      holds: 'Maps in the music pipeline’s studio: a named map of a piece with the notes written on it.',
+      weight: 'record',
+      search: ['notes', 'map'],
+      title: 'name',
+      ref: 'name',
+      newest: 'updated_at',
+    },
     {
       table: 'public.spec_interviews',
       module: 'Dev',
@@ -100,6 +137,8 @@ export const devSources: ModuleSources = {
     },
   ],
   notSources: [
+    'public.studio_dash_requests',
+    'public.studio_keys',
     'public.check_backs',
     'public.ideas',
     'public.inspiration_settings',
@@ -109,9 +148,13 @@ export const devSources: ModuleSources = {
     'public.plan_items',
     'public.plan_dependencies',
     'public.plan_history',
+    'public.plan_item_mockups',
     'public.plan_item_pictures',
     'public.post_preferences',
     'public.plan_runs',
+    'public.build_lessons',
+    'public.build_friction',
+    'public.build_reviews',
     'public.plan_commit_checks',
     'public.plan_main_checks',
     'public.plan_overnight_runs',
@@ -138,7 +181,11 @@ export const devSources: ModuleSources = {
   ].map((table) => ({
     table,
     reason:
-      table === 'public.x_accounts'
+      table === 'public.studio_dash_requests'
+        ? 'Bookkeeping: each request the music studio handed Dash and its answer. The songs it changed are in public.studio_songs.'
+        : table === 'public.studio_keys'
+          ? 'Credentials: the hashes of the tokens that open the music studio. It has no owner column, so a lookup could not be scoped to the owner.'
+          : table === 'public.x_accounts'
         ? 'The X connection and its encrypted tokens.'
         : table === 'public.post_preferences'
           ? 'A setting: the text they wrote about what they want from their posts.'

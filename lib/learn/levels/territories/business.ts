@@ -2690,7 +2690,16 @@ const OPERATIONS_TOPICS: TerritoryTopic[] = [
 export const BUSINESS: Territory = {
   key: 'business',
   name: 'Business',
+  // No subject is called Business, so each area joins the subject it serves
+  // (plan #2489); the fallback only catches an area added without one.
   subjectLens: 'Business',
+  areaLenses: {
+    [CORPORATE_FINANCE]: 'Startup Finance / FP&A',
+    [ACCOUNTING]: 'Financial modeling in Excel for operators',
+    [BANKING]: 'Financial services industry landscape',
+    [STRATEGY]: 'Corporate strategy and competitive analysis',
+    [OPERATIONS]: 'Financial modeling in Excel for operators',
+  },
   goal: {
     name: 'Business',
     about: 'Corporate finance, accounting, banking, strategy and operations, at the depth of an MBA core and a CPA',

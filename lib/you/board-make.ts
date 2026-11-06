@@ -166,6 +166,6 @@ export function backLink(
   const q = question.question.replace(/\s+/g, ' ').trim();
   const clipped = q.length > 120 ? `${q.slice(0, 119).trimEnd()}…` : q;
   const picked = decided ? ` (option ${decided})` : '';
-  const where = meetingId ? `/you/board/${meetingId}#board-q-${question.id}` : '/you/board';
-  return `From the board's decision on [${clipped}](${where})${picked}.`;
+  const where = meetingId ? `/you/council/${meetingId}#board-q-${question.id}` : '/you/council';
+  return `From the council's decision on [${clipped}](${where})${picked}.`;
 }

@@ -307,7 +307,11 @@ describe('writeYearParagraphs', () => {
     });
     expect(paragraphs).toEqual([{ topic: 'shopping', text: 'You placed 3 orders.', evidence: ['E1'] }]);
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-sonnet-5-5', tool_choice: { type: 'auto' } }),
+      // Sonnet reports as structured output (plan #2937.5).
+      expect.objectContaining({
+        model: 'claude-sonnet-5-5',
+        output_config: expect.objectContaining({ format: expect.objectContaining({ type: 'json_schema' }) }),
+      }),
     );
     expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5-5' }));
   });

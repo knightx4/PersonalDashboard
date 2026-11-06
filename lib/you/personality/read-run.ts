@@ -2,13 +2,14 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { after } from 'next/server';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { loadVaultRules } from '@/lib/vault/map/vault-rules';
@@ -172,14 +173,11 @@ async function read(
       model: MODEL,
       max_tokens: 4096 + THINKING_ROOM,
       system: READ_SYSTEM,
-      tools: [
-        {
-          name: READ_TOOL,
-          description: 'Report where the result agrees and clashes with the notes, each point naming one note.',
-          input_schema: READ_TOOL_SCHEMA,
-        },
-      ],
-      tool_choice: forceTool(READ_TOOL, MODEL),
+      ...reportRequest({
+        name: READ_TOOL,
+        description: 'Report where the result agrees and clashes with the notes, each point naming one note.',
+        input_schema: READ_TOOL_SCHEMA,
+      }, MODEL),
       messages: [
         {
           role: 'user',
@@ -192,9 +190,9 @@ async function read(
     await recordSpendReports(core, userId, { module: 'you', operation: 'read-personality' }, reports);
   }
 
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === READ_TOOL);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  const points = pointsFrom(block.input, notes);
+  const report = readReport(response, READ_TOOL, MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  const points = pointsFrom(report.value, notes);
   if (!points) return { ok: false, detail: 'The read came back in the wrong shape.' };
 
   await writeRead(you, result.id, points, MODEL);

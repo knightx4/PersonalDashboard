@@ -41,6 +41,14 @@ export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
 # check (next.config.ts), as CI's does.
 export SKIP_BUILD_TYPECHECK=1
 
+# CI gives the typecheck an 8 GB heap (.github/workflows/ci.yml); without it
+# tsc runs out of memory on this repository before it finishes. Added to
+# whatever NODE_OPTIONS already holds (cloud sessions set --use-openssl-ca).
+case " ${NODE_OPTIONS:-} " in
+  *" --max-old-space-size="*) ;;
+  *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=8192" ;;
+esac
+
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
 
@@ -107,6 +115,10 @@ if [ "$failed" = 1 ]; then
     echo >&2
     echo "gate: FAILED at $(cat "$LOGS/$l.failed")" >&2
     tail -n 60 "$LOGS/$l.log" >&2
+    # Counted for the builder review (scripts/friction.ts), so a check that
+    # fails for builder after builder becomes a lesson. Never fails the gate
+    # itself, and does nothing without database credentials.
+    timeout 30 npx tsx scripts/friction.ts gate "$(cat "$LOGS/$l.failed")" --log "$LOGS/$l.log" 2>&1 >/dev/null | sed 's/^/    /' >&2 || true
   done
   exit 1
 fi

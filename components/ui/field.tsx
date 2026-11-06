@@ -216,6 +216,9 @@ export function ComposeBody({ className, ref, ...props }: React.ComponentProps<'
   return (
     <textarea
       ref={ref}
+      // The box lights up with focus-within (ComposeBox); a ring of the
+      // textarea's own drew a second one inside it (plan #2988.2).
+      data-focus-ring="none"
       className={cn(
         // eslint-disable-next-line no-restricted-syntax -- text-base is the one deliberate off-scale size: 16px stops iOS zooming on focus.
         'field-sizing-content max-h-64 w-full resize-none border-0 bg-transparent p-0 text-base text-ink outline-none sm:text-ui',

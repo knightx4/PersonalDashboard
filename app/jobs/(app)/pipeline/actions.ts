@@ -100,7 +100,6 @@ export async function setChannel(
   );
   if (error) return { error };
   revalidatePath('/jobs/pipeline');
-  revalidatePath('/jobs/analytics');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
@@ -192,7 +191,7 @@ export async function dismissPursuit(
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
   revalidatePath('/jobs/companies');
-  revalidatePath('/jobs/review');
+  revalidatePath('/jobs/inbox');
 
   return { error: null, removed: `${role.companies.name} · ${role.title}` };
 }

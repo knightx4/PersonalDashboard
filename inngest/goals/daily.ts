@@ -32,10 +32,8 @@ import { loadRecentSuggestions } from '@/lib/goals/suggestions-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { goalProposals } from '@/lib/goals/goal-proposals';
 import {
-  OPEN_QUESTION_CAP,
   RESTING_AFTER_DEFAULT_DAYS,
   STALE_STEP_LIMIT,
-  openQuestionCount,
   restingAfterDefault,
   staleSteps,
 } from '@/lib/goals/stale-steps';
@@ -237,6 +235,35 @@ async function paces({
   return out;
 }
 
+/**
+ * The open goals with steps under them and no dashboard saved. A failed read
+ * leaves them for tomorrow's brief rather than holding up the run.
+ */
+async function readUnlaid(
+  client: GoalsSupabaseClient,
+  userId: string,
+  goals: readonly { id: string; title: string }[],
+  byGoal: ReadonlyMap<string, readonly unknown[]>,
+): Promise<{ id: string; title: string }[]> {
+  const withSteps = goals.filter((g) => (byGoal.get(g.id) ?? []).length > 0);
+  if (withSteps.length === 0) return [];
+  try {
+    const { data, error } = await client
+      .from('items')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('level', 'goal')
+      .is('dashboard', null)
+      .in('id', withSteps.map((g) => g.id));
+    if (error) throw new Error(error.message);
+    const ids = new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+    return withSteps.filter((g) => ids.has(g.id)).map((g) => ({ id: g.id, title: g.title }));
+  } catch (error) {
+    console.warn(`[goals] goals without a dashboard not read: ${error instanceof Error ? error.message : 'failed'}`);
+    return [];
+  }
+}
+
 const ownerSchema = z.object({ userId: z.string().uuid() });
 
 export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<GoalsDailyResult> {
@@ -346,8 +373,6 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     new Set(Object.keys(progress)),
     resting,
   ).slice(0, STALE_STEP_LIMIT);
-  // The questions the run may still add before the Inbox is at its cap.
-  const asksLeft = Math.max(0, OPEN_QUESTION_CAP - openQuestionCount(byGoal));
   // A step of the person's not judged yet for a Dash prep step, ten a morning,
   // newest first (plan #1217). One listed above as stale gets only that move,
   // since preparing it is one of those moves.
@@ -390,6 +415,11 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
       ? await (deps?.mentions ?? readMentions)({ client, userId, today, now, goals: passiveGoals, byGoal })
       : [];
 
+  // An open goal with steps and no dashboard yet is laid out this morning
+  // (plan #2778.9). The first morning after the layouts shipped lays out
+  // every open goal; after that it catches one mapping left without.
+  const unlaid = await readUnlaid(client, userId, goals.map((g) => g.goal), byGoal);
+
   const result = await recordAndFire({
     client,
     userId,
@@ -403,12 +433,12 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
         answers,
         review,
         stale: sitting,
-        asksLeft,
         underWay,
         unjudged,
         evidence: evidence?.lines ?? null,
         statements: statementLines(statements),
         mentions,
+        unlaid,
       }),
     fetch: deps?.fetch,
   });

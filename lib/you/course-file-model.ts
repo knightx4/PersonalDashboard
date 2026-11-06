@@ -12,12 +12,12 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { YouOperation } from '@/lib/core/spend/operations';
 import { summaryTool } from '@/lib/you/course-file-read';
 import { MODELS } from '@/lib/core/models';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 
 export const COURSE_FILE_MODEL = MODELS.youCourseFileSummary;
 
@@ -76,8 +76,7 @@ export async function askCourseFileModel(
       model: COURSE_FILE_MODEL,
       max_tokens: ask.maxTokens ?? 2_000,
       system,
-      tools: [ask.tool as Anthropic.Tool],
-      tool_choice: forceTool(ask.tool.name, COURSE_FILE_MODEL),
+      ...reportRequest(ask.tool as Anthropic.Tool, COURSE_FILE_MODEL),
       messages: [
         {
           role: 'user',
@@ -102,9 +101,7 @@ export async function askCourseFileModel(
   }
   options.onSpend?.({ model: COURSE_FILE_MODEL, usage: usageFrom(response.usage) });
 
-  const reported = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === ask.tool.name,
-  );
-  if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back. Try again.' };
-  return { ok: true, input: reported.input };
+  const reported = readReport(response, ask.tool.name, COURSE_FILE_MODEL);
+  if (!reported.ok) return { ok: false, error: 'Nothing came back. Try again.' };
+  return { ok: true, input: reported.value };
 }

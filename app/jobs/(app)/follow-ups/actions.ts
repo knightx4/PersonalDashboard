@@ -24,7 +24,6 @@ const Id = z.string().uuid();
 const SEARCH_BUDGET_MS = 200_000;
 
 function refresh() {
-  revalidatePath('/jobs/follow-ups');
   revalidatePath('/jobs/roles/[id]', 'page');
   revalidatePath('/jobs/contacts/[id]', 'page');
 }

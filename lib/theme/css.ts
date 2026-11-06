@@ -26,8 +26,6 @@ export const THEME_SELECTORS: Record<string, string> = {
   dusk: "[data-theme='dusk']",
   aurora: "[data-theme='aurora']",
   dawn: "[data-theme='dawn']",
-  poster: "[data-theme='poster']",
-  'poster-dark': "[data-theme='poster-dark']",
 };
 
 /** The declarations inside one selector block. */

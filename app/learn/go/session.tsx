@@ -16,10 +16,12 @@ import type { RunSummary } from '@/lib/learn/levels/run';
 import {
   addToTally,
   KIND_WORD,
+  sessionHref,
   tallyKind,
   tallyLine,
   tallyTotal,
   type SessionItem,
+  type SessionMode,
   type SessionStep,
   type SessionTally,
 } from '@/lib/learn/next/session';
@@ -56,27 +58,35 @@ export type SessionSource = {
   end: (startedAt: string) => Promise<SessionEndResult>;
 };
 
-const SERVER: SessionSource = {
-  next: (skip) =>
-    nextSessionItem(skip).catch(() => ({ ok: false as const, error: 'Could not reach the server. Check your connection.' })),
-  shown: (item) => {
-    if (item.kind === 'lesson') void markSessionLessonRead(item.idea.conceptId).catch(() => undefined);
-    if (item.kind === 'level_lesson') void markSessionLevelLessonRead(item.lesson.id).catch(() => undefined);
-  },
-  end: (startedAt) =>
-    endSession(startedAt).catch(() => ({ error: 'Could not reach the server. Check your connection.' })),
-};
+function serverSource(mode: SessionMode): SessionSource {
+  return {
+    next: (skip) =>
+      nextSessionItem(skip, mode).catch(() => ({ ok: false as const, error: 'Could not reach the server. Check your connection.' })),
+    shown: (item) => {
+      if (item.kind === 'lesson') void markSessionLessonRead(item.idea.conceptId).catch(() => undefined);
+      if (item.kind === 'level_lesson') void markSessionLevelLessonRead(item.lesson.id).catch(() => undefined);
+    },
+    end: (startedAt) =>
+      endSession(startedAt).catch(() => ({ error: 'Could not reach the server. Check your connection.' })),
+  };
+}
+
+/** One source a mode, made once, so the session's effects do not run again on each render. */
+const SERVER: Record<SessionMode, SessionSource> = { all: serverSource('all'), lessons: serverSource('lessons') };
 
 type Slot = { state: 'loading' } | { state: 'ready'; step: SessionStep };
 
 export function LearnSession({
   startedAt,
+  mode = 'all',
   first,
-  source = SERVER,
+  source = SERVER[mode],
   ended: endedAtFirst,
 }: {
   /** When the session began: what Stop sums up from. */
   startedAt: string;
+  /** Everything the chooser picks, or lessons only (Quick learn). */
+  mode?: SessionMode;
   /** The first item, already in hand; without it the session asks for one as it opens. */
   first?: SessionStep;
   source?: SessionSource;
@@ -153,15 +163,18 @@ export function LearnSession({
         tally={tally}
         nothingLeft={ended.nothingLeft}
         source={source}
+        mode={mode}
         summary={endedAtFirst?.summary}
       />
     );
   }
   if (current.state === 'loading') return <SessionLoading onStop={tallyTotal(tally) > 0 ? stop : undefined} />;
-  if (!current.step.ok) return <SessionReadFailed message={current.step.error} />;
+  if (!current.step.ok) return <SessionReadFailed message={current.step.error} mode={mode} />;
   if (!item) {
     return tallyTotal(tally) > 0 ? (
-      <SessionEnd startedAt={startedAt} tally={tally} nothingLeft source={source} />
+      <SessionEnd startedAt={startedAt} tally={tally} nothingLeft source={source} mode={mode} />
+    ) : mode === 'lessons' ? (
+      <NoLessonLeft />
     ) : (
       <SessionEmpty />
     );
@@ -410,14 +423,26 @@ export function SessionEmpty() {
   );
 }
 
+/** Quick learn with every lesson read: practising what they taught is what is left. */
+export function NoLessonLeft() {
+  return (
+    <EmptyState
+      icon={BookOpen}
+      title="No new lesson is waiting"
+      description="You have read every lesson Dash has for your subjects and topics. Start goes on to the checks and questions on what they taught."
+      action={{ label: 'Start', href: sessionHref('all') }}
+    />
+  );
+}
+
 /** The chooser could not read what to learn next. */
-export function SessionReadFailed({ message }: { message: string }) {
+export function SessionReadFailed({ message, mode = 'all' }: { message: string; mode?: SessionMode }) {
   return (
     <EmptyState
       icon={CircleAlert}
       title="What to learn next could not be chosen"
       description={`${message} Nothing you answered is lost.`}
-      action={{ label: 'Try again', href: '/learn/go' }}
+      action={{ label: 'Try again', href: sessionHref(mode) }}
     />
   );
 }
@@ -428,12 +453,14 @@ export function SessionEnd({
   tally,
   nothingLeft,
   source,
+  mode = 'all',
   summary: given,
 }: {
   startedAt: string;
   tally: SessionTally;
   nothingLeft: boolean;
   source: SessionSource;
+  mode?: SessionMode;
   /** Drawn in place of the read, for the gallery; null draws it reading. */
   summary?: SessionEndResult | null;
 }) {
@@ -473,19 +500,29 @@ export function SessionEnd({
       </div>
     );
   }
-  return <SessionSummary tally={tally} summary={result.summary} nothingLeft={nothingLeft} />;
+  return <SessionSummary tally={tally} summary={result.summary} nothingLeft={nothingLeft} mode={mode} />;
 }
 
-function SessionSummary({ tally, summary, nothingLeft }: { tally: SessionTally; summary: RunSummary; nothingLeft: boolean }) {
+function SessionSummary({
+  tally,
+  summary,
+  nothingLeft,
+  mode,
+}: {
+  tally: SessionTally;
+  summary: RunSummary;
+  nothingLeft: boolean;
+  mode: SessionMode;
+}) {
   const levels = summary.answered > 0 ? ` ${runHeadline(summary, false)}` : '';
-  const left = nothingLeft ? ' There is nothing left to learn for now.' : '';
+  const left = nothingLeft ? (mode === 'lessons' ? ' There is no new lesson left for now.' : ' There is nothing left to learn for now.') : '';
   return (
     <RunSummaryView
       summary={summary}
       title="End of this session"
       headline={`${tallyLine(tally)}${levels}${left}`}
-      againHref="/learn/go"
-      againLabel="Start again"
+      againHref={sessionHref(mode)}
+      againLabel={mode === 'lessons' ? 'Another lesson' : 'Start again'}
       nothingLeft={nothingLeft}
     />
   );

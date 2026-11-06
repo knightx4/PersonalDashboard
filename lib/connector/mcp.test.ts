@@ -36,7 +36,7 @@ import { refusal } from './token';
 
 const HOST = 'https://dash.example.com';
 const LOOKUP_NAMES: string[] = ASK_TOOL_NAMES.filter(
-  (name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'read_job_board' && name !== 'show_chart' && name !== 'dash_model',
+  (name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'read_job_board' && name !== 'find_places' && name !== 'show_chart' && name !== 'dash_model' && name !== 'session_handoffs',
 );
 const WRITE_NAMES = CONNECTOR_WRITE_TOOLS.map((tool) => tool.definition.name);
 const METADATA = `${HOST}/.well-known/oauth-protected-resource/api/mcp`;
@@ -303,6 +303,7 @@ describe('a write call', () => {
     expect(calls.runConnectorWrite.mock.calls[0][1]).toEqual({
       ...writeCtx,
       account: { enabledModules: session.ctx.enabledModules, today: session.ctx.today, timezone: session.ctx.timezone },
+      lookups: session.ctx,
     });
     expect(calls.executeAskTool).not.toHaveBeenCalled();
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);

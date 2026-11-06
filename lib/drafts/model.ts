@@ -2,8 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM } from '@/lib/learn/graph/tool-call';
 import { draftPrompt, type DraftContext } from './write';
 import { MODELS } from '@/lib/core/models';
 
@@ -65,27 +66,22 @@ export async function writeDraft(
     model: DRAFT_MODEL,
     max_tokens: 800 + THINKING_ROOM,
     system: SYSTEM,
-    tools: [
-      {
-        name: TOOL_NAME,
-        description:
-          'Give the email: its subject line and its body, with line breaks between paragraphs.',
-        input_schema: {
-          type: 'object',
-          properties: { subject: { type: 'string' }, body: { type: 'string' } },
-          required: ['subject', 'body'],
-        },
+    ...reportRequest({
+      name: TOOL_NAME,
+      description:
+        'Give the email: its subject line and its body, with line breaks between paragraphs.',
+      input_schema: {
+        type: 'object',
+        properties: { subject: { type: 'string' }, body: { type: 'string' } },
+        required: ['subject', 'body'],
       },
-    ],
-    tool_choice: forceTool(TOOL_NAME, DRAFT_MODEL),
+    }, DRAFT_MODEL),
     messages: [{ role: 'user', content: `${draftPrompt(context)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: DRAFT_MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use') return null;
-  const parsed = Reply.safeParse(block.input);
+  const report = readReport(response, TOOL_NAME, DRAFT_MODEL);
+  if (!report.ok) return null;
+  const parsed = Reply.safeParse(report.value);
   return parsed.success ? parsed.data : null;
 }

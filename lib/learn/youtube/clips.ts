@@ -2,9 +2,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { clockTime } from './format';
 import { JUDGE_VIDEO_MODEL, profileText, type LearnerProfile } from './judge-video';
 
@@ -331,38 +331,35 @@ export async function cutVideo(input: {
         model: CLIP_MODEL,
         max_tokens: 6000,
         system: CUT_SYSTEM,
-        tools: [
-          {
-            name: CUT_TOOL,
-            description: 'Report the clips cut from the video, in order.',
-            input_schema: {
-              type: 'object',
-              properties: {
-                clips: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      start: { type: 'integer', description: 'The number of the first sentence.' },
-                      end: { type: 'integer', description: 'The number of the last sentence.' },
-                      caption: { type: 'string' },
-                      idea: { type: 'string' },
-                      serves: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Every track and goal it serves, names copied exactly from the list.',
-                      },
-                      stands_alone: { type: 'boolean' },
+        ...reportRequest({
+          name: CUT_TOOL,
+          description: 'Report the clips cut from the video, in order.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              clips: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    start: { type: 'integer', description: 'The number of the first sentence.' },
+                    end: { type: 'integer', description: 'The number of the last sentence.' },
+                    caption: { type: 'string' },
+                    idea: { type: 'string' },
+                    serves: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Every track and goal it serves, names copied exactly from the list.',
                     },
-                    required: ['start', 'end', 'caption', 'idea', 'serves', 'stands_alone'],
+                    stands_alone: { type: 'boolean' },
                   },
+                  required: ['start', 'end', 'caption', 'idea', 'serves', 'stands_alone'],
                 },
               },
-              required: ['clips'],
             },
+            required: ['clips'],
           },
-        ],
-        tool_choice: forceTool(CUT_TOOL, CLIP_MODEL),
+        }, CLIP_MODEL),
         messages: [{ role: 'user', content: cutPrompt(input.profile, input.video) }],
       },
       input.timeoutMs !== undefined ? { timeout: Math.max(1_000, input.timeoutMs), maxRetries: 0 } : undefined,
@@ -371,8 +368,8 @@ export async function cutVideo(input: {
     return { outcome: 'failed', detail: error instanceof Error ? error.message : 'Cutting the video failed.' };
   }
   input.onSpend?.({ model: CLIP_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === CUT_TOOL);
-  if (!block || block.type !== 'tool_use') return { outcome: 'unreadable', detail: whyNoReport(response) };
-  const clips = readCutReply(block.input, input.video.sentences, input.profile);
+  const report = readReport(response, CUT_TOOL, CLIP_MODEL);
+  if (!report.ok) return { outcome: 'unreadable', detail: report.reason };
+  const clips = readCutReply(report.value, input.video.sentences, input.profile);
   return clips ? { outcome: 'cut', clips } : { outcome: 'unreadable', detail: 'The clips came back malformed.' };
 }

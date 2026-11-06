@@ -13,6 +13,7 @@
  */
 
 export type ModuleId =
+  | 'chat'
   | 'shopping'
   | 'jobs'
   | 'vault'
@@ -79,6 +80,15 @@ export type AppModule = {
    */
   alwaysHome?: true;
   /**
+   * On for every account, with no checkbox to turn it off.
+   *
+   * Chat is the one (plan #2748.1): Ask Dash lives under its Dash tab, and
+   * Dash had a row of its own in the switcher that nobody could hide. Reading
+   * it into every account's list, rather than writing it into each account's
+   * enabled_modules, means no account loses Dash on the day it moved.
+   */
+  alwaysOn?: true;
+  /**
    * The workspace's own settings page, and a line saying what is on it.
    * Account's Workspaces tab builds its list of settings links from these, so
    * a workspace that has a settings page is never left out of it (plan #1924).
@@ -111,6 +121,7 @@ export type MarkShape =
   | 'envelope'
   | 'summit'
   | 'person'
+  | 'bubbles'
   | 'wallet'
   | 'terminal';
 
@@ -138,6 +149,20 @@ export interface MarkKey {
 }
 
 export const MODULES: readonly AppModule[] = [
+  {
+    id: 'chat',
+    prefix: '/chat',
+    // People, the first tab: the mentors' threads. Ask Dash is the Dash tab
+    // at /chat/dash, and /ask redirects there (next.config.ts).
+    home: '/chat',
+    label: 'Chat',
+    description: 'Texts with your mentors, and your chats with Dash',
+    accent: '--color-w-chat',
+    alwaysOn: true,
+    // The app's own indigo, as globals.css gives the workspace: Chat is where
+    // Dash lives. The deep stop is the paper theme's --c-accent-base.
+    key: { shape: 'bubbles', from: '#a5b4fc', to: '#4a5fd0' },
+  },
   {
     id: 'shopping',
     prefix: '/shopping',
@@ -367,7 +392,17 @@ export function switchableModules(
   isOwner: boolean,
 ): readonly ModuleId[] {
   const allowed = moduleIdsFor(isOwner);
-  return (enabled ?? allowed).filter((id) => allowed.includes(id));
+  return (enabled ? withAlwaysOn(enabled) : allowed).filter((id) => allowed.includes(id));
+}
+
+/**
+ * An account's chosen workspaces with every `alwaysOn` one added: Chat, which
+ * has no checkbox and is never written into enabled_modules. They go first,
+ * as Dash's row sat above the workspaces; the rest keep the account's order.
+ */
+export function withAlwaysOn(enabled: readonly ModuleId[]): ModuleId[] {
+  const always = MODULES.filter((module) => module.alwaysOn && !enabled.includes(module.id)).map((module) => module.id);
+  return [...always, ...enabled];
 }
 
 export function moduleById(id: ModuleId | null): AppModule | null {

@@ -2,8 +2,10 @@ import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  checkProgressChange,
   checkProgressEntry,
   isProgressEstimate,
+  type ProgressChange,
   type NewProgressEntry,
   type ProgressEntry,
   type ProgressEstimate,
@@ -116,6 +118,77 @@ export async function undoProgressEntry(client: GoalsSupabaseClient, id: string)
     .select('id');
   if (error) throw new Error(error.message);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Bring back an entry that was undone, for the Restore an Undo offers
+ * (plan #2907.3). False when there is no such entry or it is not undone.
+ */
+export async function restoreProgressEntry(client: GoalsSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await client
+    .from('progress_entries')
+    .update({ undone_at: null })
+    .eq('id', id)
+    .not('undone_at', 'is', null)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Change a logged entry in place (plan #2907.1): its text, amount, unit or
+ * day. The result says what happened: `changed`, `gone` (no such entry, or
+ * it was undone, or its step or goal is archived), or `refused` with the
+ * rule's own reason. `today` is the person's today, which a new day may not
+ * pass. The table trigger writes the history and touches `updated_at`.
+ */
+export type UpdateProgressResult =
+  | { status: 'changed'; entry: ProgressEntry }
+  | { status: 'gone' }
+  | { status: 'refused'; error: string };
+
+export async function updateProgressEntry(
+  client: GoalsSupabaseClient,
+  id: string,
+  change: ProgressChange,
+  today: string,
+): Promise<UpdateProgressResult> {
+  const { data: row, error: readError } = await client
+    .from('progress_entries')
+    .select(COLUMNS)
+    .eq('id', id)
+    .is('undone_at', null)
+    .maybeSingle();
+  if (readError) throw new Error(`Could not read the progress: ${readError.message}`);
+  if (!row) return { status: 'gone' };
+  const current = toEntry(row as ProgressRow);
+
+  const { data: item, error: itemError } = await client
+    .from('items')
+    .select('id')
+    .eq('id', current.itemId)
+    .is('archived_at', null)
+    .maybeSingle();
+  if (itemError) throw new Error(itemError.message);
+  if (!item) return { status: 'gone' };
+
+  const checked = checkProgressChange(current, change, today);
+  if (!checked.ok) return { status: 'refused', error: checked.error };
+
+  const { data, error } = await client
+    .from('progress_entries')
+    .update({
+      text: checked.value.text,
+      quantity: checked.value.quantity,
+      unit: checked.value.unit,
+      happened_on: checked.value.happenedOn,
+    })
+    .eq('id', id)
+    .is('undone_at', null)
+    .select(COLUMNS);
+  if (error) throw new Error(`Could not change the progress: ${error.message}`);
+  const written = (data ?? [])[0] as ProgressRow | undefined;
+  return written ? { status: 'changed', entry: toEntry(written) } : { status: 'gone' };
 }
 
 /**

@@ -22,6 +22,7 @@ const ROOT = process.cwd();
 /** Routes that call pumpInboxSync, directly or through a cron stage. */
 const PUMPING_ROUTES = [
   'app/api/inbox/sync/route.ts',
+  'app/api/inbox/check/route.ts',
   'app/api/inbox/sync/continue/route.ts',
   'app/api/cron/daily/route.ts',
   'app/api/cron/inbox-incremental/route.ts',

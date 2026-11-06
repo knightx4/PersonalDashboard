@@ -12,7 +12,7 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
  * are put together here. A link whose file has been archived is left out.
  */
 
-type FileLinkRow = { id: string; item_id: string; target_id: string };
+type FileLinkRow = { id: string; item_id: string; target_id: string; document_kind_id: string | null };
 
 /** For each of the given goals and steps, the files it links to, oldest link first. */
 export async function loadFilesOf(
@@ -24,7 +24,7 @@ export async function loadFilesOf(
   if (itemIds.length === 0) return out;
   const { data, error } = await goals
     .from('links')
-    .select('id, item_id, target_id')
+    .select('id, item_id, target_id, document_kind_id')
     .eq('kind', 'file')
     .in('item_id', [...new Set(itemIds)])
     .is('archived_at', null)
@@ -48,6 +48,9 @@ export async function loadFilesOf(
       madeBy: file.madeBy,
       version: file.version,
       readAt: file.readAt,
+      stored: file.stored ?? null,
+      pinnedAt: file.pinnedAt ?? null,
+      documentKindId: row.document_kind_id,
     });
   }
   return out;

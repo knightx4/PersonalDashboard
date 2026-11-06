@@ -82,7 +82,10 @@ export function TriagePreview({
   writable,
   second = false,
   naming = false,
+  onVault = false,
 }: {
+  /** Drawn on the Vault's Now page, as it is since plan #1496.9. */
+  onVault?: boolean;
   empty?: boolean;
   writable: boolean;
   /** The first note already left for later, so Previous shows. */
@@ -97,6 +100,7 @@ export function TriagePreview({
       actions={triageActions}
       alreadyPassed={second ? ['triage-1'] : undefined}
       naming={naming}
+      onVault={onVault}
     />
   );
 }

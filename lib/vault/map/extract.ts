@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { chunkNote, type NoteChunk } from '@/lib/learn/graph/note-chunks';
 import {
@@ -8,7 +9,6 @@ import {
   POSITION_KIND_TOOL_FIELD,
   POSITION_RULE,
 } from '@/lib/learn/graph/position-prompt';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { classifyForMap } from '@/lib/vault/map/classify';
 import {
   mergeChunkReports,
@@ -167,8 +167,7 @@ async function readChunk(
       model: MODEL,
       max_tokens: 8192,
       system: SYSTEM,
-      tools: [TOOL],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      ...reportRequest(TOOL, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -180,11 +179,9 @@ async function readChunk(
 
   onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-  const block = response.content.find(
-    (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-  );
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, report: readChunkReport(block.input) };
+  const reportRead = readReport(response, TOOL_NAME, MODEL);
+  if (!reportRead.ok) return { ok: false, detail: reportRead.reason };
+  return { ok: true, report: readChunkReport(reportRead.value) };
 }
 
 /** `run` over every item, `limit` at a time, results in the items' order. */

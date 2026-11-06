@@ -587,7 +587,7 @@ async function changeApplication(env: JobsWriteEnv, args: Args): Promise<JobsMad
   const said = listed(changed);
   return {
     kind: 'change_application',
-    input: { verb: 'Changed', what: name, rest: `: ${said}`, href, where: 'Open the role', paths: [...rolePaths(roleId), '/jobs/analytics'] },
+    input: { verb: 'Changed', what: name, rest: `: ${said}`, href, where: 'Open the role', paths: [...rolePaths(roleId)] },
     subjectRef: toRef(APPLICATIONS, id),
     op: 'update',
     before,
@@ -1437,7 +1437,7 @@ async function mergeRoles(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
       rest: `: folded in ${folded}`,
       href,
       where: 'Open the role',
-      paths: [...rolePaths(keepId), '/jobs/analytics'],
+      paths: [...rolePaths(keepId)],
     },
     subjectRef: toRef(ROLES, keepId),
     op: 'update',
@@ -1876,7 +1876,7 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   const href = role ? roleHref(role.id) : '/jobs';
   return {
     kind: 'change_role_email',
-    input: { verb, what: subject, rest, href, where: role ? 'Open the role' : 'Open Jobs', paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/jobs/review'] },
+    input: { verb, what: subject, rest, href, where: role ? 'Open the role' : 'Open Jobs', paths: [...(role ? rolePaths(role.id) : ['/jobs']), '/jobs/inbox'] },
     subjectRef: toRef(APPLICATIONS, applicationId),
     op: 'update',
     before: application,
@@ -2007,7 +2007,7 @@ export type RowsUndo = {
  */
 const ROWS_TABLES = new Set([APPLICATIONS, 'job_search.application_events', 'job_search.ingested_messages']);
 
-const REVIEW_HREF = '/jobs/review';
+const REVIEW_HREF = '/jobs/inbox';
 const EVENTS_MAX = 50;
 const REOPEN_STATUSES = ['in_process', 'final_round'] as const;
 

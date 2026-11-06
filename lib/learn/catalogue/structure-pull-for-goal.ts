@@ -2,6 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import type postgres from 'postgres';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { MODELS } from '@/lib/core/models';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { pullOcwForGoal } from '@/lib/learn/catalogue/ocw-structure-pull';
@@ -9,7 +10,6 @@ import { pullUtForGoal, type UtPullLine } from '@/lib/learn/catalogue/ut-austin-
 import type { StructureDocumentInput } from '@/lib/learn/catalogue/structure';
 import { storeStructure } from '@/lib/learn/catalogue/structure-store';
 import { providersForKind, type GoalKind, type GoalToClassify, type ProviderId } from '@/lib/learn/goal-kind';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { fetchArxivStructure, parseArxivId } from '@/lib/learn/providers/arxiv';
 import { EXPLAINER_HOSTS, explainerHostFor, pullExplainer } from '@/lib/learn/providers/explainers';
 import { parseOpenstaxSlug, fetchOpenstaxStructure } from '@/lib/learn/providers/openstax';
@@ -161,28 +161,25 @@ export async function proposeCandidates(input: {
       model: PROPOSE_MODEL,
       max_tokens: 1024,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the documents to fetch, best first.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              candidates: {
-                type: 'array',
-                maxItems: MAX_CANDIDATES,
-                items: {
-                  type: 'object',
-                  properties: { value: { type: 'string' }, title: { type: 'string' } },
-                  required: ['value'],
-                },
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Report the documents to fetch, best first.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            candidates: {
+              type: 'array',
+              maxItems: MAX_CANDIDATES,
+              items: {
+                type: 'object',
+                properties: { value: { type: 'string' }, title: { type: 'string' } },
+                required: ['value'],
               },
             },
-            required: ['candidates'],
           },
+          required: ['candidates'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, PROPOSE_MODEL),
+      }, PROPOSE_MODEL),
       messages: [{ role: 'user', content: candidatePrompt(input.goal, input.provider) }],
     });
   } catch (error) {
@@ -190,9 +187,9 @@ export async function proposeCandidates(input: {
     return { ok: false, detail: error instanceof Error ? error.message : 'The proposing call failed.' };
   }
   input.onSpend?.({ model: PROPOSE_MODEL, usage: usageFrom(response.usage) });
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return { ok: true, candidates: readCandidates(block.input, input.provider.read) };
+  const report = readReport(response, TOOL_NAME, PROPOSE_MODEL);
+  if (!report.ok) return { ok: false, detail: report.reason };
+  return { ok: true, candidates: readCandidates(report.value, input.provider.read) };
 }
 
 export type PullLine =

@@ -14,6 +14,11 @@ const options = [
   { letter: 'B', text: 'Keep the search full time' },
 ];
 const verdict = {
+  method: null,
+  probability: null,
+  spread: null,
+  forecasts: [],
+  steelman: null,
   recommended: 'A',
   conditions: ['Get one evening written in by 2026-11-13.', 'Keep two applications a week.'],
   dissent: [],
@@ -48,7 +53,7 @@ describe('dateIn', () => {
 });
 
 describe('makeCandidates', () => {
-  it('offers the action and the conditions when the board was followed', () => {
+  it('offers the action and the conditions when the council was followed', () => {
     const got = makeCandidates({ options, verdict, decision: decided('A') }, '2026-11-02');
     expect(got.map((c) => [c.key, c.dueOn])).toEqual([
       ['action', '2026-11-16'],
@@ -97,8 +102,8 @@ describe('the rest', () => {
   it('links back to the question in its meeting', () => {
     const q = { id: 'q1', question: 'Take it?', options };
     expect(backLink(q, 'm1', 'A')).toBe(
-      "From the board's decision on [Take it?](/you/board/m1#board-q-q1) (option A).",
+      "From the council's decision on [Take it?](/you/council/m1#board-q-q1) (option A).",
     );
-    expect(backLink(q, null, null)).toContain('(/you/board)');
+    expect(backLink(q, null, null)).toContain('(/you/council)');
   });
 });

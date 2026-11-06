@@ -136,6 +136,14 @@ describe('ranRecently', () => {
 });
 
 describe('dailyRunText', () => {
+  it('asks for a dashboard on each goal without one, saved through the script as the run (plan #2778.9)', () => {
+    const text = dailyRunText({ userId: 'user-1', runId: 'run-1', steps: [], unlaid: [{ id: 'g1', title: 'Pay off the loans' }] });
+    expect(text).toContain('- "Pay off the loans" (goals.items id g1)');
+    expect(text).toContain('npm run goals:dashboard -- save <goal id> <file> --run run-1');
+    expect(text).toContain('.claude/skills/goals/reference/dashboards.md');
+    expect(dailyRunText({ userId: 'user-1', runId: 'run-1', steps: [] })).not.toContain('dashboard');
+  });
+
   it('names the account, the run row and every step to work', () => {
     const text = dailyRunText({
       userId: 'user-1',

@@ -4,7 +4,7 @@ import { parentBy, type ModuleSources, type Section } from '@/lib/sources/types'
  * The app's own pages that core rows open under. They belong to no
  * workspace, so a path to one starts at Home (refPath in lib/core/refs.ts).
  */
-const ASK: Section = { href: '/ask', label: 'Questions to Dash' };
+const ASK: Section = { href: '/chat/dash', label: 'Dash' };
 const TIMELINE: Section = { href: '/timeline', label: 'Timeline' };
 const HOME: Section = { href: '/home', label: 'Home' };
 
@@ -28,7 +28,7 @@ export const coreSources: ModuleSources = {
       page: {
         title: 'title',
         reads: ['subject_kind', 'subject_ref'],
-        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
+        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/chat/dash/${row.subject_ref}` : null),
         section: ASK,
       },
       note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
@@ -37,13 +37,13 @@ export const coreSources: ModuleSources = {
       // A source so Dash can say whether a hand-off has finished (note 59c210be).
       table: 'core.dash_handoffs',
       module: 'Home',
-      holds: 'What they asked Dash that it handed to the backup routine, and how far that has got.',
+      holds: 'What they asked Dash or another bot that was handed to the backup routine or a Claude Code session, and how far that has got.',
       weight: 'record',
-      search: ['request'],
+      search: ['request', 'asked'],
       title: 'request',
       parent: parentBy('conversation_id', 'core.conversations'),
-      facts: ['status', 'error', 'conversation_id', 'run_id'],
-      note: "status is 'pending' before the routine is started, 'fired' while it is working, 'done' once it has replied in the same conversation, and 'failed' when it could not start, with error saying why. conversation_id joins core.conversations. The rows the routine wrote are sources in their own modules.",
+      facts: ['kind', 'state', 'status', 'error', 'conversation_id', 'advisor_chat_id', 'advisor_id', 'run_id', 'cost_micros'],
+      note: "kind is 'request' for Ask Dash handing to the backup routine, 'page' for a bot on People asking for a page, and 'session' for any bot handing work to a Claude Code session (plan #3005). state is queued, running, done or failed, read from status ('pending', 'fired', 'done', 'failed'); error says why one failed. conversation_id joins core.conversations for Ask Dash; advisor_chat_id is the People chat (you.advisor_chats) and advisor_id the bot (you.board_advisors) for the others. asked is the person's own words, request the bot's version, summary the thread so far and refs the rows it pointed the session at. cost_micros is what the session cost in millionths of a dollar. The rows the routine wrote are sources in their own modules.",
     },
     {
       table: 'core.conversation_turns',
@@ -118,6 +118,16 @@ export const coreSources: ModuleSources = {
       note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id the goals.items id of a goal, or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
     },
     {
+      table: 'core.session_messages',
+      module: 'Home',
+      holds: 'What they wrote to a Claude Code session working on one of their projects or this app, and what the session wrote back, message by message.',
+      weight: 'intent',
+      search: ['body', 'answer'],
+      title: 'body',
+      facts: ['author', 'kind', 'answer', 'answered_at', 'delivered_at', 'thread_id'],
+      note: "author 'person' is theirs and 'session' is the session's: read their messages as what they asked for, and the session's only for context. kind 'question' carries options and, once they pressed one, answer; 'mockup' carries artifact_url; 'status' is a line on what the session was doing. thread_id joins core.session_threads, whose title says what the thread is about and whose project_id names the dev_projects project (null for this app).",
+    },
+    {
       table: 'core.watches',
       module: 'Home',
       holds: 'Things they asked Dash to watch outside the app, such as a resale ticket price, with the price that should alert them and when the watch ends.',
@@ -132,7 +142,10 @@ export const coreSources: ModuleSources = {
     { table: 'core.app_settings', reason: 'Settings for the whole install: which account is the owner.' },
     { table: 'core.ask_reply_checks', reason: 'Bookkeeping for the weekly check of Ask Dash replies that went badly: the week, what it flagged and the Dev note it wrote; the thumbs themselves are on core.conversation_turns.' },
     { table: 'core.dash_eval_cases', reason: 'The questions the nightly Dash quality check asks and what a good answer must show; test fixtures, not something the person wrote.' },
+    { table: 'core.dash_failures', reason: 'Bookkeeping for Dash answers that failed or came back unfinished: the reason, the model and each call\'s stop and tokens, for the daily health check.' },
+    { table: 'core.dash_slips', reason: 'Bookkeeping for chats with Dash that refused a thin or repeated plan step or ran out of a turn\'s budget, counted on Dev Home.' },
     { table: 'core.dash_eval_runs', reason: 'Bookkeeping for the nightly Dash quality check: each run, its graded answers, the day\'s health and the Dev note it wrote.' },
+    { table: 'core.bot_handoffs', reason: 'Bookkeeping for a request one bot passed to another ("tell Bob ..."): the thread, the packet sent and what the receiver did; the person\'s words are in the chat it was asked in, and the row the receiver made is a source in its own module.' },
     { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
@@ -151,10 +164,13 @@ export const coreSources: ModuleSources = {
     { table: 'core.memory_chunks', reason: 'Vectors of passages from other tables, for search by meaning; read through the rows they point at.' },
     { table: 'core.memory_documents', reason: 'Copies of the spec files in docs/, so the memory sweep can embed them; the specs are read from the repository.' },
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
+    { table: 'core.speech_usage', reason: 'Bookkeeping: bytes of chat replies read aloud this month, for the voice cap.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.run_activities', reason: 'What each Dash run did, line by line, for its run page; the rows a run wrote are sources in their own modules.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
+    { table: 'core.session_threads', reason: 'A conversation with a Claude Code session: its title, the repository it works on, the session id and its state; what was said is in core.session_messages, a source.' },
+    { table: 'core.session_progress', reason: 'What each session working for them is doing now and what it waits on, for the project pages and Dev; bookkeeping written by the sessions, and what they build is recorded on the plan.' },
     { table: 'core.scope_days', reason: 'Steps under each open goal or feature at the end of each day, counted by the daily run from rows that are sources in their own modules.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'core.writing_style', reason: 'Dash\'s analysis of how they write, read from their sent mail and shown on its own page; derived, and not read by anything else yet.' },

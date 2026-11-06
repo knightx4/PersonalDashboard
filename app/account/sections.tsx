@@ -224,7 +224,7 @@ export function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOw
    * `updateEnabledModules` filters the form through the same rule, so ticking
    * it by hand leaves it off anyway.
    */
-  const modules = modulesFor(isOwner);
+  const modules = modulesFor(isOwner).filter((module) => !module.alwaysOn);
 
   function toggle(id: ModuleId, checked: boolean) {
     const previous = on;

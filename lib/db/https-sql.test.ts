@@ -63,6 +63,35 @@ describe('https-sql', () => {
     expect(withParameters('$2 $1', [1, 2])).toBe('2 1');
   });
 
+  it('leaves dollar amounts alone in dollar-quoted text and in a statement with no values', async () => {
+    const { sql, sent } = client();
+    const prose = 'insert into ideas (body) values ($s$A $150,000 floor and a $3B deal$s$)';
+    await sql.unsafe(prose);
+    expect(sent[0].query).toBe(prose);
+    expect(withParameters('select $$costs $5$$, $q$and $12$q$, $1', ['x'])).toBe(
+      "select $$costs $5$$, $q$and $12$q$, 'x'",
+    );
+    expect(withParameters("select 'a $2', $1", [7])).toBe("select 'a $2', 7");
+  });
+
+  it('keeps $2,450 as written beside a real $1', async () => {
+    const { sql, sent } = client();
+    const prose = 'The default bill is about $2,450 a month on $204,385.';
+    await sql.unsafe(`update goals.items set result = $s$${prose}$s$ where id = $1`, ['i']);
+    expect(sent[0].query).toBe(`update goals.items set result = $s$${prose}$s$ where id = 'i'`);
+    await sql.unsafe(`update goals.items set result = '${prose}' where id = $1`, ['i']);
+    expect(sent[1].query).toBe(`update goals.items set result = '${prose}' where id = 'i'`);
+    await sql.unsafe(`update goals.items set result = $s$${prose}$s$`);
+    expect(sent[2].query).toBe(`update goals.items set result = $s$${prose}$s$`);
+    expect(withParameters(String.raw`select E'it\'s $2,450', $1`, ['x'])).toBe(
+      String.raw`select E'it\'s $2,450', 'x'`,
+    );
+    expect(withParameters('select "col $2" -- costs $3\n, $1 /* $4 */', [9])).toBe(
+      'select "col $2" -- costs $3\n, 9 /* $4 */',
+    );
+    expect(withParameters("select date'2026-11-03', $1", [1])).toBe("select date'2026-11-03', 1");
+  });
+
   it('tells a write from a read by its own words, not its values', () => {
     expect(returnsRows('update plan_items set status = _ where id = _')).toBe(false);
     expect(returnsRows('update plan_items set status = _ returning number')).toBe(true);

@@ -7,6 +7,7 @@ import type { SpecDoc } from '@/lib/specs/registry';
 import type { MailSearchInput, MailSearchResult } from '@/lib/inbox/search-mail';
 import type { MailReadInput, MailReadResult } from '@/lib/inbox/read-mail';
 import type { JobBoardResult } from './job-board';
+import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-lookup';
 
 /**
  * What Dash's lookups read with and hand back (plan #1088). No client and no
@@ -70,6 +71,12 @@ export type AskContext = {
    * read_job_board says so.
    */
   readJobBoard?: (url: string) => Promise<JobBoardResult>;
+  /**
+   * Looks places up near home on Google Places (lib/you/places-lookup.ts,
+   * bound to the person, plan #2987.3). Absent where places cannot be looked
+   * up, such as the connector, and then find_places says so.
+   */
+  findPlaces?: (input: PlacesLookupInput) => Promise<PlacesLookupResult>;
 };
 
 /**

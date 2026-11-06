@@ -1,4 +1,4 @@
-import type { ReviewRow } from './load';
+import { REVIEW_VIEWS, type ReviewCounts, type ReviewRow, type ReviewView } from './load';
 
 /** The key a row is selected by: unique across the three kinds in one queue. */
 export function reviewRowKey(row: Pick<ReviewRow, 'kind' | 'id'>): string {
@@ -12,20 +12,38 @@ export function reviewRowLabel(row: ReviewRow): string {
   return row.summary?.trim() || `${row.eventKind} at ${row.companyName}`;
 }
 
-/** How many review items the Jobs Inbox lists before it opens the rest in Review. */
-export const INBOX_REVIEW_LIMIT = 5;
+/** Which kind of row each narrowed view of the queue keeps. */
+const VIEW_KIND: Record<Exclude<ReviewView, 'all'>, ReviewRow['kind']> = {
+  messages: 'message',
+  applications: 'application',
+  events: 'event',
+};
+
+export type ReviewViewShown = { id: ReviewView; label: string; count: number };
 
 /**
- * The head of the review queue the Jobs Inbox lists (plan #2502.2), and how
- * many it leaves for Review. `total` is the queue's own count, so the rest
- * is right even when the loader hands over fewer rows than it counted.
+ * The views the Jobs Inbox offers over its imports to check (plan
+ * #1496.7.3), with their counts: All, then each kind that has something
+ * waiting. None when every item is one kind, since narrowing would change
+ * nothing.
  */
-export function inboxReviewHead<T>(
-  rows: readonly T[],
-  total: number,
-): { shown: T[]; rest: number } {
-  const shown = rows.slice(0, INBOX_REVIEW_LIMIT);
-  return { shown, rest: Math.max(total - shown.length, 0) };
+export function reviewViewsShown(counts: ReviewCounts): ReviewViewShown[] {
+  const views: ReviewViewShown[] = REVIEW_VIEWS.map((view) => ({ id: view.id, label: view.label, count: counts[view.id] }));
+  const kinds = views.filter((view) => view.id !== 'all' && view.count > 0);
+  return kinds.length > 1 ? views.filter((view) => view.id === 'all' || view.count > 0) : [];
+}
+
+/**
+ * The view the Inbox draws: the one asked for when it is offered, else All,
+ * so an address naming a kind with nothing waiting still lists everything.
+ */
+export function reviewViewIn(view: ReviewView, counts: ReviewCounts): ReviewView {
+  return reviewViewsShown(counts).some((shown) => shown.id === view) ? view : 'all';
+}
+
+/** The rows a view keeps, in the queue's order. */
+export function reviewRowsInView<T extends Pick<ReviewRow, 'kind'>>(rows: readonly T[], view: ReviewView): T[] {
+  return view === 'all' ? [...rows] : rows.filter((row) => row.kind === VIEW_KIND[view]);
 }
 
 /**

@@ -31,7 +31,13 @@ import { rateAnswer, type AnswerRating, type RateAnswerOutcome } from './rate-an
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { isOwner } from '@/lib/dev/owner';
-import { goalsRoutine } from '@/lib/feedback/routine';
+import { brokerRoutine, goalsRoutine } from '@/lib/feedback/routine';
+import { startSessionThread } from '@/lib/core/session-threads';
+import { wakeBroker } from '@/lib/threads/broker-wake';
+import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
+import { THINK_FALLBACK } from './thought';
+import { askTitle } from './talk';
+import { chatAsMessage } from './chat-to-session';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
@@ -39,17 +45,36 @@ import { createTask } from '@/lib/todo/tasks/write';
 import { fileVaultNote, sessionInboxPorts, undoVaultCapture } from '@/lib/capture/vault';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readJobBoard } from '@/lib/jobs/discover/read-board';
+import { lookUpPlaces } from '@/lib/you/places-lookup';
+import { createYouClient } from '@/lib/you/auth/server';
 import { readMail } from '@/lib/inbox/read-mail';
-import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
-import { handoffBrief } from './handoff';
-import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
-import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import type { SessionHandoffInput } from './handoff';
+import { fireSessionHandoff } from './handoff-fire';
+import {
+  askHandoffOf,
+  attachHandoffs,
+  discardHandoffs,
+  handoffStatusOf,
+  keepSessionHandoff,
+  loadOpenHandoffs,
+  type SessionHandoff,
+} from './handoffs';
+import { canHandToSession } from './session-handoff-store';
+import { botPasser } from './hand-to-bot-store';
+import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
+import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
+import { keepSlip } from '@/lib/dash/slips';
+import { codeDeps } from '@/lib/dash/think-code';
+import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { ThreadDash } from '@/lib/dash/thread';
+import type { PeopleDash } from '@/lib/you/people-actions';
 import {
   attachProposals,
   discardProposals,
   insertMadeChange,
+  insertPeopleChange,
+  insertPeopleProposal,
   insertProposal,
   insertThreadProposal,
   loadChanges,
@@ -76,6 +101,8 @@ import { RECALL_OPERATION } from '@/lib/memory/search';
 import type { TalkCitation, TalkTurn } from './talk';
 import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
+import { markAnswered, markAnswering, markFailed, readReply, requestStop, stopRequested } from './reply-state-store';
+import { replyStateOf, type ReplyState } from './reply-state';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -116,6 +143,10 @@ export async function askDashInRequest(input: {
   mentions?: readonly AskMention[];
   /** The workspace the lookups are kept to, already checked; null for every one. */
   scope?: ModuleId | null;
+  /** "Think it through" was on (plan #2789.10). */
+  think?: boolean;
+  /** Try again (plan #2854.4): answer the chat's last question, which has none, instead of adding one. */
+  retry?: boolean;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -131,18 +162,62 @@ export async function askDashInRequest(input: {
   const asked = where ? await pageFor(ctx, where) : null;
   const page = asked && list ? { ...asked, list } : asked;
   // Dash is offered the hand-off only when the backup routine can be started.
-  const backup = dashBackupRoutine();
-  const canHandOff = Boolean(backup.id && backup.token);
+  const canHandOff = canHandToSession();
+  // The session rows this answer kept, so each is started from its own row.
+  const keptSessions = new Map<string, SessionHandoff>();
   // A question kept to one workspace (plan #1899.5) looks only there: its
   // lookups run as though that were the only workspace switched on, and
   // one outside it is refused. Writes and the page keep the full context.
-  const scope = input.scope && settings.enabledModules.includes(input.scope) ? input.scope : null;
+  // Try again asks with the switches the failed answer was asked with
+  // (plan #2937.2): a reload leaves Think it through off and no workspace
+  // picked, and the question deserves the same answer it was asked for.
+  const before = input.retry && input.conversationRef ? await lastFailureSwitches(core, user.id, input.conversationRef) : null;
+  const think = Boolean(input.think || before?.think);
+  const asScope = input.scope ?? (before?.scope as ModuleId | null | undefined) ?? null;
+  const scope = asScope && settings.enabledModules.includes(asScope) ? asScope : null;
   const lookIn = scope ? { ...ctx, enabledModules: [scope] } : ctx;
+  // Think it through goes to a session thread on this app (plan #2789.11)
+  // when the broker can be woken. Sessions work on the owner's repository and
+  // the broker reads the owner's threads alone, so another account is
+  // answered here as before, with nothing said.
+  const sessions = think ? await thinkInSession(core, user.id, input.question) : null;
+  // Passing a request to a bot on People (plan #3003.2), for the owner alone, as People offers it.
+  const passToBot = (await isOwner()) ? botPasser(await createYouClient(), core, user.id) : null;
 
-  return askDash(
+  // Where the reply stands is kept on the chat (plan #2854.4), so a thread
+  // opened after the page that asked has gone shows Dash still writing, or
+  // the reply failed with Try again. Stop is read from the chat too: leaving
+  // the page no longer ends the answer, and Stop may reach another function.
+  const stopping = new AbortController();
+  if (input.signal?.aborted) stopping.abort();
+  else input.signal?.addEventListener('abort', () => stopping.abort(), { once: true });
+  let started: Promise<{ ref: string; at: string } | null> = Promise.resolve(null);
+  let watch: ReturnType<typeof setInterval> | null = null;
+  const onAsked: NonNullable<typeof input.onAsked> = (asked) => {
+    const ref = asked.conversation.ref;
+    started = markAnswering(core, user.id, ref).then(
+      (at) => ({ ref, at }),
+      (error: unknown) => {
+        console.error('the reply was not marked as being written', error);
+        return null;
+      },
+    );
+    void started.then((mark) => {
+      if (!mark || stopping.signal.aborted) return;
+      watch = setInterval(() => {
+        void stopRequested(core, user.id, ref, mark.at).then((stop) => {
+          if (stop) stopping.abort();
+        });
+      }, STOP_POLL_MS);
+    });
+    input.onAsked?.(asked);
+  };
+
+  const result = await askDash(
     {
       question: input.question,
       conversationRef: input.conversationRef,
+      retry: input.retry,
       files: input.files,
       page,
       today,
@@ -153,7 +228,7 @@ export async function askDashInRequest(input: {
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       // A write runs as the person, through their own clients (plan #1440).
-      write: (tool, args, seen) =>
+      write: (tool, args, seen, conversationId) =>
         tool.apply(
           {
             ...ctx,
@@ -162,6 +237,8 @@ export async function askDashInRequest(input: {
             createTask,
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
+            origin: { kind: 'ask_dash', ref: conversationId },
+            slipWhere: { surface: 'ask', conversation: `ask:${conversationId}`, href: `/chat/dash/${conversationId}` },
           },
           args,
         ),
@@ -171,11 +248,14 @@ export async function askDashInRequest(input: {
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
       onText: input.onText,
-      onAsked: input.onAsked,
-      signal: input.signal,
+      onAsked,
+      signal: stopping.signal,
       mentions: mentionCitations(input.mentions ?? []),
       scope,
       model: await choosing,
+      // The code is read as the owner, as Dev is (plan #2789.10).
+      think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
+      thinkFallback: sessions?.fallback ?? null,
     },
     {
       start: (question) => startAsk(core, user.id, question),
@@ -185,6 +265,10 @@ export async function askDashInRequest(input: {
       readFiles: (turnId) => readTurnFiles(core, turnId),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
+      recordFailure: (failure) => keepFailure(core, user.id, failure),
+      recordSlip: (slip) => keepSlip(core, user.id, slip),
+      ...(sessions?.toSession ? { toSession: sessions.toSession } : {}),
+      ...(passToBot ? { passToBot } : {}),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
@@ -194,7 +278,7 @@ export async function askDashInRequest(input: {
           const supabase = await createClient();
           const { error } = await supabase
             .from('feedback_items')
-            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/chat/dash/${conversationRef}` });
           if (error) console.error('the gap note was not filed', error.message);
         } catch (error) {
           console.error('the gap note was not filed', error);
@@ -202,24 +286,73 @@ export async function askDashInRequest(input: {
       },
       ...(canHandOff
         ? {
-            saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>
-              insertHandoff(core, user.id, conversationId, request, subjectRef),
+            // One session row per question (plan #3005.2), read as Ask's hand-off.
+            saveHandoff: async (handoff: SessionHandoffInput) => {
+              const kept = await keepSessionHandoff(core, user.id, handoff);
+              if (!kept.ok) return kept;
+              keptSessions.set(kept.handoff.id, kept.handoff);
+              return { ok: true as const, handoff: askHandoffOf(kept.handoff), created: kept.created };
+            },
             attachHandoffs: (ids: readonly string[], turnId: string) => attachHandoffs(core, ids, turnId),
             discardHandoffs: (ids: readonly string[]) => discardHandoffs(core, ids),
+            // Started as People's are, with the session brief (plan #3005.3).
             fireHandoff: async (handoff) => {
-              const fired = await fireFeatureRoutine({
-                apiKey: backup.token,
-                routineId: backup.id,
-                text: handoffBrief(handoff, user.id),
-              });
-              const status = await markHandoffFired(core, handoff.id, fired);
-              return fired.ok ? { status } : { status, error: fired.error };
+              const kept = keptSessions.get(handoff.id);
+              if (!kept) return { status: 'failed' as const, error: 'the request was not found to pass on.' };
+              const started = await fireSessionHandoff(core, user.id, kept);
+              const status = handoffStatusOf(started.state);
+              return started.error ? { status, error: started.error } : { status };
             },
           }
         : {}),
     },
   );
+  if (watch) clearInterval(watch);
+  const mark = await started;
+  if (mark) {
+    try {
+      if (result.error) await markFailed(core, user.id, mark.ref, result.error);
+      else await markAnswered(core, user.id, mark.ref);
+    } catch (error) {
+      console.error('where the reply stands was not kept', error);
+    }
+  }
+  return result;
 }
+
+/**
+ * How a thought-through question reaches a session thread (plan #2789.11):
+ * the store that starts the thread and wakes the broker, or why it is
+ * answered here instead. Null for an account that is not the owner's.
+ */
+async function thinkInSession(
+  core: CoreSupabaseClient,
+  userId: string,
+  question: string,
+): Promise<{ toSession?: NonNullable<AskStores['toSession']>; fallback?: string } | null> {
+  if (!(await isOwner())) return null;
+  const routine = brokerRoutine();
+  // wakeBroker never fires without both, so the thread would sit unanswered.
+  if (!routine.id || !routine.token) return { fallback: THINK_FALLBACK.noBroker };
+  return {
+    toSession: async (conversation) => {
+      const text = chatAsMessage(conversation, { think: true });
+      if (!text) return { ok: false, error: 'The chat had no words to send.' };
+      const { id } = await startSessionThread(
+        core,
+        userId,
+        { projectId: null, text, file: null, mode: 'think', title: askTitle(question) || question },
+        [],
+      );
+      const woken = await wakeBroker({ core: createCoreServiceSupabase(), userId, threadId: id, routine });
+      if (!woken.ok) console.error('the session broker was not woken for a thought-through question', woken.error);
+      return { ok: true, threadId: id };
+    },
+  };
+}
+
+/** How often a reply being written checks whether Stop was pressed (plan #2854.4). */
+const STOP_POLL_MS = 1_000;
 
 /** The rows added with @ as the question keeps them: an answer's citation shape, by search's tables. */
 export function mentionCitations(mentions: readonly AskMention[]): TalkCitation[] {
@@ -256,6 +389,8 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a thread is answered on the page it was asked on.
+          origin: { kind: 'goal_page', ref: null },
           thread: acts,
         },
         args,
@@ -263,6 +398,46 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
     queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
     saveProposal: (change, cause) => insertThreadProposal(core, userId, cause, change),
+    recordFailure: (failure) => keepFailure(core, userId, failure),
+  };
+}
+
+/**
+ * What the people on People act with (plan #2854.2): Ask's lookups, writes,
+ * proposals and paid presses as the signed-in person, each kept in
+ * core.dash_actions naming the person on People who made it and the thread.
+ * Only inside a request, or `after` one, while its cookies are still read.
+ */
+export async function peopleDashInRequest(userId: string): Promise<PeopleDash & Pick<ThreadDash, 'today' | 'execute'>> {
+  const [settings, core] = await Promise.all([loadAccountSettings(userId), createCoreClient()]);
+  const ctx = askContext(userId, settings);
+  return {
+    today: todayInTimezone(settings.timezone),
+    execute: (name, args) => executeAskTool(name, args, ctx),
+    apply: (tool, args, seen, cause) =>
+      tool.apply(
+        {
+          ...ctx,
+          seen,
+          goals: (history) => createGoalsClient(history),
+          createTask,
+          quickNotePorts: () => sessionInboxPorts(userId),
+          goalRoutine: goalRoutineInRequest,
+          // A question handed to a goal from a People thread is answered from Chat.
+          origin: { kind: 'chat', ref: null },
+          slipWhere: {
+            surface: 'people',
+            conversation: cause ? `people:${cause.chatId}` : null,
+            href: cause?.href ?? null,
+          },
+        },
+        args,
+      ),
+    recordSlip: (slip) => keepSlip(core, userId, slip),
+    saveChange: (made, cause) => insertPeopleChange(core, userId, cause, made),
+    propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
+    queue: (tool, args, seen) => queuePaidPress(tool, args, { ...ctx, seen }, paidEstimator(core, userId)),
+    saveProposal: (change, cause) => insertPeopleProposal(core, userId, cause, change),
   };
 }
 
@@ -319,6 +494,9 @@ function askContext(
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
     readMail: async (message) => readMail(await createCoreClient(), userId, message),
     readJobBoard,
+    // Google Places near home, under the app's daily cap (plan #2987.3).
+    findPlaces: async (search) =>
+      lookUpPlaces({ you: await createYouClient(), core: await createCoreClient(), userId }, search),
   };
 }
 
@@ -553,4 +731,24 @@ export async function rateAskAnswer(
     rating,
     note,
   );
+}
+
+/**
+ * Stop pressed on the reply being written in one of the person's chats (plan
+ * #2854.4). The run writing it reads the mark within a second and keeps what
+ * it had written; false when nothing was being written.
+ */
+export async function stopAskReply(ref: string): Promise<boolean> {
+  const user = await requireUser();
+  return requestStop(await createCoreClient(), user.id, ref);
+}
+
+/**
+ * Where the reply to a chat's last question stands (plan #2854.4), given its
+ * turns as just read: still being written, failed, or nothing waiting.
+ */
+export async function loadAskReply(ref: string, turns: readonly TalkTurn[]): Promise<ReplyState> {
+  const user = await requireUser();
+  const row = await readReply(await createCoreClient(), user.id, ref);
+  return replyStateOf(row, turns.at(-1)?.role ?? null, Date.now());
 }

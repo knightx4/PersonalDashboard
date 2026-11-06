@@ -22,6 +22,7 @@
  */
 
 import { HAIKU, HAIKU_4_5, HAIKU_4_5_DATED, OPUS, OPUS_5, SONNET, SONNET_5 } from '@/lib/core/models';
+import { FISH_S2_1_PRO } from '@/lib/talk/speech/budget';
 
 /** Dollars per million tokens, which is also micro-dollars per token. */
 export type ModelPrice = {
@@ -36,8 +37,18 @@ export type ModelPrice = {
    * the prompt (input, cache reads and cache writes together) is over
    * `aboveTokens`. Haiku 5.5 is the one model priced this way.
    */
-  longPrompt?: { aboveTokens: number } & Omit<ModelPrice, 'longPrompt'>;
+  longPrompt?: { aboveTokens: number } & Omit<ModelPrice, 'longPrompt' | 'perCall'>;
+  /**
+   * Micro-dollars a request costs whatever it carries, for an API billed per
+   * call rather than per token: Google Places and Geocoding. One ledger row
+   * is one call, so each row is charged this once.
+   */
+  perCall?: number;
 };
+
+/** The ledger's model names for the two Google Maps calls the places lookup makes. */
+export const GOOGLE_PLACES_TEXT_SEARCH = 'google-places-text-search';
+export const GOOGLE_GEOCODING = 'google-geocoding';
 
 /**
  * The published rates, as of the last time this file was touched.
@@ -81,6 +92,20 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   // fact about the call. Only the pinned version is listed; a call answered
   // by a newer one records its tokens unpriced until its rate is added here.
   'jev-1.13.0': { input: 0.042, cachedInput: 0, cacheWrite: 0, output: 0 },
+
+  // Fish Audio's S2.1 Pro text to speech (plan #3006), billed $15 per million
+  // UTF-8 bytes of text. The ledger keeps the bytes in the input column, so
+  // the input rate is the byte rate; there is no output or cache to charge.
+  [FISH_S2_1_PRO]: { input: 15, cachedInput: 0, cacheWrite: 0, output: 0 },
+
+  // Google Maps Platform, billed per request with no tokens (plan #2987.2).
+  // The list price before the free tier, as Voyage's is above: the monthly
+  // free calls are not modelled, so the ledger reads high until they run out.
+  // Text Search asking for rating, price level and opening hours is the
+  // Enterprise SKU, $35 per thousand.
+  [GOOGLE_PLACES_TEXT_SEARCH]: { input: 0, cachedInput: 0, cacheWrite: 0, output: 0, perCall: 35_000 },
+  // Geocoding, $5 per thousand.
+  [GOOGLE_GEOCODING]: { input: 0, cachedInput: 0, cacheWrite: 0, output: 0, perCall: 5_000 },
 };
 
 /**
@@ -144,7 +169,9 @@ export function costMicrosFor(model: string, usage: TokenUsage): number | null {
     usage.cacheWriteTokens * price.cacheWrite +
     usage.outputTokens * price.output;
   const micros =
-    tokens * (usage.batch ? BATCH_TOKEN_RATE : 1) + (usage.webSearchRequests ?? 0) * WEB_SEARCH_MICROS;
+    tokens * (usage.batch ? BATCH_TOKEN_RATE : 1) +
+    (usage.webSearchRequests ?? 0) * WEB_SEARCH_MICROS +
+    (card.perCall ?? 0);
 
   return Math.round(micros);
 }

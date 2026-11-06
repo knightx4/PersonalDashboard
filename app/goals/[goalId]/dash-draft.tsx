@@ -70,6 +70,9 @@ export function DashDraft({
   files = [],
   readId = null,
   inset,
+  defaultOpen = false,
+  summary = true,
+  aside = false,
 }: {
   /** "Dash’s draft" on a step of yours, "Dash found" on Dash's own. */
   label: string;
@@ -79,6 +82,15 @@ export function DashDraft({
   /** The Dash step to mark read when this is opened, while its result is unread. */
   readId?: string | null;
   inset: React.CSSProperties;
+  /** Start open. A seam for the gallery; nothing in the app passes it. */
+  defaultOpen?: boolean;
+  /** Follow the label with the draft's first sentence; the Plan tab's cards show the label alone. */
+  summary?: boolean;
+  /**
+   * Drawn as an aside inside a step's card (the Plan tab): the label a small
+   * semibold one in the goal's colour, the text the muted 13px of an aside.
+   */
+  aside?: boolean;
 }) {
   const marked = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +99,7 @@ export function DashDraft({
   return (
     <li style={inset} className="pb-1.5 pr-3">
       <Disclosure
+        defaultOpen={defaultOpen}
         summaryClassName="items-baseline py-0.5 text-small"
         bodyClassName="mt-1.5 space-y-2 pl-5"
         onToggle={(open) => {
@@ -101,16 +114,16 @@ export function DashDraft({
         }}
         title={
           <span className="font-normal break-words text-ink-muted">
-            <span className="font-medium text-ink">
+            <span className={aside ? 'font-semibold text-accent' : 'font-medium text-ink'}>
               <DashCredit />
               {label}
             </span>
             {readId && <span className="text-accent"> · new</span>}
-            {fact && <span>: {fact}</span>}
+            {summary && fact && <span>: {fact}</span>}
           </span>
         }
       >
-        {markdown && <FileBody markdown={markdown} compact />}
+        {markdown && <FileBody markdown={markdown} compact={!aside} aside={aside} />}
         {files.length > 0 && <FileLinks files={files} />}
         <div className="flex flex-wrap items-center gap-2">
           {markdown && <CopyButton text={markdown} />}

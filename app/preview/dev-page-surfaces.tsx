@@ -1,3 +1,5 @@
+import { StatusGrid } from '@/components/dev/status-grid';
+import type { ScopeStatuses } from '@/lib/plan/scope-status';
 import { PageHeader } from '@/components/shell/page-header';
 import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
@@ -24,6 +26,8 @@ import type { DigestNight } from '@/lib/digest/night';
 import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
+import { BotHandoffsPanel } from '@/app/dev/raised/bot-handoffs-panel';
+import type { FlaggedLine } from '@/lib/talk/bot-handoff-flags';
 import { AccountView } from '@/app/account/view';
 import { FinishNoticeRow } from '@/app/account/notifications';
 import { Banner } from '@/components/ui/banner';
@@ -921,6 +925,55 @@ const conversations: Conversation[] = [
 
 const NOW = Date.parse('2026-10-06T08:00:00Z');
 
+const STATUS_FIXTURE: ScopeStatuses = {
+  everything: { state: 'ready', count: 112 },
+  scopes: [
+    { scope: 'jobs', label: 'Jobs', project: null, state: 'ready', count: 3 },
+    { scope: 'learn', label: 'Learn', project: null, state: 'waiting', count: 0 },
+    { scope: 'goals', label: 'Goals', project: null, state: 'empty', count: 0 },
+    { scope: 'dev', label: 'Dev', project: null, state: 'ready', count: 14 },
+    { scope: 'studio', label: 'Studio, a project with the longest name there is', project: null, state: 'waiting', count: 0 },
+  ],
+};
+
+/** Bot hand-offs the watch flagged (plan #3003.4): one never picked up, one started, one Ask Dash refused. */
+const FLAGGED_HANDOFFS: FlaggedLine[] = [
+  {
+    id: 'bh1',
+    request:
+      'Tell Bob to build the voice chat update this way: Fish Audio for the voices, ElevenLabs only as the fallback, and keep the per-minute cost under what we pay today',
+    route: 'Zena to Bob',
+    why: "Bob didn't pick it up within 10 minutes.",
+    at: '2026-10-06T07:40:00Z',
+    threadHref: '/chat/people/zena',
+    receiverHref: null,
+    receiverName: 'Bob',
+    canResend: true,
+  },
+  {
+    id: 'bh2',
+    request: 'Hand this to Maya so she can add it to the March budget',
+    route: 'Dash to Maya',
+    why: "Maya started but didn't finish within 10 minutes.",
+    at: '2026-10-06T05:15:00Z',
+    threadHref: '/chat/dash/c1',
+    receiverHref: '/chat/people/maya',
+    receiverName: 'Maya',
+    canResend: false,
+  },
+  {
+    id: 'bh3',
+    request: 'Pass the shortlist to Dash',
+    route: 'Zena to Dash',
+    why: 'Ask Dash does not take requests from the bots yet.',
+    at: '2026-10-05T18:00:00Z',
+    threadHref: '/chat/groups/g1',
+    receiverHref: null,
+    receiverName: 'Dash',
+    canResend: false,
+  },
+];
+
 export function DevRaisedSurface() {
   return column(
     <>
@@ -944,9 +997,27 @@ export function DevRaisedSurface() {
             migrationsError: null,
           }}
           inbox={3}
+          slips={{ count: 3, newestHref: '/chat/people/builder' }}
+          sessions={{ working: 2, waiting: 1 }}
         />
         <AskBox />
       </div>
+      <BotHandoffsPanel lines={FLAGGED_HANDOFFS} now={NOW} timeZone="UTC" />
+      {/* The runner's card, moved here from /dev/plan (plan #578.12): resting,
+          with work ready and the features the next ticks would fire. */}
+      <OvernightControl
+        run={null}
+        canSend
+        night={null}
+        push={null}
+        ready={3}
+        readySteps={7}
+        next={[
+          { ref: '#1700', title: 'Four Dashes on the runner card, one for each thing it can run at once' },
+          { ref: '#1688', title: 'Returns list on Shopping' },
+        ]}
+      />
+      <StatusGrid statuses={STATUS_FIXTURE} />
       <CheckBacksPanel
         now={NOW}
         rows={[
@@ -1148,7 +1219,7 @@ function minutesAgo(minutes: number): string {
 }
 
 /**
- * The runner card on /dev/plan in the two states the person asked to see: a
+ * The runner card on Home in the two states the person asked to see: a
  * night running with two feature sessions, a goal run and one slot asleep
  * with the tick's reason, and the runner off with all four Dashes idle. The
  * longest titles the plan has had, so the lines are seen cut.

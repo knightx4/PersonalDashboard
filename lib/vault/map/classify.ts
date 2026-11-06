@@ -2,11 +2,11 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import { readReport, reportRequest } from '@/lib/core/model-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { askJev } from '@/lib/jev/client';
 import { decideWithJev } from '@/lib/jev/decide';
 import { sampleFor } from '@/lib/learn/vault/classify-payload';
-import { forceTool } from '@/lib/learn/graph/tool-call';
 import {
   MAP_CLASS_QUESTION,
   MAP_EVIDENCE_QUESTION,
@@ -79,32 +79,27 @@ export function haikuForMap(client: Anthropic): MapHaiku {
       model: MODEL,
       max_tokens: 300,
       system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Say what kind of note this is.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              class: { type: 'string', enum: ['knowledge', 'mixed', 'operational'] },
-              is_evidence: { type: 'boolean' },
-              reason: { type: 'string' },
-            },
-            required: ['class', 'is_evidence', 'reason'],
+      ...reportRequest({
+        name: TOOL_NAME,
+        description: 'Say what kind of note this is.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            class: { type: 'string', enum: ['knowledge', 'mixed', 'operational'] },
+            is_evidence: { type: 'boolean' },
+            reason: { type: 'string' },
           },
+          required: ['class', 'is_evidence', 'reason'],
         },
-      ],
-      tool_choice: forceTool(TOOL_NAME, MODEL),
+      }, MODEL),
       messages: [{ role: 'user', content: [`Title: ${title}`, '', sampleFor(body)].join('\n') }],
     });
 
     onSpend?.({ model: MODEL, usage: usageFrom(response.usage) });
 
-    const block = response.content.find(
-      (part) => part.type === 'tool_use' && part.name === TOOL_NAME,
-    );
+    const block = readReport(response, TOOL_NAME, MODEL);
     const parsed =
-      block && block.type === 'tool_use' ? mapClassifySchema.safeParse(block.input) : null;
+      block.ok ? mapClassifySchema.safeParse(block.value) : null;
     return parsed?.success ? parsed.data : null;
   };
 }
