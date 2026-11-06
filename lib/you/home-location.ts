@@ -11,7 +11,7 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
  * Only the address goes to Google: the request carries the address and the
  * key, nothing about the person or the chat that asked.
  *
- * With GOOGLE_MAPS_API_KEY unset, a home that still needs geocoding comes
+ * With GOOGLE_API_KEY unset, a home that still needs geocoding comes
  * back as { status: 'not_set_up' } and nothing is sent or written.
  */
 
@@ -33,7 +33,7 @@ export type HomeLocation =
   | { status: 'ok'; lat: number; lng: number; address: string; geocoded: boolean }
   /** No mailing address on Details. */
   | { status: 'no_address' }
-  /** GOOGLE_MAPS_API_KEY is not set, and the point needs making. */
+  /** GOOGLE_API_KEY is not set, and the point needs making. */
   | { status: 'not_set_up' }
   /** Google found nothing for this address; asked once, not again until it changes. */
   | { status: 'not_found'; address: string }
@@ -67,9 +67,9 @@ export function storedHome(row: HomeRow | null | undefined): HomeLocation | null
   return { status: 'not_found', address };
 }
 
-/** The key, or null when it is not set. */
+/** GOOGLE_API_KEY, or the older GOOGLE_MAPS_API_KEY when that is unset; null when neither is set. */
 export function mapsApiKey(env: Record<string, string | undefined> = process.env): string | null {
-  return env.GOOGLE_MAPS_API_KEY?.trim() || null;
+  return env.GOOGLE_API_KEY?.trim() || env.GOOGLE_MAPS_API_KEY?.trim() || null;
 }
 
 type GeocodeOutcome =
@@ -124,7 +124,7 @@ export async function geocodeAddress(
 }
 
 export type EnsureHomeOptions = {
-  /** Defaults to GOOGLE_MAPS_API_KEY. */
+  /** Defaults to GOOGLE_API_KEY. */
   apiKey?: string | null;
   fetcher?: typeof fetch;
   now?: () => Date;
