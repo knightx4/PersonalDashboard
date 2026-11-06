@@ -778,6 +778,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-agenda-tagged': ['/todo'],
   'todo-agenda-tagged-more': ['/todo', '/todo/all'],
   'todo-agenda-tagged-empty': ['/todo'],
+  'todo-agenda-schedule': ['/todo'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
   'home-arrival': ['/home'],
@@ -1158,6 +1159,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'todo-agenda-tagged': ['components/todo/tag-filter.tsx', 'components/todo/agenda-piles.tsx'],
   'todo-agenda-tagged-more': ['components/todo/tag-filter.tsx'],
   'todo-agenda-tagged-empty': ['components/todo/tag-filter.tsx'],
+  // The agenda's days from the one schedule (plan #3027.1).
+  'todo-agenda-schedule': ['components/todo/agenda-piles.tsx'],
   // A row's state with its tip (plan #1985.5), which every dev queue and
   // Goals draw through the same label.
   'dev-status-tips': ['components/dev/state-label.tsx'],

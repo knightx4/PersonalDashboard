@@ -1,4 +1,4 @@
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, CircleHelp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { DevComment } from '@/lib/comments/load';
 import type { AgendaPile } from '@/lib/todo/agenda/merge';
@@ -82,10 +82,34 @@ export function AgendaPiles({
                     )}
                     <span className="font-medium">{entry.label}</span>
                     {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
+                    {/* Where else the same thing is, said quietly: the
+                        schedule folded the copies into this one row. */}
+                    {entry.alsoIn && entry.alsoIn.length > 0 && (
+                      <span className="text-ink-muted">Also in {entry.alsoIn.join(' and ')}</span>
+                    )}
                     {entry.link && (
-                      <Link href={entry.link.href} className={linkVariants()}>
+                      <Link
+                        href={entry.link.href}
+                        className={cn(
+                          linkVariants(),
+                          // A hit area out to 44px round the short word, for a thumb.
+                          "relative after:absolute after:-inset-x-[9px] after:-inset-y-[13px] after:content-['']",
+                        )}
+                      >
                         {entry.link.label}
                       </Link>
+                    )}
+                    {/* Two copies disagree on the time. Both rows are kept
+                        and neither is picked: which is right is theirs. */}
+                    {entry.question && (
+                      <p className="flex basis-full items-baseline gap-1.5 text-ink">
+                        <CircleHelp
+                          className="size-3.5 shrink-0 translate-y-0.5 text-caution"
+                          strokeWidth={1.75}
+                          aria-hidden
+                        />
+                        <span>{entry.question}</span>
+                      </p>
                     )}
                   </li>
                 ))}

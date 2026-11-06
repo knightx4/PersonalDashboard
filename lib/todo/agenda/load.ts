@@ -2,18 +2,17 @@ import 'server-only';
 
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadOpenTasks } from '@/lib/todo/tasks/load';
-import { loadEventsInWindow } from '@/lib/todo/events/load';
-import { loadFeedEventsInWindow } from '@/lib/todo/feeds/load';
+import { loadSchedule } from '@/lib/todo/schedule/load';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import { loadDismissals } from '@/lib/todo/agenda/dismissals';
 import { loadAgendaSettings } from '@/lib/todo/agenda/settings';
 import { activeSources, allSources } from '@/lib/todo/agenda/registry';
-import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
+import { scheduleContext } from '@/lib/todo/agenda/schedule-context';
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
-import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
+import type { AgendaItem, DayContext, SourceContext, SourceId } from '@/lib/todo/agenda/sources';
 import type { ModuleId } from '@/lib/modules';
 import { withoutCoveredThreads } from '@/lib/todo/agenda/sources/threads';
 
@@ -92,24 +91,32 @@ export async function loadAgenda(
     (source) => !workspace || source.module === workspace || source.crossesWorkspaces,
   );
 
-  // Events are this module's own, so they are read here beside the tasks
-  // rather than through a source. A source is for an obligation another
-  // workspace owns; there is no switch to give an event and nothing to
-  // reconcile. Only from today forward: the merge drops day context dated
-  // before today, because a meeting you have been to is over, not overdue.
-  const [[items, context, failed], events, feedEvents] = await Promise.all([
-    runSources(active, ctx),
-    // An Inbox lists what is on you; a meeting in the day is not.
+  // What holds a place in the day comes from the one schedule (plan
+  // #3027.1): your events, every calendar you subscribe to, booking emails
+  // and interviews, with a thing told twice folded into one row. It reads
+  // them whatever the switches below say, since an interview is on Thursday
+  // whether or not the agenda borrows interviews, so the sources that used
+  // to give the same rows give none here. Only from today forward: the merge
+  // drops day context dated before today, because a meeting you have been
+  // to is over, not overdue. An Inbox lists what is on you, and a meeting in
+  // the day is not, so a workspace's reads none of it.
+  const [[items, context, sourcesFailed], schedule] = await Promise.all([
+    runSources(active, ctx, workspace ? new Set<SourceId>() : SCHEDULED_CONTEXT),
     workspace
-      ? Promise.resolve([])
-      : loadEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
-    // The calendars you subscribe to, read from the stored copy over the same
-    // days. An appointment somebody else scheduled is context like any other
-    // event: it is on your day and there is nothing to tick.
-    workspace
-      ? Promise.resolve([])
-      : loadFeedEventsInWindow(userId, { from: today, to: ctx.to }, account.timezone, todo),
+      ? Promise.resolve(null)
+      : loadSchedule(
+          userId,
+          { from: today, to: ctx.to },
+          {
+            clients,
+            now,
+            timezone: account.timezone,
+            enabledModules: account.enabledModules,
+            bookedOnly: true,
+          },
+        ),
   ]);
+  const failed = [...new Set([...sourcesFailed, ...(schedule?.failed ?? [])])];
 
   const links = await loadLinksForTasks(
     tasks.map((task) => task.id),
@@ -127,8 +134,7 @@ export async function loadAgenda(
       items,
       context: [
         ...context,
-        ...eventContext(events, account.timezone, today),
-        ...subscribedContext(feedEvents, account.timezone, today),
+        ...(schedule ? scheduleContext(schedule.entries, account.timezone, today) : []),
       ],
       dismissals,
       anchors,
@@ -141,16 +147,21 @@ export async function loadAgenda(
   };
 }
 
+/** The sources whose day context the schedule now gives, folded with the rest. */
+const SCHEDULED_CONTEXT = new Set<SourceId>(['appointments', 'job_interviews']);
+
 async function runSources(
   sources: ReturnType<typeof activeSources>,
   ctx: SourceContext,
+  /** Sources whose day context the schedule gives instead, so it is not read. */
+  scheduled: ReadonlySet<SourceId>,
 ): Promise<[AgendaItem[], DayContext[], string[]]> {
   const settled = await Promise.allSettled(
     sources.map(async (source) => ({
       items: (await source.fetch(ctx)).map((item) =>
         source.restore ? { ...item, restorable: true } : item,
       ),
-      context: (await source.context?.(ctx)) ?? [],
+      context: (scheduled.has(source.id) ? [] : await source.context?.(ctx)) ?? [],
     })),
   );
 
