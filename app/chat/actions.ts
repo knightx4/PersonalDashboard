@@ -32,8 +32,12 @@ import { requestOrigin } from '@/lib/auth/origin';
 import { headers } from 'next/headers';
 import { DASH_ACTIONS, DASH_CHANGE_SELECT, loadPeopleChanges, toDashChange, type DashChange } from '@/lib/talk/changes';
 import type { ChangeOutcome } from '@/lib/ask/changes';
-import { decideWatch, withWatches } from '@/lib/you/watch-decide';
-import { WATCH_DECISIONS, watchIdOf, type WatchDecision } from '@/lib/you/watch-card-model';
+import { declineWaitingWatches, decideWatch, withWatches } from '@/lib/you/watch-decide';
+import { WATCH_DECISIONS, watchIdOf, type WatchDecision, type WatchOutcome } from '@/lib/you/watch-card-model';
+import { draftAdvisorWatch, saveProposedWatch, watchAskFor, watchRow, type DraftedWatch } from '@/lib/you/advisor-watch';
+import { requestAskDb } from '@/lib/ask/clients';
+import type { AskContext } from '@/lib/ask/db';
+import { allSearchSources } from '@/lib/search/registry';
 import {
   addPerson,
   ASK_MAX,
@@ -545,6 +549,11 @@ export async function removePersonMemory(id: string): Promise<{ error: string | 
  * you wrote (lib/you/reach-out-make.ts), the brief is kept with the rule or
  * with why none could be made, and the form gets back what to show. An
  * empty brief clears it all.
+ *
+ * What no fixed watch reads (plan #3030.2), the whole brief or the parts the
+ * rule could not watch, gets a watch Dash writes itself, one more paid call,
+ * kept waiting for the person's OK and drawn on the form with Approve and
+ * Decline. New words decline any watch the old ones left waiting.
  */
 // latency: pending -- a model call; the box says Dash is setting it up
 export async function setReachOut(advisorId: string, brief: string): Promise<{ view: ReachOutView } | { error: string }> {
@@ -556,21 +565,65 @@ export async function setReachOut(advisorId: string, brief: string): Promise<{ v
   const found = await client.from('board_advisors').select('name').eq('user_id', user.id).eq('id', advisorId).eq('active', true).maybeSingle();
   if (found.error || typeof found.data?.name !== 'string') return { error: 'They are not on your list.' };
   let made: MadeReachOut | null = null;
+  let drafted: DraftedWatch | null = null;
   if (words) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot set this up.' };
     const reports: SpendReport[] = [];
     made = await makeReachOutRule({ name: found.data.name, brief: words }, { apiKey, onSpend: (report) => reports.push(report) });
-    await recordSpendReports(await createCoreClient(), user.id, { module: 'you', operation: 'make-reach-out-rule' }, reports);
+    const core = await createCoreClient();
+    await recordSpendReports(core, user.id, { module: 'you', operation: 'make-reach-out-rule' }, reports);
+    const uncovered = watchAskFor(made);
+    if (uncovered) {
+      const settings = await loadAccountSettings(user.id);
+      const ask: AskContext = {
+        userId: user.id,
+        today: todayInTimezone(settings.timezone),
+        timezone: settings.timezone,
+        enabledModules: settings.enabledModules,
+        db: requestAskDb(),
+        searchSources: allSearchSources(),
+      };
+      const watchReports: SpendReport[] = [];
+      drafted = await draftAdvisorWatch(
+        { name: found.data.name, brief: words, ...uncovered },
+        { ask, apiKey, onSpend: (report) => watchReports.push(report) },
+      );
+      await recordSpendReports(core, user.id, { module: 'you', operation: 'write-advisor-watch' }, watchReports);
+      if (!drafted.ok) console.error('reach-out: no watch written for what the rule left out', drafted.error);
+    }
   }
   try {
+    await declineWaitingWatches(client, user.id, advisorId);
     await saveReachOut(client, user.id, advisorId, words, made);
+    if (drafted?.ok) await saveProposedWatch(client, watchRow(user.id, advisorId, words, drafted));
     const view = await loadReachOutView(client, user.id, advisorId, Date.now());
     revalidatePath('/chat', 'layout');
     return { view };
   } catch (error) {
     console.error('reach-out not saved', error);
     return { error: 'What you wrote was not saved. Try again.' };
+  }
+}
+
+/**
+ * Approve or decline a watch waiting under Reaching out on a person's form
+ * (plan #3030.2), or put a declined one back from the toast's Undo. Never
+ * throws.
+ */
+// latency: pending
+export async function decidePersonWatch(watchId: string, decision: WatchDecision): Promise<WatchOutcome> {
+  await requireUser();
+  if (!UUID.test(watchId) || !(WATCH_DECISIONS as readonly string[]).includes(decision)) {
+    return { ok: false, error: 'That watch is not there any more.', watch: null };
+  }
+  try {
+    const decided = await decideWatch(await createYouClient(), watchId, decision);
+    revalidatePath('/chat', 'layout');
+    return decided;
+  } catch (error) {
+    console.error('watch decision failed', error);
+    return { ok: false, error: 'That did not go through. Check your connection and try again.', watch: null };
   }
 }
 

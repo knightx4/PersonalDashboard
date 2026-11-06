@@ -7,7 +7,7 @@ import { LISTABLE, ownerColumn, sourceWorkspace } from '@/lib/ask/list-rows';
 import { QUERY_OPS, queryRowsLookup } from '@/lib/ask/query';
 import { listableShapes, type TableShape } from '@/lib/ask/table-info';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { replyJson } from '@/lib/you/reach-out-make';
+import { replyJson, type MadeReachOut } from '@/lib/you/reach-out-make';
 import { cadenceWords } from '@/lib/you/advisor-watch-words';
 
 /**
@@ -264,8 +264,27 @@ export async function runWatchQuery(ask: AskContext, query: WatchQuery) {
   return result;
 }
 
-export function watchPrompt(input: { name: string; brief: string }): string {
-  return `The person on their list is ${input.name}.\n\nWhat they asked ${input.name} to text them about:\n${input.brief}`;
+/** What to write a watch for: the whole brief, or only the parts a fixed watch left out. */
+export type WatchAsk = { name: string; brief: string; only?: readonly string[] };
+
+export function watchPrompt(input: WatchAsk): string {
+  const asked = `The person on their list is ${input.name}.\n\nWhat they asked ${input.name} to text them about:\n${input.brief}`;
+  if (!input.only?.length) return asked;
+  return `${asked}\n\nA fixed watch already covers the rest. Write the watch for this part only:\n${input.only.map((part) => `- ${part}`).join('\n')}\nWhen these need more than one table, write it for the first one a table holds.`;
+}
+
+/**
+ * What a reach-out brief leaves for a watch Dash writes itself (plan
+ * #3030.2): all of it when the rule was refused because nothing in it is in
+ * a table a fixed watch reads, the parts it could not watch when the rule
+ * covered the rest, and nothing when the rule covered it all or was refused
+ * for another reason.
+ */
+export function watchAskFor(made: MadeReachOut | null): { only?: string[] } | null {
+  if (!made) return null;
+  if (!made.ok) return made.uncovered ? {} : null;
+  const parts = made.rule.cannot_watch ?? [];
+  return parts.length ? { only: parts } : null;
 }
 
 /**
@@ -274,7 +293,7 @@ export function watchPrompt(input: { name: string; brief: string }): string {
  * 'write-advisor-watch'). Never throws.
  */
 export async function draftAdvisorWatch(
-  input: { name: string; brief: string },
+  input: WatchAsk,
   options: {
     ask: AskContext;
     apiKey?: string;

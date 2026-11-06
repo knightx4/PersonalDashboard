@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DashChange } from '@/lib/talk/changes';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
-import { decideWatch, withWatches } from './watch-decide';
+import { declineWaitingWatches, decideWatch, readWaitingWatches, withWatches } from './watch-decide';
 import { cadenceWords, matchedWords, watchCardFrom, watchIdOf, watchRhythm } from './watch-card-model';
 
 type Row = Record<string, unknown>;
@@ -50,6 +50,18 @@ function fakeYou(rows: Row[]) {
             updates.push(patch);
           }
           return Promise.resolve({ data: found, error: null });
+        },
+        order: () => chain,
+        limit: () => Promise.resolve({ data: matching(), error: null }),
+        // An update awaited with no row asked back: every matching row takes the patch.
+        then: (resolve: (value: { error: null }) => void) => {
+          for (const found of matching()) {
+            if (patch) {
+              Object.assign(found, patch);
+              updates.push(patch);
+            }
+          }
+          resolve({ error: null });
         },
       };
       return chain;
@@ -142,5 +154,32 @@ describe('decideWatch', () => {
   it('says so when the watch was taken back', async () => {
     const { you } = fakeYou([]);
     expect(await decideWatch(you, 'w1', 'approve')).toMatchObject({ ok: false, watch: null });
+  });
+});
+
+describe('the watches waiting on a person form (plan #3030.2)', () => {
+  const ME = 'u1';
+  const NEWT = 'a1';
+  const rows = (): Row[] => [
+    { ...WATCH, id: 'w1', user_id: ME, advisor_id: NEWT },
+    { ...WATCH, id: 'w2', user_id: ME, advisor_id: NEWT, status: 'active' },
+    { ...WATCH, id: 'w3', user_id: ME, advisor_id: 'a2' },
+  ];
+
+  it('reads only the proposed watches for that person', async () => {
+    const { you } = fakeYou(rows());
+    expect((await readWaitingWatches(you, ME, NEWT)).map((w) => w.id)).toEqual(['w1']);
+  });
+
+  it('declines what new words replace and leaves running watches alone', async () => {
+    const all = rows();
+    const { you } = fakeYou(all);
+    await declineWaitingWatches(you, ME, NEWT, '2026-11-06T10:00:00Z');
+    expect(all.map((r) => [r.id, r.status])).toEqual([
+      ['w1', 'declined'],
+      ['w2', 'active'],
+      ['w3', 'proposed'],
+    ]);
+    expect(all[0].decided_at).toBe('2026-11-06T10:00:00Z');
   });
 });

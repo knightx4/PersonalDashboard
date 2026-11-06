@@ -137,6 +137,7 @@ export const youActions: ModuleActions = {
       'Has Dash draft or redraft a persona card on the People form, one Sonnet call paid for on each press, which the person decides to make by pressing Draft (plan #2748.11).',
     ),
     setReachOut: tool('set_reach_out'),
+    decidePersonWatch: none('theirs', "Approving or declining a watch Dash wrote for someone on People is the person's word on what Dash may run for them (plan #3030.2)."),
     turnOffPersonReachOut: none(
       'theirs',
       "Turning a person's reach-out off is the person's own choice on the form; Dash clears a rule by setting an empty brief.",

@@ -18,6 +18,7 @@ import { MENTOR_PALETTE, personInitials } from '@/lib/you/chat-threads-model';
 import { uploadBotPhoto } from '@/lib/you/bot-photo-upload';
 import type { CouncilMemory } from '@/lib/you/council-model';
 import type { ReachOutView } from '@/lib/you/reach-out-card-model';
+import type { WatchDecision, WatchOutcome } from '@/lib/you/watch-card-model';
 import { ruleFor } from '@/lib/you/first-texts';
 import {
   ASK_MAX,
@@ -77,6 +78,8 @@ export type PersonFormActions = {
   /** Set it up and Turn off under Reaching out (plan #2931.3); a new bot's form has neither. */
   setReachOut?: (advisorId: string, brief: string) => Promise<{ view: ReachOutView } | { error: string }>;
   turnOffReachOut?: (advisorId: string) => Promise<{ view: ReachOutView } | { error: string }>;
+  /** Approve or decline a watch Dash wrote under Reaching out (plan #3030.2). */
+  decideWatch?: (watchId: string, decision: WatchDecision) => Promise<WatchOutcome>;
   /** Save the bot's picture after the form has uploaded it, or take it off with null (plan #2955). */
   photo?: (advisorId: string, path: string | null) => Promise<{ error: string | null }>;
   /** List Fish voices and save the bot's (plan #3006.5). */
@@ -108,6 +111,7 @@ const NO_ACTIONS: PersonFormActions = {
 const NO_REACH_OUT_ACTIONS = {
   set: async () => ({ error: 'The gallery sets up nothing.' }),
   turnOff: async () => ({ error: 'The gallery turns nothing off.' }),
+  decide: async (): Promise<WatchOutcome> => ({ ok: false, error: 'The gallery decides nothing.', watch: null }),
 };
 
 type Drafted = { card: string; ask: string | null };
@@ -143,7 +147,7 @@ export function PersonForm({
   /** For the gallery: the memory line being corrected. */
   editing?: string | null;
   /** For the gallery: open scrolled to a part further down. */
-  scrollTo?: 'card' | 'versions' | 'memory' | 'texts' | 'reach-out' | 'delete' | null;
+  scrollTo?: 'card' | 'versions' | 'memory' | 'texts' | 'reach-out' | 'reach-out-watches' | 'delete' | null;
   /** For the gallery: the confirm before the bot is deleted. */
   deleting?: boolean;
   /** For the gallery: Dash making the reach-out rule. */
@@ -340,6 +344,7 @@ export function PersonForm({
             actions={{
               set: actions.setReachOut ?? NO_REACH_OUT_ACTIONS.set,
               turnOff: actions.turnOffReachOut ?? NO_REACH_OUT_ACTIONS.turnOff,
+              decide: actions.decideWatch ?? NO_REACH_OUT_ACTIONS.decide,
             }}
             setting={settingReachOut}
           />

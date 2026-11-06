@@ -9614,6 +9614,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="reach-out-failed" />,
   },
   {
+    /* Reaching out when no fixed watch reads any of the words (plan #3030.2): in place of the refusal, the card says Dash wrote a watch of its own and shows it waiting for your OK, with what it checks, how often, what it reads, a sample text, and Approve and Decline. */
+    id: 'chat-person-edit-reach-out-watch',
+    label: 'Chat · Editing a bot, a watch Dash wrote waiting for your OK',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-watch" />,
+  },
+  {
+    /* Reaching out when the rule covers part of the words (plan #3030.2): the Set up card as before, and under it the watch Dash wrote for what the rule left out, waiting with Approve and Decline. */
+    id: 'chat-person-edit-reach-out-partly',
+    label: 'Chat · Editing a bot, a rule and a watch for what it left out',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="reach-out-partly" />,
+  },
+  {
     /* A thread whose person has a reach-out rule (plan #2931.3): under the name, when the next text is due, if there is something new. */
     id: 'chat-people-thread-next-text',
     label: 'Chat · A thread, when their next text is due',

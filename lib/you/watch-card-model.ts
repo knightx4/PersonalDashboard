@@ -35,6 +35,9 @@ export type WatchCard = {
 
 export const WATCH_TABLE = 'you.advisor_watches';
 
+/** What a press on the card comes back with: the watch as it now is, or why not (with the watch, when it is still there). */
+export type WatchOutcome = { ok: true; watch: WatchCard } | { ok: false; error: string; watch: WatchCard | null };
+
 /** The columns the card reads. */
 export const WATCH_CARD_SELECT = 'id, about, sends_when, sample, every_days, mode, tables, status, matched';
 

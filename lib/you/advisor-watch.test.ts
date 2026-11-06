@@ -14,8 +14,19 @@ vi.mock('@/lib/ask/query', async (original) => ({
   queryRowsLookup: (...args: unknown[]) => query(...args),
 }));
 
-const { cadenceWords, draftAdvisorWatch, readWatchReply, watchKey, watchReplySchema, watchRow, watchSummary, watchTableLines, WATCH_LIMITS } =
-  await import('./advisor-watch');
+const {
+  cadenceWords,
+  draftAdvisorWatch,
+  readWatchReply,
+  watchAskFor,
+  watchKey,
+  watchPrompt,
+  watchReplySchema,
+  watchRow,
+  watchSummary,
+  watchTableLines,
+  WATCH_LIMITS,
+} = await import('./advisor-watch');
 
 /**
  * The watch Dash writes when no fixed watch covers a brief (plan #3030.1.1),
@@ -190,5 +201,30 @@ describe('what is said and kept', () => {
       sends_when: SISTER.sends_when,
       matched: 3,
     });
+  });
+});
+
+describe('what a reach-out brief leaves for a watch (plan #3030.2)', () => {
+  const RULE = { watches: [{ key: 'w', source: 'insights', mode: 'each', every_days: 7 }] } as never;
+
+  it('asks for all of it when nothing was in a fixed watch, and for the parts left out when some was', () => {
+    expect(watchAskFor({ ok: false, error: 'Dash cannot watch anything you asked for: news.', uncovered: true })).toEqual({});
+    expect(watchAskFor({ ok: true, rule: { ...(RULE as object), cannot_watch: ['news about AI'] } as never, summary: 's' })).toEqual({
+      only: ['news about AI'],
+    });
+  });
+
+  it('asks for nothing when the rule covered it all, was refused for another reason, or was cleared', () => {
+    expect(watchAskFor({ ok: true, rule: RULE, summary: 's' })).toBeNull();
+    expect(watchAskFor({ ok: false, error: 'Dash is busy. Try again in a minute.' })).toBeNull();
+    expect(watchAskFor(null)).toBeNull();
+  });
+
+  it('tells the model which parts to write the watch for', () => {
+    const whole = watchPrompt({ name: 'Newt', brief: 'text me about news on AI and my weekly reading' });
+    expect(whole).not.toContain('fixed watch already covers');
+    const part = watchPrompt({ name: 'Newt', brief: 'text me about news on AI and my weekly reading', only: ['news on AI'] });
+    expect(part).toContain('A fixed watch already covers the rest');
+    expect(part).toContain('- news on AI');
   });
 });
