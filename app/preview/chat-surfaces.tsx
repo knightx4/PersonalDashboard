@@ -255,7 +255,7 @@ const UNNAMED_GROUP: GroupRow = {
 
 export const MESSAGE_GROUPS: GroupRow[] = [GROUP_ROW, UNNAMED_GROUP];
 
-type GroupState = 'thread' | 'typing' | 'new' | 'settings' | 'settings-delete';
+type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'settings' | 'settings-delete';
 
 /** A group open beside the list, in each of its states, and its settings. */
 export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
@@ -266,9 +266,18 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
   // A group just started has no name of its own, so the list and the thread both call it by its members.
   const unnamed = groupTitleOf(null, GROUP_MEMBERS.map((m) => m.name));
   const groups = MESSAGE_GROUPS.map((g) =>
-    g.id === GROUP_ID ? { ...g, unread: false, members, ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}) } : g,
+    g.id === GROUP_ID
+      ? {
+          ...g,
+          unread: false,
+          members,
+          ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}),
+          ...(state === 'reply-failed' ? { last: { role: 'person' as const, speaker: null, text: GROUP_THREAD[GROUP_THREAD.length - 1].text, at: '2026-11-03T08:50:00Z' } } : {}),
+        }
+      : g,
   );
-  const messages = state === 'new' ? [] : typing ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
+  // A burst that failed leaves your last text with no answer (plan #2988.3).
+  const messages = state === 'new' ? [] : typing || state === 'reply-failed' ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
   return (
     <ChatShell path={`/chat/groups/${GROUP_ID}`}>
       <PeopleView rows={MESSAGE_ROWS} groups={groups} current={GROUP_ID} timezone={ZONE} now={NOW} live={false}>
@@ -280,7 +289,8 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
             title={state === 'new' ? unnamed : 'Northwind offer'}
             members={members}
             former={[]}
-            page={{ messages, hasOlder: false, reactions: GROUP_REACTIONS }}
+            replyFailed={state === 'reply-failed' ? 'The group ran out of time before anyone answered.' : null}
+            page={{ messages, hasOlder: false, reactions: state === 'reply-failed' ? { g4: GROUP_REACTIONS.g4, g5: GROUP_REACTIONS.g5 } : GROUP_REACTIONS }}
             timezone={ZONE}
             now={NOW}
             live={false}

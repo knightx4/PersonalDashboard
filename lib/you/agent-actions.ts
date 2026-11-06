@@ -151,6 +151,7 @@ export const youActions: ModuleActions = {
     deleteGroupChat: none('deletes'),
     olderGroupMessages: none('page', 'Reads the page of a group before the oldest message shown; it serves the page.'),
     readGroup: none('own', "Having a group open is the person's own reading of what its bots wrote."),
+    retryGroupReply: none('own', "Asking a group to answer again after a burst failed or went quiet is the person's own press on their thread (plan #2988.3)."),
   },
   // The Council's notes, talks and memory (you 0037).
   'app/you/council/council-actions.ts': {
