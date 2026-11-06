@@ -1633,6 +1633,15 @@ function TalkThread({
       {elsewhere ? `${assistant.name} is still answering. The reply shows here when it is in.` : (waiting ?? `${assistant.name} is replying…`)}
     </p>
   );
+  // Under the last held text while the answer above is written: Dash has it.
+  const heldNote = (index: number) =>
+    answering && index === held.length - 1 ? (
+      <p className="text-small text-ink-muted">
+        {held.length > 1
+          ? `${assistant.name} answers these together once the answer above is in.`
+          : `${assistant.name} answers this once the answer above is in.`}
+      </p>
+    ) : null;
   const waitingBubble = (
     <ChatTurn
       mine={false}
@@ -1715,6 +1724,7 @@ function TalkThread({
             )}
             {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
             {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
+            {heldNote(index)}
           </ChatTurn>
         );
       })}
@@ -1792,6 +1802,7 @@ function TalkThread({
                 )}
                 {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
+                {heldNote(index)}
               </ThreadTurn>
             );
           })}
@@ -1937,7 +1948,8 @@ function TalkThread({
                     type="button"
                     size="sm"
                     variant={together && canSend ? 'secondary' : undefined}
-                    className="size-7 shrink-0 px-0 active:brightness-90"
+                    // On a phone the row has room for one: Send while words are typed, Stop once the box is empty.
+                    className={cn('size-7 shrink-0 px-0 active:brightness-90', together && canSend && 'max-sm:hidden')}
                     aria-label="Stop"
                     onClick={onStop}
                   >
