@@ -145,6 +145,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.dash_failures', reason: 'Bookkeeping for Dash answers that failed or came back unfinished: the reason, the model and each call\'s stop and tokens, for the daily health check.' },
     { table: 'core.dash_slips', reason: 'Bookkeeping for chats with Dash that refused a thin or repeated plan step or ran out of a turn\'s budget, counted on Dev Home.' },
     { table: 'core.dash_eval_runs', reason: 'Bookkeeping for the nightly Dash quality check: each run, its graded answers, the day\'s health and the Dev note it wrote.' },
+    { table: 'core.bot_handoffs', reason: 'Bookkeeping for a request one bot passed to another ("tell Bob ..."): the thread, the packet sent and what the receiver did; the person\'s words are in the chat it was asked in, and the row the receiver made is a source in its own module.' },
     { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
