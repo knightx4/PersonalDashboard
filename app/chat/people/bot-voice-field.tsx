@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AudioLines, Play, Search, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input } from '@/components/ui/field';
+import { FieldError, Input, PressLabel } from '@/components/ui/field';
 import { IconButton } from '@/components/ui/icon-button';
 import Link from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -165,7 +165,9 @@ export function BotVoiceField({
         <div className="mt-3 flex flex-col gap-3">
           <div className="relative">
             <Search aria-hidden strokeWidth={1.75} className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-ink-muted" />
+            <PressLabel htmlFor="bot-voice-search" />
             <Input
+              id="bot-voice-search"
               type="search"
               aria-label="Search Fish voices"
               placeholder="Search Fish voices"
