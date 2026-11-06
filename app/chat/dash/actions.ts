@@ -28,6 +28,8 @@ import type { DashChange } from '@/lib/talk/changes';
 import type { SaveAnswerOutcome, SaveAnswerTo } from '@/lib/talk/save-answer';
 import { parseRating, ratingNote, type RateAnswerOutcome } from '@/lib/talk/rate-answer';
 import type { ConversationSummary } from '@/lib/talk/store';
+import { createYouClient } from '@/lib/you/auth/server';
+import { loadPeople } from '@/lib/you/chat-threads';
 import type { TalkTurn } from '@/lib/talk/talk';
 import type { ReplyState } from '@/lib/talk/reply-state';
 
@@ -69,6 +71,34 @@ export async function recentAskQuestions(): Promise<{
     return { conversations: await listAskConversations(5) };
   } catch {
     return { conversations: [], error: 'Your earlier questions could not be read.' };
+  }
+}
+
+/** One bot in the sheet's row of bots to switch to (plan #2976). */
+export type AskBot = {
+  key: string;
+  name: string;
+  colour: string;
+  photo: string | null;
+  unread: boolean;
+};
+
+/**
+ * The bots for the sheet's switcher (plan #2976): everyone on the roster,
+ * the one you messaged last first, as the Messages list orders them.
+ */
+// latency: pending
+export async function askDashBots(): Promise<{ bots: AskBot[]; error?: string }> {
+  try {
+    const user = await requireUser();
+    const client = await createYouClient();
+    const people = await loadPeople(client, user.id);
+    return {
+      bots: people.map((p) => ({ key: p.key, name: p.name, colour: p.colour, photo: p.photo ?? null, unread: p.unread })),
+    };
+  } catch (error) {
+    console.error('the sheet’s bots were not read', error);
+    return { bots: [], error: 'Your bots could not be read.' };
   }
 }
 

@@ -8573,6 +8573,19 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Earlier questions pressed open under the box (plan #2976): the one
+     * button the list folded into, opened in place. */
+    id: 'ask-dash-new-earlier',
+    label: 'Ask Dash · Earlier questions open',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open earlier>
+        <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
     id: 'ask-dash-answer',
     label: 'Ask Dash · An answer with its rows',
     module: 'jobs',
