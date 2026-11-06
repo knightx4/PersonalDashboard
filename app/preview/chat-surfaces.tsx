@@ -288,7 +288,7 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
             members={members}
             former={[]}
             replyFailed={state === 'reply-failed' ? 'The group ran out of time before anyone answered.' : null}
-            page={{ messages, hasOlder: false, reactions: GROUP_REACTIONS }}
+            page={{ messages, hasOlder: false, reactions: state === 'reply-failed' ? { g4: GROUP_REACTIONS.g4, g5: GROUP_REACTIONS.g5 } : GROUP_REACTIONS }}
             timezone={ZONE}
             now={NOW}
             live={false}
