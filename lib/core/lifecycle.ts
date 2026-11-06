@@ -388,6 +388,7 @@ export const NOT_A_CLOSING_STATUS: Record<string, string> = {
   runs_status_ck: 'state of a Dash run',
   watches_status_ck: 'state of a Dash watch',
   dash_handoffs_status_ck: 'state of a hand-off to Dash',
+  bot_handoffs_status_ck: 'state of a request one bot passed to another',
   briefs_status_check: 'state of a research run',
   subject_preparations_status_ck: 'state of a subject\'s preparation run',
   topic_draft_requests_status_ck: 'whether the routine has drafted a topic someone asked for',
