@@ -96,6 +96,7 @@ describe('thinkVoice', () => {
     expect(voice.model).toBe(OPUS);
     expect(voice.effort).toBe('high');
     expect(voice.timeBudgetMs).toBe(THINK_TIME_BUDGET_MS);
+    expect(voice.extend).toBe(true);
     expect(voice.serverTools?.map((tool) => (tool as { type: string }).type)).toEqual(['web_search_20260209']);
     const names = voice.tools.map((tool) => tool.name);
     expect(names).toEqual(expect.arrayContaining(['read_spec', 'read_code', 'search_code', 'show_mockup']));

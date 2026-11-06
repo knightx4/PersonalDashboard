@@ -350,6 +350,9 @@ export function thinkVoice(scope: ModuleId | null | undefined): DashVoice {
     effort: THINK_EFFORT,
     maxTokens: THINK_MAX_TOKENS,
     timeBudgetMs: THINK_TIME_BUDGET_MS,
+    // A question the person asked to be thought through reads code and plan
+    // rows past twelve lookups; it gets one more stretch, not a cut-off.
+    extend: true,
   };
 }
 
