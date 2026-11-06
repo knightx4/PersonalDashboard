@@ -4,12 +4,15 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
+import { botVoiceStatus } from '@/lib/talk/speech/fish';
 import {
   correctPersonMemory,
   deletePersonCard,
   draftPersonCard,
   removePersonMemory,
+  listBotVoices,
   saveBotPhoto,
+  saveBotVoice,
   savePersonCard,
   setReachOut,
   turnOffPersonReachOut,
@@ -44,6 +47,7 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
     loadAccountSettings(user.id),
   ]);
   if (!card) notFound();
+  const voiceStatus = await botVoiceStatus(card.voice?.id ?? null);
   return (
     <BotsView rows={rows} current={key}>
       <PersonForm
@@ -60,7 +64,9 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
           setReachOut,
           turnOffReachOut: turnOffPersonReachOut,
           photo: saveBotPhoto,
+          voice: { list: listBotVoices, save: saveBotVoice },
         }}
+        voiceStatus={voiceStatus}
       />
     </BotsView>
   );

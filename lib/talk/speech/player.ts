@@ -47,7 +47,14 @@ export type PlayerDeps = {
   fetch: (url: string, init: RequestInit) => Promise<Response>;
   /** An audio element playing the MP3 in this blob. */
   audio: (blob: Blob) => { audio: SpeechAudio; release: () => void };
+  /** An audio element playing the recording at this link (plan #3006.5). */
+  audioUrl?: (url: string) => { audio: SpeechAudio; release: () => void };
 };
+
+/** A stand-in that cannot play, for a player given no audioUrl. */
+function silent(): SpeechAudio {
+  return { play: () => Promise.reject(new Error('no audio for links')), pause: () => {}, onended: null, onerror: null };
+}
 
 /** What the chat shows when the route could not be reached or answered with nothing it could read. */
 export const SPEAK_UNREACHABLE = 'This reply could not be read aloud. Check your connection and press play again.';
@@ -56,14 +63,28 @@ export const SPEAK_HELD_BACK = 'Your browser held the sound back. Press play to 
 
 export const SPEAKING_KEY = 'talk.speaking';
 
+/**
+ * Whose voice a reply is read in (plan #3006.5): `bot`, the id of the bot
+ * that wrote it, read in its own voice when it has one; or `voice`, a Fish
+ * voice id, for a sample on a bot's form. Neither reads it in the default.
+ */
+export type SpeechVoice = { bot?: string | null; voice?: string | null };
+
+function voiceFields(voice: SpeechVoice | undefined): { bot?: string; voice?: string } {
+  if (voice?.voice) return { voice: voice.voice };
+  if (voice?.bot) return { bot: voice.bot };
+  return {};
+}
+
 const IDLE: SpeechState = { key: null, phase: 'idle', notes: {} };
 
 export function createSpeechPlayer(deps: PlayerDeps) {
   let state: SpeechState = IDLE;
   const listeners = new Set<() => void>();
   const spoken = new Set<string>();
-  let waiting: { key: string; text: string }[] = [];
-  let current: { abort: AbortController; audio: SpeechAudio | null; release: () => void } | null = null;
+  let waiting: { key: string; text: string; voice?: SpeechVoice }[] = [];
+  type Current = { abort: AbortController; audio: SpeechAudio | null; release: () => void };
+  let current: Current | null = null;
 
   const set = (next: Partial<SpeechState>) => {
     state = { ...state, ...next };
@@ -87,11 +108,11 @@ export function createSpeechPlayer(deps: PlayerDeps) {
 
   const next = () => {
     const item = waiting.shift();
-    if (item) void start(item.key, item.text);
+    if (item) void start(item.key, item.text, item.voice);
     else set({ key: null, phase: 'idle' });
   };
 
-  async function start(key: string, text: string) {
+  async function start(key: string, text: string, voice?: SpeechVoice) {
     end();
     const mine = { abort: new AbortController(), audio: null as SpeechAudio | null, release: () => {} };
     current = mine;
@@ -102,7 +123,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       response = await deps.fetch('/api/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...voiceFields(voice) }),
         signal: mine.abort.signal,
       });
     } catch {
@@ -141,8 +162,11 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       return;
     }
     if (current !== mine) return;
+    await sound(mine, key, deps.audio(blob));
+  }
 
-    const made = deps.audio(blob);
+  /** Plays what was made for `key`, then moves on to what waits. */
+  async function sound(mine: Current, key: string, made: { audio: SpeechAudio; release: () => void }) {
     mine.audio = made.audio;
     mine.release = made.release;
     const finished = () => {
@@ -178,21 +202,33 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       };
     },
     /** Plays this reply now, stopping what was playing and emptying the queue. */
-    play(key: string, text: string) {
+    play(key: string, text: string, voice?: SpeechVoice) {
       spoken.add(key);
       waiting = [];
-      void start(key, text);
+      void start(key, text, voice);
     },
     /** Plays this reply after what is playing or waiting. */
-    queue(key: string, text: string) {
+    queue(key: string, text: string, voice?: SpeechVoice) {
       spoken.add(key);
-      if (state.phase === 'idle' && !current) void start(key, text);
-      else waiting.push({ key, text });
+      if (state.phase === 'idle' && !current) void start(key, text, voice);
+      else waiting.push({ key, text, voice });
+    },
+    /**
+     * Plays a recording at a link now (a voice's sample, plan #3006.5),
+     * stopping what was playing and emptying the queue. Nothing is spent.
+     */
+    playUrl(key: string, url: string) {
+      waiting = [];
+      end();
+      const mine: Current = { abort: new AbortController(), audio: null, release: () => {} };
+      current = mine;
+      set({ key, phase: 'loading', notes: note(key, null) });
+      void sound(mine, key, deps.audioUrl ? deps.audioUrl(url) : { audio: silent(), release: () => {} });
     },
     /** Queues a reply the first time only: a new reply plays once. */
-    speakOnce(key: string, text: string) {
+    speakOnce(key: string, text: string, voice?: SpeechVoice) {
       if (spoken.has(key)) return;
-      this.queue(key, text);
+      this.queue(key, text, voice);
     },
     stop() {
       waiting = [];

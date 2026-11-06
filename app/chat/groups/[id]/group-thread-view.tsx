@@ -32,6 +32,8 @@ import {
   type Reacted,
 } from '@/lib/you/group-chats-model';
 import { GroupMark, Reactions } from '../../group-parts';
+import { SpeakRun } from '../../people/[key]/thread-view';
+import { useSpeakArrivals } from '@/components/talk/speak-reply';
 
 /**
  * A group chat on the Messages tab (plan #2879.1.3): the person and two to
@@ -126,6 +128,7 @@ export function GroupThreadView({
   const [typing, setTyping] = useState<Record<string, string | null>>({});
   const members = firstMembers.map((m) => (m.id in typing ? { ...m, typingUntil: typing[m.id] } : m));
   const [openingIds] = useState(() => new Set(page.messages.map((m) => m.id)));
+  const [openedThrough] = useState(() => page.messages.reduce((latest, m) => (m.createdAt > latest ? m.createdAt : latest), ''));
   const [hasOlderState, setHasOlder] = useState<boolean | null>(null);
   const hasOlder = hasOlderState ?? page.hasOlder;
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -354,6 +357,17 @@ export function GroupThreadView({
   }, [owedId, owedAt]);
 
   const blocks = threadBlocks(messages, { timeZone: timezone, now });
+  // Each bot's texts that arrived while the thread was open play aloud once,
+  // in order and in that bot's own voice, while the speaking switch is on
+  // (plan #3006.5). Earlier messages loaded above are older than the newest
+  // the page opened with, so they never play by themselves.
+  // speakOnce plays each once, so a fresh list on every draw is harmless.
+  const arrived = messages.flatMap((m) =>
+    m.role === 'advisor' && !openingIds.has(m.id) && m.createdAt > openedThrough && m.text.trim()
+      ? [{ id: m.id, text: m.text, bot: m.speakerId ?? null }]
+      : [],
+  );
+  useSpeakArrivals(arrived);
   const empty = messages.length === 0 && pending.length === 0;
   // A failed burst is said under your last text, while nothing newer is on its way.
   const failedNote =
@@ -439,6 +453,7 @@ export function GroupThreadView({
                 ))}
               </Fragment>
             ))}
+            {block.from === 'them' && <SpeakRun messages={block.messages} bot={block.speakerId ?? null} />}
           </MessageGroup>
         );
       })}

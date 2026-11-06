@@ -17,11 +17,12 @@ export const SPEAK_SPEND_OPERATION = 'speak-reply';
  * ledger row lands under RLS as theirs; their timezone for the month; and the
  * Fish key from the server's environment.
  */
-export async function speakDeps(userId: string): Promise<SpeakDeps> {
+export async function speakDeps(userId: string, voice: string | null = null): Promise<SpeakDeps> {
   const [core, settings] = await Promise.all([createCoreClient(), loadAccountSettings(userId)]);
   const fish = fishEnv();
   return {
     configured: fish !== null,
+    voice,
     month: speechMonth(todayInTimezone(settings.timezone)),
     reserve: async (month, bytes, cap) => {
       const { data, error } = await core.rpc('reserve_speech_bytes', { p_month: month, p_bytes: bytes, p_cap: cap });
@@ -32,8 +33,8 @@ export async function speakDeps(userId: string): Promise<SpeakDeps> {
       const { error } = await core.rpc('release_speech_bytes', { p_month: month, p_bytes: bytes });
       if (error) console.error('[speech] release failed', error.message);
     },
-    synthesize: (text) =>
-      fish ? fishSpeak(fish, text) : Promise.resolve({ ok: false, why: 'key', detail: 'FISH_AUDIO_API_KEY is not set' }),
+    synthesize: (text, voiceId) =>
+      fish ? fishSpeak(fish, text, fetch, voiceId) :Promise.resolve({ ok: false, why: 'key', detail: 'FISH_AUDIO_API_KEY is not set' }),
     recordSpend: async (bytes) => {
       // Fish bills bytes, so the bytes go in the input column and the price
       // table charges them at $15 a million.
