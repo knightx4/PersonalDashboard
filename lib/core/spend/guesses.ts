@@ -9,6 +9,7 @@ import type {
 } from '@/lib/core/spend/operations';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
+import { GOOGLE_GEOCODING, GOOGLE_PLACES_TEXT_SEARCH } from '@/lib/core/spend/pricing';
 
 /**
  * A written best guess at what each paid operation costs, for when the ledger
@@ -543,6 +544,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The rules, the form and for a redraft the current card in; a card of
   // about 2,500 characters out (plan #2748.11).
   'draft-persona': run(SONNET, 1_800, 700),
+  // Google calls billed per request, so no tokens: the price table's perCall
+  // is the whole cost (plan #2987.2).
+  'find-places': run(GOOGLE_PLACES_TEXT_SEARCH, 0, 0),
+  'geocode-address': background(run(GOOGLE_GEOCODING, 0, 0)),
   // The rules and the tables a rule may watch in, a short brief; a rule of
   // two or three watches and a sentence out, with a little thinking (plan #2931.2).
   'make-reach-out-rule': run(SONNET, 1_400, 900),
