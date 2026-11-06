@@ -422,6 +422,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-page': ['/chat/dash/[ref]'],
+  'ask-page-speaking': ['/chat/dash/[ref]'],
+  'ask-page-speak-paused': ['/chat/dash/[ref]'],
   'ask-page-new': ['/chat/dash'],
   'ask-page-empty': ['/chat/dash'],
   'ask-page-failed': ['/chat/dash'],
@@ -444,6 +446,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-search': ['/chat'],
   'chat-people-search-none': ['/chat'],
   'chat-people-thread': ['/chat/people/[key]'],
+  'chat-people-thread-speak': ['/chat/people/[key]'],
   'chat-people-thread-changes': ['/chat/people/[key]'],
   'chat-people-thread-working': ['/chat/people/[key]'],
   'chat-people-thread-builds': ['/chat/people/[key]'],
@@ -730,6 +733,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'account-spend-overview': ['/account/spend'],
   'account-spend-by-module': ['/account/spend'],
   'account-spend-by-module-open': ['/account/spend'],
+  // Spoken replies this month against the voice cap (plan #3006.2), mid-month
+  // and once the cap is reached.
+  'account-spend-voice': ['/account/spend'],
+  'account-spend-voice-paused': ['/account/spend'],
   // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
   'core-tooltip': ['/dev/ui'],
   // A component surface (COMPONENT_SURFACES); the pages it opens on have their own.
@@ -1236,6 +1243,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ref-preview': ['components/ui/ref-link.tsx'],
   // The per-day bar chart in each state it has (plan #2036.1).
   'usage-day-bars': ['components/ui/day-bar-chart.tsx'],
+  'account-spend-voice': ['components/talk/voice-usage.tsx'],
+  'account-spend-voice-paused': ['components/talk/voice-usage.tsx'],
   // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
   // Without this a change to Button or Card reached every surface in the
   // gallery, and each had to be settled by hand. A new file in components/ui

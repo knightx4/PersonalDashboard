@@ -22,6 +22,7 @@ import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes'
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
+import { SpeakSwitch } from '@/components/talk/speak-reply';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
@@ -715,6 +716,9 @@ export function AskThread({
     [refreshModel],
   );
   const [today] = useState(localToday);
+  // The answers the chat opened with (plan #3006.1): any other is new, and
+  // plays aloud once while the speaking switch is on.
+  const [openedWith] = useState(() => new Set(turns.map((turn) => turn.id)));
   // The chat's ref is stable once kept, so the source is too (plan #2789.8).
   const sessionSource = useMemo(() => {
     const to = source.toSession;
@@ -786,6 +790,8 @@ export function AskThread({
           {box.thread.boxStart}
           {/* On Chat's Dash tab they sit under the box as quiet words (plan #2863). */}
           <ThinkSwitch on={think} onChange={setThink} quiet={bubbles} />
+          {/* New answers read aloud while on (plan #3006.1). In the sheet the switch is in its header. */}
+          {bubbles && <SpeakSwitch look="quiet" />}
           {/* Thinking it through answers on Opus whatever was picked, so the pick steps aside. */}
           {!think && handle?.model && handle.chooseModel ? (
             <ModelChip model={handle.model} onModel={handle.chooseModel} initialOpen={handle.modelOpen} quiet={bubbles} />
@@ -840,6 +846,8 @@ export function AskThread({
               // To a session thread on a project (plan #2789.8), once the chat is kept.
               toSession={sessionSource}
               offerSession={offersSession(turn.body)}
+              // Read aloud (plan #3006.1): a new latest answer plays once while speaking is on.
+              speak={{ id: turn.id, fresh: thread.latest === true && !openedWith.has(turn.id) }}
             />
             </div>
           </>
@@ -1154,6 +1162,8 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               {pick.kind === 'dash' ? (
                 <>
+                  {/* New answers read aloud while on (plan #3006.1): here, not in the box's crowded foot. */}
+                  <SpeakSwitch look="icon" />
                   <Tooltip label="Earlier questions" align="end">
                     <IconButton
                       label="Earlier questions"

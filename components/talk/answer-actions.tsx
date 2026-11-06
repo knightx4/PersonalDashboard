@@ -11,6 +11,7 @@ import type { DashChange } from '@/lib/talk/changes';
 import { RATING_NOTE_MAX, type AnswerRating, type RateAnswerOutcome } from '@/lib/talk/rate-answer';
 import type { SaveAnswerTo } from '@/lib/talk/save-answer';
 import { ToSessionForm, type ToSessionSource } from './to-session';
+import { SpeakNote, SpeakPress } from './speak-reply';
 
 /**
  * The row of presses under each of Dash's answers (plan #1899.7): copy it,
@@ -28,6 +29,11 @@ import { ToSessionForm, type ToSessionSource } from './to-session';
  * it back. Thumbs down opens What went wrong?, one line that can be sent or
  * skipped, and what is sent is kept with the rating. A refused write puts the
  * thumb back and says why in the line under the row.
+ *
+ * Read aloud sits after Copy (plan #3006.1): it plays the answer, and Stop
+ * ends it. A new answer plays by itself while the speaking switch is on; why
+ * one was not read (voice not set up, paused for the month) is said under
+ * the row.
  */
 
 /** What a save hands back: the change it made, or why not. */
@@ -53,6 +59,7 @@ export function AnswerActions({
   rate,
   toSession,
   offerSession = false,
+  speak,
 }: {
   /** The answer as written, which Copy puts on the clipboard. */
   body: string;
@@ -76,6 +83,12 @@ export function AnswerActions({
   toSession?: ToSessionSource;
   /** Dash said the request needs a code change: the press is written out, not an icon. */
   offerSession?: boolean;
+  /**
+   * The answer's key for Read aloud (plan #3006.1), and whether it arrived
+   * while the chat was open, which plays it once while speaking is on. Left
+   * out where the answer is not read aloud.
+   */
+  speak?: { id: string; fresh: boolean };
 }) {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState<SaveAnswerTo | null>(null);
@@ -157,6 +170,7 @@ export function AnswerActions({
             {copied ? <Check strokeWidth={1.75} aria-hidden /> : <Copy strokeWidth={1.75} aria-hidden />}
           </IconButton>
         </Tooltip>
+        {speak && <SpeakPress id={speak.id} text={body} fresh={speak.fresh} />}
         {question !== null && (
           <>
             <Tooltip label="Retry">
@@ -265,6 +279,7 @@ export function AnswerActions({
           </Button>
         </form>
       )}
+      {speak && <SpeakNote ids={[speak.id]} className="mt-1 max-w-prose" />}
       <FieldError>{error}</FieldError>
     </div>
   );
