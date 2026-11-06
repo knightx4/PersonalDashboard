@@ -163,6 +163,36 @@ export function messageOf(row: Record<string, unknown>): CouncilMessage | null {
   };
 }
 
+/** A watch Dash wrote for a mentor (you.advisor_watches, plan #3030.1.4). */
+export type MentorWatch = {
+  id: string;
+  about: string;
+  sendsWhen: string;
+  everyDays: number;
+  /** active runs on its cadence; paused ran into errors three times; stopped was stopped by the person. */
+  status: 'active' | 'paused' | 'stopped';
+  lastRunAt: string | null;
+  lastError: string | null;
+};
+
+const WATCH_STATES = ['active', 'paused', 'stopped'] as const;
+
+/** A watch row; proposed and declined ones are not listed, so they read as null. */
+export function watchOf(row: Record<string, unknown>): MentorWatch | null {
+  const status = WATCH_STATES.find((k) => k === row.status);
+  const about = str(row.about);
+  if (typeof row.id !== 'string' || !status || !about) return null;
+  return {
+    id: row.id,
+    about,
+    sendsWhen: str(row.sends_when),
+    everyDays: typeof row.every_days === 'number' ? row.every_days : 1,
+    status,
+    lastRunAt: strOrNull(row.last_run_at),
+    lastError: strOrNull(row.last_error),
+  };
+}
+
 export function memoryOf(row: Record<string, unknown>): CouncilMemory | null {
   const text = str(row.text);
   const kind = MEMORY_KINDS.find((k) => k === row.kind);

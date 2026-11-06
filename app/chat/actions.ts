@@ -30,7 +30,10 @@ import { retryMentorReplyInRequest } from '@/lib/you/mentor-reply-request';
 import { retryGroupBurstInRequest } from '@/lib/you/group-burst-request';
 import { requestOrigin } from '@/lib/auth/origin';
 import { headers } from 'next/headers';
-import { loadPeopleChanges, type DashChange } from '@/lib/talk/changes';
+import { DASH_ACTIONS, DASH_CHANGE_SELECT, loadPeopleChanges, toDashChange, type DashChange } from '@/lib/talk/changes';
+import type { ChangeOutcome } from '@/lib/ask/changes';
+import { decideWatch, withWatches } from '@/lib/you/watch-decide';
+import { WATCH_DECISIONS, watchIdOf, type WatchDecision } from '@/lib/you/watch-card-model';
 import {
   addPerson,
   ASK_MAX,
@@ -93,10 +96,39 @@ export async function threadChanges(chatId: string): Promise<DashChange[] | null
   await requireUser();
   if (!UUID.test(chatId)) return null;
   try {
-    return await loadPeopleChanges(await createCoreClient(), chatId);
+    const changes = await loadPeopleChanges(await createCoreClient(), chatId);
+    return await withWatches(await createYouClient(), changes);
   } catch (error) {
     console.error('thread changes not read', error);
     return null;
+  }
+}
+
+/**
+ * Approve or decline the watch a set_reach_out change in a People thread
+ * proposed (plan #3030.1.2), or put a declined one back from the toast's
+ * Undo. Answers with the change carrying the watch as it now is. Never
+ * throws.
+ */
+// latency: pending
+export async function decideThreadWatch(changeId: string, decision: WatchDecision): Promise<ChangeOutcome> {
+  await requireUser();
+  if (!UUID.test(changeId) || !(WATCH_DECISIONS as readonly string[]).includes(decision)) {
+    return { ok: false, error: 'That watch is not there any more.', change: null };
+  }
+  try {
+    const core = await createCoreClient();
+    const { data, error } = await core.from(DASH_ACTIONS).select(DASH_CHANGE_SELECT).eq('id', changeId).maybeSingle();
+    if (error) throw new Error(error.message);
+    const change = data ? toDashChange(data as Parameters<typeof toDashChange>[0]) : null;
+    const watchId = change ? watchIdOf(change) : null;
+    if (!change || !watchId) return { ok: false, error: 'That watch is not there any more.', change: null };
+    const decided = await decideWatch(await createYouClient(), watchId, decision);
+    const next: DashChange = decided.watch ? { ...change, watch: decided.watch } : change;
+    return decided.ok ? { ok: true, change: next } : { ok: false, error: decided.error, change: decided.watch ? next : null };
+  } catch (error) {
+    console.error('watch decision failed', error);
+    return { ok: false, error: 'That did not go through. Check your connection and try again.', change: null };
   }
 }
 

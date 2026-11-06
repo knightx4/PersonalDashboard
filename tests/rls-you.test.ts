@@ -28,7 +28,7 @@ describe('coverage', () => {
       join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'you' and c.relkind = 'r'
       order by 1`;
-    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'places_cache', 'places_calls', 'profile_entries', 'transcripts', 'work_history']);
+    expect(rows.map((r) => r.tablename)).toEqual(['advisor_chat_members', 'advisor_chats', 'advisor_episodes', 'advisor_memory', 'advisor_message_reactions', 'advisor_messages', 'advisor_persona_versions', 'advisor_reach_outs', 'advisor_watches', 'board_advisors', 'board_marks', 'board_meetings', 'board_panels', 'board_questions', 'board_turns', 'claude_chats', 'council_notes', 'council_runs', 'course_file_summaries', 'course_files', 'course_overviews', 'course_weeks', 'courses', 'dash_question_runs', 'dash_questions', 'details', 'first_text_events', 'insight_digest', 'insight_runs', 'insight_signals', 'insight_tripwires', 'insight_verdicts', 'insights', 'note_extract_reads', 'note_extracts', 'now', 'personality_profiles', 'personality_results', 'places', 'places_cache', 'places_calls', 'profile_entries', 'transcripts', 'work_history']);
   });
 
   it('has row level security on every table', async () => {
@@ -1368,6 +1368,32 @@ describe('reach-out briefs and what was mentioned', () => {
     const [kept] = await admin<{ message_id: string | null }[]>`
       select message_id from you.advisor_reach_outs where ref_id = 'r1'`;
     expect(kept.message_id).toBeNull();
+  });
+
+  it('keeps a watch Dash wrote to its owner, proposed when they write it, removable only while proposed (plan #3030.1.1)', async () => {
+    const values = (tx: Parameters<Parameters<typeof asUser>[1]>[0] | typeof admin, user: string, key: string, status = 'proposed') => tx`
+      insert into you.advisor_watches (user_id, advisor_id, key, brief, about, sends_when, sample, query, tables, status)
+      values (${user}, ${advisor}, ${key}, 'my sister', 'Notes that mention Anna', 'A note mentions Anna.', 'Your note mentions Anna.',
+              ${tx.json({ table: 'obsidian.notes', limit: 50 })}, ${['obsidian.notes']}, ${status})
+      returning id`;
+    const [mine] = await asUser(userA, (tx) => values(tx, userA, 'custom_sister_a1'));
+    expect(mine.id).toBeTruthy();
+    // The person's own client cannot write one that already runs, nor one for someone else.
+    await expect(asUser(userA, (tx) => values(tx, userA, 'custom_sister_a2', 'active'))).rejects.toThrow();
+    await expect(asUser(userB, (tx) => values(tx, userB, 'custom_sister_b1'))).rejects.toThrow();
+    expect(await asUser(userB, (tx) => tx`select id from advisor_watches`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`update advisor_watches set status = 'active' returning id`)).toHaveLength(0);
+
+    await expect(values(admin, userA, 'Bad Key')).rejects.toThrow(/advisor_watches_key_ck/);
+    await expect(admin`
+      insert into you.advisor_watches (user_id, advisor_id, key, brief, about, sends_when, sample, query, tables)
+      values (${userA}, ${advisor}, 'custom_x', 'b', 'a', 's', 's', ${admin.json([])}, ${['obsidian.notes']})`).rejects.toThrow(/advisor_watches_query_ck/);
+
+    // Approved, it can no longer be taken back with a delete.
+    await asUser(userA, (tx) => tx`update advisor_watches set status = 'active' where id = ${mine.id}`);
+    expect(await asUser(userA, (tx) => tx`delete from advisor_watches where id = ${mine.id} returning id`)).toHaveLength(0);
+    await asUser(userA, (tx) => tx`update advisor_watches set status = 'proposed' where id = ${mine.id}`);
+    expect(await asUser(userA, (tx) => tx`delete from advisor_watches where id = ${mine.id} returning id`)).toHaveLength(1);
   });
 });
 

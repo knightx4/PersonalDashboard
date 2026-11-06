@@ -315,6 +315,10 @@ export const SPEND_OPERATIONS = {
     // about, on a save of their form or when you say so in Ask or their
     // thread (plan #2931.2). One Sonnet call with structured output.
     'make-reach-out-rule',
+    // A watch Dash writes itself when no fixed watch covers what someone on
+    // People was asked to text about (plan #3030.1.1). One Sonnet call with
+    // structured output, given every readable table with its columns.
+    'write-advisor-watch',
     // A set of insights about the person in one Opus call (plan #2413.9).
     // Insights now run on the goals routine, so nothing makes this call; the
     // name stays for the spend rows it already wrote.

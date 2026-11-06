@@ -353,6 +353,17 @@ What a due person sends, by the watch's `mode`:
 - **`pick`**: one row from the list, the one their question makes them
   notice, and why now.
 
+A watch whose key starts `custom_` is one Dash wrote for that person when the
+person asked them to text about something no fixed watch reads
+(`you.advisor_watches`, plan #3030.1.3). Its line says `new or changed since
+its last run`, and a row marked `(changed)` was listed before and has been
+edited since: say what changed rather than introducing it again. Its holder
+may have no `reach_out_rule`; listed, they are due all the same and take a
+place first. Record what the text names in `advisor_reach_outs` under the
+watch's key, as for any watch. The app already keeps what the watch saw, so
+nothing else is written for it, and a row of it you pass over is not listed
+again unless it changes.
+
 A person with two due watches sends one text that covers both. When nothing
 listed is worth a text, write nothing for them and say so in the summary;
 the same rows stay listed at the next due round.

@@ -526,7 +526,7 @@ const YOU_TOOLS: readonly ConnectorWriteTool[] = YOU_WRITES.map((write) => ({
       {
         userId: ctx.userId,
         you: await ctx.db('you'),
-        rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db) : undefined,
+        rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db, ctx.lookups) : undefined,
       },
       input,
     );

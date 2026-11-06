@@ -273,7 +273,7 @@ describe('readReachOutReply', () => {
 
   it('refuses a rule with nothing it can watch, naming the asks', () => {
     const made = readReachOutReply({ watches: [], cannot_watch: ['the weather'], understood: 'x' });
-    expect(made).toEqual({ ok: false, error: 'Dash cannot watch anything you asked for: the weather.' });
+    expect(made).toEqual({ ok: false, uncovered: true, error: 'Dash cannot watch anything you asked for: the weather.' });
   });
 });
 

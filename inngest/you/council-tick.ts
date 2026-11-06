@@ -8,6 +8,9 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { maybeStartAdviceRun } from '@/lib/you/council';
 import { isQuietHours } from '@/lib/you/council-texts';
 import type { SchemaReader } from '@/lib/you/reach-out-due';
+import type { AskContext, AskSchema, SchemaClient } from '@/lib/ask/db';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { todayInTimezone } from '@/lib/money';
 
 /**
  * The Council's daily round, a stage of the daily cron (you 0037). Once a day
@@ -36,6 +39,8 @@ export async function runCouncilTick(deps?: {
   timezone?: string;
   /** A client per schema, for the tables reach-out rules watch (plan #2931.5). */
   db?: SchemaReader;
+  /** The lookup context the watches Dash wrote run with (plan #3030.1.3); built for the owner when absent. */
+  ask?: AskContext;
 }): Promise<{ skipped: string } | { started: true; runId: string }> {
   let userId = deps?.userId;
   if (!userId) {
@@ -47,20 +52,27 @@ export async function runCouncilTick(deps?: {
   const you = deps?.you ?? (createServiceSchemaSupabase('you') as unknown as YouSupabaseClient);
   const now = deps?.now ?? Date.now();
   let timezone = deps?.timezone;
-  if (!timezone) {
-    const settings = await createCoreServiceSupabase()
-      .from('account_settings')
-      .select('timezone')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (settings.error) throw new Error(`Reading the time zone failed: ${settings.error.message}`);
-    timezone = (settings.data as { timezone?: string } | null)?.timezone || 'UTC';
+  let ask = deps?.ask;
+  if (!timezone || !ask) {
+    // The owner's settings give the zone and the workspaces a watch may read.
+    const settings = await loadAccountSettings(userId, createCoreServiceSupabase());
+    timezone ??= settings.timezone || 'UTC';
+    ask ??= {
+      userId,
+      today: todayInTimezone(settings.timezone),
+      timezone: settings.timezone,
+      enabledModules: settings.enabledModules,
+      // Service-role clients: query_rows adds the owner filter to every read.
+      db: async (schema: AskSchema) => createServiceSchemaSupabase(schema) as unknown as SchemaClient,
+      searchSources: [],
+    };
   }
   return maybeStartAdviceRun({
     client: you,
     userId,
     quiet: isQuietHours(new Date(now), timezone),
     db: deps?.db ?? createServiceSchemaSupabase,
+    ask,
     routine: deps?.routine ?? boardRoutine(),
     now,
     fetch: deps?.fetch,

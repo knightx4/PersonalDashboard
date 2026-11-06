@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import type { PersonRow, ThreadMessage } from '@/lib/you/chat-threads-model';
 import type { ChangePresses } from '@/components/talk/dash-changes';
 import type { DashChange } from '@/lib/talk/changes';
+import { WATCH_MOVES } from '@/lib/you/watch-card-model';
 
 /**
  * A thread with cards for what they did (plan #2854.2.1), with presses that
@@ -23,6 +24,12 @@ export function ChangeThreadDemo(props: Omit<React.ComponentProps<typeof ThreadV
     decline: async (id) => ({ ok: true, change: { ...find(id), status: 'declined', declinedAt: at } }),
     reopen: async (id) => ({ ok: true, change: { ...find(id), status: 'proposed', declinedAt: null } }),
     undo: async (id) => ({ ok: true, change: { ...find(id), status: 'undone', undoneAt: at } }),
+    // A watch's Approve and Decline (plan #3030.1.2) move the watch, not the change.
+    watch: async (id, decision) => {
+      const change = find(id);
+      if (!change.watch) return { ok: false, error: 'That watch is not there any more.', change: null };
+      return { ok: true, change: { ...change, watch: { ...change.watch, status: WATCH_MOVES[decision].to } } };
+    },
   };
   return <ThreadView {...props} presses={presses} />;
 }

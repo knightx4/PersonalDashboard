@@ -1,6 +1,6 @@
 import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
-import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { isUuid, type AskContext, type AskRow, type SchemaClient } from '@/lib/ask/db';
 import type { YouChangeInput, YouChangeKind } from '@/lib/ask/you-changes';
 import { toRef } from '@/lib/core/refs';
 import { EDUCATION_HREF } from '@/lib/you/education';
@@ -29,6 +29,7 @@ import {
 import { putQuestionToBoard } from '@/lib/you/board-ask';
 import { CONTEXT_MAX, LEAN_MAX, OPTION_MAX, OPTIONS_MAX, QUESTION_MAX } from '@/lib/you/board-questions';
 import { makeReachOutRule, saveReachOut } from '@/lib/you/reach-out-make';
+import { draftAdvisorWatch, saveProposedWatch, watchRow, watchSummary } from '@/lib/you/advisor-watch';
 import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
 import { recordSpendReports, type SpendClient } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
@@ -55,7 +56,11 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  *                 often, in their words (plan #2931.4): the rule is made by
  *                 makeReachOutRule and saved by saveReachOut, as the People
  *                 form does, and the summary is said back. Undo puts the
- *                 earlier brief and rule back.
+ *                 earlier brief and rule back. When nothing in the brief is
+ *                 in a table a fixed watch reads, Dash writes a watch of its
+ *                 own instead (plan #3030.1.1), kept as proposed in
+ *                 you.advisor_watches until the person approves it; Undo
+ *                 removes it.
  *   save_job      a job on Work & school added, or one corrected by its ref
  *                 (plan #1991.4.1). Either way the row is marked as theirs,
  *                 as the page's form does, so a later read of the résumé
@@ -81,7 +86,19 @@ export type YouWriteEnv = {
    * client in tests, and the core client the spend is recorded on. Absent,
    * the tool says it cannot make a rule here.
    */
-  rules?: { apiKey?: string; client?: Parameters<typeof makeReachOutRule>[1]['client']; core?: SpendClient };
+  rules?: {
+    apiKey?: string;
+    client?: Parameters<typeof makeReachOutRule>[1]['client'];
+    core?: SpendClient;
+    /**
+     * The person's lookups, for a watch Dash writes itself when no fixed
+     * watch covers the brief (plan #3030.1.1): the tables it may read and
+     * the dry run of its query. Absent, such a brief is refused as before.
+     */
+    ask?: AskContext;
+    /** Keeps a written watch's key unique; random when absent (tests fix it). */
+    watchSuffix?: string;
+  };
 };
 
 export type YouMade = {
@@ -495,6 +512,7 @@ async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
         (error) => console.error('[spend] you/make-reach-out-rule', error instanceof Error ? error.message : error),
       );
     }
+    if (!made.ok && made.uncovered && rules.ask) return proposeWatch(env, { ...rules, ask: rules.ask }, person, brief);
     if (!made.ok) throw new YouRefused(`${made.error} Their words are not saved. Tell them in plain words.`);
   }
   await saveReachOut(client, env.userId, person.id, brief, made);
@@ -531,6 +549,60 @@ async function setReachOut(env: YouWriteEnv, args: Args): Promise<YouMade> {
       title: person.name,
       href,
       detail: { brief: brief || null, summary: said || null },
+    },
+  };
+}
+
+/**
+ * A watch Dash writes itself for a brief no fixed watch covers (plan
+ * #3030.1.1): one paid call, its query run once to check it, then kept as
+ * proposed. Nothing runs it until the person approves it, and the person's
+ * reach-out rule is left as it was.
+ */
+async function proposeWatch(
+  env: YouWriteEnv,
+  rules: NonNullable<YouWriteEnv['rules']> & { ask: AskContext },
+  person: { id: string; key: string; name: string },
+  brief: string,
+): Promise<YouMade> {
+  const reports: SpendReport[] = [];
+  const drafted = await draftAdvisorWatch(
+    { name: person.name, brief },
+    { ask: rules.ask, apiKey: rules.apiKey, client: rules.client, onSpend: (report) => reports.push(report), suffix: rules.watchSuffix },
+  );
+  if (rules.core) {
+    await recordSpendReports(rules.core, env.userId, { module: 'you', operation: 'write-advisor-watch' }, reports).catch(
+      (error) => console.error('[spend] you/write-advisor-watch', error instanceof Error ? error.message : error),
+    );
+  }
+  if (!drafted.ok) throw new YouRefused(`${drafted.error} Nothing was saved. Tell them in plain words.`);
+
+  const client = env.you as unknown as YouSupabaseClient;
+  const after = await saveProposedWatch(client, watchRow(env.userId, person.id, brief, drafted));
+  const id = String(after.id);
+  const href = `/chat/people/${person.key}`;
+  const summary = watchSummary(person.name, drafted.draft, drafted.matched);
+  return {
+    kind: 'set_reach_out',
+    input: {
+      verb: 'Wrote a watch for',
+      what: person.name,
+      rest: `: ${summary}`,
+      href,
+      where: `Open ${person.name}`,
+      paths: [...REACH_OUT_PATHS, href],
+    },
+    subjectRef: toRef('you.advisor_watches', id),
+    op: 'insert',
+    before: null,
+    after,
+    summary: `${summary} Tell them it is waiting for their OK, and show them the sample text.`,
+    row: {
+      table: 'you.advisor_watches',
+      ref: id,
+      title: drafted.draft.about,
+      href,
+      detail: { brief, summary, status: 'proposed', every_days: drafted.draft.everyDays, tables: drafted.draft.tables.join(', ') },
     },
   };
 }
@@ -673,7 +745,7 @@ export const YOU_WRITES: readonly YouWrite[] = [
   {
     name: 'set_reach_out',
     runs: sameAs(['app/chat/actions.ts#setReachOut', 'lib/you/reach-out-make.ts#saveReachOut']),
-    description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends"). Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
+    description: `Set what a person on the People tab should text the person about, and how often, from what they say ("have the hiring manager tell me about good-fit jobs every Monday", "ask Seneca to nudge me about my reading on weekends"). Give person as People names them and brief as their sentence in their own words, keeping the cadence and what to watch; Dash makes the rule from it with one paid call and checks it. Send an empty brief only when they ask to stop those texts. When it comes back, repeat the summary it returns to them in your answer, as it says what will be sent and how often, and what Dash cannot watch. When nothing they asked for is in a table a fixed watch reads, Dash writes a watch of its own over their rows and keeps it waiting for their OK: repeat what it checks, how often and the sample text it returns, and say nothing runs until they approve it. If it refuses, say why in plain words. Not for the person's persona or how they sound.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -710,8 +782,8 @@ const ASK_NOTE =
   'It is done: it shows under your answer with an Undo. Say in your answer what you did, and cite the row this returned.';
 
 /** What set_reach_out is given where the key and the core client are the app's own. */
-export async function reachOutRules(db: DashWriteContext['db']): Promise<NonNullable<YouWriteEnv['rules']>> {
-  return { apiKey: process.env.ANTHROPIC_API_KEY, core: (await db('core')) as unknown as SpendClient };
+export async function reachOutRules(db: DashWriteContext['db'], ask?: AskContext): Promise<NonNullable<YouWriteEnv['rules']>> {
+  return { apiKey: process.env.ANTHROPIC_API_KEY, core: (await db('core')) as unknown as SpendClient, ask };
 }
 
 /** The You writes as Ask's write tools, run on the person's own you client. */
@@ -727,7 +799,7 @@ export const YOU_WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = YOU_WR
     const env: YouWriteEnv = {
       userId: ctx.userId,
       you: await ctx.db('you'),
-      rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db) : undefined,
+      rules: write.name === 'set_reach_out' ? await reachOutRules(ctx.db, ctx) : undefined,
     };
     const result = await runYouWrite(write, env, input);
     if ('ok' in result) return result;
