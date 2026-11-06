@@ -8623,7 +8623,7 @@ export const SURFACES: readonly Surface[] = [
       target: 'button[type="submit"][title="Send"]',
       submits: true,
       shows:
-        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+        'Send puts the question in the chat at once with the mark working under it; after the short pause for more texts (plan #2988.2) the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
     render: () => (
       <AskDashSurface open draft={AT_WORK_QUESTION}>
@@ -8875,7 +8875,7 @@ export const SURFACES: readonly Surface[] = [
       target: 'button[type="submit"][title="Send"]',
       submits: true,
       shows:
-        'Send answers at once and the mark starts working; the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
+        'Send puts the question in the chat at once with the mark working under it; after the short pause for more texts (plan #2988.2) the lookup lines appear one after another under Dash, the answer is written out after them, and the mark comes to rest on the finished answer.',
     },
     render: () => <DashPageSurface usedOpen={false} draft={AT_WORK_QUESTION} />,
   },
