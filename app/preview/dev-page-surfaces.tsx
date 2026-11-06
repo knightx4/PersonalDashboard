@@ -957,6 +957,7 @@ export function DevRaisedSurface() {
             migrationsError: null,
           }}
           inbox={3}
+          slips={{ count: 3, newestHref: '/chat/people/builder' }}
         />
         <AskBox />
       </div>
