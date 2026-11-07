@@ -514,7 +514,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { AskSpeakSurface, ChatThreadSpeakSurface } from './speak-surfaces';
+import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
 import {
   ChatArrivalMomentSurface,
   ChatBuilderTextSurface,
@@ -8719,6 +8719,19 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A bot speaking in the sheet (plan #3043): Benjamin Franklin's thread
+     * open in Ask Dash, his last reply read aloud and the pill at the top. */
+    id: 'ask-dash-chat-speaking',
+    label: 'Ask Dash · A bot speaking in the sheet',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashChatSpeakingSurface>
+        <PreviewShell />
+      </AskDashChatSpeakingSurface>
+    ),
+  },
+  {
     /* A group chat open in the sheet (plan #2981), its stacked mark lit in the row. */
     id: 'ask-dash-group',
     label: 'Ask Dash · A group open in the sheet',
@@ -9232,6 +9245,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSpeakSurface />,
+  },
+  {
+    /* A bot speaking (plan #3043): the speaker on each of their bubbles, the
+     * one being read with its bars moving, and the pill at the top saying
+     * Benjamin Franklin is speaking, with Stop. */
+    id: 'chat-people-thread-speaking',
+    label: 'Chat · A thread, a reply being read aloud',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSpeakingSurface state="playing" />,
+  },
+  {
+    /* A reply the browser would not play by itself (plan #3043): its speaker
+     * grey with a play arrow, which a press plays. */
+    id: 'chat-people-thread-speak-blocked',
+    label: 'Chat · A thread, a reply the browser held back',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSpeakingSurface state="blocked" />,
   },
   {
     /* What they did when asked (plan #2854.2.1): a todo they added, as a card with Undo after their reply, and a build and a delete they proposed, each with Confirm and nothing written until it is pressed. */

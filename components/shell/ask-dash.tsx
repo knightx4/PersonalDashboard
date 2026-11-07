@@ -22,7 +22,7 @@ import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes'
 import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { Thread, type ServerReply, type TalkSend, type ThreadCost } from '@/components/thread/thread';
 import { AnswerActions } from '@/components/talk/answer-actions';
-import { SpeakSwitch } from '@/components/talk/speak-reply';
+import { SpeakingPill, SpeakSwitch } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
@@ -738,6 +738,9 @@ export function AskThread({
   }, [changes]);
 
   return (
+    <>
+    {/* Dash speaking, pinned at the top of the chat while an answer is read aloud (plan #3043). */}
+    <SpeakingPill />
     <Thread
       id={id}
       turns={turns}
@@ -859,6 +862,7 @@ export function AskThread({
       }}
       {...thread}
     />
+    </>
   );
 }
 

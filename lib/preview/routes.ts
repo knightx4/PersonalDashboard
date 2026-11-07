@@ -394,6 +394,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-new': ['/chat/dash', '/chat/dash/[ref]'],
   // The sheet's row of chats (plan #2981), over any page; listed under the Messages routes it opens.
   'ask-dash-chat': ['/chat', '/chat/people/[key]'],
+  'ask-dash-chat-speaking': ['/chat', '/chat/people/[key]'],
   'ask-dash-group': ['/chat', '/chat/groups/[id]'],
   'ask-dash-earlier': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-chat-name': ['/chat', '/chat/people/[key]'],
@@ -447,6 +448,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-search-none': ['/chat'],
   'chat-people-thread': ['/chat/people/[key]'],
   'chat-people-thread-speak': ['/chat/people/[key]'],
+  'chat-people-thread-speaking': ['/chat/people/[key]'],
+  'chat-people-thread-speak-blocked': ['/chat/people/[key]'],
   'chat-people-thread-changes': ['/chat/people/[key]'],
   'chat-people-thread-watch': ['/chat/people/[key]'],
   'chat-people-thread-working': ['/chat/people/[key]'],

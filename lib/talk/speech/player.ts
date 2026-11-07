@@ -306,6 +306,19 @@ export function createSpeechPlayer(deps: PlayerDeps) {
 
 export type SpeechPlayer = ReturnType<typeof createSpeechPlayer>;
 
+/**
+ * How a bubble's speaker icon is drawn (plan #3043): `playing` while its
+ * audio sounds, `loading` while its turn has come and the audio is on its
+ * way, `blocked` when the browser held the sound back (a press plays it),
+ * and `rest` otherwise, ready to play it again.
+ */
+export type BubbleVoice = 'playing' | 'loading' | 'blocked' | 'rest';
+
+export function bubbleVoice(state: SpeechState, key: string): BubbleVoice {
+  if (state.key === key && state.phase !== 'idle') return state.phase;
+  return state.notes[key] === SPEAK_HELD_BACK ? 'blocked' : 'rest';
+}
+
 /** Whether new replies play aloud in this browser; off until switched on. */
 export function readSpeaking(): boolean {
   try {

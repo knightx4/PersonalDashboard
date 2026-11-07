@@ -2180,6 +2180,35 @@ body[data-keyhints] .keyhint {
   animation: typing-dot calc(var(--motion-moment) * 2) var(--ease-sway) infinite;
 }
 
+/* A reply being read aloud (plan #3043): three bars beside the speaker on
+ * its bubble, and in the speaking pill, that rise and fall out of step while
+ * its audio plays. At rest they stand still at their three heights. */
+@keyframes speak-bar {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.speak-bars > span {
+  transform-origin: bottom;
+}
+
+.speak-bars[data-playing] > span {
+  animation: speak-bar calc(var(--motion-moment) * 1.6) var(--ease-sway) infinite;
+}
+
+.speak-bars[data-playing] > span:nth-child(2) {
+  animation-delay: calc(var(--motion-moment) * -0.5);
+}
+
+.speak-bars[data-playing] > span:nth-child(3) {
+  animation-delay: calc(var(--motion-moment) * -1.1);
+}
+
 /* Their typing arrives, then their text does (plan #2748.10, the moment
  * "A mentor typing"). The dots rise in where the next bubble will stand; a
  * bubble that comes in over Realtime rises from the same place, and the dots
@@ -3032,7 +3061,8 @@ button[aria-busy='true'] {
 
   .typing-dot,
   .typing-in,
-  .message-in {
+  .message-in,
+  .speak-bars[data-playing] > span {
     animation: none;
   }
 

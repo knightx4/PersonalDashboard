@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUBBLE_GAP_MS, createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
+import { BUBBLE_GAP_MS, bubbleVoice, createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
 
 function audioResponse() {
   return new Response(new Blob(['mp3'], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
@@ -245,5 +245,33 @@ describe('the speech player', () => {
     await settle();
     expect(sent).toEqual(['One.', 'One.']);
     expect(player.get()).toMatchObject({ key: 'a', phase: 'playing' });
+  });
+});
+
+describe('bubbleVoice (plan #3043)', () => {
+  it('follows the queue from bubble to bubble, and greys a bubble the browser held back', async () => {
+    let refuse = true;
+    const { player, audios } = setup([], async () => {
+      if (refuse) {
+        refuse = false;
+        throw new Error('NotAllowedError');
+      }
+    });
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    expect(bubbleVoice(player.get(), 'a')).toBe('loading');
+    await settle();
+    // The first was held back, so the second plays and the first waits for a press.
+    expect(bubbleVoice(player.get(), 'a')).toBe('blocked');
+    expect(bubbleVoice(player.get(), 'b')).toBe('playing');
+    audios[1].onended?.();
+    await settle();
+    expect(bubbleVoice(player.get(), 'b')).toBe('rest');
+    // A press on the grey one plays it, and it is no longer blocked.
+    player.play('a', 'One.');
+    await settle();
+    expect(bubbleVoice(player.get(), 'a')).toBe('playing');
+    player.stop();
+    expect(bubbleVoice(player.get(), 'a')).toBe('rest');
   });
 });
