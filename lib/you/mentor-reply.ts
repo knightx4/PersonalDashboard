@@ -39,6 +39,7 @@ import {
 } from '@/lib/you/mentor-reply-model';
 import { keepRenewing, waitForQuiet, waitingLast } from '@/lib/you/reply-turn';
 import type { DashChange } from '@/lib/talk/changes';
+import { ATTACH_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
 
 export * from '@/lib/you/mentor-reply-model';
 
@@ -509,6 +510,7 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
     system: [
       ctx.layers.persona.text,
       REPLY_RULES,
+      ATTACH_RULES,
       PEOPLE_WEB_RULES,
       ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
       ...(makePage ? [PAGE_RULES] : []),
@@ -578,6 +580,18 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   closed = true;
   acking.abort();
   await chain;
+
+  // A reply that says a file is attached when nothing was sent says so after all (plan #3050.1).
+  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), 0) : null;
+  if (claim) {
+    save(NOTHING_ATTACHED, 'reply');
+    await chain;
+    if (input.act?.recordSlip) {
+      await input.act
+        .recordSlip({ ...claimSlip(name, claim), surface: 'people', conversation: `people:${chatId}`, href: threadHref })
+        .catch((error) => console.error('the attachment slip was not kept', error));
+    }
+  }
 
   await Promise.all(
     (Object.keys(spent) as MentorSpendOperation[])

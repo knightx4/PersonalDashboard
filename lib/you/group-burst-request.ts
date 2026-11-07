@@ -16,6 +16,7 @@ import { isOwner } from '@/lib/dev/owner';
 import { botPageStarter } from '@/lib/you/bot-pages-store';
 import { sessionStarter } from '@/lib/talk/session-handoff-store';
 import { botPasser } from '@/lib/talk/hand-to-bot-store';
+import { keepSlip } from '@/lib/dash/slips';
 
 /**
  * Writing in a group from a request (plan #2879.1.2): POST
@@ -126,6 +127,7 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
       handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
       // A request passed to another bot (plan #3003.2), for the owner alone, as hand_off is.
       passToBot: owner ? botPasser(client, core, userId) : undefined,
+      recordSlip: (slip) => keepSlip(core, userId, slip),
       claimed: from.claimed,
       round: from.round,
       deadline: Date.now() + BURST_REQUEST_MS,
