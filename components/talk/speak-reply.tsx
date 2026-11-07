@@ -377,7 +377,7 @@ export function SpeakingPill({ className }: { className?: string }) {
   };
 
   return (
-    <div ref={anchor} className={cn('pointer-events-none sticky top-0 z-10 h-0 self-stretch', className)}>
+    <div ref={anchor} className={cn('pointer-events-none sticky top-0 z-over-link h-0 self-stretch', className)}>
       {shown && (
         <div className="flex justify-center">
           <div
