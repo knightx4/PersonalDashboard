@@ -789,6 +789,13 @@ only the host and the last four characters.
   fresh. `refreshing_since` is the claim that stops two tabs fetching the same
   address at once, and a page render gets a shorter fetch timeout than the
   Refresh now button does.
+  Since plan #3045 every read of the combined schedule (`lib/todo/schedule`)
+  does the same first: Dash's and the mentors' schedule lookup, the morning
+  brief and the agenda. Each stale subscription gets four seconds; one that
+  fails or is slow is answered from its stored rows and named in the
+  schedule's `stale` list, and the lookup tells the bot to say that calendar
+  may be out of date. A read already under way in the same process is shared,
+  and a failed one is reused for a minute. Still no cron entry.
 
 A failed read never empties the page. `last_read_at` moves only on a good read,
 `last_error` carries the reason, and the appointments from the last good read

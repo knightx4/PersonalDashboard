@@ -5,6 +5,7 @@ import type { ModuleId } from '@/lib/modules';
 import { endDay, isAllDay, startDay, type Event } from '@/lib/todo/events/model';
 import { loadEventsInWindow } from '@/lib/todo/events/load';
 import { loadFeedEventsInWindow, type SubscribedEvent } from '@/lib/todo/feeds/load';
+import { syncStaleFeeds } from '@/lib/todo/feeds/refresh';
 import { loadOpenTasks } from '@/lib/todo/tasks/load';
 import { addDays, dueDay, isSnoozed, type Task } from '@/lib/todo/tasks/model';
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
@@ -33,6 +34,12 @@ import { foldSchedule, type ScheduleEntry, type ScheduleRange } from './model';
  *
  * Every read names the person, so the service-role clients the morning brief
  * and the connector pass are as safe as the session's (clients.ts).
+ *
+ * Subscribed calendars are re-read first when their copy is over an hour old
+ * (plan #3045), so a bot asked about tonight sees the invite that arrived
+ * since anybody opened the calendar. Each re-read gets a few seconds; one
+ * that fails or is slow leaves its stored rows in place and its name in
+ * `stale`, for the reader to say that calendar may be out of date.
  */
 
 export interface Schedule {
@@ -41,6 +48,8 @@ export interface Schedule {
   entries: ScheduleEntry[];
   /** The sources that did not answer, in words. */
   failed: string[];
+  /** Subscribed calendars that could not be re-read just now, by name, so may be out of date. */
+  stale: string[];
 }
 
 export interface ScheduleOptions {
@@ -81,6 +90,7 @@ export async function loadSchedule(
 
   const ctx: SourceContext = { userId, timezone: zone, from: range.from, to: range.to, now, clients };
 
+  const stale: string[] = [];
   const reads: { label: string; run: () => Promise<ScheduleEntry[]> }[] = [
     {
       label: 'Your calendar',
@@ -90,6 +100,8 @@ export async function loadSchedule(
     {
       label: 'Subscribed calendars',
       run: async () => {
+        const behind = await syncStaleFeeds(userId, { client: todo, now, timezone: zone }).catch(() => [] as string[]);
+        stale.push(...behind.map((name) => `${name} calendar`));
         const events = await loadFeedEventsInWindow(userId, range, zone, todo);
         const names = await feedNames(userId, events, clients);
         return events.map((event) =>
@@ -146,7 +158,7 @@ export async function loadSchedule(
     }
   });
 
-  return { range, timezone: zone, entries: foldSchedule(entries), failed };
+  return { range, timezone: zone, entries: foldSchedule(entries), failed, stale };
 }
 
 /** The names of the calendars these subscribed events came from, by feed id. */

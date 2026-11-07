@@ -81,6 +81,9 @@ export async function scheduleLookup(ctx: AskContext, input: Record<string, unkn
     schedule.failed.length > 0
       ? `These could not be read, so the day may hold more: ${schedule.failed.join(', ')}. Say so.`
       : null,
+    schedule.stale.length > 0
+      ? `These subscribed calendars could not be re-read just now, so what they show may be out of date: ${schedule.stale.join(', ')}. Say so in a sentence.`
+      : null,
   ].filter(Boolean);
 
   return {
