@@ -57,8 +57,14 @@ export const NOTHING_ATTACHED =
 export const NOTHING_ATTACHED_CHART_ONLY =
   'Sorry, no file came through with that: I can draw a chart here, but I cannot send files or pictures yet.';
 
-/** Ask Dash's closing sentence, where the chart it draws counts as sent. */
-export const NOTHING_ATTACHED_ASK =
+/**
+ * Ask Dash's closing sentence when it claimed a file its code did not make
+ * (plan #3050.3.2): a chart it drew counts as sent.
+ */
+export const NOTHING_ATTACHED_ASK = 'Nothing is attached to this answer: no file was made to send. Ask again and Dash will make it.';
+
+/** Ask Dash's closing sentence where nothing its code makes could be kept, so a chart is the one thing sent. */
+export const NOTHING_ATTACHED_ASK_CHART_ONLY =
   'Nothing is attached to this answer: Dash can draw a chart here but cannot send a file or picture yet.';
 
 const FILE_EXTENSIONS = 'png|jpe?g|gif|webp|svg|pdf|csv|xlsx?|docx?|pptx?|zip|json|txt|html?|md';

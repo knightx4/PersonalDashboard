@@ -53,6 +53,16 @@ function onlyFiles(turn: Pick<TalkTurn, 'body' | 'files'>): boolean {
 }
 
 /**
+ * A turn's files: the person's as small thumbnails and chips, and those
+ * Dash's code made for an answer (plan #3050.3.2) drawn large, as a bot's
+ * are on People, since a chart made as a picture is the answer.
+ */
+function TurnFiles({ files, mine, name }: { files: NonNullable<TalkTurn['files']>; mine: boolean; name: string }) {
+  if (mine) return <AskTurnFiles files={files} />;
+  return <AskTurnFiles files={files} large fit label={`Made by ${name} for this answer`} />;
+}
+
+/**
  * Every conversation in the app, and the box for adding to it
  * (docs/CORE-AND-DASH-SPEC.md, Part 2; docs/ONE-INTERFACE-SPEC.md, "One
  * thread", plan #1964.3).
@@ -1696,7 +1706,7 @@ function TalkThread({
                 <Words body={turn.body} refs="outlines" marks={marksFor(turn)} />
               </>
             )}
-            {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+            {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
             {!mine && <ReplyCharts calls={turn.toolCalls} />}
             {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
             {isPending(turn.id)
@@ -1777,7 +1787,7 @@ function TalkThread({
                 ) : (
                   <Words body={turn.body} refs="outlines" />
                 )}
-                {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+                {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
                 {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}

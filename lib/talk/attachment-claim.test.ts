@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { askDash, type AskStores } from '@/lib/dash/ask';
 import type { DashSlip } from '@/lib/dash/slips';
 import type { NewTalkTurn, TalkTurn } from './talk';
-import { attachmentClaim, claimSlip, falseAttachment, NOTHING_ATTACHED_ASK } from './attachment-claim';
+import { attachmentClaim, claimSlip, falseAttachment, NOTHING_ATTACHED_ASK_CHART_ONLY } from './attachment-claim';
 
 describe('attachmentClaim (plan #3050.1)', () => {
   it("catches Newt's reply of 7 November", () => {
@@ -95,7 +95,7 @@ describe('Ask Dash (plan #3050.1)', () => {
   it('ends an answer that claims a file with a sentence saying nothing is attached, and keeps a slip', async () => {
     const h = harness('I have attached the PDF.');
     await askDash({ question: 'Send me a PDF', today: '2026-11-07', execute: h.execute, anthropicApiKey: 'k', client: h.client }, h.stores);
-    expect(h.kept.at(-1)?.body).toBe(`I have attached the PDF.\n\n${NOTHING_ATTACHED_ASK}`);
+    expect(h.kept.at(-1)?.body).toBe(`I have attached the PDF.\n\n${NOTHING_ATTACHED_ASK_CHART_ONLY}`);
     expect(h.slips).toEqual([expect.objectContaining({ kind: 'claimed_attachment', surface: 'ask', conversation: 'ask:conv-new' })]);
   });
 

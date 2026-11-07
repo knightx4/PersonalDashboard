@@ -421,6 +421,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['/chat/dash/[ref]'],
   'ask-dash-charts': ['/chat/dash/[ref]'],
   'ask-dash-charts-full': ['/chat/dash/[ref]'],
+  'ask-dash-made-files': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
@@ -1133,6 +1134,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // table, and a chart opened full screen with its tooltip showing.
   'ask-dash-charts': ['components/talk/reply-chart.tsx'],
   'ask-dash-charts-full': ['components/talk/reply-chart.tsx'],
+  // The files an answer's code made, under it (plan #3050.3.2).
+  'ask-dash-made-files': ['components/thread/thread.tsx', 'components/attachments/ask-turn-files.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],
