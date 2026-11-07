@@ -9,6 +9,11 @@
  *       [--link "<label>=<path>"]… [--undo]                                                 # People
  *   npx tsx scripts/handoff-session.ts close <hand-off id> --failed "<the reason, in a sentence>"
  *   npx tsx scripts/handoff-session.ts cost              # what this session has cost so far
+ *   npx tsx scripts/handoff-session.ts browser <hand-off id> --route chrome|headless|none --reason "<why>"
+ *
+ * `browser` records which browser a browser task used, or that it could use
+ * none (plan #3040.2, lib/talk/handoff-browser.ts). A browser task's done
+ * close is refused until it has.
  *
  * `seen` keeps last_seen_at, so a session gone quiet can be flagged, and
  * moves a hand-off still queued to running. `close` sets it done or failed
@@ -50,6 +55,8 @@ import {
   transcriptSpend,
   type SessionClose,
 } from '../lib/talk/handoff-session';
+import { BROWSER_SQL, browserChoice, browserCloseRefusal } from '../lib/talk/handoff-browser';
+import type { HandoffBrowser } from '../lib/talk/handoffs';
 
 type Sql = { unsafe: (query: string, parameters?: readonly unknown[]) => Promise<Record<string, unknown>[]> };
 
@@ -147,7 +154,16 @@ async function close(sql: Sql, owner: string, id: string, args: string[]) {
   const ending: SessionClose = reason
     ? { outcome: 'failed', reason, replyTurnId, noteId }
     : { outcome: 'done', replyTurnId, noteId };
-  const refused = closeRefusal(thread, ending, reply);
+  const refused =
+    closeRefusal(thread, ending, reply) ??
+    browserCloseRefusal(
+      {
+        browserTask: row.browser_task === true,
+        browser: (row.browser as HandoffBrowser | null) ?? null,
+        browserReason: (row.browser_reason as string | null) ?? null,
+      },
+      ending.outcome === 'done',
+    );
   if (refused) fail(refused);
   const [handoff] = await sql.unsafe(CLOSE_SQL, closeParameters(id, owner, ending, spend));
   if (!handoff) fail(`No open session hand-off ${id} in the owner's account. It may be closed already.`);
@@ -165,6 +181,14 @@ async function close(sql: Sql, owner: string, id: string, args: string[]) {
   );
 }
 
+async function browser(sql: Sql, owner: string, id: string, args: string[]) {
+  const choice = browserChoice(flag(args, '--route'), flag(args, '--reason'));
+  if (!choice.ok) fail(choice.error);
+  const rows = await sql.unsafe(BROWSER_SQL, [id, owner, choice.browser, choice.reason]);
+  if (rows.length === 0) fail(`No open session hand-off ${id} in the owner's account. It may be closed already.`);
+  console.log(JSON.stringify(rows[0], null, 2));
+}
+
 async function main() {
   const [command, id, ...rest] = process.argv.slice(2);
   if (command === 'cost') {
@@ -172,15 +196,16 @@ async function main() {
     console.log(JSON.stringify({ spend, total_micros: totalSessionMicros(spend) }, null, 2));
     return;
   }
-  if ((command !== 'seen' && command !== 'close') || !id || !UUID.test(id)) {
+  if ((command !== 'seen' && command !== 'close' && command !== 'browser') || !id || !UUID.test(id)) {
     fail(
-      'Usage: handoff-session.ts seen <id> | close <id> --done --reply-turn <id> | close <id> --done --reply "<text>" [--link "<label>=<path>"]… [--undo] | close <id> --failed "<reason>" | cost',
+      'Usage: handoff-session.ts seen <id> | browser <id> --route chrome|headless|none --reason "<why>" | close <id> --done --reply-turn <id> | close <id> --done --reply "<text>" [--link "<label>=<path>"]… [--undo] | close <id> --failed "<reason>" | cost',
     );
   }
   const { sql, end } = connect();
   try {
     const owner = await ownerId(sql);
     if (command === 'seen') await seen(sql, owner, id);
+    else if (command === 'browser') await browser(sql, owner, id, rest);
     else await close(sql, owner, id, rest);
   } finally {
     await end();

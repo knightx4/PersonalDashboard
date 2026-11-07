@@ -73,3 +73,80 @@ on session hand-offs only:
   the bot can pass on.
 
 No passwords and no page contents are kept.
+
+## How a session picks (plan #3040.2)
+
+The dash-backup skill's **A browser task** section has the order. A session
+with Claude in Chrome's tools, which only a session on the person's own
+computer has, checks that the extension answers and uses it. Without them it
+reads public pages in the headless Chromium through `scripts/browse.ts`. When
+a page needs a sign-in and Chrome is not there, it uses neither and closes
+failed with the reason. In each case it first records the route with
+`npx tsx scripts/handoff-session.ts browser <id> --route chrome|headless|none
+--reason "…"`, and `close --done` refuses a browser task that has not. A
+session never buys, sends or submits a form in either browser.
+
+## The runner on the PC and the Mac (plan #3040.5 and #3040.6)
+
+`npm run browser-runner -- pc` (or `mac`), started from a checkout on that
+computer with Chrome open and Claude Code signed in, is the route to the
+person's Chrome. Every 30 seconds it sends a heartbeat
+(`core.browser_runner_heartbeat`) and claims the oldest pending browser task
+(`core.claim_browser_task`, migration 0312). The claim function puts the PC
+first: the Mac gets a task only when the PC has sent no heartbeat for 2
+minutes.
+
+With a task claimed, the runner checks that Claude in Chrome answers, with a
+short `claude -p --chrome` run that lists the tabs. If it does not, the
+runner clears `claimed_by` and `claimed_at`, writes nothing else, and sends
+no heartbeat and claims nothing for 5 minutes, so the other computer or the
+cloud session takes the task. If it does, the runner moves the hand-off to
+running, so the cloud starts no second session on it, and runs
+`claude -p --chrome` on the hand-off's brief with lines telling the session
+it is on the person's PC or Mac. That session follows the skill's **A browser
+task**: it records route `chrome` with the reason "Ran on your PC in Chrome.",
+replies in the thread and closes the hand-off. A hand-off the session leaves
+open is closed failed by the runner. The loop is in
+lib/talk/browser-runner.ts and the database calls in scripts/browser-runner.ts.
+
+## The wait for the PC or Mac, and a claim that goes quiet
+
+Plan #3040.4. A browser task is not started in the cloud when it is kept.
+`fireSessionHandoff` leaves a row with `browser_task` true pending, so the
+runner on the PC or the Mac can claim it (`core.claim_browser_task`,
+migration 0312) and do it in the person's own Chrome.
+
+Every minute pg_cron calls `/api/cron/browser-handoffs` (migration 0313,
+`inngest/core/browser-wait.ts`, rules in `lib/talk/browser-wait.ts`). One pass:
+
+1. Lets go of a claim whose computer has gone quiet.
+   `core.release_stale_browser_claims()` sets `claimed_by` and `claimed_at`
+   back to null on a pending browser task claimed over 5 minutes ago by a
+   computer whose last heartbeat in `core.browser_runners` is over 5 minutes
+   old, or which never sent one.
+2. Starts the cloud session on every browser task still pending and
+   unclaimed 3 minutes after it was kept (`BROWSER_WAIT_MS` in
+   lib/talk/handoff-fire.ts). The update that marks it fired also requires
+   `claimed_by is null`, so a computer that claims it in the meantime keeps
+   it and no cloud session starts.
+3. Says in the thread, as the bot that handed it on, that none of the
+   person's computers picked it up and that the cloud session can use public
+   pages only. If the cloud session will not start, the line says why
+   instead.
+
+A task let go in step 1 has already waited past the 3 minutes, so step 2
+starts it in the cloud on the same pass. It does not go back to the other
+computer first: a computer that died partway through a task may have left
+it half done, and the cloud session starting from the request is the
+predictable outcome.
+
+How this fits the runner (#3040.6): a claimed task stays pending only
+between the claim and the runner's check that Chrome answers. If Chrome
+answers, the runner moves it to fired, and neither the release nor the cloud
+fire touches a row that is not pending. If Chrome does not answer, the runner
+clears the claim itself and stands down for 5 minutes, so the next pass
+starts the task in the cloud. The release in step 1 is for the case neither
+covers: a runner that claimed a task and then died or lost its connection
+before either move.
+
+Hand-offs that are not browser tasks start at once, as before.

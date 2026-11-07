@@ -18,12 +18,33 @@ import type { SessionHandoff } from './handoffs';
  * says it did not get passed on (startHandoffs in lib/dash/ask.ts, notHandedOn
  * in lib/talk/session-handoff.ts), so the watch (you.watch_bot_pages) does
  * not say it a second time.
+ *
+ * A browser task (plan #3040.4) is not started here when it is kept. It
+ * stays pending for BROWSER_WAIT_MS so the runner on the person's PC or Mac
+ * can claim it (core.claim_browser_task, migration 0312) and use their own
+ * Chrome. The minute sweep (runBrowserWait, lib/talk/browser-wait.ts) then
+ * calls this with `afterWait`, and the row is claimed for the cloud only
+ * where no computer has claimed it, in the same update, so a runner's claim
+ * and the cloud's never both win.
  */
+
+/** How long a browser task waits for a computer of the person's before the cloud takes it. */
+export const BROWSER_WAIT_MS = 3 * 60_000;
 
 export type FireSessionDeps = {
   routine?: () => RoutineTarget;
   fire?: (options: { apiKey: string | null; routineId?: string | null; text?: string | null }) => Promise<FireRoutineResult>;
   now?: () => Date;
+  /** The browser task has waited its BROWSER_WAIT_MS: start it if no computer claimed it. */
+  afterWait?: boolean;
+};
+
+export type FireSessionResult = {
+  state: HandoffState;
+  runId: string | null;
+  error: string | null;
+  /** This call started the cloud session. */
+  started: boolean;
 };
 
 /** Said on the row when this deployment has no backup routine to start. */
@@ -35,27 +56,31 @@ export async function fireSessionHandoff(
   userId: string,
   handoff: SessionHandoff,
   deps: FireSessionDeps = {},
-): Promise<{ state: HandoffState; runId: string | null; error: string | null }> {
-  if (handoff.state !== 'queued') return { state: handoff.state, runId: handoff.runId, error: handoff.error };
+): Promise<FireSessionResult> {
+  if (handoff.state !== 'queued') return { state: handoff.state, runId: handoff.runId, error: handoff.error, started: false };
+  // Left for a computer of theirs to claim; the sweep starts it after the wait.
+  if (handoff.browserTask && !deps.afterWait) return { state: 'queued', runId: null, error: null, started: false };
   const now = (deps.now ?? (() => new Date()))().toISOString();
   const routine = (deps.routine ?? dashBackupRoutine)();
 
   if (!routine.id || !routine.token) {
     await finish(core, userId, handoff.id, NO_SESSION_ROUTINE, now, 'pending');
-    return { state: 'failed', runId: null, error: NO_SESSION_ROUTINE };
+    return { state: 'failed', runId: null, error: NO_SESSION_ROUTINE, started: false };
   }
 
-  const { data: claimed, error: claimError } = await core
+  let claim = core
     .from('dash_handoffs')
     .update({ status: 'fired', fired_at: now, last_seen_at: now })
     .eq('id', handoff.id)
     .eq('user_id', userId)
     .eq('kind', 'session')
-    .eq('status', 'pending')
-    .select('id');
+    .eq('status', 'pending');
+  // A computer of theirs that claimed the browser task keeps it.
+  if (handoff.browserTask) claim = claim.is('claimed_by', null);
+  const { data: claimed, error: claimError } = await claim.select('id');
   if (claimError) throw new Error(`Starting the hand-off failed: ${claimError.message}`);
-  // Another caller claimed it first and is starting the session.
-  if (!claimed || claimed.length === 0) return { state: 'running', runId: null, error: null };
+  // Another caller (or the person's PC or Mac) claimed it first.
+  if (!claimed || claimed.length === 0) return { state: 'running', runId: null, error: null, started: false };
 
   const fired = await (deps.fire ?? fireFeatureRoutine)({
     apiKey: routine.token,
@@ -65,7 +90,7 @@ export async function fireSessionHandoff(
   if (!fired.ok) {
     const reason = `The session could not be started: ${fired.error}`.slice(0, 1000);
     await finish(core, userId, handoff.id, reason, now, 'fired');
-    return { state: 'failed', runId: null, error: reason };
+    return { state: 'failed', runId: null, error: reason, started: false };
   }
   if (fired.runId) {
     const { error } = await core
@@ -75,7 +100,7 @@ export async function fireSessionHandoff(
       .eq('user_id', userId);
     if (error) console.error('the hand-off run id was not kept', error.message);
   }
-  return { state: 'running', runId: fired.runId, error: null };
+  return { state: 'running', runId: fired.runId, error: null, started: true };
 }
 
 async function finish(
