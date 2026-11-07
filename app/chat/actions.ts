@@ -14,7 +14,8 @@ import { fishEnv, fishVoice, fishVoices } from '@/lib/talk/speech/fish';
 import { VOICE_ID, type VoiceList } from '@/lib/talk/speech/voices-model';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadPeople, loadThreadPage, markThreadRead, startChat, threadHref, withChats, type ThreadPage } from '@/lib/you/chat-threads';
-import { withMessageFiles } from '@/lib/you/chat-message-files';
+import { messageFiles, withMessageFiles } from '@/lib/you/chat-message-files';
+import type { ThreadFile } from '@/lib/you/chat-threads-model';
 import {
   createGroup,
   deleteGroup,
@@ -86,6 +87,24 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+/**
+ * The files a bot's code made for one of its messages (plan #3050.3.1), read
+ * when the thread hears the message's file count rise, since a Realtime row
+ * never carries them. Null when they could not be read; the thread keeps
+ * what it has.
+ */
+// latency: instant
+export async function threadMessageFiles(messageId: string): Promise<ThreadFile[] | null> {
+  await requireUser();
+  if (!UUID.test(messageId)) return null;
+  try {
+    return await messageFiles(await createCoreClient(), messageId);
+  } catch (error) {
+    console.error('message files not read', error);
+    return null;
   }
 }
 

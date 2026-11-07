@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#ffffff"/>
+  <text x="60" y="48" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#222222">US markets, 2 to 6 November 2026 (change since Monday, %)</text>
+  <g stroke="#e6e6e6" stroke-width="1">
+    <line x1="80" y1="100" x2="760" y2="100"/>
+    <line x1="80" y1="180" x2="760" y2="180"/>
+    <line x1="80" y1="260" x2="760" y2="260"/>
+    <line x1="80" y1="340" x2="760" y2="340"/>
+    <line x1="80" y1="420" x2="760" y2="420"/>
+  </g>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#555555" text-anchor="end">
+    <text x="70" y="105">2.0</text>
+    <text x="70" y="185">1.0</text>
+    <text x="70" y="265">0.0</text>
+    <text x="70" y="345">-1.0</text>
+  </g>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#555555" text-anchor="middle">
+    <text x="100" y="450">Mon</text>
+    <text x="260" y="450">Tue</text>
+    <text x="420" y="450">Wed</text>
+    <text x="580" y="450">Thu</text>
+    <text x="740" y="450">Fri</text>
+  </g>
+  <polyline fill="none" stroke="#1f77b4" stroke-width="3" points="100,260 260,228 420,284 580,196 740,164"/>
+  <polyline fill="none" stroke="#ff7f0e" stroke-width="3" points="100,260 260,188 420,324 580,132 740,92"/>
+  <polyline fill="none" stroke="#2ca02c" stroke-width="3" points="100,260 260,252 420,244 580,220 740,204"/>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#222222">
+    <rect x="590" y="70" width="14" height="4" fill="#1f77b4"/><text x="612" y="77">S&amp;P 500</text>
+    <rect x="590" y="94" width="14" height="4" fill="#ff7f0e"/><text x="612" y="101">Nasdaq</text>
+    <rect x="590" y="118" width="14" height="4" fill="#2ca02c"/><text x="612" y="125">Dow</text>
+  </g>
+</svg>

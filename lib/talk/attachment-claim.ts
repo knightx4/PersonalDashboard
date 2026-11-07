@@ -13,11 +13,33 @@
  * text, as Ask Dash does. A reply that drew one may say so; a reply that
  * names a file, a picture or a PDF is still flagged, chart or not.
  *
+ * A bot in a direct thread can send what its code makes (plan #3050.3.1).
+ * A reply whose code made a file is not checked at all: what was kept shows
+ * under it, and what could not be kept is said in a text of its own
+ * (lib/talk/made-files.ts).
+ *
  * Pure: nothing here reads a database or the network.
  */
 
-/** What every bot is told, after its own rules: it can draw a chart, but it cannot attach a file, so it never says it did. */
-export const ATTACH_RULES = `YOU CAN DRAW A CHART, BUT YOU CANNOT SEND FILES. When they ask for a chart
+/**
+ * What a bot in a direct thread is told, after its own rules (plan
+ * #3050.3.1): it can draw a chart, and it can send a file its code makes,
+ * so it never says it sent one it did not make.
+ */
+export const ATTACH_RULES = `YOU CAN DRAW A CHART, AND YOU CAN SEND FILES YOUR CODE MAKES. When they ask
+for a chart or a table of figures, call show_chart with the figures a lookup
+or a search gave you, and it is drawn under your text; then say in a sentence
+what it shows. When they ask for an image, a PDF or another file, make it with
+code_execution: write the file in your code (a PNG with matplotlib, a PDF, a
+CSV) and it is sent under your text, up to four files, each up to 20 MB, as an
+image, a PDF, a Word file, text or CSV. Put the figures from a lookup or a
+search into the code yourself; the code cannot reach their rows or the web.
+Say in a sentence what you sent. Never write that you attached or sent a file
+your code did not make, and never name one (such as markets.png) as though it
+were there.`;
+
+/** What a group's speakers are told, who cannot run code yet: a chart is drawn, no file is sent. */
+export const CHART_ONLY_RULES = `YOU CAN DRAW A CHART, BUT YOU CANNOT SEND FILES. When they ask for a chart
 or a table of figures, call show_chart with the figures a lookup or a search
 gave you, and it is drawn under your text; then say in a sentence what it
 shows. Nothing else goes with your replies: no image, picture, PDF,
@@ -27,8 +49,12 @@ markets.png) as though it were there. When they ask for an image or a file,
 say in a sentence that you cannot send one here yet, then give what you can:
 a chart, the figures in words, or a link to a page that has them.`;
 
-/** The closing text a reply that claimed an attachment gets when nothing was sent. */
+/** The closing text a direct reply that claimed an attachment gets when its code made none. */
 export const NOTHING_ATTACHED =
+  'Sorry, no file came through with that: nothing was made to send. Ask again and I will make it.';
+
+/** The closing text a group's text that claimed an attachment gets, where only a chart can be sent. */
+export const NOTHING_ATTACHED_CHART_ONLY =
   'Sorry, no file came through with that: I can draw a chart here, but I cannot send files or pictures yet.';
 
 /** Ask Dash's closing sentence, where the chart it draws counts as sent. */
@@ -103,9 +129,11 @@ export function fileClaim(text: string): string | null {
  * What to do about a reply's text: null when it is honest, else the
  * sentence that claimed a file. `charts` is how many charts the reply drew:
  * with none, any claim of a chart or a file counts; with one or more, only a
- * claim of a file does.
+ * claim of a file does. `files` is how many files its code made (plan
+ * #3050.3.1): with any, nothing it says is counted as a false claim.
  */
-export function falseAttachment(text: string, charts: number): string | null {
+export function falseAttachment(text: string, charts: number, files = 0): string | null {
+  if (files > 0) return null;
   if (charts > 0) return fileClaim(text);
   return attachmentClaim(text);
 }

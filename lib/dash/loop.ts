@@ -13,6 +13,7 @@ import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type 
 import { whenDate, whenWeekday } from '@/lib/core/when';
 import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
 import { searchedPages, textCitedPages } from './web-search';
+import { madeFileIds } from '@/lib/talk/made-files';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -435,6 +436,12 @@ export type DashAnswer =
        * the model cited, which an exact quote can be checked against.
        */
       webCited?: string[];
+      /**
+       * For a voice with code execution (plan #3050.3.1): the ids of the
+       * files its code wrote in this answer, oldest first, for the caller to
+       * read through the Files API and keep with the reply. Absent: none.
+       */
+      madeFiles?: string[];
       /**
        * What the person asked for that Dash could not do or see, in the
        * model's sentence, when the answer says so. Ask files it as a note so
@@ -927,8 +934,12 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const webCited: string[] = [];
   // Set once a limit has been met with one more stretch (voice.extend, plan #2999).
   let extended = false;
-  const extras = (): { report?: unknown; webCited?: string[]; extended?: true } => ({
+  // The files the code wrote, and the container it ran in, which later rounds reuse (plan #3050.3.1).
+  const madeFiles: string[] = [];
+  let container: string | null = null;
+  const extras = (): { report?: unknown; webCited?: string[]; madeFiles?: string[]; extended?: true } => ({
     ...(choose ? { webCited } : {}),
+    ...(madeFiles.length > 0 ? { madeFiles: [...madeFiles] } : {}),
     ...(extended ? { extended: true as const } : {}),
   });
   const toolCalls: TalkToolCall[] = [];
@@ -1155,6 +1166,8 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           tools,
           tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
           messages: withRollingBreakpoint(messages),
+          // Widened: the installed SDK's params predate the container.
+          ...(container ? ({ container } as Record<string, string>) : {}),
         },
         onText,
         finishName,
@@ -1185,6 +1198,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       webCited.push(...citedSearchText(content));
       // Pages a search returned may be cited, as rows a lookup returned may (plan #2861).
       for (const page of searchedPages(content)) known.set(citationKey(page), page);
+      for (const id of madeFileIds(content)) if (!madeFiles.includes(id)) madeFiles.push(id);
+      const ran = (response as unknown as { container?: { id?: unknown } | null }).container?.id;
+      if (typeof ran === 'string' && ran) container = ran;
     }
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
@@ -1346,6 +1362,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           toolCalls,
           citations: pages,
           stop,
+          ...(madeFiles.length > 0 ? { madeFiles: [...madeFiles] } : {}),
           ...(extended ? { extended: true as const } : {}),
         };
       }

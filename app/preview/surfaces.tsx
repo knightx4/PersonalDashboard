@@ -9399,6 +9399,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface state="chart" />,
   },
   {
+    /* Files a bot's code made (plan #3050.3.1): asked for the markets chart as an image and a PDF, the reply's bubble has the PNG under it as a picture that opens full size and the PDF as a chip with its name, then a text saying the file that could not be kept. */
+    id: 'chat-people-thread-made-files',
+    label: 'Chat · A thread, files a bot made under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="made-files" />,
+  },
+  {
     /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */
     id: 'chat-people-thread-adding',
     label: 'Chat · A thread, files in the box',

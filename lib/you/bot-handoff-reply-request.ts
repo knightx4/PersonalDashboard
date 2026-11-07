@@ -8,6 +8,7 @@ import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import { endBotHandoff, loadBotHandoff, pickUpBotHandoff } from '@/lib/talk/bot-handoffs';
 import { createYouClient } from '@/lib/you/auth/server';
 import { listRoster } from '@/lib/you/board-advisors';
+import { keepMadeFiles } from '@/lib/you/chat-message-files';
 import { answerBotHandoff, type HandoffBot, type HandoffReplyPorts, type HandoffReplyResult } from '@/lib/you/bot-handoff-reply';
 import { claimTyping, replyToHandoff } from '@/lib/you/mentor-reply';
 import { announceUnreadReply } from '@/lib/you/mentor-reply-request';
@@ -69,6 +70,8 @@ export async function answerBotHandoffInRequest(userId: string, handoffId: strin
         // Ask Dash's own actions, kept as this bot's under its hand-off line (plan #2854.2).
         act: dash,
         recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
+        // What the bot's code made, kept under its reply (plan #3050.3.1).
+        keepFiles: (messageId, files) => keepMadeFiles(core, userId, messageId, files),
         handoff,
       }),
     end: async (id, end) => {

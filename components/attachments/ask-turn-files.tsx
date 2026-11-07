@@ -28,17 +28,17 @@ export function AskTurnFiles({
 }) {
   if (files.length === 0) return null;
   return (
-    <ul className={cn('flex flex-wrap gap-1.5', large ? 'py-0.5' : 'pt-1', align === 'end' && 'justify-end')} aria-label={label}>
+    <ul className={cn('flex min-w-0 max-w-full flex-wrap gap-1.5', large ? 'py-0.5' : 'pt-1', align === 'end' && 'justify-end')} aria-label={label}>
       {files.map((file, index) => {
         const key = file.id ?? `${file.name}-${index}`;
         if (file.href && isImageAttachment(file.contentType)) {
           return (
-            <li key={key}>
+            <li key={key} className="min-w-0 max-w-full">
               <a
                 href={file.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="press-area block overflow-hidden rounded-card bg-sunken"
+                className="press-area block max-w-full overflow-hidden rounded-card bg-sunken"
                 title={file.name}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- a signed, private link; next/image cannot optimise it */}

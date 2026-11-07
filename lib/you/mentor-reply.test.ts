@@ -17,7 +17,7 @@ import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
-import { ATTACH_RULES, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import { CHART_DRAWN, parseChart } from '@/lib/talk/chart';
 import type { DashExecutor } from '@/lib/dash/loop';
 
@@ -205,6 +205,61 @@ function chartStub(chart: Record<string, unknown>, pieces: string[]) {
   return { stub, streamed };
 }
 
+/**
+ * A client whose first round runs code that writes `files` (by file id), and
+ * whose second answers with `pieces`; `get` serves the Files API.
+ */
+function codeStub(pieces: string[], files: Record<string, { filename: string; mime_type: string; size_bytes: number; bytes: number[] }>) {
+  const streamed: Record<string, unknown>[] = [];
+  const usage = { input_tokens: 3_000, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const stub = {
+    messages: {
+      create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+      stream: (params: Record<string, unknown>) => {
+        streamed.push(params);
+        const round = streamed.length;
+        return {
+          on() {
+            return this;
+          },
+          async finalMessage() {
+            if (round === 1) {
+              return {
+                content: [
+                  { type: 'server_tool_use', id: 's1', name: 'bash_code_execution', input: { command: 'python chart.py' } },
+                  {
+                    type: 'bash_code_execution_tool_result',
+                    tool_use_id: 's1',
+                    content: {
+                      type: 'bash_code_execution_result',
+                      stdout: '',
+                      stderr: '',
+                      return_code: 0,
+                      content: Object.keys(files).map((file_id) => ({ type: 'bash_code_execution_output', file_id })),
+                    },
+                  },
+                ],
+                container: { id: 'container_1' },
+                stop_reason: 'pause_turn',
+                usage,
+              };
+            }
+            return answerMessage(pieces.join(''));
+          },
+        };
+      },
+    },
+    get: async (path: string) => {
+      const id = /\/v1\/files\/([^/]+)/.exec(path)?.[1] ?? '';
+      const file = files[id];
+      if (!file) throw new Error('no such file');
+      if (path.endsWith('/content')) return new Response(new Uint8Array(file.bytes));
+      return { filename: file.filename, mime_type: file.mime_type, size_bytes: file.size_bytes };
+    },
+  } as unknown as Anthropic;
+  return { stub, streamed };
+}
+
 /** The chart lookup as Ask runs it (lib/ask/tools.ts chartLookup). */
 const drawChart: DashExecutor = async (name, input) => {
   const parsed = parseChart(input);
@@ -275,7 +330,7 @@ describe('replyToMentor', () => {
     const { stub, streamed } = anthropicStub(["Choppy week.", "\n\nHere's your chart, attached as stocks_week.png!"]);
     const recordSlip = vi.fn(async () => undefined);
     const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
-    await run(tables, stub, { act }).promise;
+    await run(tables, stub, { act, keepFiles: vi.fn() }).promise;
 
     expect(mentorRows(tables).map((m) => m.text)).toEqual(['Choppy week.', "Here's your chart, attached as stocks_week.png!", NOTHING_ATTACHED]);
     expect(recordSlip).toHaveBeenCalledWith(
@@ -308,8 +363,47 @@ describe('replyToMentor', () => {
     const { stub } = chartStub(MARKETS, ['Here is the chart, attached as markets.png.']);
     await run(tables, stub, { execute: drawChart }).promise;
     const rows = mentorRows(tables);
-    expect(rows.map((m) => m.text)).toEqual(['Here is the chart, attached as markets.png.', NOTHING_ATTACHED]);
+    expect(rows.map((m) => m.text)).toEqual(['Here is the chart, attached as markets.png.', NOTHING_ATTACHED_CHART_ONLY]);
     expect(rows[0].charts).toHaveLength(1);
+  });
+
+  it('offers code execution and says it can send files only where the files are kept (plan #3050.3.1)', async () => {
+    const without = anthropicStub(['Fine.']);
+    await run(world(), without.stub).promise;
+    const plain = (without.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
+    expect(plain).toContain(CHART_ONLY_RULES);
+    expect((without.streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('code_execution');
+
+    const withFiles = anthropicStub(['Fine.']);
+    await run(world(), withFiles.stub, { keepFiles: vi.fn() }).promise;
+    expect((withFiles.streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('code_execution');
+  });
+
+  it('keeps the files its code made under the last bubble, counts them, and says which could not be kept (plan #3050.3.1)', async () => {
+    const tables = world();
+    const { stub, streamed } = codeStub(['Choppy week.', "\n\nHere's the chart as a picture."], {
+      file_png: { filename: 'markets.png', mime_type: 'image/png', size_bytes: 4, bytes: [137, 80, 78, 71] },
+      file_svg: { filename: 'markets.svg', mime_type: 'image/svg+xml', size_bytes: 9, bytes: [60] },
+    });
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    const keepFiles = vi.fn(async (_id: string, files: { name: string }[]) => ({ kept: files.map((f) => ({ name: f.name })), unkept: [] }));
+    await run(tables, stub, { act, keepFiles }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual([
+      'Choppy week.',
+      "Here's the chart as a picture.",
+      expect.stringContaining('markets.svg could not be saved'),
+    ]);
+    expect(keepFiles).toHaveBeenCalledTimes(1);
+    const [messageId, files] = keepFiles.mock.calls[0];
+    expect(messageId).toBe(rows[1].id);
+    expect(files.map((f) => f.name)).toEqual(['markets.png']);
+    expect(rows[1].file_count).toBe(1);
+    expect(recordSlip).not.toHaveBeenCalled();
+    // The paused round goes on in the container the code ran in.
+    expect(streamed[1].container).toBe('container_1');
   });
 
   it('adds nothing to a reply that claims no file', async () => {

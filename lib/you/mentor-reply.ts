@@ -19,6 +19,7 @@ import {
   PEOPLE_WEB_RULES,
   peopleActing,
   peopleServerTools,
+  replyServerTools,
   type PeopleDash,
 } from '@/lib/you/people-actions';
 import {
@@ -39,7 +40,8 @@ import {
 } from '@/lib/you/mentor-reply-model';
 import { keepRenewing, waitForQuiet, waitingLast } from '@/lib/you/reply-turn';
 import type { DashChange } from '@/lib/talk/changes';
-import { ATTACH_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { ATTACH_RULES, CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { fetchMadeFiles, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
 import { turnCharts, type DashChart } from '@/lib/talk/chart';
 import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
 
@@ -101,6 +103,13 @@ export type MentorReplyInput = {
    * the model (plan #2974). Absent: the mentor reads the words alone.
    */
   readFiles?: (messageIds: string[]) => Promise<DashFile[]>;
+  /**
+   * Keeps the files the mentor's code made against the reply's last bubble
+   * (plan #3050.3.1), in core.attachments, and says which could not be
+   * kept. Present, the mentor is offered code execution and told it can
+   * send files; absent, it can draw a chart and send nothing else.
+   */
+  keepFiles?: (messageId: string, files: MadeFile[]) => Promise<{ kept: unknown[]; unkept: UnkeptFile[] }>;
   /**
    * Starts a page in a Claude Code session (plan #2997), offered to the
    * mentor as make_page. Absent: the mentor cannot make pages.
@@ -520,7 +529,7 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
     system: [
       ctx.layers.persona.text,
       REPLY_RULES,
-      ATTACH_RULES,
+      input.keepFiles ? ATTACH_RULES : CHART_ONLY_RULES,
       PEOPLE_WEB_RULES,
       ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
       ...(makePage ? [PAGE_RULES] : []),
@@ -534,7 +543,8 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
       ...(handOn ? [HAND_OFF] : []),
       ...(passBot ? [HAND_TO_BOT] : []),
     ],
-    serverTools: peopleServerTools(input.model),
+    // Code runs only where what it makes is kept (plan #3050.3.1).
+    serverTools: input.keepFiles ? replyServerTools(input.model) : peopleServerTools(input.model),
     // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
     maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
     // A reply that reaches a limit gets one more stretch to make the change it was asked for.
@@ -599,11 +609,46 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
     if (error) console.error('the charts of a reply were not kept', error);
   }
 
+  // What the mentor's code made goes under the reply's last bubble (plan #3050.3.1);
+  // what could not be kept is said in a text of its own.
+  const made = answer.ok && !saveError && input.keepFiles ? (answer.madeFiles ?? []) : [];
+  if (made.length > 0 && input.keepFiles) {
+    const { files, unkept } = await fetchMadeFiles(anthropic, made);
+    let notKept: UnkeptFile[] = unkept;
+    if (files.length > 0 && lastReplyId) {
+      try {
+        const outcome = await input.keepFiles(lastReplyId, files);
+        notKept = [...unkept, ...outcome.unkept];
+        if (outcome.kept.length > 0) {
+          // The count is what an open thread hears, to ask for the files.
+          const { error } = await client
+            .from('advisor_messages')
+            .update({ file_count: outcome.kept.length })
+            .eq('user_id', userId)
+            .eq('chat_id', chatId)
+            .eq('id', lastReplyId);
+          if (error) console.error('the file count of a reply was not kept', error);
+        }
+      } catch (error) {
+        console.error('the files a mentor made were not kept', error);
+        notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'it could not be kept with the reply' }))];
+      }
+    } else if (files.length > 0) {
+      notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'the reply it went with was not saved' }))];
+    }
+    const note = madeFilesNote(notKept);
+    if (note) {
+      save(note, 'reply');
+      await chain;
+    }
+  }
+
   // A reply that says a file is attached when nothing was sent says so after all (plan #3050.1).
   // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
-  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), charts.length) : null;
+  // A file its code made is said for above (plan #3050.3.1).
+  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), charts.length, made.length) : null;
   if (claim) {
-    save(NOTHING_ATTACHED, 'reply');
+    save(input.keepFiles ? NOTHING_ATTACHED : NOTHING_ATTACHED_CHART_ONLY, 'reply');
     await chain;
     if (input.act?.recordSlip) {
       await input.act

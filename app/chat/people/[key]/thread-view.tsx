@@ -31,6 +31,7 @@ import {
   bubbleText,
   isTyping,
   mergeMessages,
+  needsBotFiles,
   personInitials,
   receiptOf,
   replyFailedOf,
@@ -94,6 +95,8 @@ export type ThreadActions = {
   changes?: (chatId: string) => Promise<DashChange[] | null>;
   /** Where the thread's confirmed builds stand, by run id, or null when they could not be read (plan #2854.3). */
   builds?: (runIds: string[]) => Promise<Record<string, BuildRun> | null>;
+  /** The files a bot's code made for one message (plan #3050.3.1), or null when they could not be read. */
+  files?: (messageId: string) => Promise<ThreadFile[] | null>;
 };
 
 /** What the gallery reads with: nothing further back, and reading and trying again change nothing. */
@@ -289,6 +292,8 @@ export function ThreadView({
   // next send redrew the page (plan #2988).
   const router = useRouter();
   const drawnWithChat = useRef(initialChatId !== null);
+  // The bot messages whose files were asked for, by id and count, so a receipt's update does not ask again.
+  const askedFiles = useRef(new Set<string>());
   useEffect(() => {
     if (!live || !chatId) return;
     const supabase = createClient();
@@ -300,6 +305,15 @@ export function ThreadView({
         if (!row) return;
         setMessages((list) => mergeMessages(list, [row]));
         if (row.role === 'advisor' && !row.readAt && shown()) void act.current.read(chatId, person.id);
+        // The bot's code made files for this text (plan #3050.3.1): a Realtime row never carries them.
+        const asking = `${row.id}:${row.fileCount ?? 0}`;
+        if (needsBotFiles(row) && !askedFiles.current.has(asking)) {
+          askedFiles.current.add(asking);
+          void act.current.files?.(row.id).then((files) => {
+            if (!files || files.length === 0) return;
+            setMessages((list) => list.map((m) => (m.id === row.id ? { ...m, files } : m)));
+          });
+        }
         // A text of theirs may be the reply to something they did: read the cards again.
         if (row.role === 'advisor' && event.eventType === 'INSERT') {
           void act.current.changes?.(chatId).then((next) => next && setChanges(next));
@@ -672,7 +686,12 @@ export function ThreadView({
                     </VoicedBubble>
                   )}
                   {m.files && m.files.length > 0 && (
-                    <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
+                    <AskTurnFiles
+                      files={m.files}
+                      large
+                      align={block.from === 'you' ? 'end' : 'start'}
+                      label={block.from === 'you' ? 'Sent with this message' : `Made by ${person.name} for this reply`}
+                    />
                   )}
                   {/* What the bot drew with show_chart (plan #3050.2.2), kept on the row, so a reopened thread draws it again. */}
                   <BubbleCharts charts={m.charts} />

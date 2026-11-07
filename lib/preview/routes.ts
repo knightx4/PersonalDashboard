@@ -465,6 +465,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-thread-new': ['/chat/people/[key]'],
   'chat-people-thread-files': ['/chat/people/[key]'],
   'chat-people-thread-chart': ['/chat/people/[key]'],
+  'chat-people-thread-made-files': ['/chat/people/[key]'],
   'chat-people-thread-adding': ['/chat/people/[key]'],
   'chat-people-thread-not-ready': ['/chat/people/[key]'],
   'chat-people-thread-loading': ['/chat/people/[key]'],
