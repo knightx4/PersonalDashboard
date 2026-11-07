@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { decryptToken } from '@/lib/crypto/tokens';
-import { TODO_SCHEMA } from '@/lib/todo/db/schema-name';
+import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { fetchCalendar } from '@/lib/todo/feeds/fetch';
 import { parseCalendar, type FeedEvent } from '@/lib/todo/feeds/parse';
@@ -61,8 +61,9 @@ export async function refreshFeed(
   now: Date = new Date(),
   timezone = 'UTC',
   timeoutMs?: number,
+  client?: TodoSupabaseClient,
 ): Promise<RefreshResult> {
-  const supabase = await createTodoClient();
+  const supabase = client ?? (await createTodoClient());
 
   const { data, error } = await supabase
     .from('calendar_feeds')
@@ -83,11 +84,11 @@ export async function refreshFeed(
   } catch {
     // The row cannot be read back, so there is nothing to fetch and nothing to
     // tell the person to do except add it again.
-    return record(userId, feedId, 0, 'That address could not be read. Add the calendar again.');
+    return record(supabase, userId, feedId, 0, 'That address could not be read. Add the calendar again.');
   }
 
   const fetched = await fetchCalendar(address, timeoutMs);
-  if (!fetched.ok) return record(userId, feedId, 0, fetched.detail);
+  if (!fetched.ok) return record(supabase, userId, feedId, 0, fetched.detail);
 
   const today = todayIn(timezone, now);
   let events: FeedEvent[];
@@ -97,13 +98,13 @@ export async function refreshFeed(
       to: addDays(today, WINDOW_DAYS),
     });
   } catch {
-    return record(userId, feedId, 0, 'That calendar could not be read.');
+    return record(supabase, userId, feedId, 0, 'That calendar could not be read.');
   }
 
-  const replaced = await replaceEvents(userId, feedId, events);
-  if (replaced) return record(userId, feedId, 0, replaced);
+  const replaced = await replaceEvents(supabase, userId, feedId, events);
+  if (replaced) return record(supabase, userId, feedId, 0, replaced);
 
-  return record(userId, feedId, events.length, null);
+  return record(supabase, userId, feedId, events.length, null);
 }
 
 /**
@@ -117,12 +118,11 @@ export async function refreshFeed(
  * those links whole.
  */
 async function replaceEvents(
+  supabase: TodoSupabaseClient,
   userId: string,
   feedId: string,
   events: FeedEvent[],
 ): Promise<string | null> {
-  const supabase = await createTodoClient();
-
   const { error: cleared } = await supabase
     .from('feed_events')
     .delete()
@@ -161,13 +161,12 @@ async function replaceEvents(
  * appointments are from Tuesday, and here is why there is nothing newer".
  */
 async function record(
+  supabase: TodoSupabaseClient,
   userId: string,
   feedId: string,
   stored: number,
   error: string | null,
 ): Promise<RefreshResult> {
-  const supabase = await createTodoClient();
-
   await supabase
     .from('calendar_feeds')
     .update({
@@ -184,7 +183,8 @@ async function record(
 }
 
 /**
- * How old a copy may be before opening the calendar re-reads it.
+ * How old a copy may be before a read of the day re-reads it: opening the
+ * calendar, or anything that reads the combined schedule (plan #3045).
  *
  * #277 settled on an hour: a calendar that can be a day behind is one you
  * check your phone to confirm, which is the thing this exists to stop.
@@ -204,43 +204,137 @@ const CLAIM_MS = 5 * 60 * 1000;
 const PAGE_TIMEOUT_MS = 8_000;
 
 /**
- * Re-read the subscriptions whose copy has gone stale.
+ * How long a schedule read waits on one stale subscription (plan #3045).
  *
- * Called when the calendar is opened, which is the whole of the schedule:
- * there is no job, nothing runs while nobody is looking, and a calendar
- * nobody opens costs nothing to keep fresh.
- *
- * One broken subscription does not stop the others -- they are read together
- * and each failure is recorded on its own row. A subscription another tab is
- * already reading is skipped rather than fetched twice.
+ * A chat answer or the morning brief is waiting, so a slow host gets a few
+ * seconds and then the answer goes ahead on the rows already stored.
  */
-export async function refreshStaleFeeds(
-  userId: string,
-  now: Date = new Date(),
-  timezone = 'UTC',
-): Promise<void> {
-  const supabase = await createTodoClient();
+export const SCHEDULE_TIMEOUT_MS = 4_000;
+
+/**
+ * Time on top of the fetch's own timeout for the writing that follows it.
+ * Past this the read is given up on for this answer and finishes on its own.
+ */
+const WRITE_GRACE_MS = 2_000;
+
+/**
+ * How long a finished read is reused instead of starting another.
+ *
+ * A good read moves last_read_at and is not stale for an hour anyway; this is
+ * for the one that failed, so a broken host is not asked again by every
+ * lookup in the same conversation.
+ */
+const REUSE_MS = 60 * 1000;
+
+/** Reads of one subscription under way in this process, or just finished, by user and feed. */
+const attempts = new Map<string, { promise: Promise<boolean>; settledAt: number | null }>();
+
+export interface StaleFeedOptions {
+  /** The caller's client. The session's when absent; a service-role one must come with the person's id. */
+  client?: TodoSupabaseClient;
+  now?: Date;
+  timezone?: string;
+  /** How long the fetch of one subscription may take. */
+  timeoutMs?: number;
+}
+
+/**
+ * Re-read the subscriptions whose copy is more than STALE_MS old, all at
+ * once, and say which of them could not be re-read.
+ *
+ * The answer is the names of the subscriptions still stale: the read failed,
+ * timed out, or another reader holds it. Their stored rows are still the ones
+ * a caller reads, so it can say those calendars may be out of date. A
+ * subscription read under an hour ago is not asked for, and one being read
+ * already, here or in another tab, is waited on or skipped rather than read
+ * twice.
+ */
+export async function syncStaleFeeds(userId: string, options: StaleFeedOptions = {}): Promise<string[]> {
+  const supabase = options.client ?? (await createTodoClient());
+  const now = options.now ?? new Date();
+  const timezone = options.timezone ?? 'UTC';
+  const timeoutMs = options.timeoutMs ?? SCHEDULE_TIMEOUT_MS;
 
   const staleBefore = new Date(now.getTime() - STALE_MS).toISOString();
 
   const { data, error } = await supabase
     .from('calendar_feeds')
-    .select('id')
+    .select('id, name')
     .eq('user_id', userId)
     // A subscription nobody is drawing is not worth somebody else's server: it
     // is re-read the moment it is switched back on, by this same call.
     .eq('shown', true)
     .or(`last_read_at.is.null,last_read_at.lt.${staleBefore}`);
 
-  if (error || !data || data.length === 0) return;
+  if (error || !data || data.length === 0) return [];
 
-  await Promise.allSettled(
-    data.map(async (row) => {
-      const feedId = row.id as string;
-      if (!(await claim(userId, feedId, now))) return;
-      await refreshFeed(userId, feedId, now, timezone, PAGE_TIMEOUT_MS);
-    }),
+  const read = await Promise.all(
+    data.map((row) =>
+      attemptOnce(`${userId}:${row.id as string}`, () =>
+        withinTime(readIfFree(supabase, userId, row.id as string, now, timezone, timeoutMs), timeoutMs + WRITE_GRACE_MS),
+      ),
+    ),
   );
+
+  return data.filter((_, index) => !read[index]).map((row) => (row.name as string | null) ?? 'Subscribed');
+}
+
+/** One read of a subscription, shared by every caller asking while it runs or just after. */
+function attemptOnce(key: string, start: () => Promise<boolean>): Promise<boolean> {
+  const held = attempts.get(key);
+  if (held && (held.settledAt === null || Date.now() - held.settledAt < REUSE_MS)) return held.promise;
+
+  const entry: { promise: Promise<boolean>; settledAt: number | null } = { promise: Promise.resolve(false), settledAt: null };
+  entry.promise = start()
+    .catch(() => false)
+    .finally(() => {
+      entry.settledAt = Date.now();
+    });
+  attempts.set(key, entry);
+  return entry.promise;
+}
+
+/** Claim the subscription and read it. False when another reader has it or the read failed. */
+async function readIfFree(
+  supabase: TodoSupabaseClient,
+  userId: string,
+  feedId: string,
+  now: Date,
+  timezone: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  if (!(await claim(supabase, userId, feedId, now))) return false;
+  const result = await refreshFeed(userId, feedId, now, timezone, timeoutMs, supabase);
+  return result.error === null;
+}
+
+/** False once `ms` has passed; the read itself carries on and records what it finds. */
+function withinTime(read: Promise<boolean>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<boolean>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  return Promise.race([read, late]).finally(() => clearTimeout(timer));
+}
+
+/** Forget the reads under way. For tests. */
+export function resetFeedAttempts(): void {
+  attempts.clear();
+}
+
+/**
+ * Re-read the subscriptions whose copy has gone stale.
+ *
+ * Called when the calendar is opened. Every other reader of the day reaches
+ * the same reads through the combined schedule (lib/todo/schedule/load.ts,
+ * plan #3045), which calls syncStaleFeeds with a shorter wait.
+ */
+export async function refreshStaleFeeds(
+  userId: string,
+  now: Date = new Date(),
+  timezone = 'UTC',
+): Promise<void> {
+  await syncStaleFeeds(userId, { now, timezone, timeoutMs: PAGE_TIMEOUT_MS });
 }
 
 /**
@@ -249,8 +343,7 @@ export async function refreshStaleFeeds(
  * The condition is part of the update rather than a read followed by a write,
  * because two tabs opened together would both pass a check written that way.
  */
-async function claim(userId: string, feedId: string, now: Date): Promise<boolean> {
-  const supabase = await createTodoClient();
+async function claim(supabase: TodoSupabaseClient, userId: string, feedId: string, now: Date): Promise<boolean> {
   const expired = new Date(now.getTime() - CLAIM_MS).toISOString();
 
   const { data, error } = await supabase
