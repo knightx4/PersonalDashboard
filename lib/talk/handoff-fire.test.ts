@@ -3,14 +3,16 @@ import { fireSessionHandoff, NO_SESSION_ROUTINE } from './handoff-fire';
 import type { SessionHandoff } from './handoffs';
 
 /** A stand-in for core.dash_handoffs: one row, and the updates made to it. */
-function fakeCore(row: { status: string }) {
+function fakeCore(row: { status: string; claimed_by?: string | null }) {
   const updates: Record<string, unknown>[] = [];
   const core = {
     from: () => ({
       update: (patch: Record<string, unknown>) => {
         const filters: Record<string, unknown> = {};
         const apply = () => {
-          const matches = filters.status === undefined || filters.status === row.status;
+          const matches =
+            (filters.status === undefined || filters.status === row.status) &&
+            (!('claimed_by' in filters) || filters.claimed_by === (row.claimed_by ?? null));
           if (matches) {
             updates.push(patch);
             if (typeof patch.status === 'string') row.status = patch.status;
@@ -19,6 +21,10 @@ function fakeCore(row: { status: string }) {
         };
         const chain = {
           eq: (column: string, value: unknown) => {
+            filters[column] = value;
+            return chain;
+          },
+          is: (column: string, value: unknown) => {
             filters[column] = value;
             return chain;
           },
@@ -67,7 +73,7 @@ describe('fireSessionHandoff', () => {
     const { core, updates, row } = fakeCore({ status: 'pending' });
     const fire = vi.fn(async () => ({ ok: true as const, detail: '', status: 200, body: {}, runId: 'cse_9' }));
     const result = await fireSessionHandoff(core, 'u1', HANDOFF, { routine: ROUTINE, fire, now: NOW });
-    expect(result).toEqual({ state: 'running', runId: 'cse_9', error: null });
+    expect(result).toEqual({ state: 'running', runId: 'cse_9', error: null, started: true });
     expect(row.status).toBe('fired');
     expect(updates[0]).toMatchObject({ status: 'fired', fired_at: '2026-11-06T10:00:00.000Z' });
     expect(updates[1]).toEqual({ run_id: 'cse_9' });
@@ -100,6 +106,7 @@ describe('fireSessionHandoff', () => {
       state: 'failed',
       runId: null,
       error: 'The session could not be started: Anthropic answered 401.',
+      started: false,
     });
     expect(row.status).toBe('failed');
     expect(updates[1]).toMatchObject({
@@ -117,8 +124,49 @@ describe('fireSessionHandoff', () => {
       fire,
       now: NOW,
     });
-    expect(result).toEqual({ state: 'failed', runId: null, error: NO_SESSION_ROUTINE });
+    expect(result).toEqual({ state: 'failed', runId: null, error: NO_SESSION_ROUTINE, started: false });
     expect(row.status).toBe('failed');
     expect(fire).not.toHaveBeenCalled();
+  });
+});
+
+describe('fireSessionHandoff on a browser task (plan #3040.4)', () => {
+  const BROWSER: SessionHandoff = { ...HANDOFF, browserTask: true };
+
+  it('starts nothing when it is kept, leaving it for a computer of theirs to claim', async () => {
+    const { core, row, updates } = fakeCore({ status: 'pending', claimed_by: null });
+    const fire = vi.fn();
+    const result = await fireSessionHandoff(core, 'u1', BROWSER, { routine: ROUTINE, fire, now: NOW });
+    expect(result).toEqual({ state: 'queued', runId: null, error: null, started: false });
+    expect(row.status).toBe('pending');
+    expect(updates).toHaveLength(0);
+    expect(fire).not.toHaveBeenCalled();
+  });
+
+  it('starts the cloud session after the wait when no computer claimed it', async () => {
+    const { core, row } = fakeCore({ status: 'pending', claimed_by: null });
+    const fire = vi.fn(async () => ({ ok: true as const, detail: '', status: 200, body: {}, runId: 'cse_7' }));
+    const result = await fireSessionHandoff(core, 'u1', BROWSER, { routine: ROUTINE, fire, now: NOW, afterWait: true });
+    expect(result).toEqual({ state: 'running', runId: 'cse_7', error: null, started: true });
+    expect(row.status).toBe('fired');
+    expect(fire).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts nothing after the wait when the PC or Mac took it', async () => {
+    const { core, row, updates } = fakeCore({ status: 'pending', claimed_by: 'pc' });
+    const fire = vi.fn();
+    const result = await fireSessionHandoff(core, 'u1', BROWSER, { routine: ROUTINE, fire, now: NOW, afterWait: true });
+    expect(result.started).toBe(false);
+    expect(row.status).toBe('pending');
+    expect(updates).toHaveLength(0);
+    expect(fire).not.toHaveBeenCalled();
+  });
+
+  it('still starts a hand-off that is not a browser task at once', async () => {
+    const { core, row } = fakeCore({ status: 'pending', claimed_by: 'pc' });
+    const fire = vi.fn(async () => ({ ok: true as const, detail: '', status: 200, body: {}, runId: 'cse_8' }));
+    const result = await fireSessionHandoff(core, 'u1', HANDOFF, { routine: ROUTINE, fire, now: NOW });
+    expect(result.started).toBe(true);
+    expect(row.status).toBe('fired');
   });
 });
