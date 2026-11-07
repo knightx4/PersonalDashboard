@@ -21,7 +21,15 @@ export type SessionBriefHandoff = {
   asked: string;
   summary: string | null;
   refs: readonly HandoffRef[];
+  /** The bot marked it as needing a web browser (plan #3040.1). */
+  browserTask?: boolean;
 };
+
+/**
+ * The line a browser task's brief carries after `kind session`. The skill's
+ * browser section (plan #3040.2) reads it to choose Chrome or headless.
+ */
+export const BROWSER_TASK_LINE = 'browser task';
 
 /** The most of the person's words the brief carries; the row keeps them all. */
 const BRIEF_ASKED = 4000;
@@ -30,7 +38,8 @@ const BRIEF_ASKED = 4000;
  * The turn the backup routine is started with for a session hand-off. It
  * opens with `Hand-off <id>` as a request hand-off's brief does, so the
  * routine's standing prompt sends it to the same skill, then `kind session`,
- * which sends the skill to its section for these. The thread, the person's
+ * which sends the skill to its section for these, and `browser task` when
+ * the bot marked it as needing a browser. The thread, the person's
  * words, the summary and the rows to read follow, so the run has its context
  * before it reads the row.
  */
@@ -45,6 +54,7 @@ export function sessionHandoffBrief(handoff: SessionBriefHandoff, userId: string
   return [
     `Hand-off ${handoff.id}`,
     'kind session',
+    ...(handoff.browserTask ? [BROWSER_TASK_LINE] : []),
     `user_id ${userId}`,
     thread,
     'Follow .claude/skills/dash-backup/SKILL.md, "A session hand-off".',

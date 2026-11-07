@@ -85,6 +85,11 @@ export const HAND_OFF_TOOL: Anthropic.Tool = {
         required: ['table', 'ref'],
         additionalProperties: false,
       },
+      browser: {
+        type: 'boolean',
+        description:
+          'true when the request needs a real web browser: clicking through a site, filling in a form, or reading a page that needs them signed in. The session then uses their own Chrome when it can reach it and a browser with no sign-ins when it cannot. Leave it out for anything a search or a lookup can answer.',
+      },
     },
     required: ['request'],
     additionalProperties: false,
@@ -219,6 +224,8 @@ export type SessionHandoffInput = {
   refs?: readonly HandoffRef[];
   /** The row the request is about, which reads "Dash is on it" meanwhile. */
   subjectRef?: string | null;
+  /** The bot marked it as needing a web browser (plan #3040.1). */
+  browserTask?: boolean;
 };
 
 /** The core.dash_handoffs insert for a session hand-off. */
@@ -235,6 +242,7 @@ export type SessionHandoffRow = {
   refs: HandoffRef[];
   subject_ref: string | null;
   request_key: string;
+  browser_task: boolean;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -281,6 +289,7 @@ export function sessionHandoffRow(
       refs: cleanRefs(input.refs ?? []),
       subject_ref: subject && subject.length <= MAX_SUBJECT_REF && parseRef(subject) ? subject : null,
       request_key: handoffKey(thread, messageId),
+      browser_task: input.browserTask === true,
     },
   };
 }
