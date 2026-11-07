@@ -879,7 +879,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-run': ['/goals/runs/[runId]'],
   'dev-plan-run': ['/dev/plan/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
-  'jobs-activity': ['/jobs'],
+  'jobs-activity': ['/jobs/activity'],
   'jobs-answers': ['/jobs/answers'],
   'jobs-thoughts': ['/jobs/settings'],
   'jobs-settings-linkedin': ['/jobs/settings'],
