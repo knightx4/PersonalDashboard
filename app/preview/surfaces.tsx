@@ -9471,6 +9471,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatGroupSurface state="reply-failed" />,
   },
   {
+    /* Files a bot's code made in a group (plan #3050.3.3): asked for the pay as a picture and a PDF, the CFO's text has the PNG under it as a picture that opens full size and the PDF as a chip with its name, then a text of the CFO's saying the file that could not be kept. */
+    id: 'chat-group-made-files',
+    label: 'Chat · A group chat, files a bot made under its text',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="made-files" />,
+  },
+  {
     /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
     id: 'chat-group-settings',
     label: 'Chat · A group chat, settings',

@@ -3,9 +3,10 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { loadPeople, withChats } from '@/lib/you/chat-threads';
-import { loadGroup, loadGroupRows, loadGroupThreadPage } from '@/lib/you/group-chats';
-import { deleteGroupChat, olderGroupMessages, readGroup, retryGroupReply, saveGroup } from '../../actions';
+import { loadGroup, loadGroupRows } from '@/lib/you/group-chats';
+import { deleteGroupChat, olderGroupMessages, readGroup, retryGroupReply, saveGroup, threadMessageFiles } from '../../actions';
 import { PeopleView } from '../../people-view';
+import { loadGroupThreadParts } from '../../thread-data';
 import { GroupSettings } from './group-settings';
 import { GroupThreadView } from './group-thread-view';
 
@@ -57,7 +58,7 @@ export default async function ChatGroupPage({
       </PeopleView>
     );
   }
-  const page = await loadGroupThreadPage(client, user.id, id);
+  const page = await loadGroupThreadParts(client, user.id, id);
   return (
     <PeopleView rows={rows} groups={groups} current={id} timezone={settings.timezone} now={now}>
       <GroupThreadView
@@ -71,7 +72,7 @@ export default async function ChatGroupPage({
         page={page}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderGroupMessages, read: readGroup, retryReply: retryGroupReply }}
+        actions={{ older: olderGroupMessages, read: readGroup, retryReply: retryGroupReply, files: threadMessageFiles }}
       />
     </PeopleView>
   );

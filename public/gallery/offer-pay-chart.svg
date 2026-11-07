@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#ffffff"/>
+  <text x="60" y="48" font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="22" fill="#222222">Pay a year before tax: now and the Northwind offer</text>
+  <g stroke="#e6e6e6" stroke-width="1">
+    <line x1="120" y1="100" x2="740" y2="100"/>
+    <line x1="120" y1="180" x2="740" y2="180"/>
+    <line x1="120" y1="260" x2="740" y2="260"/>
+    <line x1="120" y1="340" x2="740" y2="340"/>
+    <line x1="120" y1="420" x2="740" y2="420"/>
+  </g>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#555555" text-anchor="end">
+    <text x="110" y="105">$140k</text>
+    <text x="110" y="185">$105k</text>
+    <text x="110" y="265">$70k</text>
+    <text x="110" y="345">$35k</text>
+    <text x="110" y="425">$0</text>
+  </g>
+  <rect x="210" y="155" width="160" height="265" fill="#1f77b4"/>
+  <rect x="490" y="123" width="160" height="297" fill="#ff7f0e"/>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="17" fill="#222222" text-anchor="middle">
+    <text x="290" y="143">$116,000</text>
+    <text x="570" y="111">$130,000</text>
+  </g>
+  <g font-family="DejaVu Sans, Helvetica, Arial, sans-serif" font-size="15" fill="#555555" text-anchor="middle">
+    <text x="290" y="450">Now</text>
+    <text x="570" y="450">Northwind (+12%)</text>
+  </g>
+</svg>

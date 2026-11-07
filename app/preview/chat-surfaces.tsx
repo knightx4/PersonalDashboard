@@ -256,7 +256,31 @@ const UNNAMED_GROUP: GroupRow = {
 
 export const MESSAGE_GROUPS: GroupRow[] = [GROUP_ROW, UNNAMED_GROUP];
 
-type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'settings' | 'settings-delete';
+/**
+ * You ask the CFO for the pay as a picture and a PDF, and its code made three
+ * files (plan #3050.3.3): the PNG and the PDF are kept under its text, and
+ * the SVG it also wrote could not be, which a text of its own says.
+ */
+const GROUP_MADE_FILES: ThreadMessage[] = [
+  ...GROUP_THREAD.slice(0, 3),
+  gmsg('g7', null, 'CFO, can you send me that as a picture I can share? And a PDF.', '2026-11-03T08:50:00Z'),
+  {
+    ...gmsg('g8', 'm1', 'Here it is as a picture, and as a one-page PDF with the yearly figures.', '2026-11-03T08:50:30Z'),
+    fileCount: 2,
+    files: [
+      { id: 'gf1', name: 'pay-now-and-northwind.png', contentType: 'image/png', size: 41_984, href: '/gallery/offer-pay-chart.svg' },
+      { id: 'gf2', name: 'Pay now and the Northwind offer, a year before tax.pdf', contentType: 'application/pdf', size: 118_784, href: '#' },
+    ],
+  },
+  gmsg(
+    'g9',
+    'm1',
+    'Sorry, a file did not come through. pay.svg could not be saved: that kind of file cannot be kept here; images, PDFs, Word, text and CSV can.',
+    '2026-11-03T08:50:31Z',
+  ),
+];
+
+type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'made-files' | 'settings' | 'settings-delete';
 
 /** A group open beside the list, in each of its states, and its settings. */
 export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
@@ -274,11 +298,19 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
           members,
           ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}),
           ...(state === 'reply-failed' ? { last: { role: 'person' as const, speaker: null, text: GROUP_THREAD[GROUP_THREAD.length - 1].text, at: '2026-11-03T08:50:00Z' } } : {}),
+          ...(state === 'made-files' ? { last: { role: 'advisor' as const, speaker: 'The CFO', text: GROUP_MADE_FILES[GROUP_MADE_FILES.length - 1].text, at: '2026-11-03T08:50:31Z' } } : {}),
         }
       : g,
   );
   // A burst that failed leaves your last text with no answer (plan #2988.3).
-  const messages = state === 'new' ? [] : typing || state === 'reply-failed' ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
+  const messages =
+    state === 'new'
+      ? []
+      : state === 'made-files'
+        ? GROUP_MADE_FILES
+        : typing || state === 'reply-failed'
+          ? GROUP_THREAD
+          : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
   return (
     <ChatShell path={`/chat/groups/${GROUP_ID}`}>
       <PeopleView rows={MESSAGE_ROWS} groups={groups} current={GROUP_ID} timezone={ZONE} now={NOW} live={false}>
