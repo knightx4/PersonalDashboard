@@ -32,8 +32,8 @@ import {
   type Reacted,
 } from '@/lib/you/group-chats-model';
 import { GroupMark, Reactions } from '../../group-parts';
-import { SpeakRun } from '../../people/[key]/thread-view';
-import { useSpeakArrivals } from '@/components/talk/speak-reply';
+import { SpeakRun, VoicedBubble } from '../../people/[key]/thread-view';
+import { SpeakingPill, useSpeakArrivals } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 
 /**
@@ -428,6 +428,8 @@ export function GroupThreadView({
           )}
         </p>
       )}
+      {/* Which bot is speaking, pinned at the top while a reply is read aloud (plan #3043). */}
+      <SpeakingPill />
       {empty && (
         <div className="my-auto flex flex-col items-center gap-2 px-4 py-8 text-center">
           <GroupMark members={members} />
@@ -445,9 +447,17 @@ export function GroupThreadView({
             {block.from === 'them' && <SpeakerLabel member={who} />}
             {block.messages.map((m, i) => (
               <Fragment key={m.id}>
-                <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={m.role === 'advisor' && !openingIds.has(m.id)}>
-                  {m.text}
-                </MessageBubble>
+                <VoicedBubble
+                  id={m.id}
+                  text={m.role === 'advisor' && m.text.trim() ? m.text : null}
+                  name={who?.name ?? 'A bot'}
+                  bot={block.speakerId ?? null}
+                  run={block.messages}
+                >
+                  <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={m.role === 'advisor' && !openingIds.has(m.id)}>
+                    {m.text}
+                  </MessageBubble>
+                </VoicedBubble>
                 {reactions[m.id]?.length ? <Reactions list={reactions[m.id]} members={[...members, ...former]} from={block.from} /> : null}
                 {m.receipts.map((r) => (
                   <MessageLink key={`${r.link}-${r.label}`} href={r.link}>

@@ -1,16 +1,18 @@
 'use client';
 
-import { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
-import { Play, Square, Volume2, VolumeX } from 'lucide-react';
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Play, Square, Volume, Volume2, VolumeX } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { cn } from '@/lib/cn';
 import { clipOf, linkClip, listenForUnlock, unlockSpeechOutput } from '@/lib/talk/speech/output';
 import {
+  bubbleVoice,
   createSpeechPlayer,
   readSpeaking,
   rememberSpeaking,
+  SPEAK_HELD_BACK,
   SPEAKING_KEY,
   type SpeechItem,
   type SpeechState,
@@ -206,6 +208,7 @@ export function SpeakPress({
   parts,
   fresh = false,
   bot = null,
+  name = 'Dash',
 }: {
   id: string;
   text: string;
@@ -213,6 +216,8 @@ export function SpeakPress({
   parts?: readonly { id: string; text: string }[];
   fresh?: boolean;
   bot?: string | null;
+  /** Who wrote it, for the speaking pill: Dash unless a bot's name is given. */
+  name?: string;
 }) {
   const speech = useSpeech();
   const speaking = useSpeaking();
@@ -225,6 +230,8 @@ export function SpeakPress({
   }, [fresh, speaking, fixture, id, text, bot]);
 
   if (!text.trim()) return null;
+  // One reply on its own (an answer of Dash's) shows the bubble's speaker while speaking is on (plan #3043).
+  if (speaking && !parts) return <SpeakBubble id={id} text={text} name={name} bot={bot} />;
   const label = busy ? (speech.phase === 'loading' ? 'Stop (getting the voice ready)' : 'Stop reading') : 'Read aloud';
   return (
     <Tooltip label={label}>
@@ -250,10 +257,167 @@ export function SpeakPress({
   );
 }
 
+/**
+ * Three bars that rise and fall while a reply is read aloud (plan #3043),
+ * standing still at rest and under reduced motion (app/globals.css).
+ */
+function SpeakBars({ playing, className }: { playing: boolean; className?: string }) {
+  return (
+    <span aria-hidden data-playing={playing || undefined} className={cn('speak-bars inline-flex h-3 items-end gap-px', className)}>
+      <span className="h-1/2 w-0.5 rounded-pill bg-current" />
+      <span className="h-full w-0.5 rounded-pill bg-current" />
+      <span className="h-3/4 w-0.5 rounded-pill bg-current" />
+    </span>
+  );
+}
+
+const BUBBLE_LABEL = {
+  playing: 'Stop reading',
+  loading: 'Stop (getting the voice ready)',
+  blocked: 'Your browser held the sound back. Press to play this reply',
+  rest: 'Play this reply again',
+} as const;
+
+/**
+ * The speaker on a bot's bubble while speaking is on (plan #3043). Its bars
+ * move while the bubble is read aloud, and a press stops it; at rest a press
+ * reads the bubble again, and the rest of its run after it (`then`), through
+ * the one player, stopping whatever was playing. A bubble the browser would
+ * not play by itself turns grey with a play arrow, and a press, which the
+ * browser does allow, plays it. Nothing is drawn while speaking is off, where
+ * the run's Read aloud press stands instead. `name` is who is speaking, for
+ * the speaking pill at the top of the thread, which finds the bubble by its
+ * `data-speech-key`.
+ */
+export function SpeakBubble({
+  id,
+  text,
+  name,
+  bot = null,
+  then = [],
+}: {
+  id: string;
+  text: string;
+  name: string;
+  bot?: string | null;
+  then?: readonly { id: string; text: string }[];
+}) {
+  const speech = useSpeech();
+  const speaking = useSpeaking();
+  const fixture = useContext(SpeechFixture);
+  if (!speaking || !text.trim()) return null;
+  const voice = bubbleVoice(speech, id);
+  const busy = voice === 'playing' || voice === 'loading';
+  const label = BUBBLE_LABEL[voice];
+  return (
+    <Tooltip label={label}>
+      <IconButton
+        size="sm"
+        label={label}
+        aria-pressed={busy}
+        active={busy}
+        data-speech-key={id}
+        data-speech-name={name}
+        className={cn('w-auto gap-0.5 px-1', voice === 'blocked' && 'bg-sunken text-ink-muted')}
+        onClick={() => {
+          if (fixture) return;
+          if (busy) {
+            thePlayer().stop();
+            return;
+          }
+          unlockSpeechOutput();
+          const items = [{ id, text }, ...then].map((part): SpeechItem => ({ key: part.id, text: part.text, voice: { bot } }));
+          thePlayer().playList(items);
+        }}
+      >
+        <Volume strokeWidth={1.75} aria-hidden />
+        {voice === 'blocked' ? (
+          <Play strokeWidth={1.75} fill="currentColor" aria-hidden className="size-2.5!" />
+        ) : (
+          <SpeakBars playing={voice === 'playing'} />
+        )}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
+/**
+ * The speaking pill (plan #3043): pinned at the top of a thread while one of
+ * its bubbles is read aloud, saying who is speaking, with the bars and a
+ * Stop that ends the reply and empties the queue. It stays up across a run
+ * of queued bubbles, since the player moves from one to the next without
+ * going idle, and a press on its words scrolls to the bubble being read.
+ *
+ * It is drawn as the first thing in the thread's scrolling part and finds
+ * the bubble among its siblings by `data-speech-key`, so a pill shows only
+ * in the thread whose bubble is playing: the Ask Dash pane's chat and a
+ * person's thread each have their own. It takes no room in the thread.
+ */
+export function SpeakingPill({ className }: { className?: string }) {
+  const speech = useSpeech();
+  const speaking = useSpeaking();
+  const fixture = useContext(SpeechFixture);
+  const anchor = useRef<HTMLDivElement>(null);
+  const [found, setFound] = useState<{ key: string; name: string } | null>(null);
+  const key = speaking && speech.phase !== 'idle' ? speech.key : null;
+
+  // Read after the bubbles are drawn, since the pill sits above them.
+  useEffect(() => {
+    const scope = anchor.current?.parentElement;
+    const bubble = key && scope ? scope.querySelector<HTMLElement>(`[data-speech-key="${CSS.escape(key)}"]`) : null;
+    setFound(bubble && key ? { key, name: bubble.dataset.speechName ?? '' } : null);
+  }, [key]);
+
+  const shown = found && found.key === key ? found : null;
+  const goTo = () => {
+    if (!shown) return;
+    const bubble = anchor.current?.parentElement?.querySelector<HTMLElement>(`[data-speech-key="${CSS.escape(shown.key)}"]`);
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    bubble?.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+  };
+
+  return (
+    <div ref={anchor} className={cn('pointer-events-none sticky top-0 z-over-link h-0 self-stretch', className)}>
+      {shown && (
+        <div className="flex justify-center">
+          <div
+            role="status"
+            className="popover-panel pointer-events-auto flex max-w-full items-center rounded-pill border border-border bg-raised py-0.5 pr-0.5 pl-1" /* ui-ok: a floating pill over the thread, framed as the menus are so it reads above the bubbles */
+          >
+            <button
+              type="button"
+              onClick={goTo}
+              className="press press-area flex min-w-0 items-center gap-1.5 rounded-pill px-2 py-0.5 text-small text-ink hover:bg-sunken" /* ui-ok: the speaking pill's own words, a press that scrolls to the bubble being read, inside the pill */
+            >
+              <SpeakBars playing={speech.phase === 'playing'} className="shrink-0 text-accent" />
+              <span className="truncate">
+                <span className="font-medium">{shown.name}</span> speaking
+              </span>
+            </button>
+            <Tooltip label="Stop speaking">
+              <IconButton
+                size="sm"
+                label="Stop speaking"
+                onClick={() => {
+                  if (!fixture) thePlayer().stop();
+                }}
+              >
+                <Square strokeWidth={1.75} fill="currentColor" aria-hidden />
+              </IconButton>
+            </Tooltip>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Why this reply was not read aloud, in the route's own words; nothing when it was. */
 export function SpeakNote({ ids, className }: { ids: readonly string[]; className?: string }) {
   const speech = useSpeech();
-  const message = ids.map((id) => speech.notes[id]).find(Boolean);
+  const speaking = useSpeaking();
+  // While speaking is on, a reply held back says so on its own bubble's speaker (plan #3043).
+  const message = ids.map((id) => speech.notes[id]).find((note) => Boolean(note) && !(speaking && note === SPEAK_HELD_BACK));
   return (
     <p role="status" aria-live="polite" className={cn('text-small text-ink-muted', !message && 'sr-only', className)}>
       {message ?? ''}

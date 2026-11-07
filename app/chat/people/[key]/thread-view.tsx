@@ -47,7 +47,7 @@ import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
 import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
-import { SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { SpeakBubble, SpeakingPill, SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals, useSpeaking } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import type { DashChange } from '@/lib/talk/changes';
 import { followedRuns, workingCard, type BuildRun } from '@/lib/you/live-cards';
@@ -649,6 +649,8 @@ export function ThreadView({
           )}
         </p>
       )}
+      {/* Who is speaking, pinned at the top while a reply is read aloud (plan #3043). */}
+      <SpeakingPill />
       {empty && <EmptyThread person={person} />}
       {blocks.map((block) =>
         block.kind === 'day' ? (
@@ -662,9 +664,11 @@ export function ThreadView({
                 <Fragment key={m.id}>
                   {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
                   {words !== null && (
-                    <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
-                      {words}
-                    </MessageBubble>
+                    <VoicedBubble id={m.id} text={m.role === 'advisor' ? words : null} name={person.name} bot={person.id} run={block.messages}>
+                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
+                        {words}
+                      </MessageBubble>
+                    </VoicedBubble>
                   )}
                   {m.files && m.files.length > 0 && (
                     <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
@@ -749,17 +753,56 @@ export function ThreadView({
  * A group's thread draws it too, under each bot's run.
  */
 export function SpeakRun({ messages, bot }: { messages: readonly ThreadMessage[]; bot: string | null }) {
-  const said = messages.flatMap((m) => {
-    const words = m.role === 'advisor' ? bubbleText(m) : null;
-    return words ? [{ id: m.id, text: words }] : [];
-  });
+  const speaking = useSpeaking();
+  const said = spokenOf(messages);
   const last = said.at(-1);
   if (!last) return null;
   const ids = said.map((m) => m.id);
   return (
     <div className="flex flex-col items-start">
-      <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} parts={said} bot={bot} />
+      {/* While speaking is on, each bubble carries its own speaker instead (plan #3043). */}
+      {!speaking && <SpeakPress id={last.id} text={said.map((m) => m.text).join('\n\n')} also={ids} parts={said} bot={bot} />}
       <SpeakNote ids={ids} className="px-1" />
+    </div>
+  );
+}
+
+/** The bubbles of a run that can be read aloud: theirs, with words. */
+function spokenOf(messages: readonly ThreadMessage[]): { id: string; text: string }[] {
+  return messages.flatMap((m) => {
+    const words = m.role === 'advisor' ? bubbleText(m) : null;
+    return words ? [{ id: m.id, text: words }] : [];
+  });
+}
+
+/**
+ * A bubble with its speaker beside it while speaking is on (plan #3043):
+ * `text` is what is read, null for your own messages, which have none. A
+ * press at rest reads it and the rest of `run` after it. A group's thread
+ * draws it too, with each bot's name and voice.
+ */
+export function VoicedBubble({
+  id,
+  text,
+  name,
+  bot,
+  run,
+  children,
+}: {
+  id: string;
+  text: string | null;
+  name: string;
+  bot: string | null;
+  run: readonly ThreadMessage[];
+  children: React.ReactNode;
+}) {
+  if (text === null) return children;
+  const said = spokenOf(run);
+  const then = said.slice(said.findIndex((m) => m.id === id) + 1);
+  return (
+    <div className="flex max-w-full items-end gap-1 *:min-w-0">
+      {children}
+      <SpeakBubble id={id} text={text} name={name} bot={bot} then={then} />
     </div>
   );
 }
