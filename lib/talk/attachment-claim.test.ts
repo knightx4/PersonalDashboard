@@ -47,6 +47,12 @@ describe('falseAttachment', () => {
     expect(falseAttachment('Here is the spreadsheet.', 2)).toBe('Here is the spreadsheet.');
     expect(falseAttachment('Thanks for the PDF you sent.', 1)).toBeNull();
   });
+
+  it('lets any claim through when the code made a file (plan #3050.3.1)', () => {
+    expect(falseAttachment("Here's your chart, attached as markets.png!", 0, 1)).toBeNull();
+    expect(falseAttachment("I've attached the PDF.", 1, 2)).toBeNull();
+    expect(falseAttachment("I've attached the PDF.", 0, 0)).toBe("I've attached the PDF.");
+  });
 });
 
 describe('claimSlip', () => {

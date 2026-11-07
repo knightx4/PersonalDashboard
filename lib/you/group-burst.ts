@@ -43,7 +43,7 @@ import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } 
 import { HAND_OFF_TOOL, HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
 import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT_TOOL, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
-import { ATTACH_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import { CHART_DRAWN, CHART_TOOL, CHART_TOOL_DEFINITION, parseChart, type DashChart } from '@/lib/talk/chart';
 import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
 import type { DashSlip } from '@/lib/dash/slips';
@@ -413,7 +413,7 @@ export async function speakWithModel(
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
   const rules = [
     SPEAKER_RULES,
-    ATTACH_RULES,
+    CHART_ONLY_RULES,
     ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
     ...(input.page ? [PAGE_RULES] : []),
     ...(input.handOn ? [SESSION_RULES] : []),
@@ -607,7 +607,7 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
             // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
             const claim = text ? falseAttachment(text, charts.length) : null;
             if (text && claim) {
-              text = `${text}\n\n${NOTHING_ATTACHED}`;
+              text = `${text}\n\n${NOTHING_ATTACHED_CHART_ONLY}`;
               await input
                 .recordSlip?.({ ...claimSlip(member.name, claim), surface: 'people', conversation: `people:${chatId}`, href: `/chat/groups/${chatId}` })
                 .catch((error) => console.error('the attachment slip was not kept', error));

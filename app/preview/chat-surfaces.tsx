@@ -365,7 +365,8 @@ type ThreadState =
   | 'next-text'
   | 'files'
   | 'adding'
-  | 'chart';
+  | 'chart'
+  | 'made-files';
 
 /** The markets over last week, as a bot draws them with show_chart (plan #3050.2.2): each index as the change since Monday. */
 const MARKETS_CHART: DashChart = {
@@ -394,6 +395,32 @@ const CHART_THREAD: ThreadMessage[] = [
   }),
   msg('c2', 'advisor', 'A choppy week that ended up. Wednesday took back most of Tuesday.', '2026-11-03T08:58:30Z'),
   msg('c3', 'advisor', 'The Nasdaq led, up 2.1% by Friday; the Dow lagged at 0.7%.', '2026-11-03T08:58:40Z', { charts: [MARKETS_CHART] }),
+];
+
+/**
+ * You ask for the chart as a picture and a PDF, and the reply's code made
+ * three files (plan #3050.3.1): the PNG and the PDF are kept under the last
+ * bubble, and the SVG it also wrote could not be, which a text says.
+ */
+const MADE_FILES_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('c1', 'person', 'Can you send me the stock markets chart for the past week as an image? And a PDF I can forward.', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('c2', 'advisor', 'Here it is as a picture, and the same week as a one-page PDF with the closing figures.', '2026-11-03T08:58:40Z', {
+    fileCount: 2,
+    files: [
+      { id: 'mf1', name: 'us-markets-week-2026-11-06.png', contentType: 'image/png', size: 48_128, href: '/gallery/markets-chart.svg' },
+      { id: 'mf2', name: 'US markets, week to 6 November 2026, closing figures.pdf', contentType: 'application/pdf', size: 212_992, href: '#' },
+    ],
+  }),
+  msg(
+    'c3',
+    'advisor',
+    'Sorry, a file did not come through. markets.svg could not be saved: that kind of file cannot be kept here; images, PDFs, Word, text and CSV can.',
+    '2026-11-03T08:58:41Z',
+  ),
 ];
 
 /** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
@@ -754,6 +781,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
             ? FILES_THREAD
             : state === 'chart'
             ? CHART_THREAD
+            : state === 'made-files'
+            ? MADE_FILES_THREAD
             : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))

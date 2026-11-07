@@ -6,7 +6,7 @@ import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-loo
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
-import { NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
@@ -203,7 +203,7 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
       director: async () => ({ wait: true, picks: [], reactions: [] }),
       speak: async () => "Here's the chart, attached as markets.png.",
     });
-    expect(botMessages(tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED}`]);
+    expect(botMessages(tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED_CHART_ONLY}`]);
     expect(recordSlip).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claimed_attachment', surface: 'people' }));
   });
 

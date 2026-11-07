@@ -17,6 +17,7 @@ import {
   sortPeople,
   threadBlocks,
   threadDetail,
+  needsBotFiles,
   threadMessageOf,
   threadTime,
   recipientsOf,
@@ -264,5 +265,17 @@ describe("a bubble's charts (plan #3050.2.2)", () => {
     expect(threadMessageOf(row([]))?.charts).toBeUndefined();
     expect(threadMessageOf(row(undefined))?.charts).toBeUndefined();
     expect(threadMessageOf(row({ kind: 'bar' }))?.charts).toBeUndefined();
+  });
+});
+
+describe('a bot message whose code made files (plan #3050.3.1)', () => {
+  it('reads the count off the row, and asks for files only while it has fewer than the count', () => {
+    const row = threadMessageOf({ id: 'x', chat_id: 'c', role: 'advisor', text: 'Here it is.', file_count: 2, created_at: '2026-11-03T08:00:00Z' });
+    expect(row?.fileCount).toBe(2);
+    expect(row && needsBotFiles(row)).toBe(true);
+    const file = { id: 'f', name: 'a.png', contentType: 'image/png', size: 4, href: '/attachments/f' };
+    expect(needsBotFiles({ role: 'advisor', fileCount: 2, files: [file, { ...file, id: 'g' }] })).toBe(false);
+    expect(needsBotFiles({ role: 'person', fileCount: 2 })).toBe(false);
+    expect(threadMessageOf({ id: 'y', text: 'hi', file_count: 0, created_at: '2026-11-03T08:00:00Z' })?.fileCount).toBeUndefined();
   });
 });

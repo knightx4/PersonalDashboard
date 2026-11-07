@@ -11,7 +11,9 @@ import { attachmentSize, isImageAttachment } from '@/lib/attachments/rules';
  * a plain chip.
  *
  * A message on People (plan #2974) draws its pictures `large`, as a texting
- * app does, on the sender's side (`align="end"` for the person's own).
+ * app does, on the sender's side (`align="end"` for the person's own). A
+ * wide one, such as a chart a bot's code made (plan #3050.3.1), is held
+ * inside the phone's width.
  */
 export type AskTurnFile = { id?: string; name: string; contentType: string; size: number; href?: string };
 
@@ -45,7 +47,7 @@ export function AskTurnFiles({
                 <img
                   src={file.href}
                   alt={file.name}
-                  className={large ? 'max-h-60 w-auto max-w-full object-contain sm:max-w-72' : 'size-16 object-cover'}
+                  className={large ? 'max-h-60 w-auto max-w-xs object-contain sm:max-w-72' : 'size-16 object-cover'}
                 />
               </a>
             </li>
@@ -60,7 +62,7 @@ export function AskTurnFiles({
         );
         const style = `${chipVariants({ size: 'md' })} min-w-0 max-w-full text-ink`;
         return (
-          <li key={key} className="min-w-0 max-w-full">
+          <li key={key} className={cn('min-w-0 max-w-full', large && 'max-sm:max-w-xs')}>
             {file.href ? (
               <a
                 href={file.href}

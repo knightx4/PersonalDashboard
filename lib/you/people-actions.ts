@@ -12,6 +12,7 @@ import {
   type DashWriteTool,
 } from '@/lib/dash/registry';
 import { dashWebSearch, WEB_RULES } from '@/lib/dash/web-search';
+import { dashCodeExecution } from '@/lib/talk/made-files';
 import type { DashChange, MadeDashChange, NewDashChange, PeopleCause } from '@/lib/talk/changes';
 import type { DashSlip } from '@/lib/dash/slips';
 
@@ -52,6 +53,16 @@ export const PEOPLE_TOOLS: readonly DashTool[] = ASK_DASH_TOOLS.filter((tool) =>
  */
 export function peopleServerTools(model: string): Anthropic.ToolUnion[] {
   return [dashWebSearch(model)];
+}
+
+/**
+ * A direct thread's reply has code execution too (plan #3050.3.1), since it
+ * keeps what the code makes: a picture or a PDF goes under the reply
+ * (lib/you/mentor-reply.ts). Elsewhere the files would be lost, so nothing
+ * else is offered it.
+ */
+export function replyServerTools(model: string): Anthropic.ToolUnion[] {
+  return [...peopleServerTools(model), dashCodeExecution()];
 }
 
 /**
