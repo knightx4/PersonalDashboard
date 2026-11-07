@@ -18,6 +18,8 @@ import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
 import { ATTACH_RULES, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { CHART_DRAWN, parseChart } from '@/lib/talk/chart';
+import type { DashExecutor } from '@/lib/dash/loop';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -165,6 +167,51 @@ function anthropicStub(pieces: string[], options: { delayMs?: number; ack?: stri
   return { stub, streamed, created };
 }
 
+/** A week of two indexes, as Newt would draw it. */
+const MARKETS = {
+  kind: 'line',
+  title: 'Markets, 2 to 6 November',
+  unit: '%',
+  series: ['S&P 500', 'Nasdaq'],
+  rows: [
+    { label: 'Mon', values: [0, 0] },
+    { label: 'Wed', values: [0.6, 1.1] },
+    { label: 'Fri', values: [1.2, 2] },
+  ],
+};
+
+/** A client whose first round calls show_chart with `chart`, and whose second answers with `pieces`. */
+function chartStub(chart: Record<string, unknown>, pieces: string[]) {
+  const streamed: Record<string, unknown>[] = [];
+  const usage = { input_tokens: 3_000, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const stub = {
+    messages: {
+      create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+      stream: (params: Record<string, unknown>) => {
+        streamed.push(params);
+        const round = streamed.length;
+        return {
+          on() {
+            return this;
+          },
+          async finalMessage() {
+            if (round === 1) return { content: [{ type: 'tool_use', id: 'c1', name: 'show_chart', input: chart }], stop_reason: 'tool_use', usage };
+            return answerMessage(pieces.join(''));
+          },
+        };
+      },
+    },
+  } as unknown as Anthropic;
+  return { stub, streamed };
+}
+
+/** The chart lookup as Ask runs it (lib/ask/tools.ts chartLookup). */
+const drawChart: DashExecutor = async (name, input) => {
+  const parsed = parseChart(input);
+  if (name !== 'show_chart' || !parsed.ok) return { ok: false as const, error: 'no' };
+  return { ok: true as const, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
+};
+
 function run(tables: Tables, stub: Anthropic, extra: Partial<Parameters<typeof replyToMentor>[0]> = {}) {
   const spent: { op: MentorSpendOperation; reports: SpendReport[] }[] = [];
   const client = fakeClient(tables);
@@ -219,7 +266,7 @@ describe('replyToMentor', () => {
     expect(system[0].cache_control).toEqual({ type: 'ephemeral' });
     const tools = (streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toContain('todos');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     expect(tools.at(-1)).toBe('answer');
   });
 
@@ -236,6 +283,33 @@ describe('replyToMentor', () => {
     );
     const system = (streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
     expect(system).toContain(ATTACH_RULES);
+  });
+
+  it('keeps a chart it drew on the last bubble, out of the text, and does not call it a false attachment (plan #3050.2.2)', async () => {
+    const tables = world();
+    const { stub, streamed } = chartStub(MARKETS, ['Choppy week.', "\n\nHere's the chart: the Nasdaq led."]);
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act, execute: drawChart }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Choppy week.', "Here's the chart: the Nasdaq led."]);
+    expect(rows[0].charts).toBeUndefined();
+    const charts = rows[1].charts as { kind: string; series: string[]; rows: unknown[] }[];
+    expect(charts).toHaveLength(1);
+    expect(charts[0]).toMatchObject({ kind: 'line', series: ['S&P 500', 'Nasdaq'] });
+    expect(charts[0].rows).toHaveLength(3);
+    expect(recordSlip).not.toHaveBeenCalled();
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('show_chart');
+  });
+
+  it('still says no file came when a reply that drew a chart names a file (plan #3050.2.2)', async () => {
+    const tables = world();
+    const { stub } = chartStub(MARKETS, ['Here is the chart, attached as markets.png.']);
+    await run(tables, stub, { execute: drawChart }).promise;
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Here is the chart, attached as markets.png.', NOTHING_ATTACHED]);
+    expect(rows[0].charts).toHaveLength(1);
   });
 
   it('adds nothing to a reply that claims no file', async () => {
@@ -257,7 +331,7 @@ describe('replyToMentor', () => {
     const tools = (acting.streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toEqual(expect.arrayContaining(['todos', 'add_todo', 'add_plan_step', 'propose_build', 'propose_delete']));
     expect(tools).not.toContain('hand_off');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     const system = (acting.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
     expect(system).toContain(PEOPLE_ACTION_RULES);
     // Web search is in the core set, acting or not (plan #2861).
@@ -757,9 +831,9 @@ describe('replyToMentor', () => {
     expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('make_page');
   });
 
-  it('offers every lookup but the chart, and nothing that writes', () => {
+  it('offers every lookup, the chart among them, and nothing that writes (plan #3050.2.2)', () => {
     expect(MENTOR_LOOKUPS.every((t) => t.kind === 'lookup')).toBe(true);
-    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(false);
+    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(true);
   });
 });
 

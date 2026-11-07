@@ -295,16 +295,17 @@ export function MessageLink({ href, children }: { href: string; children: React.
  * People did or proposes, with its presses, as the last item in their run.
  * Wider than a short bubble so its sentence and buttons have room. The slot is
  * the content's: the change cards and the live card of #2854.3 bring their
- * own surface.
+ * own surface. `wide` is for a chart a bot drew (plan #3050.2.2).
  */
-export function MessageCard({ label, children }: { label?: string; children: React.ReactNode }) {
+export function MessageCard({ label, wide = false, children }: { label?: string; wide?: boolean; children: React.ReactNode }) {
   return (
     <div
       role={label ? 'group' : undefined}
       aria-label={label}
       // In a run of bubbles, so the same 2px gap. On a phone it takes the thread's whole width (the group is three
       // quarters of it), so a proposal's title and buttons are not squeezed; from sm up, a fixed width under the bubble.
-      className="w-[133.333%] max-w-none sm:w-80 sm:max-w-full"
+      // A chart (plan #3050.2.2) is wide: its lines need more room across than a card's sentence does.
+      className={wide ? 'w-[133.333%] max-w-none sm:w-[28rem] sm:max-w-full' : 'w-[133.333%] max-w-none sm:w-80 sm:max-w-full'}
     >
       {children}
     </div>

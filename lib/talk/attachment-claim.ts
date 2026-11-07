@@ -4,25 +4,32 @@
  * On 7 November 2026 Newt answered "Can you show me a chart of the stock
  * markets past week?" with "Here's your chart, attached as
  * stocks_week_nov6_2026.png!" and no picture came: nothing carries a file a
- * bot makes into a People thread or Ask Dash. Until bots can send files
- * (plan #3050.2 to #3050.4), every bot is told it cannot, and a reply that
- * claims one anyway gets a closing text saying nothing came through, and a
- * slip (core.dash_slips, kind claimed_attachment) so Dev Home counts it.
+ * bot makes into a People thread or Ask Dash. Every bot is told it cannot
+ * send files, and a reply that claims one anyway gets a closing text saying
+ * nothing came through, and a slip (core.dash_slips, kind
+ * claimed_attachment) so Dev Home counts it.
+ *
+ * A bot can draw a chart (plan #3050.2.2): show_chart draws it under the
+ * text, as Ask Dash does. A reply that drew one may say so; a reply that
+ * names a file, a picture or a PDF is still flagged, chart or not.
  *
  * Pure: nothing here reads a database or the network.
  */
 
-/** What every bot is told, after its own rules: it cannot attach, so it never says it did. */
-export const ATTACH_RULES = `YOU CANNOT SEND FILES. Your replies are text only: no image, chart picture, PDF,
-spreadsheet or other file goes with them, whatever your tools make along the
-way. Never write that you attached, sent or included a file, and never name one
-as though it were there. When they ask for a chart, an image or a file, say in
-a sentence that you cannot send one here yet, then give what you can in words:
-the figures, or a link to a page that has them.`;
+/** What every bot is told, after its own rules: it can draw a chart, but it cannot attach a file, so it never says it did. */
+export const ATTACH_RULES = `YOU CAN DRAW A CHART, BUT YOU CANNOT SEND FILES. When they ask for a chart
+or a table of figures, call show_chart with the figures a lookup or a search
+gave you, and it is drawn under your text; then say in a sentence what it
+shows. Nothing else goes with your replies: no image, picture, PDF,
+spreadsheet or other file, whatever your tools make along the way. Never write
+that you attached, sent or included a file, and never name one (such as
+markets.png) as though it were there. When they ask for an image or a file,
+say in a sentence that you cannot send one here yet, then give what you can:
+a chart, the figures in words, or a link to a page that has them.`;
 
 /** The closing text a reply that claimed an attachment gets when nothing was sent. */
 export const NOTHING_ATTACHED =
-  'Sorry, nothing actually came through with that: I cannot send files or pictures here yet, so there is no attachment.';
+  'Sorry, no file came through with that: I can draw a chart here, but I cannot send files or pictures yet.';
 
 /** Ask Dash's closing sentence, where the chart it draws counts as sent. */
 export const NOTHING_ATTACHED_ASK =
@@ -52,6 +59,8 @@ const FILE_NAME = new RegExp(`\\b[\\w-]+\\.(?:${FILE_EXTENSIONS})\\b`, 'i');
 /** "Here's your chart", "the chart below". */
 const HERE_IS = /\b(?:here'?s|here is|here are|i'?ve (?:made|put together|drawn)|i made)\b[^.!?\n]{0,30}\b(?:chart|graph|plot|image|picture|pdf|spreadsheet|csv|file)\b/i;
 const BELOW = /\b(?:chart|graph|plot|image|picture|pdf|spreadsheet|csv|file)\b[^.!?\n]{0,20}\b(?:below|above)\b/i;
+/** A thing that is a file whatever the bot drew: a chart is drawn, these never are. */
+const FILE_THING = /\b(?:image|picture|photo|png|jpe?g|pdf|spreadsheet|csv|file|download)s?\b/i;
 
 /**
  * The sentence of a reply that says a file or picture is with it, or null
@@ -76,10 +85,27 @@ export function claimSlip(who: string, claim: string): { kind: 'claimed_attachme
 }
 
 /**
- * What to do about a reply's text: null when it is honest (no claim, or
- * something really was sent with it), else the sentence that claimed one.
+ * The sentence of a reply that drew a chart which still claims a file: one
+ * that names a file, or speaks of a picture, a PDF or a file as attached,
+ * here or below. "Here's the chart" and "the chart below" are true then.
  */
-export function falseAttachment(text: string, sent: number): string | null {
-  if (sent > 0) return null;
+export function fileClaim(text: string): string | null {
+  for (const sentence of sentences(text)) {
+    if (SOMEONE_ELSE.test(sentence) || LINK.test(sentence)) continue;
+    if (FILE_NAME.test(sentence) && /\b(?:here|sent|sending)\b/i.test(sentence)) return sentence;
+    const claims = (ATTACH_WORD.test(sentence) && !ATTACHED_TO.test(sentence)) || HERE_IS.test(sentence) || BELOW.test(sentence);
+    if (claims && FILE_THING.test(sentence)) return sentence;
+  }
+  return null;
+}
+
+/**
+ * What to do about a reply's text: null when it is honest, else the
+ * sentence that claimed a file. `charts` is how many charts the reply drew:
+ * with none, any claim of a chart or a file counts; with one or more, only a
+ * claim of a file does.
+ */
+export function falseAttachment(text: string, charts: number): string | null {
+  if (charts > 0) return fileClaim(text);
   return attachmentClaim(text);
 }

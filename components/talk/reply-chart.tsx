@@ -19,6 +19,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import { formatNumber } from '@/lib/money';
 import { SectionLabel } from '@/components/ui/section-heading';
+import { MessageCard } from '@/components/patterns/messaging';
 import {
   chartChange,
   chartValue,
@@ -700,5 +701,31 @@ export function ReplyCharts({ calls }: { calls: readonly TalkToolCall[] | undefi
         <ReplyChart key={`${i}-${chart.title}`} chart={chart} />
       ))}
     </>
+  );
+}
+
+/**
+ * The charts a bot on People drew with a bubble (plan #3050.2.2), under it in
+ * the thread, wide enough for their lines and opening full screen as Ask's do.
+ * Nothing for a bubble that drew none.
+ */
+export function BubbleCharts({
+  charts,
+  startFull,
+  tipAt,
+}: {
+  charts: readonly DashChart[] | undefined;
+  /** For the preview gallery's shots: the first chart open full screen. */
+  startFull?: boolean;
+  /** For the preview gallery's shots: the tooltip at this point. */
+  tipAt?: number;
+}) {
+  if (!charts || charts.length === 0) return null;
+  return (
+    <MessageCard wide label={charts.length === 1 ? 'Chart drawn with this message' : 'Charts drawn with this message'}>
+      {charts.map((chart, i) => (
+        <ReplyChart key={`${i}-${chart.title}`} chart={chart} startFull={Boolean(startFull) && i === 0} tipAt={tipAt} />
+      ))}
+    </MessageCard>
   );
 }

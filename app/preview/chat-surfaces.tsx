@@ -7,6 +7,7 @@ import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
 import { nextTextLine } from '@/lib/you/reach-out-card-model';
 import type { DashChange } from '@/lib/talk/changes';
+import type { DashChart } from '@/lib/talk/chart';
 import type { BuildRun } from '@/lib/you/live-cards';
 import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
@@ -363,7 +364,37 @@ type ThreadState =
   | 'loading'
   | 'next-text'
   | 'files'
-  | 'adding';
+  | 'adding'
+  | 'chart';
+
+/** The markets over last week, as a bot draws them with show_chart (plan #3050.2.2): each index as the change since Monday. */
+const MARKETS_CHART: DashChart = {
+  kind: 'line',
+  title: 'US markets, 2 to 6 November 2026',
+  rows: [
+    { label: 'Mon 2', value: 0, values: [0, 0, 0] },
+    { label: 'Tue 3', value: 0.4, values: [0.4, 0.9, 0.1] },
+    { label: 'Wed 4', value: -0.3, values: [-0.3, -0.8, 0.2] },
+    { label: 'Thu 5', value: 0.8, values: [0.8, 1.6, 0.5] },
+    { label: 'Fri 6', value: 1.2, values: [1.2, 2.1, 0.7] },
+  ],
+  currency: null,
+  unit: '%',
+  columns: null,
+  reference: null,
+  series: ['S&P 500', 'Nasdaq', 'Dow'],
+};
+
+/** You ask for a chart of the markets, and the reply draws it under its last bubble. */
+const CHART_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('c1', 'person', 'Can you show me a chart of the stock markets past week?', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('c2', 'advisor', 'A choppy week that ended up. Wednesday took back most of Tuesday.', '2026-11-03T08:58:30Z'),
+  msg('c3', 'advisor', 'The Nasdaq led, up 2.1% by Friday; the Dow lagged at 0.7%.', '2026-11-03T08:58:40Z', { charts: [MARKETS_CHART] }),
+];
 
 /** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
 const OFFER_FILES = [
@@ -721,6 +752,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           ? THREAD.slice(0, 7)
           : state === 'files'
             ? FILES_THREAD
+            : state === 'chart'
+            ? CHART_THREAD
             : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))

@@ -207,6 +207,24 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     expect(recordSlip).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claimed_attachment', surface: 'people' }));
   });
 
+  it('keeps a chart a bot drew on its text, and lets "here is the chart" through (plan #3050.2.2)', async () => {
+    const { client, tables } = group('@cy chart the markets');
+    const recordSlip = vi.fn(async () => undefined);
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        input.charts?.push({ kind: 'bar', title: 'Week', rows: [{ label: 'S&P', value: 1.2 }], currency: null, unit: '%', columns: null, reference: null });
+        return "Here's the chart: the S&P rose.";
+      },
+    });
+    const [message] = botMessages(tables);
+    expect(message.text).toBe("Here's the chart: the S&P rose.");
+    expect(message.charts).toEqual([expect.objectContaining({ kind: 'bar', title: 'Week' })]);
+    expect(recordSlip).not.toHaveBeenCalled();
+  });
+
   it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
     const { client, tables, stamp } = group('@cy quick one');
     let clock = Date.parse('2026-11-04T09:59:00Z');

@@ -239,3 +239,30 @@ describe('files sent with a message (plan #2974)', () => {
     expect(bubbleText({ text })).toBe(text);
   });
 });
+
+describe("a bubble's charts (plan #3050.2.2)", () => {
+  const row = (charts: unknown) => ({ id: 'm1', chat_id: 'c1', role: 'advisor', kind: 'reply', text: 'Choppy week.', created_at: '2026-11-07T09:00:00Z', charts });
+
+  it('reads the charts kept on the row through parseChart, and drops one that no longer parses', () => {
+    const line = {
+      kind: 'line',
+      title: 'Markets',
+      unit: '%',
+      series: ['S&P 500', 'Nasdaq'],
+      rows: [
+        { label: 'Mon', values: [0, 0] },
+        { label: 'Fri', values: [1.2, 2] },
+      ],
+    };
+    const m = threadMessageOf(row([line, { kind: 'pie', title: 'x', rows: [] }]));
+    expect(m?.charts).toHaveLength(1);
+    expect(m?.charts?.[0]).toMatchObject({ kind: 'line', series: ['S&P 500', 'Nasdaq'] });
+    expect(m?.text).toBe('Choppy week.');
+  });
+
+  it('has none for an empty array, a missing column or something that is not a list', () => {
+    expect(threadMessageOf(row([]))?.charts).toBeUndefined();
+    expect(threadMessageOf(row(undefined))?.charts).toBeUndefined();
+    expect(threadMessageOf(row({ kind: 'bar' }))?.charts).toBeUndefined();
+  });
+});
