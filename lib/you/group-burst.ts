@@ -45,6 +45,8 @@ import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT_TOOL, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
 import { ATTACH_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
 import type { DashSlip } from '@/lib/dash/slips';
+import { CHART_DRAWN, CHART_TOOL, CHART_TOOL_DEFINITION, parseChart, type DashChart } from '@/lib/talk/chart';
+import { MAX_MESSAGE_CHARTS } from '@/lib/you/chat-threads-model';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -81,6 +83,11 @@ export type SpeakerInput = {
   handOn?: (input: unknown) => Promise<AskToolResult>;
   /** Passes a request to another bot for this speaker (plan #3003.2). Absent: no hand_to_bot. */
   passToBot?: (input: unknown) => Promise<AskToolResult>;
+  /**
+   * Keeps a chart this speaker drew with show_chart (plan #3050.2.2), which
+   * is saved with its text and drawn under it. Absent: no show_chart.
+   */
+  draw?: (chart: DashChart) => void;
 };
 
 export type GroupBurstInput = {
@@ -365,8 +372,17 @@ async function handOffCall(
   }
 }
 
+/** A chart a speaker drew: checked as Ask checks one, kept for its text, and the model told it is drawn. */
+function chartCall(draw: (chart: DashChart) => void, block: Anthropic.ToolUseBlock): Anthropic.ToolResultBlockParam {
+  const parsed = parseChart(block.input);
+  if (!parsed.ok) return { type: 'tool_result', tool_use_id: block.id, content: parsed.error, is_error: true };
+  draw(parsed.chart);
+  return { type: 'tool_result', tool_use_id: block.id, content: CHART_DRAWN.replace('your answer', 'your text') };
+}
+
 /** One call of a speaker's, run by its name. */
 function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, call: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  if (call.name === CHART_TOOL && input.draw) return Promise.resolve(chartCall(input.draw, call));
   if (call.name === MAKE_PAGE_TOOL_NAME && input.page) return handOffCall(input.page, call, 'The page could not be started. Say so plainly.');
   if (call.name === HAND_OFF_TOOL_NAME && input.handOn) {
     return handOffCall(input.handOn, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
@@ -378,10 +394,11 @@ function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, 
 }
 
 /**
- * One bot's text. With a places finder it is offered find_places, and with
- * a page starter make_page (plan #2997); it may call them up to
- * SPEAKER_MAX_LOOKUPS times before it writes. With neither, it writes
- * straight away, so a turn stays short.
+ * One bot's text. With a places finder it is offered find_places, with a
+ * page starter make_page (plan #2997), and with somewhere to keep a chart
+ * show_chart (plan #3050.2.2); it may call them up to SPEAKER_MAX_LOOKUPS
+ * times before it writes. With none, it writes straight away, so a turn
+ * stays short.
  */
 export async function speakWithModel(
   anthropic: Anthropic,
@@ -405,6 +422,7 @@ export async function speakWithModel(
     ...(input.page ? [MAKE_PAGE_TOOL] : []),
     ...(input.handOn ? [HAND_OFF_TOOL] : []),
     ...(input.passToBot ? [HAND_TO_BOT_TOOL] : []),
+    ...(input.draw ? [CHART_TOOL_DEFINITION] : []),
   ];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
@@ -568,6 +586,8 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                     args,
                   )
               : undefined;
+            // The charts this bot draws go with its text (plan #3050.2.2).
+            const drawn: DashChart[] = [];
             text = await speak(
               {
                 speaker: { ...member, system: persona.system },
@@ -576,11 +596,14 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                 ...(page ? { page } : {}),
                 ...(handOn ? { handOn } : {}),
                 ...(passToBot ? { passToBot } : {}),
+                draw: (chart) => {
+                  if (drawn.length < MAX_MESSAGE_CHARTS) drawn.push(chart);
+                },
               },
               spent['group-speaker'],
             );
             // A text that says a file is attached when nothing was sent says so after all (plan #3050.1).
-            const claim = text ? falseAttachment(text, 0) : null;
+            const claim = text ? falseAttachment(text, drawn.length) : null;
             if (text && claim) {
               text = `${text}\n\n${NOTHING_ATTACHED}`;
               await input
@@ -592,7 +615,15 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
               if (wait > 0) await sleep(wait);
               const saved = await client
                 .from('advisor_messages')
-                .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind: 'reply', speaker_id: advisorId, text })
+                .insert({
+                  user_id: userId,
+                  chat_id: chatId,
+                  role: 'advisor',
+                  kind: 'reply',
+                  speaker_id: advisorId,
+                  text,
+                  ...(drawn.length > 0 ? { charts: drawn } : {}),
+                })
                 .select('id, created_at')
                 .single();
               if (saved.error || typeof saved.data?.id !== 'string') throw new Error(`A message was written but not saved: ${saved.error?.message ?? 'no row came back'}`);

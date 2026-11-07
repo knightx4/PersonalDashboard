@@ -68,6 +68,16 @@ describe('the People tab model', () => {
     expect(threadMessageOf({ id: 'x', text: '', created_at: '2026-11-03T08:00:00Z' })).toBeNull();
   });
 
+  it('reads the charts a bot drew with a message, leaving out one that no longer parses (plan #3050.2.2)', () => {
+    const line = { kind: 'line', title: 'Markets', rows: [{ label: 'Mon', value: 0 }, { label: 'Fri', value: 1.1 }] };
+    const row = { id: 'x', chat_id: 'c', role: 'advisor', text: 'Up.', created_at: '2026-11-03T08:00:00Z' };
+    expect(threadMessageOf({ ...row, charts: [line, { kind: 'pie' }] })?.charts).toEqual([
+      expect.objectContaining({ kind: 'line', title: 'Markets', series: null }),
+    ]);
+    expect(threadMessageOf({ ...row, charts: [] })).not.toHaveProperty('charts');
+    expect(threadMessageOf(row)).not.toHaveProperty('charts');
+  });
+
   it('merges by id, oldest first, keeping the copy whose receipts are further on', () => {
     const read = msg('b', 'person', '2026-11-03T08:01:00Z', { readAt: '2026-11-03T08:02:00Z' });
     const sent = msg('b', 'person', '2026-11-03T08:01:01Z');

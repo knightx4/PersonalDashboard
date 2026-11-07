@@ -12,7 +12,7 @@ import type { TalkToolCall } from './talk';
  * (core.conversation_turns), so a reopened conversation draws it again from
  * the turn alone. It is never written to a workspace page.
  *
- * Four kinds. A bar compares amounts that are parts of one question
+ * Six kinds. A bar compares amounts that are parts of one question
  * (spend by shop); a table lists figures a length would mislead about, such
  * as days in each stage beside a count; columns show one amount over time,
  * oldest first, the last column the period asked about; a figure is the one
@@ -21,11 +21,19 @@ import type { TalkToolCall } from './talk';
  * the person set, drawn as a line across the columns or as the change beside
  * the figure.
  *
+ * A line or an area (plan #3050.2.1) shows up to four series over the same
+ * labels, such as three stock indices over a week; a table can carry the same
+ * several values a row, one column each, and sorts by any of them. A chart
+ * with several series names them in `series`, and each row carries one value
+ * per series in `values`, null where a series has none for that label (a
+ * market closed for a holiday). Charts kept before then have no series and
+ * draw as they did.
+ *
  * Nothing here reads a database or the network, so the thread imports it.
  */
 
 export const CHART_TOOL = 'show_chart';
-export const CHART_KINDS = ['bar', 'table', 'columns', 'figure'] as const;
+export const CHART_KINDS = ['bar', 'table', 'columns', 'figure', 'line', 'area'] as const;
 export type ChartKind = (typeof CHART_KINDS)[number];
 
 /** The most rows a chart draws: a phone shows twelve bars without scrolling past the answer. */
@@ -35,8 +43,23 @@ export const MAX_CHART_TITLE = 100;
 export const MAX_CHART_LABEL = 60;
 export const MAX_CHART_HEADING = 30;
 export const MAX_CHART_UNIT = 20;
+/** The most series a line, an area or a table carries: a fifth line on a phone is a tangle. */
+export const MAX_CHART_SERIES = 4;
+/** The most points a line or an area draws: a day each over two months. */
+export const MAX_CHART_POINTS = 62;
 
-export type DashChartRow = { label: string; value: number };
+/** The kinds that draw series over time: a line, or a line with the ground under it filled. */
+export const TREND_KINDS = ['line', 'area'] as const;
+
+/**
+ * One row. With several series, `values` holds one value per series in the
+ * order `series` names them, null where that series has none, and `value` is
+ * the first series' value (0 when it has none) for the code that reads one.
+ */
+export type DashChartRow = { label: string; value: number; values?: (number | null)[] };
+
+/** One of several series: its name, and its own unit when it differs from the chart's ("%"). */
+export type DashChartSeries = { name: string; unit: string | null };
 
 /** What a figure or columns are measured against: the usual amount, or a target. */
 export type DashChartReference = { label: string; value: number };
@@ -53,6 +76,12 @@ export type DashChart = {
   columns: [string, string] | null;
   /** For columns or a figure: the usual amount or a target; null when none was given. */
   reference: DashChartReference | null;
+  /**
+   * The series a line, an area or a table draws, in order; null for one
+   * series, whose values are the rows' `value`. Charts kept before plan
+   * #3050.2.1 have no such field, which reads as null.
+   */
+  series: DashChartSeries[] | null;
 };
 
 function line(value: unknown): string {
@@ -77,7 +106,7 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
 
   const kind = raw.kind;
   if (!(CHART_KINDS as readonly unknown[]).includes(kind)) {
-    return { ok: false, error: 'kind must be "bar", "table", "columns" or "figure".' };
+    return { ok: false, error: 'kind must be "bar", "table", "columns", "figure", "line" or "area".' };
   }
   const chartKind = kind as ChartKind;
 
@@ -87,10 +116,23 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
     return { ok: false, error: `The title is ${title.length} characters; the most is ${MAX_CHART_TITLE}.` };
   }
 
+  const trend = isTrend(chartKind);
+  const series = parseSeries(raw.series);
+  if (typeof series === 'string') return { ok: false, error: series };
+  if (series && chartKind !== 'table' && !trend) {
+    return { ok: false, error: 'Only a line, an area or a table takes several series.' };
+  }
+
   if (!Array.isArray(raw.rows) || raw.rows.length === 0) {
     return { ok: false, error: 'A chart needs at least one row.' };
   }
-  if (raw.rows.length > MAX_CHART_ROWS) {
+  if (trend && raw.rows.length > MAX_CHART_POINTS) {
+    return {
+      ok: false,
+      error: `That is ${raw.rows.length} points; the most is ${MAX_CHART_POINTS}. Take one a week instead of one a day.`,
+    };
+  }
+  if (!trend && raw.rows.length > MAX_CHART_ROWS) {
     return {
       ok: false,
       error: `That is ${raw.rows.length} rows; the most is ${MAX_CHART_ROWS}. Keep the ${MAX_CHART_ROWS - 1} largest and add the rest together as one row called "Everything else".`,
@@ -101,14 +143,39 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
     const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
     const label = line(row.label);
     if (!label) return { ok: false, error: `Row ${i + 1} has no label.` };
+    const name = cut(label, 30);
+    if (series) {
+      const values = row.values;
+      if (!Array.isArray(values) || values.length !== series.length) {
+        return {
+          ok: false,
+          error: `Row ${i + 1} ("${name}") needs values: one number for each of the ${series.length} series, in the order series names them, null where one has none.`,
+        };
+      }
+      const kept: (number | null)[] = [];
+      for (const value of values) {
+        if (value === null) kept.push(null);
+        else if (typeof value === 'number' && Number.isFinite(value)) kept.push(value);
+        else return { ok: false, error: `Row ${i + 1} ("${name}") has a value that is not a number or null.` };
+      }
+      rows.push({ label: cut(label, MAX_CHART_LABEL), value: kept[0] ?? 0, values: kept });
+      continue;
+    }
     const value = row.value;
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-      return { ok: false, error: `Row ${i + 1} ("${cut(label, 30)}") needs a number for its value.` };
+      return { ok: false, error: `Row ${i + 1} ("${name}") needs a number for its value.` };
     }
     if ((kind === 'bar' || kind === 'columns') && value < 0) {
-      return { ok: false, error: `Row ${i + 1} ("${cut(label, 30)}") is below zero, which a bar cannot draw. Use a table.` };
+      return { ok: false, error: `Row ${i + 1} ("${name}") is below zero, which a bar cannot draw. Use a table.` };
     }
     rows.push({ label: cut(label, MAX_CHART_LABEL), value });
+  }
+
+  if (trend && rows.length < 2) {
+    return { ok: false, error: 'A line needs two or more points, oldest first. A single number is a figure.' };
+  }
+  if (series && rows.every((row) => row.values?.every((value) => value === null))) {
+    return { ok: false, error: 'Every value is null, so there is nothing to draw.' };
   }
 
   if (kind === 'figure' && rows.length !== 1) {
@@ -138,13 +205,111 @@ export function parseChart(input: unknown): { ok: true; chart: DashChart } | { o
   }
   const unit = code ? null : cut(line(raw.unit), MAX_CHART_UNIT) || null;
 
+  // A table's headings. With several series the series name the value
+  // columns, so only the first heading, the labels', is kept from columns.
   let columns: [string, string] | null = null;
-  if (kind === 'table' && Array.isArray(raw.columns) && raw.columns.length === 2) {
+  if (kind === 'table' && Array.isArray(raw.columns)) {
     const [first, second] = raw.columns.map((c) => cut(line(c), MAX_CHART_HEADING));
-    if (first && second) columns = [first, second];
+    if (series && first) columns = [first, ''];
+    else if (!series && raw.columns.length === 2 && first && second) columns = [first, second];
   }
 
-  return { ok: true, chart: { kind: chartKind, title, rows, currency: code || null, unit, columns, reference } };
+  return { ok: true, chart: { kind: chartKind, title, rows, currency: code || null, unit, columns, reference, series } };
+}
+
+/** A line or an area: the kinds that draw series over time. */
+export function isTrend(kind: ChartKind): kind is (typeof TREND_KINDS)[number] {
+  return (TREND_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * The series as the model named them: a list of { name, unit }, or of bare
+ * names. Null when none were given; a sentence for the model when they
+ * cannot be drawn.
+ */
+function parseSeries(input: unknown): DashChartSeries[] | null | string {
+  if (input === undefined || input === null) return null;
+  if (!Array.isArray(input) || input.length === 0) return 'series must be a list naming each line or column.';
+  if (input.length > MAX_CHART_SERIES) {
+    return `That is ${input.length} series; the most is ${MAX_CHART_SERIES}. Draw the ${MAX_CHART_SERIES} the question is about.`;
+  }
+  const series: DashChartSeries[] = [];
+  for (const [i, item] of input.entries()) {
+    const entry: Record<string, unknown> =
+      typeof item === 'string' ? { name: item } : item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
+    const name = cut(line(entry.name), MAX_CHART_HEADING);
+    if (!name) return `Series ${i + 1} has no name.`;
+    if (series.some((s) => s.name === name)) return `Two series are both called "${name}"; give each its own name.`;
+    series.push({ name, unit: cut(line(entry.unit), MAX_CHART_UNIT) || null });
+  }
+  return series;
+}
+
+/** The series a chart draws: its own, or the one its rows make, named by its unit or its title. */
+export function chartSeries(chart: DashChart): DashChartSeries[] {
+  if (chart.series && chart.series.length > 0) return chart.series;
+  const unit = chart.unit ? chart.unit.charAt(0).toUpperCase() + chart.unit.slice(1) : null;
+  return [{ name: unit ?? chart.title, unit: null }];
+}
+
+/** A row's value in one series, by its place in chartSeries; null where it has none. */
+export function rowValue(chart: DashChart, row: DashChartRow, index: number): number | null {
+  if (chart.series && chart.series.length > 0) return row.values?.[index] ?? null;
+  return index === 0 ? row.value : null;
+}
+
+/** One series' value as the reply prints it: in the series' own unit when it has one, a dash when it has none. */
+export function seriesValue(chart: DashChart, series: DashChartSeries | undefined, value: number | null): string {
+  if (value === null) return '–';
+  if (series?.unit) {
+    const number = formatNumber(value, { maximumFractionDigits: 2 });
+    return series.unit === '%' ? `${number}%` : `${number} ${series.unit}`;
+  }
+  return chartValue(chart, value);
+}
+
+/** A number short enough for an axis: 18.2k, 1.4m, 0.85, as the Learn charts write them. */
+export function axisNumber(value: number): string {
+  const size = Math.abs(value);
+  if (size >= 1e9) return `${Number((value / 1e9).toPrecision(3))}bn`;
+  if (size >= 1e6) return `${Number((value / 1e6).toPrecision(3))}m`;
+  if (size >= 1e4) return `${Number((value / 1e3).toPrecision(3))}k`;
+  if (size >= 100) return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return String(Number(value.toPrecision(3)));
+}
+
+/** How a table is sorted: column -1 is the labels, 0 and on the series; null is the order it was sent in. */
+export type ChartSort = { column: number; direction: 'asc' | 'desc' } | null;
+
+/**
+ * A table's rows in the order a pressed heading asks for. Labels sort A to Z
+ * with numbers in number order; a row with no value in the column goes last
+ * whichever way it sorts; ties keep the order the chart was sent in.
+ */
+export function sortRows(chart: DashChart, sort: ChartSort): DashChartRow[] {
+  if (!sort) return chart.rows;
+  const sign = sort.direction === 'asc' ? 1 : -1;
+  return chart.rows
+    .map((row, at) => ({ row, at }))
+    .sort((a, b) => {
+      if (sort.column < 0) return sign * a.row.label.localeCompare(b.row.label, 'en', { numeric: true }) || a.at - b.at;
+      const x = rowValue(chart, a.row, sort.column);
+      const y = rowValue(chart, b.row, sort.column);
+      if (x === null || y === null) return x === y ? a.at - b.at : x === null ? 1 : -1;
+      return sign * (x - y) || a.at - b.at;
+    })
+    .map(({ row }) => row);
+}
+
+/**
+ * Where a press on a heading takes the sort: figures largest first and
+ * labels A to Z, then the other way, then back to the order it was sent in.
+ */
+export function nextSort(current: ChartSort, column: number): ChartSort {
+  const first = column < 0 ? 'asc' : 'desc';
+  if (!current || current.column !== column) return { column, direction: first };
+  if (current.direction === first) return { column, direction: first === 'asc' ? 'desc' : 'asc' };
+  return null;
 }
 
 /**
@@ -191,7 +356,13 @@ export function chartChange(chart: Pick<DashChart, 'rows' | 'reference'>): numbe
   return Math.round(((value - base) / base) * 100);
 }
 
-/** A table's headings: its own, or the label and what the values are. */
+/** A table's headings: the labels' and then one per series. */
+export function tableHeadings(chart: DashChart): string[] {
+  if (chart.series && chart.series.length > 0) return [chart.columns?.[0] ?? '', ...chart.series.map((s) => s.name)];
+  return chartColumns(chart);
+}
+
+/** A one-series table's two headings: its own, or the label and what the values are. */
 export function chartColumns(chart: DashChart): [string, string] {
   if (chart.columns) return chart.columns;
   const unit = chart.unit ? chart.unit.charAt(0).toUpperCase() + chart.unit.slice(1) : null;
@@ -205,28 +376,51 @@ export const CHART_DRAWN =
 /** The tool's definition, sent to the model with the lookups (lib/ask/tools.ts). */
 export const CHART_TOOL_DEFINITION = {
   name: CHART_TOOL,
-  description: `Draw a chart under your answer. Fill it with the figures a lookup returned, exactly as it gave them, never estimated. Four kinds:
+  description: `Draw a chart under your answer. Fill it with the figures a lookup or a web search returned, exactly as it gave them, never estimated. Six kinds:
 - figure: the one number a question asks for ("what did I spend in September", "how many applications this month"), set large, with reference set to the usual amount (the average of the periods before, which you work out from the same lookup) or to a target the person wrote down, so the change shows beside it. One row.
 - columns: one amount over time, oldest first, the period asked about last: spending by month, applications by week. Two to ${MAX_CHART_ROWS} periods. reference draws a line across them: the target, or the usual amount.
 - bar: amounts that are parts of one question, largest first: spending by shop, applications by status. Keep the largest and add the rest together as "Everything else".
-- table: figures a length would mislead about, or values below zero, such as days in each stage beside a count.
+- table: figures a length would mislead about, or values below zero, such as days in each stage beside a count. With series, a row carries several values, one column each, such as each index's close and its change over the week; the person can sort by any column.
+- line: up to ${MAX_CHART_SERIES} series over the same labels, oldest first, such as the S&P 500, Nasdaq and Dow each day last week: name them in series and give each row values, one per series, null where one has none. Two to ${MAX_CHART_POINTS} points. When the series differ greatly in size, as three indices do, give each as its change since the first point in % (series unit "%"), so they share one scale.
+- area: a line with the ground under it filled, for one amount over time, or a few that are parts of one total.
 Money goes in whole units with its currency (12.5 for 12.50); give one chart per currency. Draw at most two charts for an answer: a figure and the columns or bar behind it is the usual pair.`,
   input_schema: {
     type: 'object' as const,
     properties: {
-      kind: { type: 'string', enum: [...CHART_KINDS], description: 'figure, columns, bar or table.' },
+      kind: { type: 'string', enum: [...CHART_KINDS], description: 'figure, columns, bar, table, line or area.' },
       title: { type: 'string', description: 'What the chart shows, with its period: "Spending by shop, 2026".' },
       rows: {
         type: 'array',
         minItems: 1,
-        maxItems: MAX_CHART_ROWS,
+        maxItems: MAX_CHART_POINTS,
+        description: `At most ${MAX_CHART_ROWS} for a figure, columns, bar or table; ${MAX_CHART_POINTS} for a line or an area.`,
         items: {
           type: 'object',
           properties: {
-            label: { type: 'string', description: 'The shop, month, stage or status, as the lookup named it.' },
-            value: { type: 'number', description: 'The figure for that label.' },
+            label: { type: 'string', description: 'The shop, month, day, stage or status, as the lookup named it.' },
+            value: { type: 'number', description: 'The figure for that label, for a chart with one series.' },
+            values: {
+              type: 'array',
+              items: { type: ['number', 'null'] },
+              description: 'With series: one figure per series, in their order, null where one has none.',
+            },
           },
-          required: ['label', 'value'],
+          required: ['label'],
+          additionalProperties: false,
+        },
+      },
+      series: {
+        type: 'array',
+        minItems: 1,
+        maxItems: MAX_CHART_SERIES,
+        description: 'For a line, an area or a table with several values a row: what each value is, such as the index.',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The series as the person knows it: "S&P 500", "Week change".' },
+            unit: { type: 'string', description: 'Its own unit when it is not the chart\'s, such as "%".' },
+          },
+          required: ['name'],
           additionalProperties: false,
         },
       },
@@ -237,7 +431,7 @@ Money goes in whole units with its currency (12.5 for 12.50); give one chart per
         minItems: 2,
         maxItems: 2,
         items: { type: 'string' },
-        description: 'For a table, its two column headings, such as ["Stage", "Median days"].',
+        description: 'For a table, its two column headings, such as ["Stage", "Median days"]. With series, give only the labels\' heading; the series name the rest.',
       },
       reference: {
         type: 'object',

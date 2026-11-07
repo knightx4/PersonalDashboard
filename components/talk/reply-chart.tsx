@@ -1,15 +1,30 @@
+'use client';
+
+import { useEffect, useId, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Maximize2, X } from 'lucide-react';
 import { Meter } from '@/components/ui/meter';
 import { Chip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { SectionLabel } from '@/components/ui/section-heading';
 import {
   chartChange,
-  chartColumns,
+  chartSeries,
   chartValue,
+  isTrend,
+  nextSort,
+  rowValue,
+  seriesValue,
+  sortRows,
+  tableHeadings,
   turnCharts,
+  type ChartSort,
   type DashChart,
 } from '@/lib/talk/chart';
 import type { TalkToolCall } from '@/lib/talk/talk';
+import { MessageCard } from '@/components/patterns/messaging';
+import { ReplyTrend } from './reply-trend';
 
 /**
  * The charts Dash drew in an answer (plan #1655), read from the turn's kept
@@ -17,6 +32,10 @@ import type { TalkToolCall } from '@/lib/talk/talk';
  * Bars are the merchant breakdown's rows (components/dashboard/
  * merchant-breakdown.tsx): the label and the figure on one line, the meter
  * under them, where the length compares rows and the figure is read.
+ *
+ * A line, an area or a table (plan #3050.2.1) opens full screen from the
+ * button by its title, and a table sorts by any heading pressed. The same
+ * charts draw under a bot's text in a People thread (plan #3050.2.2).
  */
 
 function Bars({ chart }: { chart: DashChart }) {
@@ -50,33 +69,79 @@ function Bars({ chart }: { chart: DashChart }) {
 }
 
 /**
- * A two-column table drawn by hand rather than with components/ui/table.tsx:
- * that one fades its right edge on a phone to show it scrolls, and a column
- * of figures this narrow never needs to, so the fade only hid the numbers.
+ * A table drawn by hand rather than with components/ui/table.tsx: that one
+ * fades its right edge on a phone to show it scrolls, and a column of figures
+ * this narrow never needs to, so the fade only hid the numbers. A table with
+ * several series can be wider than a phone; it scrolls sideways under its
+ * labels, which stay put.
+ *
+ * Each heading is a button that sorts by its column: figures largest first,
+ * labels A to Z, then the other way, then back to the order Dash gave.
  */
 function Rows({ chart }: { chart: DashChart }) {
-  const [label, value] = chartColumns(chart);
+  const [sort, setSort] = useState<ChartSort>(null);
+  const headings = tableHeadings(chart);
+  const series = chart.series && chart.series.length > 0 ? chart.series : null;
+  const wide = series !== null && series.length > 1;
+  const rows = sortRows(chart, sort);
+  const cell = (row: DashChart['rows'][number], index: number) =>
+    series ? seriesValue(chart, series[index], rowValue(chart, row, index)) : chartValue(chart, row.value);
+
+  const heading = (text: string, column: number) => {
+    const sorted = sort?.column === column ? sort.direction : null;
+    const Arrow = sorted === 'asc' ? ArrowUp : ArrowDown;
+    return (
+      <th
+        key={column}
+        scope="col"
+        aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
+        className={cn(
+          'pb-1.5 font-normal',
+          column < 0 ? 'text-left' : 'pl-3 text-right',
+          column < 0 && wide && 'sticky left-0 z-10 bg-sunken',
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setSort((current) => nextSort(current, column))}
+          className={cn(
+            'press -mx-1 inline-flex items-center gap-1 rounded-control px-1 py-0.5 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2',
+            column >= 0 && 'flex-row-reverse',
+          )}
+        >
+          {text ? <SectionLabel as="span">{text}</SectionLabel> : <span className="sr-only">Row</span>}
+          <Arrow aria-hidden strokeWidth={1.75} className={cn('size-3 text-ink-muted', !sorted && 'opacity-0')} />
+          <span className="sr-only">, sort</span>
+        </button>
+      </th>
+    );
+  };
+
   return (
-    <table className="w-full border-collapse text-ui">
-      <thead>
-        <tr>
-          <th scope="col" className="pb-1.5 text-left font-normal">
-            {label ? <SectionLabel as="span">{label}</SectionLabel> : <span className="sr-only">Row</span>}
-          </th>
-          <th scope="col" className="pb-1.5 pl-3 text-right font-normal">
-            <SectionLabel as="span">{value}</SectionLabel>
-          </th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-border">
-        {chart.rows.map((row, i) => (
-          <tr key={`${i}-${row.label}`}>
-            <td className="py-2 text-ink">{row.label}</td>
-            <td className="tabular whitespace-nowrap py-2 pl-3 text-right text-ink">{chartValue(chart, row.value)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className={cn(wide && '-mx-3 overflow-x-auto px-3')}>
+      <table className={cn('w-full border-collapse text-ui', wide && 'min-w-max')}>
+        <thead>
+          <tr>{headings.map((text, i) => heading(text, i - 1))}</tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((row, i) => (
+            <tr key={`${i}-${row.label}`}>
+              <td
+                className={cn('py-2 text-ink', wide && 'sticky left-0 max-w-40 truncate bg-sunken pr-2')}
+                title={wide ? row.label : undefined}
+              >
+                {row.label}
+              </td>
+              {headings.slice(1).map((_, index) => (
+                <td key={index} className="tabular whitespace-nowrap py-2 pl-3 text-right text-ink">
+                  {cell(row, index)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -196,25 +261,115 @@ function Columns({ chart }: { chart: DashChart }) {
   );
 }
 
-export function ReplyChart({ chart }: { chart: DashChart }) {
+/** The kinds that open full screen: the ones with more to read than a reply's width shows. */
+function opens(chart: DashChart): boolean {
+  return isTrend(chart.kind) || chart.kind === 'table';
+}
+
+/** What the chart draws, at the reply's width or, `large`, full screen. */
+function Body({ chart, large = false }: { chart: DashChart; large?: boolean }) {
+  if (isTrend(chart.kind)) return <ReplyTrend chart={chart} large={large} />;
+  if (chart.kind === 'bar') return <Bars chart={chart} />;
+  if (chart.kind === 'columns') return <Columns chart={chart} />;
+  if (chart.kind === 'figure') return <Figure chart={chart} />;
+  return <Rows chart={chart} />;
+}
+
+/** What a caption names beside the title: the currency or unit every value is in. */
+function captionUnit(chart: DashChart): string | null {
+  if (chart.kind === 'bar' || chart.kind === 'columns') return chart.currency ?? chart.unit;
+  if (isTrend(chart.kind)) {
+    const units = new Set(chartSeries(chart).map((s) => s.unit));
+    if (units.size === 1 && [...units][0]) return [...units][0];
+    return chart.currency ?? chart.unit;
+  }
+  return null;
+}
+
+/**
+ * The chart over the whole screen, a native modal so the page behind is
+ * inert and focus stays inside. Escape, Close or a press on the backdrop
+ * shuts it.
+ */
+function FullScreen({ chart, onClose }: { chart: DashChart; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const dialog = ref.current;
+    if (dialog && !dialog.open) dialog.showModal();
+  }, []);
+  const unit = captionUnit(chart);
   return (
-    <figure className="mt-2 rounded-card bg-sunken px-3 pb-3 pt-2.5">
-      <figcaption className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 text-ui font-medium text-ink">
-        <span className="min-w-0">{chart.title}</span>
-        {(chart.kind === 'bar' || chart.kind === 'columns') && (chart.unit || chart.currency) ? (
-          <span className="text-small font-normal text-ink-muted">{chart.currency ?? chart.unit}</span>
-        ) : null}
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === ref.current) onClose();
+      }}
+      className="m-0 h-dvh max-h-none w-screen max-w-none bg-surface p-0 text-ink shadow-lg backdrop:bg-black/40 sm:m-auto sm:h-[calc(100dvh-3rem)] sm:w-[calc(100vw-3rem)] sm:rounded-card"
+    >
+      <div className="flex h-full flex-col px-4 pb-5 pt-3 sm:px-6">
+        <div className="flex items-start justify-between gap-3">
+          <h2 id={titleId} className="min-w-0 pt-1 font-display text-title font-semibold tracking-tight text-ink">
+            {chart.title}
+            {unit && <span className="ml-2 text-ui font-normal text-ink-muted">{unit}</span>}
+          </h2>
+          <Tooltip label="Close" align="end">
+            <IconButton label="Close" onClick={onClose}>
+              <X strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
+        </div>
+        <div className="mt-4 min-h-0 flex-1 overflow-auto rounded-card bg-sunken px-3 pb-3 pt-3">
+          <Body chart={chart} large />
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
+/** One chart under a reply; `defaultOpen` draws it full screen at once, as the gallery shows it. */
+export function ReplyChart({ chart, defaultOpen = false, className }: { chart: DashChart; defaultOpen?: boolean; className?: string }) {
+  const [open, setOpen] = useState(defaultOpen && opens(chart));
+  const unit = captionUnit(chart);
+  return (
+    <figure className={cn('mt-2 rounded-card bg-sunken px-3 pb-3 pt-2.5', className)}>
+      <figcaption className="mb-2 flex items-start justify-between gap-x-3 text-ui font-medium text-ink">
+        <span className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+          <span className="min-w-0">{chart.title}</span>
+          {unit ? <span className="text-small font-normal text-ink-muted">{unit}</span> : null}
+        </span>
+        {opens(chart) && (
+          <Tooltip label="Open full screen" align="end">
+            <IconButton size="sm" label="Open full screen" className="-mr-1 -mt-0.5" onClick={() => setOpen(true)}>
+              <Maximize2 strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
+        )}
       </figcaption>
-      {chart.kind === 'bar' ? (
-        <Bars chart={chart} />
-      ) : chart.kind === 'columns' ? (
-        <Columns chart={chart} />
-      ) : chart.kind === 'figure' ? (
-        <Figure chart={chart} />
-      ) : (
-        <Rows chart={chart} />
-      )}
+      <Body chart={chart} />
+      {open && <FullScreen chart={chart} onClose={() => setOpen(false)} />}
     </figure>
+  );
+}
+
+/**
+ * The charts a bot on People drew with a text (plan #3050.2.2), kept on its
+ * message, under its bubble in the run: the same charts Ask draws, a card's
+ * width wide. Voice reads the bubble's words and never these.
+ */
+export function MessageCharts({ charts }: { charts: readonly DashChart[] | undefined }) {
+  if (!charts || charts.length === 0) return null;
+  return (
+    <MessageCard wide>
+      {charts.map((chart, i) => (
+        <ReplyChart key={`${i}-${chart.title}`} chart={chart} className="mt-0.5" />
+      ))}
+    </MessageCard>
   );
 }
 

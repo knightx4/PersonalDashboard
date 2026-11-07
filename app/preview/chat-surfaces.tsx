@@ -14,6 +14,7 @@ import { GroupThreadView } from '@/app/chat/groups/[id]/group-thread-view';
 import { groupTitleOf, type GroupMember, type GroupRow, type Reacted } from '@/lib/you/group-chats-model';
 import type { PaneChats } from '@/components/shell/ask-dash-chats';
 import type { PaneThread } from '@/lib/you/pane-threads-model';
+import { MARKETS_LINE, MARKETS_TABLE } from './chart-fixtures';
 
 /**
  * The Chat workspace in the gallery (plan #2748.1, #2748.6): People, its
@@ -363,6 +364,7 @@ type ThreadState =
   | 'loading'
   | 'next-text'
   | 'files'
+  | 'charts'
   | 'adding';
 
 /** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
@@ -383,6 +385,23 @@ const FILES_THREAD: ThreadMessage[] = [
   msg('t10', 'advisor', 'Ask them for the last valuation before the 14th. The $132,000 base is the part to weigh.', '2026-11-03T08:58:40Z'),
   msg('t11', 'person', 'Pasted image 2.png', '2026-11-03T08:59:00Z', {
     files: [{ id: 'f3', name: 'Pasted image 2.png', contentType: 'image/png', size: 96_256, href: '/gallery/offer-screenshot.svg' }],
+  }),
+];
+
+/**
+ * Asking for a chart of the markets (plan #3050.2.2): two texts back, and
+ * under the second the line chart with each index and the table of closes,
+ * kept on that message's charts.
+ */
+const CHARTS_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(0, 7),
+  msg('t8', 'person', 'Can you show me a chart of the stock markets past week?', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('t9', 'advisor', 'All three ended the week up, after a dip on Wednesday.', '2026-11-03T08:58:30Z'),
+  msg('t10', 'advisor', 'The Nasdaq gained most, 1.71% since Monday. The chart has each day.', '2026-11-03T08:58:40Z', {
+    charts: [MARKETS_LINE, MARKETS_TABLE],
   }),
 ];
 
@@ -721,6 +740,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           ? THREAD.slice(0, 7)
           : state === 'files'
             ? FILES_THREAD
+            : state === 'charts'
+            ? CHARTS_THREAD
             : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))

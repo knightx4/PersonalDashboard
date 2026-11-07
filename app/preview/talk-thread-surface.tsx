@@ -2,6 +2,8 @@
 
 import { Thread, type TalkSend } from '@/components/thread/thread';
 import type { DashChart } from '@/lib/talk/chart';
+import { ReplyChart } from '@/components/talk/reply-chart';
+import { MARKETS_LINE, MARKETS_TABLE } from './chart-fixtures';
 import { Card } from '@/components/ui/card';
 import { CostHint } from '@/components/ui/cost-hint';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
@@ -34,8 +36,15 @@ import { AskDashProvider, AskThread, type AskSource } from '@/components/shell/a
 const at = (hour: number, minute = 0) =>
   `2026-09-28T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
 
-/** A `show_chart` call as a kept turn holds it: the tool's result is the chart. */
-function chartCall(chart: Omit<DashChart, 'reference'> & { reference?: DashChart['reference'] }): TalkToolCall {
+/**
+ * A `show_chart` call as a kept turn holds it: the tool's result is the
+ * chart. A chart kept before plan #3050.2.1 has no series field, and the
+ * bar, table, figure and columns here are kept that way, to show they still
+ * draw.
+ */
+function chartCall(
+  chart: Omit<DashChart, 'reference' | 'series'> & { reference?: DashChart['reference']; series?: DashChart['series'] },
+): TalkToolCall {
   const kept = { reference: null, ...chart };
   return { name: 'show_chart', input: kept, result: { ok: true, chart: kept } };
 }
@@ -197,7 +206,27 @@ const TURNS: TalkTurn[] = [
       }),
     ],
   },
+  { id: 'q6', role: 'user', body: 'Can you show me a chart of the stock markets past week?', createdAt: at(11, 30) },
+  {
+    id: 'a6',
+    role: 'assistant',
+    body:
+      'All three indices ended the week up, after a dip on Wednesday. The Nasdaq gained most, 1.71% since Monday, and the Dow least at 0.55%.',
+    createdAt: at(11, 30),
+    toolCalls: [chartCall(MARKETS_LINE), chartCall(MARKETS_TABLE)],
+  },
 ];
+
+/** A reply's line chart opened full screen (plan #3050.2.1), over the answer it belongs to. */
+export function TalkChartFullSurface() {
+  return (
+    <PageColumn className="py-4">
+      <Card padding="standard">
+        <ReplyChart chart={MARKETS_LINE} defaultOpen />
+      </Card>
+    </PageColumn>
+  );
+}
 
 /** The gallery cannot ask: a follow-up is answered with a fixed line after a moment. */
 const send: TalkSend = async (body) => {

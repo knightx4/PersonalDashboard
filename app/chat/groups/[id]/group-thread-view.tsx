@@ -16,6 +16,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { MessageInput } from '@/components/patterns/message-input';
 import Link from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
+import { MessageCharts } from '@/components/talk/reply-chart';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { MESSAGE_MAX } from '@/lib/you/council-model';
@@ -454,11 +455,17 @@ export function GroupThreadView({
                   bot={block.speakerId ?? null}
                   run={block.messages}
                 >
-                  <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={m.role === 'advisor' && !openingIds.has(m.id)}>
+                  <MessageBubble
+                    from={block.from}
+                    last={i === block.messages.length - 1 && !m.charts?.length}
+                    arriving={m.role === 'advisor' && !openingIds.has(m.id)}
+                  >
                     {m.text}
                   </MessageBubble>
                 </VoicedBubble>
                 {reactions[m.id]?.length ? <Reactions list={reactions[m.id]} members={[...members, ...former]} from={block.from} /> : null}
+                {/* A chart the bot drew with this text (plan #3050.2.2). */}
+                <MessageCharts charts={m.charts} />
                 {m.receipts.map((r) => (
                   <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                     {r.label}

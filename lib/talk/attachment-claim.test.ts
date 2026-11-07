@@ -35,9 +35,16 @@ describe('attachmentClaim (plan #3050.1)', () => {
 });
 
 describe('falseAttachment', () => {
-  it('lets a claim through when something really was sent', () => {
+  it('lets a reply point at a chart it drew, and only then', () => {
     expect(falseAttachment('Here is the chart.', 1)).toBeNull();
+    expect(falseAttachment('The chart below shows the Dow and the Nasdaq.', 2)).toBeNull();
     expect(falseAttachment('Here is the chart.', 0)).toBe('Here is the chart.');
+  });
+
+  it('still catches a file claimed beside a drawn chart (plan #3050.2.2)', () => {
+    expect(falseAttachment("Here's your chart, attached as stocks_week.png!", 1)).toBe("Here's your chart, attached as stocks_week.png!");
+    expect(falseAttachment('Here is the PDF of the week.', 1)).toBe('Here is the PDF of the week.');
+    expect(falseAttachment('Sent you markets.csv just now.', 1)).toBe('Sent you markets.csv just now.');
   });
 });
 

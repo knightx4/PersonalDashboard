@@ -528,7 +528,7 @@ import {
   ChatTypingMomentSurface,
 } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
+import { TalkChartFullSurface, TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
   FinancesSpendingCategoriesSurface,
@@ -8974,6 +8974,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TalkThreadSurface />,
   },
   {
+    /* A line chart of last week's markets opened full screen from its
+     * reply (plan #3050.2.1): the title, Close, the key naming each index
+     * and the plot over the rest of the screen. */
+    id: 'ask-dash-chart-full',
+    label: 'Ask Dash · A chart full screen',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkChartFullSurface />,
+  },
+  {
     /* A question with a bill's photo and PDF added (plan #1716): Dash reads
      * them with the question, and the $ beside Send, open, counts reading
      * them. */
@@ -9364,6 +9374,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="files" />,
+  },
+  {
+    /* A chart a bot drew (plan #3050.2.2): asked for last week's markets,
+     * Franklin's two texts and under the second a line for each index and
+     * a table of closes that sorts by its headings. */
+    id: 'chat-people-thread-chart',
+    label: 'Chat · A thread with a chart drawn',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="charts" />,
   },
   {
     /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */

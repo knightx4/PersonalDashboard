@@ -207,6 +207,25 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     expect(recordSlip).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claimed_attachment', surface: 'people' }));
   });
 
+  it('saves a chart a bot drew with its text, and does not call it a false attachment (plan #3050.2.2)', async () => {
+    const { client, tables } = group('@cy chart the markets');
+    const recordSlip = vi.fn(async () => undefined);
+    const chart = { kind: 'line', title: 'Markets', rows: [{ label: 'Mon', value: 0 }, { label: 'Fri', value: 1.1 }], currency: null, unit: '%', columns: null, reference: null, series: null } as const;
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        input.draw?.({ ...chart, rows: [...chart.rows] });
+        return 'Up 1.1% on the week; the chart below has each day.';
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.text)).toEqual(['Up 1.1% on the week; the chart below has each day.']);
+    expect(said[0].charts).toEqual([expect.objectContaining({ kind: 'line', title: 'Markets' })]);
+    expect(recordSlip).not.toHaveBeenCalled();
+  });
+
   it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
     const { client, tables, stamp } = group('@cy quick one');
     let clock = Date.parse('2026-11-04T09:59:00Z');
@@ -409,6 +428,27 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
     expect(back[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'g1', content: 'Started. Say you are on it.' });
     expect(said).toBe("On it, I'll drop the link here.");
+  });
+
+  it('offers show_chart when the chart can be kept, keeps it, and hands an error back for one it cannot draw (plan #3050.2.2)', async () => {
+    const good = { kind: 'bar', title: 'Spend', rows: [{ label: 'Amazon', value: 12 }] };
+    const calls = {
+      content: [
+        { type: 'tool_use', id: 'c1', name: 'show_chart', input: good },
+        { type: 'tool_use', id: 'c2', name: 'show_chart', input: { kind: 'pie', title: 'x', rows: [] } },
+      ],
+      usage: USAGE,
+    };
+    const { anthropic, sent } = scripted([calls, text('Amazon is all of it.')]);
+    const drawn: unknown[] = [];
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, draw: (c) => void drawn.push(c) }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['show_chart']);
+    expect(drawn).toEqual([expect.objectContaining({ kind: 'bar', title: 'Spend' })]);
+    const back = sent[1].messages.at(-1)?.content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ tool_use_id: 'c1', content: expect.stringContaining('drawn under your text') });
+    expect(back[1]).toMatchObject({ tool_use_id: 'c2', is_error: true });
+    expect(said).toBe('Amazon is all of it.');
   });
 
   it('offers hand_off when the speaker can hand on, and hands the result back before the bot texts (plan #3005.2)', async () => {

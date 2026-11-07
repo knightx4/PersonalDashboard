@@ -18,6 +18,7 @@ import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
 import { ATTACH_RULES, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import { CHART_DRAWN, parseChart } from '@/lib/talk/chart';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -219,7 +220,7 @@ describe('replyToMentor', () => {
     expect(system[0].cache_control).toEqual({ type: 'ephemeral' });
     const tools = (streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toContain('todos');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     expect(tools.at(-1)).toBe('answer');
   });
 
@@ -257,7 +258,7 @@ describe('replyToMentor', () => {
     const tools = (acting.streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toEqual(expect.arrayContaining(['todos', 'add_todo', 'add_plan_step', 'propose_build', 'propose_delete']));
     expect(tools).not.toContain('hand_off');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     const system = (acting.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
     expect(system).toContain(PEOPLE_ACTION_RULES);
     // Web search is in the core set, acting or not (plan #2861).
@@ -511,6 +512,78 @@ describe('replyToMentor', () => {
     expect(mentorRows(tables).map((m) => m.text)).toEqual([reply]);
   });
 
+  describe('a chart drawn in a reply (plan #3050.2.2)', () => {
+    const MARKETS = {
+      kind: 'line',
+      title: 'US markets last week',
+      series: [
+        { name: 'S&P 500', unit: '%' },
+        { name: 'Nasdaq', unit: '%' },
+        { name: 'Dow Jones', unit: '%' },
+      ],
+      rows: [
+        { label: 'Mon', values: [0, 0, 0] },
+        { label: 'Fri', values: [1.12, 1.71, 0.55] },
+      ],
+    };
+
+    /** A mentor that draws the chart, then texts `reply`; the executor checks the chart as Ask's does. */
+    function drawing(reply: string) {
+      const draw = {
+        content: [{ type: 'tool_use', id: 'c1', name: 'show_chart', input: MARKETS }],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 3_000, output_tokens: 40 },
+      };
+      let round = 0;
+      const stub = {
+        messages: {
+          create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+          stream: () => {
+            round += 1;
+            const now = round;
+            return {
+              on() {
+                return this;
+              },
+              async finalMessage() {
+                return now === 1 ? draw : answerMessage(reply);
+              },
+            };
+          },
+        },
+      } as unknown as Anthropic;
+      const execute = vi.fn(async (name: string, input: unknown) => {
+        const parsed = parseChart(input);
+        return name === 'show_chart' && parsed.ok
+          ? { ok: true as const, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } }
+          : { ok: false as const, error: 'no' };
+      });
+      return { stub, execute };
+    }
+
+    it('keeps the chart on the last text of the reply, and does not call it a false attachment', async () => {
+      const tables = world();
+      tables['you.advisor_messages'][0].text = 'Can you show me a chart of the stock markets past week?';
+      const { stub, execute } = drawing('Up all week, after a dip on Wednesday.\n\nThe chart below has all three.');
+      const recordSlip = vi.fn(async () => undefined);
+      const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+      await run(tables, stub, { ackAfterMs: 60_000, execute, act }).promise;
+
+      const rows = mentorRows(tables);
+      expect(rows.map((m) => m.text)).toEqual(['Up all week, after a dip on Wednesday.', 'The chart below has all three.']);
+      expect(rows[0].charts).toBeUndefined();
+      expect(rows[1].charts).toEqual([expect.objectContaining({ kind: 'line', title: 'US markets last week' })]);
+      expect(recordSlip).not.toHaveBeenCalled();
+    });
+
+    it('still says no file came through when a reply that drew a chart claims one', async () => {
+      const tables = world();
+      const { stub, execute } = drawing("Here's your chart, attached as markets.png!");
+      await run(tables, stub, { ackAfterMs: 60_000, execute }).promise;
+      expect(mentorRows(tables).map((m) => m.text)).toEqual(["Here's your chart, attached as markets.png!", NOTHING_ATTACHED]);
+    });
+  });
+
   it('starts a page with make_page, as this mentor answering this message, and texts that it is on it (plan #2997)', async () => {
     const tables = world();
     tables['you.advisor_messages'][0].text = 'Prepare me something to practise my accounting for tomorrow';
@@ -757,9 +830,9 @@ describe('replyToMentor', () => {
     expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('make_page');
   });
 
-  it('offers every lookup but the chart, and nothing that writes', () => {
+  it('offers every lookup, the chart among them, and nothing that writes (plan #3050.2.2)', () => {
     expect(MENTOR_LOOKUPS.every((t) => t.kind === 'lookup')).toBe(true);
-    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(false);
+    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(true);
   });
 });
 

@@ -1,6 +1,7 @@
 import { filesOnlyText } from '@/lib/attachments/rules';
 import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
+import { parseChart, type DashChart } from '@/lib/talk/chart';
 
 /**
  * The People tab's threads (plan #2748.6), kept pure so the tests fix the
@@ -23,7 +24,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id, charts';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -45,7 +46,26 @@ export type ThreadMessage = {
    * Realtime row never carries them, so a merge keeps the copy that does.
    */
   files?: ThreadFile[];
+  /**
+   * The charts a bot drew with it (plan #3050.2.2), from the row's charts
+   * column, drawn under the bubble as Ask draws them; absent when none.
+   */
+  charts?: DashChart[];
 };
+
+/** The most charts one message keeps, as the column's check allows (you 0052). */
+export const MAX_MESSAGE_CHARTS = 4;
+
+/** The charts a row keeps, each checked again as Ask's kept charts are; one that no longer parses is left out. */
+export function messageCharts(value: unknown): DashChart[] {
+  if (!Array.isArray(value)) return [];
+  const charts: DashChart[] = [];
+  for (const item of value.slice(0, MAX_MESSAGE_CHARTS)) {
+    const parsed = parseChart(item);
+    if (parsed.ok) charts.push(parsed.chart);
+  }
+  return charts;
+}
 
 /** A file sent with a message, as the thread draws it: `href` opens it through a short signed link. */
 export type ThreadFile = { id: string; name: string; contentType: string; size: number; href: string };
@@ -74,6 +94,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
   const text = str(row.text);
   if (typeof row.id !== 'string' || !text || !str(row.created_at)) return null;
   const kind: MessageKind = row.kind === 'ack' || row.kind === 'text_first' ? row.kind : 'reply';
+  const charts = messageCharts(row.charts);
   return {
     id: row.id,
     chatId: str(row.chat_id),
@@ -85,6 +106,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     deliveredAt: strOrNull(row.delivered_at),
     readAt: strOrNull(row.read_at),
     speakerId: strOrNull(row.speaker_id),
+    ...(charts.length > 0 ? { charts } : {}),
   };
 }
 
@@ -104,6 +126,8 @@ export function mergeMessages(list: readonly ThreadMessage[], incoming: readonly
     const had = byId.get(m.id);
     if (had && progress(m) < progress(had)) {
       if (!had.files && m.files) byId.set(m.id, { ...had, files: m.files });
+      // Charts are written onto a bot's last text after it lands, so a later copy may bring them.
+      if (!had.charts && m.charts) byId.set(m.id, { ...byId.get(m.id)!, charts: m.charts });
       continue;
     }
     byId.set(m.id, !m.files && had?.files ? { ...m, files: had.files } : m);

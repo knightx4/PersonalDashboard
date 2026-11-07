@@ -419,6 +419,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-paid-declined': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-made-changes': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-thread': ['/chat/dash/[ref]'],
+  'ask-dash-chart-full': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
@@ -462,6 +463,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-thread-reply-failed': ['/chat/people/[key]'],
   'chat-people-thread-new': ['/chat/people/[key]'],
   'chat-people-thread-files': ['/chat/people/[key]'],
+  'chat-people-thread-chart': ['/chat/people/[key]'],
   'chat-people-thread-adding': ['/chat/people/[key]'],
   'chat-people-thread-not-ready': ['/chat/people/[key]'],
   'chat-people-thread-loading': ['/chat/people/[key]'],
@@ -1124,7 +1126,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The one thread (plan #1964.3), with a subject or none: a change to it is
   // looked at here and on the dev-comment-thread surfaces, rather than on
   // every page that draws a thread.
-  'ask-dash-thread': ['components/thread/thread.tsx'],
+  'ask-dash-thread': ['components/thread/thread.tsx', 'components/talk/reply-chart.tsx', 'components/talk/reply-trend.tsx'],
+  // A line chart under a reply opened full screen (plan #3050.2.1).
+  'ask-dash-chart-full': ['components/talk/reply-chart.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],

@@ -20,6 +20,7 @@ import Link from '@/components/ui/link';
 import { MessageInput } from '@/components/patterns/message-input';
 import { AddFile, FileChips, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
+import { MessageCharts } from '@/components/talk/reply-chart';
 import { FieldError } from '@/components/ui/field';
 import { filesOnlyText, type UploadedAttachment } from '@/lib/attachments/rules';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -665,7 +666,7 @@ export function ThreadView({
                   {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
                   {words !== null && (
                     <VoicedBubble id={m.id} text={m.role === 'advisor' ? words : null} name={person.name} bot={person.id} run={block.messages}>
-                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
+                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length && !m.charts?.length} arriving={arrives(m)}>
                         {words}
                       </MessageBubble>
                     </VoicedBubble>
@@ -673,6 +674,8 @@ export function ThreadView({
                   {m.files && m.files.length > 0 && (
                     <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
                   )}
+                  {/* A chart the bot drew with this text (plan #3050.2.2), drawn as Ask draws one. */}
+                  <MessageCharts charts={m.charts} />
                   {m.receipts.map((r) => (
                     <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                       {r.label}

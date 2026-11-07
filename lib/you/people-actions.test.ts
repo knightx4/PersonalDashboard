@@ -36,13 +36,13 @@ function stubDash(overrides: Partial<PeopleDash> = {}): PeopleDash {
 }
 
 describe('the tools people on People act with', () => {
-  it("are Ask Dash's writes, proposals and paid presses, without the hand-off or the chart", () => {
+  it("are Ask Dash's writes, proposals, paid presses and chart, without the hand-off", () => {
     const names = PEOPLE_TOOLS.map((tool) => tool.name);
     expect(names).toEqual(expect.arrayContaining(['add_todo', 'add_goal', 'add_goal_step', 'add_idea', 'add_role_note', 'add_plan_step']));
     expect(names).toEqual(expect.arrayContaining(['propose_build', 'propose_delete', 'propose_watch']));
     expect(PEOPLE_TOOLS.some((tool) => tool.kind === 'paid')).toBe(true);
     expect(names).not.toContain('hand_off');
-    expect(names).not.toContain('show_chart');
+    expect(names).toContain('show_chart');
     // No row thread's own tool: People has no row.
     expect(PEOPLE_TOOLS.every((tool) => !('subjects' in tool) || !tool.subjects)).toBe(true);
   });
