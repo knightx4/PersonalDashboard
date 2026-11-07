@@ -47,6 +47,7 @@ import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
 import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
+import { BubbleCharts } from '@/components/talk/reply-chart';
 import { SpeakBubble, SpeakingPill, SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals, useSpeaking } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import type { DashChange } from '@/lib/talk/changes';
@@ -665,7 +666,7 @@ export function ThreadView({
                   {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
                   {words !== null && (
                     <VoicedBubble id={m.id} text={m.role === 'advisor' ? words : null} name={person.name} bot={person.id} run={block.messages}>
-                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
+                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length && !m.charts?.length} arriving={arrives(m)}>
                         {words}
                       </MessageBubble>
                     </VoicedBubble>
@@ -673,6 +674,8 @@ export function ThreadView({
                   {m.files && m.files.length > 0 && (
                     <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
                   )}
+                  {/* What the bot drew with show_chart (plan #3050.2.2), kept on the row, so a reopened thread draws it again. */}
+                  <BubbleCharts charts={m.charts} />
                   {m.receipts.map((r) => (
                     <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                       {r.label}

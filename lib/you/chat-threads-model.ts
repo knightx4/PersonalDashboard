@@ -1,6 +1,7 @@
 import { filesOnlyText } from '@/lib/attachments/rules';
 import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
+import { parseChart, type DashChart } from '@/lib/talk/chart';
 
 /**
  * The People tab's threads (plan #2748.6), kept pure so the tests fix the
@@ -23,7 +24,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, charts, created_at, delivered_at, read_at, speaker_id';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -45,7 +46,27 @@ export type ThreadMessage = {
    * Realtime row never carries them, so a merge keeps the copy that does.
    */
   files?: ThreadFile[];
+  /**
+   * The charts a bot drew with this bubble (plan #3050.2.2), from
+   * you.advisor_messages.charts through parseChart; absent when none. Kept
+   * out of `text`, so voice reads the words alone.
+   */
+  charts?: DashChart[];
 };
+
+/** The most charts one bubble keeps, as you 0052's check allows. */
+export const MAX_BUBBLE_CHARTS = 4;
+
+/** The charts a row keeps, each read again through parseChart; one that no longer parses draws nothing. */
+export function chartsOf(value: unknown): DashChart[] {
+  if (!Array.isArray(value)) return [];
+  const charts: DashChart[] = [];
+  for (const raw of value.slice(0, MAX_BUBBLE_CHARTS)) {
+    const parsed = parseChart(raw);
+    if (parsed.ok) charts.push(parsed.chart);
+  }
+  return charts;
+}
 
 /** A file sent with a message, as the thread draws it: `href` opens it through a short signed link. */
 export type ThreadFile = { id: string; name: string; contentType: string; size: number; href: string };
@@ -74,6 +95,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
   const text = str(row.text);
   if (typeof row.id !== 'string' || !text || !str(row.created_at)) return null;
   const kind: MessageKind = row.kind === 'ack' || row.kind === 'text_first' ? row.kind : 'reply';
+  const charts = chartsOf(row.charts);
   return {
     id: row.id,
     chatId: str(row.chat_id),
@@ -85,6 +107,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     deliveredAt: strOrNull(row.delivered_at),
     readAt: strOrNull(row.read_at),
     speakerId: strOrNull(row.speaker_id),
+    ...(charts.length > 0 ? { charts } : {}),
   };
 }
 

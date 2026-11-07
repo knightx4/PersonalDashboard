@@ -9391,6 +9391,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface state="files" />,
   },
   {
+    /* A chart a bot drew (plan #3050.2.2): asked for the markets over last week, the reply's last bubble has a line chart under it, one line an index, with the button that opens it full screen. */
+    id: 'chat-people-thread-chart',
+    label: 'Chat · A thread, a chart under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="chart" />,
+  },
+  {
     /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */
     id: 'chat-people-thread-adding',
     label: 'Chat · A thread, files in the box',

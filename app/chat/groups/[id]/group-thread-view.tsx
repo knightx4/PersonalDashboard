@@ -34,6 +34,7 @@ import {
 import { GroupMark, Reactions } from '../../group-parts';
 import { SpeakRun, VoicedBubble } from '../../people/[key]/thread-view';
 import { SpeakingPill, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { BubbleCharts } from '@/components/talk/reply-chart';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 
 /**
@@ -454,10 +455,15 @@ export function GroupThreadView({
                   bot={block.speakerId ?? null}
                   run={block.messages}
                 >
-                  <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={m.role === 'advisor' && !openingIds.has(m.id)}>
+                  <MessageBubble
+                    from={block.from}
+                    last={i === block.messages.length - 1 && !m.charts?.length}
+                    arriving={m.role === 'advisor' && !openingIds.has(m.id)}
+                  >
                     {m.text}
                   </MessageBubble>
                 </VoicedBubble>
+                <BubbleCharts charts={m.charts} />
                 {reactions[m.id]?.length ? <Reactions list={reactions[m.id]} members={[...members, ...former]} from={block.from} /> : null}
                 {m.receipts.map((r) => (
                   <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
