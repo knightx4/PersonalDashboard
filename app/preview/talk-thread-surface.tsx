@@ -498,3 +498,50 @@ export function TalkThreadMadeFilesSurface() {
     </PageColumn>
   );
 }
+
+/**
+ * A saved page Dash attached by reference (plan #3050.4): asked for the
+ * prep page for Thursday's interview, the answer has the page under it as a
+ * card with its title that opens it.
+ */
+const ATTACHED_TURNS: TalkTurn[] = [
+  {
+    id: 'at-q1',
+    role: 'user',
+    body: 'Can you send me the prep page you made for the Northwind final round?',
+    createdAt: at(9, 2),
+  },
+  {
+    id: 'at-a1',
+    role: 'assistant',
+    body: 'Here it is. It ends with the case drill, which is the part worth one more pass before Thursday.',
+    createdAt: at(9, 3),
+    toolCalls: [
+      { name: 'search', input: { query: 'Northwind prep' }, result: { ok: true, rows: [] } },
+      {
+        name: 'attach_saved',
+        input: { table: 'core.files', ref: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11' },
+        result: {
+          ok: true,
+          attached: {
+            table: 'core.files',
+            id: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+            title: 'Northwind final round: accounting practice drill and the questions they ask',
+            kind: 'page',
+            href: '/goals/files/7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+          },
+        },
+      },
+    ],
+  },
+];
+
+export function TalkThreadAttachedSurface() {
+  return (
+    <PageColumn className="py-4">
+      <Card padding="standard">
+        <Thread id="talk-thread-attached-preview" turns={ATTACHED_TURNS} send={send} label="Ask a follow-up" placeholder="Ask more about this" />
+      </Card>
+    </PageColumn>
+  );
+}

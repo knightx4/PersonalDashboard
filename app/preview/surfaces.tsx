@@ -531,6 +531,7 @@ import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPerso
 import {
   TalkThreadChartFullSurface,
   TalkThreadMadeFilesSurface,
+  TalkThreadAttachedSurface,
   TalkThreadChartsSurface,
   TalkThreadFilesSurface,
   TalkThreadSurface,
@@ -9011,6 +9012,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TalkThreadMadeFilesSurface />,
   },
   {
+    /* A saved page Dash attached by reference (plan #3050.4): asked for the
+     * prep page it made for an interview, the answer has the page under it
+     * as a card with its title that opens it. */
+    id: 'ask-dash-attached',
+    label: 'Ask Dash · A saved page attached under the answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadAttachedSurface />,
+  },
+  {
     /* A question with a bill's photo and PDF added (plan #1716): Dash reads
      * them with the question, and the $ beside Send, open, counts reading
      * them. */
@@ -9417,6 +9428,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatThreadSurface state="made-files" />,
+  },
+  {
+    /* A saved page and a file a bot sent by reference (plan #3050.4): asked for the prep page and the offer letter, the reply's bubble has a card for each under it, its title first, that opens it. */
+    id: 'chat-people-thread-attached',
+    label: 'Chat · A thread, a saved page and file under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="attached" />,
   },
   {
     /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */

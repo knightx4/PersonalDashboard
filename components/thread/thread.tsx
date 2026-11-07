@@ -21,6 +21,8 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { AttachedCards } from '@/components/talk/attached-cards';
+import { turnAttached } from '@/lib/talk/attached';
 import { ReplyMockups } from '@/components/talk/reply-mockup';
 import { PaidCard } from '@/components/talk/paid-card';
 import { paidCardHosts } from '@/lib/dash/paid-card';
@@ -1708,6 +1710,7 @@ function TalkThread({
             )}
             {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
             {!mine && <ReplyCharts calls={turn.toolCalls} />}
+            {!mine && <AttachedCards cards={turnAttached(turn.toolCalls)} className="mt-2" />}
             {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
             {isPending(turn.id)
               ? undefined
@@ -1790,6 +1793,8 @@ function TalkThread({
                 {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
+                {/* A saved page or file Dash attached by reference (plan #3050.4), as a card that opens it. */}
+                {!mine && <AttachedCards cards={turnAttached(turn.toolCalls)} className="mt-2" />}
                 {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
                 {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}

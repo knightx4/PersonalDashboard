@@ -49,6 +49,7 @@ import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
 import { BubbleCharts } from '@/components/talk/reply-chart';
+import { AttachedCards } from '@/components/talk/attached-cards';
 import { SpeakBubble, SpeakingPill, SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals, useSpeaking } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import type { DashChange } from '@/lib/talk/changes';
@@ -680,7 +681,7 @@ export function ThreadView({
                   {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
                   {words !== null && (
                     <VoicedBubble id={m.id} text={m.role === 'advisor' ? words : null} name={person.name} bot={person.id} run={block.messages}>
-                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length && !m.charts?.length} arriving={arrives(m)}>
+                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length && !m.charts?.length && !m.attached?.length} arriving={arrives(m)}>
                         {words}
                       </MessageBubble>
                     </VoicedBubble>
@@ -695,6 +696,12 @@ export function ThreadView({
                   )}
                   {/* What the bot drew with show_chart (plan #3050.2.2), kept on the row, so a reopened thread draws it again. */}
                   <BubbleCharts charts={m.charts} />
+                  {/* A saved page or file the bot attached by reference (plan #3050.4), as a card that opens it. */}
+                  {m.attached && m.attached.length > 0 && (
+                    <MessageCard>
+                      <AttachedCards cards={m.attached} label={`Sent by ${person.name} with this reply`} />
+                    </MessageCard>
+                  )}
                   {m.receipts.map((r) => (
                     <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                       {r.label}

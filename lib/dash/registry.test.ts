@@ -145,11 +145,12 @@ describe('DASH_TOOLS', () => {
         .filter(
           (name) => !ASK_TOOL_NAMES.includes(name as never) && !WRITE_TOOL_NAMES.includes(name) && !PAID_NAMES.includes(name),
         );
-    const lookups = ASK_TOOL_NAMES.filter((name) => name !== 'show_chart');
+    const lookups = ASK_TOOL_NAMES.filter((name) => name !== 'show_chart' && name !== 'attach_saved');
     for (const table of [...Object.values(DEV_THREAD_TABLES), GOAL_THREAD_TABLE, ROLE_THREAD_TABLE]) {
       const names = threadDashTools(table).map((t) => t.name);
       expect(names.slice(0, lookups.length + WRITE_TOOL_NAMES.length)).toEqual([...lookups, ...WRITE_TOOL_NAMES]);
       expect(names).not.toContain('show_chart');
+      expect(names).not.toContain('attach_saved');
       expect(names).not.toContain('propose_watch');
       expect(names).not.toContain('propose_build');
       expect(names).not.toContain('propose_delete');

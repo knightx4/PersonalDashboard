@@ -7,6 +7,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
 import { runDash, type DashExecutor } from '@/lib/dash/loop';
 import { dashToolsOf } from '@/lib/dash/registry';
 import { CHART_TOOL } from '@/lib/talk/chart';
+import { ATTACH_SAVED_TOOL } from '@/lib/talk/attached';
 import { MAX_TURN, type TalkCitation } from '@/lib/talk/talk';
 import { MAYA_MODEL, mayaVoice } from './voice';
 
@@ -187,10 +188,10 @@ export async function replyInThread(
   }
 
   const answer = await runDash({
-    // Not the chart (plan #1655): it is drawn only under an Ask answer.
+    // Not the chart or a saved page's card (plans #1655, #3050.4): they are drawn only under an Ask answer.
     voice: mayaVoice({
       system: replySystem(input),
-      tools: dashToolsOf('lookup').filter((tool) => tool.name !== CHART_TOOL),
+      tools: dashToolsOf('lookup').filter((tool) => tool.name !== CHART_TOOL && tool.name !== ATTACH_SAVED_TOOL),
       finish: ANSWER_TOOL,
     }),
     context: {

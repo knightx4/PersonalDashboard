@@ -7,6 +7,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { runDash, type DashAnswer, type DashExecutor } from '@/lib/dash/loop';
 import { dashToolsOf } from '@/lib/dash/registry';
 import { CHART_TOOL } from '@/lib/talk/chart';
+import { ATTACH_SAVED_TOOL } from '@/lib/talk/attached';
 import { PEOPLE_WEB_RULES, peopleServerTools } from '@/lib/you/people-actions';
 import type { TalkTurn } from '@/lib/talk/talk';
 import {
@@ -61,8 +62,8 @@ export async function answerAsAdvisor(input: {
     voice: {
       model: ADVISOR_TALK_MODEL,
       system: `${advisorSystem(input.context)}\n\n${PEOPLE_WEB_RULES}`,
-      // Not the chart: it is drawn only under an Ask answer (plan #1655).
-      tools: dashToolsOf('lookup').filter((tool) => tool.name !== CHART_TOOL),
+      // Not the chart or a saved page's card: they are drawn only under an Ask answer (plans #1655, #3050.4).
+      tools: dashToolsOf('lookup').filter((tool) => tool.name !== CHART_TOOL && tool.name !== ATTACH_SAVED_TOOL),
       // The web, as every person on People has it (plan #2861).
       serverTools: peopleServerTools(ADVISOR_TALK_MODEL),
     },

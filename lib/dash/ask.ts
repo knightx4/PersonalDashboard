@@ -10,6 +10,7 @@ import { BOT_HANDOFF_RULES, HAND_TO_BOT, HAND_TO_BOT_TOOL_NAME, type BotPasser }
 import { claimSlip, falseAttachment, NOTHING_ATTACHED_ASK, NOTHING_ATTACHED_ASK_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import { dashCodeExecution, fetchMadeFiles, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
 import { turnCharts } from '@/lib/talk/chart';
+import { SAVED_RULES, turnAttached } from '@/lib/talk/attached';
 import { DASH_MODELS } from './models';
 import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
@@ -190,6 +191,8 @@ ${ASK_CHART_ONLY}
   applications by status, and a lookup gives three or more figures, draw a
   bar. A figure for the total and a bar for the shops behind it is a good
   pair; never draw more than two.
+
+${SAVED_RULES}
 
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. When they ask you to
 add, rename, move or tick off a todo, add a goal under one of their areas,
@@ -967,7 +970,8 @@ export async function askDash(
   // An answer that says a file is attached when none was sent says so after all (plan #3050.1).
   // A file its code made is said for once the answer is kept (plan #3050.3.2).
   const made = stores.keepFiles ? (answer.madeFiles ?? []) : [];
-  const claim = falseAttachment(answer.body, turnCharts(answer.toolCalls).length, made.length);
+  // A saved page or file it attached by reference counts as sent (plan #3050.4).
+  const claim = falseAttachment(answer.body, turnCharts(answer.toolCalls).length, made.length + turnAttached(answer.toolCalls).length);
   const nothing = stores.keepFiles ? NOTHING_ATTACHED_ASK : NOTHING_ATTACHED_ASK_CHART_ONLY;
   const body = claim ? `${answer.body.trimEnd()}\n\n${nothing}` : answer.body;
   if (claim) {

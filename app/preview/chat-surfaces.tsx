@@ -398,7 +398,8 @@ type ThreadState =
   | 'files'
   | 'adding'
   | 'chart'
-  | 'made-files';
+  | 'made-files'
+  | 'attached';
 
 /** The markets over last week, as a bot draws them with show_chart (plan #3050.2.2): each index as the change since Monday. */
 const MARKETS_CHART: DashChart = {
@@ -453,6 +454,39 @@ const MADE_FILES_THREAD: ThreadMessage[] = [
     'Sorry, a file did not come through. markets.svg could not be saved: that kind of file cannot be kept here; images, PDFs, Word, text and CSV can.',
     '2026-11-03T08:58:41Z',
   ),
+];
+
+/**
+ * Asked for the interview prep page and the offer letter (plan #3050.4),
+ * Franklin found both and sent them by reference: the page a bot made
+ * earlier and the PDF you sent last week, each a card that opens it.
+ */
+const ATTACHED_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('a1', 'person', 'Can you send me that prep page for the Northwind interview again? And the offer letter.', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('a2', 'advisor', 'Here are both. The prep page has the case drill at the end, worth one more pass tonight.', '2026-11-03T08:58:40Z', {
+    attached: [
+      {
+        table: 'core.files',
+        id: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+        title: 'Northwind final round: accounting practice drill and the questions they ask',
+        kind: 'page',
+        href: '/goals/files/7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+      },
+      {
+        table: 'core.attachments',
+        id: '1a9e5c3b-6d2f-4e7a-8b0c-5f3d1e9a7c22',
+        title: 'Northwind offer letter, signed copy.pdf',
+        kind: 'file',
+        href: '#',
+        contentType: 'application/pdf',
+        size: 1_258_291,
+      },
+    ],
+  }),
 ];
 
 /** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
@@ -815,6 +849,8 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
             ? CHART_THREAD
             : state === 'made-files'
             ? MADE_FILES_THREAD
+            : state === 'attached'
+            ? ATTACHED_THREAD
             : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))

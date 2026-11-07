@@ -43,6 +43,7 @@ import type { DashChange } from '@/lib/talk/changes';
 import { ATTACH_RULES, CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import { fetchMadeFiles, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
 import { turnCharts, type DashChart } from '@/lib/talk/chart';
+import { SAVED_RULES, turnAttached, type SavedAttachment } from '@/lib/talk/attached';
 import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
 
 export * from '@/lib/you/mentor-reply-model';
@@ -430,7 +431,7 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   let lastReplyId: string | null = null;
   // Set once the reply is in: a first text that comes back later is dropped.
   let closed = false;
-  const save = (text: string, kind: 'reply' | 'ack', charts: DashChart[] = []) => {
+  const save = (text: string, kind: 'reply' | 'ack', charts: DashChart[] = [], attached: SavedAttachment[] = []) => {
     chain = chain.then(async () => {
       if (saveError) return;
       if (saved > 0) {
@@ -439,7 +440,15 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
       }
       const { data, error } = await client
         .from('advisor_messages')
-        .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind, text, ...(charts.length > 0 ? { charts } : {}) })
+        .insert({
+          user_id: userId,
+          chat_id: chatId,
+          role: 'advisor',
+          kind,
+          text,
+          ...(charts.length > 0 ? { charts } : {}),
+          ...(attached.length > 0 ? { attached } : {}),
+        })
         .select('id')
         .single();
       if (error) {
@@ -530,6 +539,7 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
       ctx.layers.persona.text,
       REPLY_RULES,
       input.keepFiles ? ATTACH_RULES : CHART_ONLY_RULES,
+      SAVED_RULES,
       PEOPLE_WEB_RULES,
       ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
       ...(makePage ? [PAGE_RULES] : []),
@@ -598,15 +608,25 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   const bubbles = answer.ok ? splitBubbles(answer.body) : [];
   // What show_chart drew goes on the reply's last bubble (plan #3050.2.2), never in its text.
   const charts = answer.ok ? turnCharts(answer.toolCalls).slice(0, MAX_BUBBLE_CHARTS) : [];
+  // A saved page or file it attached by reference goes there too, as a card (plan #3050.4).
+  const attached = answer.ok ? turnAttached(answer.toolCalls) : [];
   const unsaved = bubbles.length - queued;
-  for (; queued < bubbles.length; queued++) save(bubbles[queued], 'reply', queued === bubbles.length - 1 ? charts : []);
+  for (; queued < bubbles.length; queued++) {
+    const last = queued === bubbles.length - 1;
+    save(bubbles[queued], 'reply', last ? charts : [], last ? attached : []);
+  }
   closed = true;
   acking.abort();
   await chain;
   // Every bubble went while the text streamed: the charts go on the last of them now.
-  if (charts.length > 0 && unsaved <= 0 && lastReplyId && !saveError) {
-    const { error } = await client.from('advisor_messages').update({ charts }).eq('user_id', userId).eq('chat_id', chatId).eq('id', lastReplyId);
-    if (error) console.error('the charts of a reply were not kept', error);
+  if ((charts.length > 0 || attached.length > 0) && unsaved <= 0 && lastReplyId && !saveError) {
+    const { error } = await client
+      .from('advisor_messages')
+      .update({ ...(charts.length > 0 ? { charts } : {}), ...(attached.length > 0 ? { attached } : {}) })
+      .eq('user_id', userId)
+      .eq('chat_id', chatId)
+      .eq('id', lastReplyId);
+    if (error) console.error('the charts and cards of a reply were not kept', error);
   }
 
   // What the mentor's code made goes under the reply's last bubble (plan #3050.3.1);
@@ -646,7 +666,8 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   // A reply that says a file is attached when nothing was sent says so after all (plan #3050.1).
   // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
   // A file its code made is said for above (plan #3050.3.1).
-  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), charts.length, made.length) : null;
+  // A saved page or file it attached counts as sent (plan #3050.4).
+  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), charts.length, made.length + attached.length) : null;
   if (claim) {
     save(input.keepFiles ? NOTHING_ATTACHED : NOTHING_ATTACHED_CHART_ONLY, 'reply');
     await chain;

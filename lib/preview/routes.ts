@@ -422,6 +422,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-charts': ['/chat/dash/[ref]'],
   'ask-dash-charts-full': ['/chat/dash/[ref]'],
   'ask-dash-made-files': ['/chat/dash/[ref]'],
+  'ask-dash-attached': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
@@ -467,6 +468,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-thread-files': ['/chat/people/[key]'],
   'chat-people-thread-chart': ['/chat/people/[key]'],
   'chat-people-thread-made-files': ['/chat/people/[key]'],
+  'chat-people-thread-attached': ['/chat/people/[key]'],
   'chat-people-thread-adding': ['/chat/people/[key]'],
   'chat-people-thread-not-ready': ['/chat/people/[key]'],
   'chat-people-thread-loading': ['/chat/people/[key]'],
@@ -1137,6 +1139,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-charts-full': ['components/talk/reply-chart.tsx'],
   // The files an answer's code made, under it (plan #3050.3.2).
   'ask-dash-made-files': ['components/thread/thread.tsx', 'components/attachments/ask-turn-files.tsx'],
+  // A saved page or file attached by reference, as a card under the answer (plan #3050.4).
+  'ask-dash-attached': ['components/thread/thread.tsx', 'components/talk/attached-cards.tsx'],
+  'chat-people-thread-attached': ['components/talk/attached-cards.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],

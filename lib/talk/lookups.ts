@@ -1,6 +1,7 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import { LOOKUP_NOT_RUN, type TalkToolCall, type TalkTurn } from './talk';
 import { CHART_TOOL } from './chart';
+import { ATTACH_SAVED_TOOL } from './attached';
 import { MOCKUP_TOOL } from './mockup';
 import { SESSION_SENT_CALL, THOUGHT_CALL } from './thought';
 import { LEARN_CHANGE_KINDS } from '@/lib/ask/learn-changes';
@@ -152,6 +153,7 @@ export function isShownLookup(name: string): boolean {
     !name.startsWith('propose_') &&
     name !== 'hand_off' &&
     name !== CHART_TOOL &&
+    name !== ATTACH_SAVED_TOOL &&
     name !== MOCKUP_TOOL &&
     name !== THOUGHT_CALL &&
     name !== SESSION_SENT_CALL &&
