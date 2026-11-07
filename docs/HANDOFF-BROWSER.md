@@ -85,3 +85,26 @@ failed with the reason. In each case it first records the route with
 `npx tsx scripts/handoff-session.ts browser <id> --route chrome|headless|none
 --reason "…"`, and `close --done` refuses a browser task that has not. A
 session never buys, sends or submits a form in either browser.
+
+## The runner on the PC and the Mac (plan #3040.5 and #3040.6)
+
+`npm run browser-runner -- pc` (or `mac`), started from a checkout on that
+computer with Chrome open and Claude Code signed in, is the route to the
+person's Chrome. Every 30 seconds it sends a heartbeat
+(`core.browser_runner_heartbeat`) and claims the oldest pending browser task
+(`core.claim_browser_task`, migration 0312). The claim function puts the PC
+first: the Mac gets a task only when the PC has sent no heartbeat for 2
+minutes.
+
+With a task claimed, the runner checks that Claude in Chrome answers, with a
+short `claude -p --chrome` run that lists the tabs. If it does not, the
+runner clears `claimed_by` and `claimed_at`, writes nothing else, and sends
+no heartbeat and claims nothing for 5 minutes, so the other computer or the
+cloud session takes the task. If it does, the runner moves the hand-off to
+running, so the cloud starts no second session on it, and runs
+`claude -p --chrome` on the hand-off's brief with lines telling the session
+it is on the person's PC or Mac. That session follows the skill's **A browser
+task**: it records route `chrome` with the reason "Ran on your PC in Chrome.",
+replies in the thread and closes the hand-off. A hand-off the session leaves
+open is closed failed by the runner. The loop is in
+lib/talk/browser-runner.ts and the database calls in scripts/browser-runner.ts.
