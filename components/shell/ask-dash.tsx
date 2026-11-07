@@ -327,7 +327,7 @@ const ACTIONS: AskSource = {
     open: paneThread,
     live: {
       thread: { older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds, files: threadMessageFiles },
-      group: { older: olderGroupMessages, read: readGroup },
+      group: { older: olderGroupMessages, read: readGroup, files: threadMessageFiles },
       presses: { confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange, watch: decideThreadWatch },
     },
   },

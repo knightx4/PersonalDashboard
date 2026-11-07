@@ -17,6 +17,7 @@ import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { SAVED_RULES } from '@/lib/talk/attached';
 import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import { CHART_DRAWN, parseChart } from '@/lib/talk/chart';
 import type { DashExecutor } from '@/lib/dash/loop';
@@ -181,7 +182,7 @@ const MARKETS = {
 };
 
 /** A client whose first round calls show_chart with `chart`, and whose second answers with `pieces`. */
-function chartStub(chart: Record<string, unknown>, pieces: string[]) {
+function chartStub(chart: Record<string, unknown>, pieces: string[], tool = 'show_chart') {
   const streamed: Record<string, unknown>[] = [];
   const usage = { input_tokens: 3_000, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
   const stub = {
@@ -195,7 +196,7 @@ function chartStub(chart: Record<string, unknown>, pieces: string[]) {
             return this;
           },
           async finalMessage() {
-            if (round === 1) return { content: [{ type: 'tool_use', id: 'c1', name: 'show_chart', input: chart }], stop_reason: 'tool_use', usage };
+            if (round === 1) return { content: [{ type: 'tool_use', id: 'c1', name: tool, input: chart }], stop_reason: 'tool_use', usage };
             return answerMessage(pieces.join(''));
           },
         };
@@ -356,6 +357,25 @@ describe('replyToMentor', () => {
     expect(charts[0].rows).toHaveLength(3);
     expect(recordSlip).not.toHaveBeenCalled();
     expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('show_chart');
+  });
+
+  it('keeps a saved page it attached by reference on the last bubble, and does not call it a false attachment (plan #3050.4)', async () => {
+    const tables = world();
+    const page = { table: 'core.files', id: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11', title: 'Northwind prep', kind: 'page', href: '/goals/files/7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11' };
+    const attach: DashExecutor = async (name) =>
+      name === 'attach_saved' ? { ok: true as const, rows: [], note: 'Attached.', kept: { attached: page } } : { ok: false as const, error: 'no' };
+    const { stub, streamed } = chartStub({ table: 'core.files', ref: page.id }, ['Found it.', "\n\nHere it is, I've attached the prep page."], 'attach_saved');
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act, execute: attach }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Found it.', "Here it is, I've attached the prep page."]);
+    expect(rows[0].attached).toBeUndefined();
+    expect(rows[1].attached).toEqual([page]);
+    expect(recordSlip).not.toHaveBeenCalled();
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('attach_saved');
+    expect((streamed[0].system as { text: string }[]).map((b) => b.text).join('\n')).toContain(SAVED_RULES);
   });
 
   it('still says no file came when a reply that drew a chart names a file (plan #3050.2.2)', async () => {

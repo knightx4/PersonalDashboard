@@ -22,7 +22,6 @@ import {
   groupHref,
   loadGroup,
   loadGroupRows,
-  loadGroupThreadPage,
   renameGroup,
   setGroupMembers,
   type Reacted,
@@ -63,7 +62,7 @@ import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
 import type { PanePick, PaneThread, PaneThreads } from '@/lib/you/pane-threads-model';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { todayInTimezone } from '@/lib/money';
-import { loadThreadParts } from './thread-data';
+import { loadGroupThreadParts, loadThreadParts } from './thread-data';
 
 /**
  * The People tab's presses that are not a send (plan #2748.6): reading the
@@ -205,7 +204,7 @@ export async function paneThread(pick: PanePick): Promise<PaneThread> {
     if (pick.kind === 'group') {
       const group = await loadGroup(client, user.id, pick.id);
       if (!group) return gone;
-      const page = await loadGroupThreadPage(client, user.id, pick.id);
+      const page = await loadGroupThreadParts(client, user.id, pick.id);
       return {
         kind: 'group',
         chatId: pick.id,
@@ -311,7 +310,7 @@ export async function olderGroupMessages(
   const user = await requireUser();
   if (!UUID.test(chatId) || !Number.isFinite(Date.parse(before))) return { error: 'Those messages cannot be read.' };
   try {
-    return await loadGroupThreadPage(await createYouClient(), user.id, chatId, before);
+    return await loadGroupThreadParts(await createYouClient(), user.id, chatId, before);
   } catch (error) {
     console.error('older group messages not read', error);
     return { error: 'Earlier messages could not be read.' };

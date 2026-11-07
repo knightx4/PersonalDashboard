@@ -8,6 +8,29 @@ import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { withMessageFiles } from '@/lib/you/chat-message-files';
 import { withWatches } from '@/lib/you/watch-decide';
 import { loadThreadPage, type ThreadPage } from '@/lib/you/chat-threads';
+import { loadGroupThreadPage } from '@/lib/you/group-chats';
+
+/**
+ * A group thread's page with the files its bots' code made (plan
+ * #3050.3.3): the newest page, or the one before `before`. The thread still
+ * opens without the files when they cannot be read.
+ */
+export async function loadGroupThreadParts(
+  client: YouSupabaseClient,
+  userId: string,
+  chatId: string,
+  before?: string | null,
+): Promise<Awaited<ReturnType<typeof loadGroupThreadPage>>> {
+  const page = await loadGroupThreadPage(client, userId, chatId, before);
+  if (!page.messages.some((m) => (m.fileCount ?? 0) > 0)) return page;
+  const messages = await createCoreClient()
+    .then((core) => withMessageFiles(core, page.messages))
+    .catch((error: unknown) => {
+      console.error('group files not read', error);
+      return page.messages;
+    });
+  return { ...page, messages };
+}
 
 /**
  * What a direct thread is drawn from, on its page on the Messages tab and in

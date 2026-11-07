@@ -6,14 +6,17 @@ import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-loo
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
-import { NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
   MAX_PER_BOT,
   runGroupBurst,
+  SPEAKER_CODE_MAX_TOKENS,
   SPEAKER_MAX_LOOKUPS,
+  SPEAKER_MAX_TOKENS,
   SPEAKER_PLACES_RULES,
+  speakerText,
   speakWithModel,
   type DirectorInput,
   type DirectorPlan,
@@ -137,6 +140,17 @@ const base = (client: YouSupabaseClient) => ({
 
 const botMessages = (tables: Record<string, Row[]>) => tables.advisor_messages.filter((m) => m.role === 'advisor');
 
+/** The Files API as a speaker's code left it: each id's name and type, and three bytes; an id not here cannot be read. */
+function madeFilesClient(files: Record<string, { filename: string; mime_type: string }>): Anthropic {
+  return {
+    get: async (path: string) => {
+      const file = files[/\/v1\/files\/([^/]+)/.exec(path)?.[1] ?? ''];
+      if (!file) throw new Error('not found');
+      return path.endsWith('/content') ? new Response(new Uint8Array([1, 2, 3])) : { ...file, size_bytes: 3 };
+    },
+  } as unknown as Anthropic;
+}
+
 /** Checks every cap over the bot messages after one message from the person. */
 function expectCapsHold(said: Row[]) {
   expect(said.length).toBeLessThanOrEqual(MAX_BOT_MESSAGES);
@@ -223,6 +237,78 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     expect(message.text).toBe("Here's the chart: the S&P rose.");
     expect(message.charts).toEqual([expect.objectContaining({ kind: 'bar', title: 'Week' })]);
     expect(recordSlip).not.toHaveBeenCalled();
+  });
+
+  it("keeps the files a bot's code made under its text, counts them, and says in a text of its own which could not be kept (plan #3050.3.3)", async () => {
+    const { client, tables } = group('@cy send the markets chart as an image');
+    const recordSlip = vi.fn(async () => undefined);
+    const keepFiles = vi.fn(async (_id: string, files: { name: string }[]) => ({ kept: files.map((f) => ({ name: f.name })), unkept: [] }));
+    const offered: (string[] | undefined)[] = [];
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      keepFiles,
+      anthropic: madeFilesClient({
+        png: { filename: '/tmp/outputs/markets.png', mime_type: 'image/png' },
+        svg: { filename: 'markets.svg', mime_type: 'image/svg+xml' },
+      }),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        offered.push(input.made && [...input.made]);
+        input.made?.push('png', 'svg');
+        return "Here's the markets chart as a picture.";
+      },
+    });
+    expect(offered).toEqual([[]]);
+    const [text, note] = botMessages(tables);
+    expect(text).toMatchObject({ text: "Here's the markets chart as a picture.", speaker_id: 'id-cy', file_count: 1 });
+    expect(keepFiles).toHaveBeenCalledTimes(1);
+    const [messageId, files] = keepFiles.mock.calls[0];
+    expect(messageId).toBe(text.id);
+    expect(files.map((f) => f.name)).toEqual(['markets.png']);
+    expect(note).toMatchObject({ speaker_id: 'id-cy', role: 'advisor' });
+    expect(note.text).toMatch(/^Sorry, a file did not come through\. markets\.svg could not be saved/);
+    // A file its code made is not a false claim.
+    expect(recordSlip).not.toHaveBeenCalled();
+  });
+
+  it("says so in the group when not one of the files a bot's code made could be read (plan #3050.3.3)", async () => {
+    const { client, tables } = group('@cy send the markets chart as an image');
+    const keepFiles = vi.fn(async () => ({ kept: [], unkept: [] }));
+    await runGroupBurst({
+      ...base(client),
+      keepFiles,
+      anthropic: madeFilesClient({}),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        input.made?.push('gone');
+        return 'Here it is as a picture.';
+      },
+    });
+    const [text, note] = botMessages(tables);
+    expect(text.file_count).toBeUndefined();
+    expect(keepFiles).not.toHaveBeenCalled();
+    expect(note.text).toContain('could not be fetched from where the code ran');
+  });
+
+  it('offers a speaker no code where nothing keeps its files, and says a claimed file did not come where something does (plan #3050.3.3)', async () => {
+    const without = group('@cy chart it');
+    const offered: (string[] | undefined)[] = [];
+    await runGroupBurst({
+      ...base(without.client),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => (offered.push(input.made), 'Sure.'),
+    });
+    expect(offered).toEqual([undefined]);
+
+    const withKeep = group('@cy chart it');
+    await runGroupBurst({
+      ...base(withKeep.client),
+      keepFiles: vi.fn(),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async () => "Here's the chart, attached as markets.png.",
+    });
+    expect(botMessages(withKeep.tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED}`]);
   });
 
   it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
@@ -461,6 +547,46 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     const { anthropic, sent } = scripted([text('Try the noodle place.')]);
     expect(await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [])).toBe('Try the noodle place.');
     expect(sent[0].tools).toBeUndefined();
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(CHART_ONLY_RULES);
+  });
+
+  it('runs code where its files are kept, carries on past a pause in the same container, and collects what the code wrote (plan #3050.3.3)', async () => {
+    const ran = (fileId: string) => [
+      { type: 'server_tool_use', id: `s-${fileId}`, name: 'bash_code_execution', input: { command: 'python chart.py' } },
+      {
+        type: 'bash_code_execution_tool_result',
+        tool_use_id: `s-${fileId}`,
+        content: { type: 'bash_code_execution_result', stdout: '', stderr: '', return_code: 0, content: [{ type: 'bash_code_execution_output', file_id: fileId }] },
+      },
+    ];
+    const paused = { content: [{ type: 'text', text: 'Let me draw that.' }, ...ran('f-png')], stop_reason: 'pause_turn', container: { id: 'c1' }, usage: USAGE };
+    const done = { content: [...ran('f-pdf'), { type: 'text', text: 'Here is the week as a picture and a PDF.' }], stop_reason: 'end_turn', usage: USAGE };
+    const { anthropic, sent } = scripted([paused, done]);
+    const made: string[] = [];
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, charts: [], made }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['code_execution', 'show_chart']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(ATTACH_RULES);
+    expect((sent[0] as unknown as { max_tokens: number }).max_tokens).toBe(SPEAKER_CODE_MAX_TOKENS);
+    // The paused turn goes back as it was, in the container it ran in.
+    expect(sent).toHaveLength(2);
+    expect((sent[1] as unknown as { container?: string }).container).toBe('c1');
+    expect(sent[1].messages.at(-1)).toMatchObject({ role: 'assistant' });
+    expect(sent[1].tool_choice).toEqual({ type: 'auto' });
+    expect(made).toEqual(['f-png', 'f-pdf']);
+    expect(said).toBe('Here is the week as a picture and a PDF.');
+
+    const plain = scripted([text('Sure.')]);
+    await speakWithModel(plain.anthropic, 'claude-sonnet-5-5', speaker, []);
+    expect((plain.sent[0] as unknown as { max_tokens: number }).max_tokens).toBe(SPEAKER_MAX_TOKENS);
+  });
+
+  it("reads a speaker's words after its code, not what it said it was about to do (plan #3050.3.3)", () => {
+    const result = { type: 'bash_code_execution_tool_result' };
+    expect(speakerText([{ type: 'text', text: 'Drawing it now.' }, { type: 'server_tool_use' }, result, { type: 'text', text: 'Here it is.' }])).toBe('Here it is.');
+    expect(speakerText([{ type: 'text', text: 'Drawing it now.' }, { type: 'server_tool_use' }, result])).toBe('Drawing it now.');
+    expect(speakerText([{ type: 'text', text: 'First.' }, { type: 'text', text: 'Second.' }])).toBe('First.');
+    expect(speakerText([])).toBe('');
   });
 });
 

@@ -36,6 +36,8 @@ import { dashModelLookup } from '@/lib/dash/model-lookup';
 import { sessionHandoffsLookup } from './session-handoffs';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
+import { ATTACH_SAVED_DEFINITION } from '@/lib/talk/attached';
+import { attachSavedLookup } from './attach';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -86,13 +88,15 @@ export const ASK_TOOL_NAMES = [
   'read_job_board',
   'find_places',
   'show_chart',
+  'attach_saved',
 ] as const;
 
 /**
  * Tools the connector (lib/connector/mcp.ts) does not offer. Mail is searched
  * and read in Gmail as the person, which a connector token cannot do, and
  * what it holds is not to leave the app for another client. A chart is drawn
- * in the app's own reply (plan #1655), which another client does not have.
+ * in the app's own reply (plan #1655), which another client does not have,
+ * and so is a card for a saved page or file (plan #3050.4).
  * The model Dash answers with is the app's own setting (plan #2458.4), and a
  * connector client is not Dash. A places lookup spends the app's own daily
  * allowance of Google calls (plan #2987.3), which stays with the app's chats.
@@ -103,6 +107,7 @@ export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = [
   'read_job_board',
   'find_places',
   'show_chart',
+  'attach_saved',
   'dash_model',
   'session_handoffs',
 ];
@@ -661,6 +666,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   FIND_PLACES_DEFINITION,
   CHART_TOOL_DEFINITION,
+  ATTACH_SAVED_DEFINITION,
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -710,6 +716,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   find_places: { run: placesLookup, module: null },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
+  // Reads the page or file it is given, the person's own, and keeps its card (plan #3050.4).
+  attach_saved: { run: attachSavedLookup, module: null },
 };
 
 /**

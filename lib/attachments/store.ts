@@ -43,6 +43,9 @@ type Row = {
 
 const COLUMNS = 'id, ref, path, name, content_type, size_bytes, created_at';
 
+/** The most refs one read of listAttachments names; more are read in pieces. */
+const REFS_PER_READ = 100;
+
 function toAttachment(row: Row): Attachment {
   return {
     id: row.id,
@@ -118,14 +121,21 @@ export async function listAttachments(
   const wanted = [...new Set(refs)];
   if (wanted.length === 0) return byRef;
 
-  const { data, error } = await client
-    .from('attachments')
-    .select(COLUMNS)
-    .in('ref', wanted)
-    .order('created_at', { ascending: true });
-  if (error) throw new Error(`Reading the files failed: ${error.message}`);
+  // A long chat asks for every turn (plan #3050.3.2): the refs go in pieces,
+  // so the request's address stays within what the API takes.
+  const rows: Row[] = [];
+  for (let start = 0; start < wanted.length; start += REFS_PER_READ) {
+    const { data, error } = await client
+      .from('attachments')
+      .select(COLUMNS)
+      .in('ref', wanted.slice(start, start + REFS_PER_READ))
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`Reading the files failed: ${error.message}`);
+    rows.push(...((data ?? []) as Row[]));
+  }
+  if (wanted.length > REFS_PER_READ) rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
 
-  for (const row of (data ?? []) as Row[]) {
+  for (const row of rows) {
     const list = byRef.get(row.ref) ?? [];
     list.push(toAttachment(row));
     byRef.set(row.ref, list);

@@ -1,5 +1,5 @@
 import { SESSION_OFFER } from '@/lib/talk/chat-to-session';
-import type Anthropic from '@anthropic-ai/sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
@@ -7,15 +7,17 @@ import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/chang
 import type { DashHandoff, SessionHandoffInput } from '@/lib/talk/handoff';
 import { startSessionHandoff } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT, HAND_TO_BOT_TOOL_NAME, type BotPasser } from '@/lib/talk/hand-to-bot';
-import { claimSlip, falseAttachment, NOTHING_ATTACHED_ASK } from '@/lib/talk/attachment-claim';
+import { claimSlip, falseAttachment, NOTHING_ATTACHED_ASK, NOTHING_ATTACHED_ASK_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { dashCodeExecution, fetchMadeFiles, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
 import { turnCharts } from '@/lib/talk/chart';
+import { SAVED_RULES, turnAttached } from '@/lib/talk/attached';
 import { DASH_MODELS } from './models';
 import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { UNFINISHED_REASON, type DashFailure } from './failures';
 import { budgetSlip, type DashSlip } from './slips';
-import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkFile, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
@@ -72,6 +74,23 @@ import { SESSION_SENT_BODY, THINK_FALLBACK, sessionSentCall } from '@/lib/talk/t
  */
 
 export const ASK_MODEL = DASH_MODELS.ask;
+
+/** What Ask is told about files where nothing it makes can be kept: a chart is the one thing sent. */
+export const ASK_CHART_ONLY = `The chart is the one thing that can go with an answer: you cannot send an
+image, a PDF or any other file, so never write that you attached or sent one.`;
+
+/**
+ * What Ask is told about files when its code's are kept under the answer
+ * (plan #3050.3.2), in place of ASK_CHART_ONLY.
+ */
+export const ASK_MAKES_FILES = `Beside a chart, you can send a file your code makes. When they ask for an
+image, a PDF or another file, rather than a chart, make it with
+code_execution: write the file in your code (a PNG with matplotlib, a PDF, a
+CSV) and it is kept under your answer, up to four files, each up to 20 MB, as
+an image, a PDF, a Word file, text or CSV. Put the figures from a lookup or a
+search into the code yourself; the code cannot reach their rows or the web.
+Say in a sentence what you sent. Never write that you attached or sent a file
+your code did not make.`;
 
 const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. It holds their
 shopping orders, job applications, notes, todos, reading, videos, newsletters,
@@ -155,8 +174,7 @@ A NUMBER CAN BE DRAWN, AND SO CAN WHAT IT IS MADE OF. Call show_chart with
 figures exactly as a lookup gave them, then answer; the chart is drawn under
 your answer, so say in a sentence or two what it shows (the change, the
 largest row) rather than listing every figure again.
-The chart is the one thing that can go with an answer: you cannot send an
-image, a PDF or any other file, so never write that you attached or sent one.
+${ASK_CHART_ONLY}
 - When they ask for one amount for a period, such as what they spent in
   September or how many applications they sent this month, draw it as a
   figure with the usual amount as its reference. For spending, ask
@@ -173,6 +191,8 @@ image, a PDF or any other file, so never write that you attached or sent one.
   applications by status, and a lookup gives three or more figures, draw a
   bar. A figure for the total and a bar for the shops behind it is a good
   pair; never draw more than two.
+
+${SAVED_RULES}
 
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. When they ask you to
 add, rename, move or tick off a todo, add a goal under one of their areas,
@@ -370,6 +390,20 @@ export function thinkVoice(scope: ModuleId | null | undefined): DashVoice {
   };
 }
 
+/**
+ * A voice that can send what its code makes (plan #3050.3.2): code execution
+ * beside its server tools, and the file rules in place of the chart-only
+ * ones. Without `on`, the voice as it was.
+ */
+export function withMadeFiles(voice: DashVoice, on: boolean): DashVoice {
+  if (!on) return voice;
+  return {
+    ...voice,
+    system: voice.system.replace(ASK_CHART_ONLY, ASK_MAKES_FILES),
+    serverTools: [...(voice.serverTools ?? []), dashCodeExecution()],
+  };
+}
+
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
 export type AskLookupEvent = DashLookupEvent;
@@ -428,9 +462,15 @@ export async function answerQuestion(input: {
    * think lookups run with these. Absent: an ordinary answer.
    */
   think?: ThinkDeps | null;
+  /**
+   * Offers code execution and tells Dash it can send the files its code
+   * makes (plan #3050.3.2): set only where the answer's files are kept.
+   * Absent: a chart is the one thing it can send.
+   */
+  makeFiles?: boolean;
 }): Promise<AskAnswer> {
-  const { page, scope, model, think, execute, passToBot, ...rest } = input;
-  const voice = think ? thinkVoice(scope) : scopedVoice(scope, model);
+  const { page, scope, model, think, execute, passToBot, makeFiles, ...rest } = input;
+  const voice = withMadeFiles(think ? thinkVoice(scope) : scopedVoice(scope, model), Boolean(makeFiles));
   return runDash({
     ...rest,
     execute: think ? (name, args) => (isThinkTool(name) ? runThinkTool(name, args, think) : execute(name, args)) : execute,
@@ -513,6 +553,15 @@ export type AskStores = {
    * absent, a thought-through question is answered here.
    */
   toSession?: (conversation: readonly TalkTurn[]) => Promise<{ ok: true; threadId: string } | { ok: false; error: string }>;
+  /**
+   * Keeps the files the answer's code made against its turn (plan
+   * #3050.3.2, turn-files.ts keepTurnMadeFiles), and says which could not
+   * be kept. Present, Dash is offered code execution; absent, it can draw a
+   * chart and send nothing else.
+   */
+  keepFiles?: (turnId: string, files: readonly MadeFile[]) => Promise<{ kept: TalkFile[]; unkept: UnkeptFile[] }>;
+  /** Rewrites a kept answer's words, for the sentence on files that were not kept (store.ts amendAnswerBody). */
+  amendAnswer?: (turnId: string, body: string) => Promise<void>;
 };
 
 
@@ -898,6 +947,7 @@ export async function askDash(
     scope: input.scope,
     model: input.model,
     think: input.think,
+    makeFiles: Boolean(stores.keepFiles),
     onSpend: (report) => spent.push(report),
     onCall: (call) => calls.push(call),
   });
@@ -917,9 +967,13 @@ export async function askDash(
     await stores.recordSlip?.({ ...slip, surface: 'ask', conversation: `ask:${subject.ref}`, href: `/chat/dash/${subject.ref}` });
   }
 
-  // An answer that says a file is attached when only a chart can be sent says so after all (plan #3050.1).
-  const claim = falseAttachment(answer.body, turnCharts(answer.toolCalls).length);
-  const body = claim ? `${answer.body.trimEnd()}\n\n${NOTHING_ATTACHED_ASK}` : answer.body;
+  // An answer that says a file is attached when none was sent says so after all (plan #3050.1).
+  // A file its code made is said for once the answer is kept (plan #3050.3.2).
+  const made = stores.keepFiles ? (answer.madeFiles ?? []) : [];
+  // A saved page or file it attached by reference counts as sent (plan #3050.4).
+  const claim = falseAttachment(answer.body, turnCharts(answer.toolCalls).length, made.length + turnAttached(answer.toolCalls).length);
+  const nothing = stores.keepFiles ? NOTHING_ATTACHED_ASK : NOTHING_ATTACHED_ASK_CHART_ONLY;
+  const body = claim ? `${answer.body.trimEnd()}\n\n${nothing}` : answer.body;
   if (claim) {
     await stores.recordSlip?.({ ...claimSlip('Ask Dash', claim), surface: 'ask', conversation: `ask:${subject.ref}`, href: `/chat/dash/${subject.ref}` });
   }
@@ -942,6 +996,9 @@ export async function askDash(
     return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
   }
   const turnId = answered[answered.length - 1].id;
+  if (made.length > 0 && stores.keepFiles) {
+    answered = await keepAnswerFiles(answered, made, stores, input.client ?? new Anthropic({ apiKey: input.anthropicApiKey }));
+  }
   const handoffs = handed.length > 0 ? await startHandoffs(handed, turnId, subject, stores) : undefined;
   const turns = [...asked, ...answered, ...(handoffs?.failedTurns ?? [])];
   if (proposed.length === 0) return { conversation, turns, stop: answer.stop, handoffs: handoffs?.handoffs };
@@ -957,6 +1014,54 @@ export async function askDash(
     console.error('ask proposals were not tied to the answer', error);
   }
   return { conversation, turns, stop: answer.stop, changes, handoffs: handoffs?.handoffs };
+}
+
+/**
+ * Keeps the files the answer's code made under it (plan #3050.3.2): each is
+ * read through the Files API and kept against the answer's turn. Any that
+ * could not be kept are named, with why, at the end of the answer's words,
+ * which are rewritten to say so. Returns the answer's turns with the kept
+ * files on the last. Never throws.
+ */
+async function keepAnswerFiles(
+  answered: TalkTurn[],
+  made: readonly string[],
+  stores: AskStores,
+  client: Pick<Anthropic, 'get'>,
+): Promise<TalkTurn[]> {
+  const last = answered[answered.length - 1];
+  let kept: TalkFile[] = [];
+  let notKept: UnkeptFile[] = [];
+  try {
+    const { files, unkept } = await fetchMadeFiles(client, made);
+    notKept = unkept;
+    if (files.length > 0 && stores.keepFiles) {
+      try {
+        const outcome = await stores.keepFiles(last.id, files);
+        kept = outcome.kept;
+        notKept = [...unkept, ...outcome.unkept];
+      } catch (error) {
+        console.error('the files an answer made were not kept', error);
+        notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'it could not be kept with the answer' }))];
+      }
+    }
+  } catch (error) {
+    console.error('the files an answer made were not read', error);
+  }
+  const note = madeFilesNote(notKept);
+  let body = last.body;
+  if (note) {
+    const tail = `\n\n${note}`;
+    const amended = `${last.body.trimEnd().slice(0, MAX_TURN - tail.length)}${tail}`;
+    try {
+      await stores.amendAnswer?.(last.id, amended);
+      body = amended;
+    } catch (error) {
+      console.error('the answer was not told which files were not kept', error);
+    }
+  }
+  const files = [...(last.files ?? []), ...kept];
+  return [...answered.slice(0, -1), { ...last, body, ...(files.length > 0 ? { files } : {}) }];
 }
 
 /**

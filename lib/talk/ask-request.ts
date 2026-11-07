@@ -83,6 +83,7 @@ import {
   type MadeChange,
 } from './changes';
 import {
+  amendAnswerBody,
   appendTurns,
   editAskChat,
   listAskChats,
@@ -99,7 +100,7 @@ import type { AskChat } from './ask-chats';
 import { chatCostMicros, chatSpan } from './chat-trail';
 import { RECALL_OPERATION } from '@/lib/memory/search';
 import type { TalkCitation, TalkTurn } from './talk';
-import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
+import { keepTurnMadeFiles, readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 import { saveAnswer, type SaveAnswerOutcome, type SaveAnswerTo } from './save-answer';
 import { markAnswered, markAnswering, markFailed, readReply, requestStop, stopRequested } from './reply-state-store';
 import { replyStateOf, type ReplyState } from './reply-state';
@@ -263,6 +264,9 @@ export async function askDashInRequest(input: {
       append: async (subject, turns) =>
         recordTurnFiles(core, user.id, turns, await appendTurns(core, user.id, subject, turns)),
       readFiles: (turnId) => readTurnFiles(core, turnId),
+      // What the answer's code made is kept under it (plan #3050.3.2).
+      keepFiles: (turnId, files) => keepTurnMadeFiles(core, user.id, turnId, files),
+      amendAnswer: (turnId, body) => amendAnswerBody(core, user.id, turnId, body),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       recordFailure: (failure) => keepFailure(core, user.id, failure),

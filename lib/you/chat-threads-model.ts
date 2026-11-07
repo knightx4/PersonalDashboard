@@ -2,6 +2,7 @@ import { filesOnlyText } from '@/lib/attachments/rules';
 import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
 import { parseChart, type DashChart } from '@/lib/talk/chart';
+import { savedAttachmentsOf, type SavedAttachment } from '@/lib/talk/attached';
 
 /**
  * The People tab's threads (plan #2748.6), kept pure so the tests fix the
@@ -24,7 +25,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, charts, file_count, created_at, delivered_at, read_at, speaker_id';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, charts, attached, file_count, created_at, delivered_at, read_at, speaker_id';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -59,6 +60,12 @@ export type ThreadMessage = {
    * out of `text`, so voice reads the words alone.
    */
   charts?: DashChart[];
+  /**
+   * The saved pages and files a bot attached by reference (plan #3050.4),
+   * from you.advisor_messages.attached through parseSavedAttachment; absent
+   * when none. Kept out of `text`, as charts are.
+   */
+  attached?: SavedAttachment[];
 };
 
 /** The most charts one bubble keeps, as you 0052's check allows. */
@@ -103,6 +110,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
   if (typeof row.id !== 'string' || !text || !str(row.created_at)) return null;
   const kind: MessageKind = row.kind === 'ack' || row.kind === 'text_first' ? row.kind : 'reply';
   const charts = chartsOf(row.charts);
+  const attached = savedAttachmentsOf(row.attached);
   const fileCount = typeof row.file_count === 'number' && row.file_count > 0 ? Math.floor(row.file_count) : 0;
   return {
     id: row.id,
@@ -116,6 +124,7 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     readAt: strOrNull(row.read_at),
     speakerId: strOrNull(row.speaker_id),
     ...(charts.length > 0 ? { charts } : {}),
+    ...(attached.length > 0 ? { attached } : {}),
     ...(fileCount > 0 ? { fileCount } : {}),
   };
 }

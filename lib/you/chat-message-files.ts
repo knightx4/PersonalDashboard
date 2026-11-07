@@ -1,12 +1,11 @@
 import 'server-only';
 
-import { randomUUID } from 'node:crypto';
 import { listAttachments, recordAttachments, type Attachment } from '@/lib/attachments/store';
-import { ATTACHMENTS_BUCKET, attachmentPath, type UploadedAttachment } from '@/lib/attachments/rules';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import type { MadeFile, UnkeptFile } from '@/lib/talk/made-files';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { DashFile } from '@/lib/dash/files';
-import { readHeldFiles } from '@/lib/talk/turn-files';
+import { keepMadeFilesAt, readHeldFiles } from '@/lib/talk/turn-files';
 import { messageFilesRef, type ThreadFile, type ThreadMessage } from '@/lib/you/chat-threads-model';
 
 /**
@@ -54,10 +53,8 @@ export async function messageFiles(core: CoreSupabaseClient, messageId: string):
 }
 
 /**
- * Keeps the files a bot's code made against its message (plan #3050.3.1):
- * each is put in the person's folder of the attachments bucket, then all are
- * recorded against the message in one insert. A file the bucket refuses is
- * returned as unkept with the reason, and the rest are still kept.
+ * Keeps the files a bot's code made against its message (plan #3050.3.1),
+ * as Ask keeps its answer's (lib/talk/turn-files.ts keepMadeFilesAt).
  */
 export async function keepMadeFiles(
   core: CoreSupabaseClient,
@@ -65,29 +62,8 @@ export async function keepMadeFiles(
   messageId: string,
   files: readonly MadeFile[],
 ): Promise<{ kept: ThreadFile[]; unkept: UnkeptFile[] }> {
-  const uploaded: UploadedAttachment[] = [];
-  const unkept: UnkeptFile[] = [];
-  for (const file of files) {
-    const path = attachmentPath(userId, randomUUID(), file.name);
-    const { error } = await core.storage
-      .from(ATTACHMENTS_BUCKET)
-      .upload(path, file.bytes, { contentType: file.contentType, upsert: false });
-    if (error) {
-      console.error('a file a bot made was not stored', file.name, error);
-      unkept.push({ name: file.name, why: 'storage would not take it' });
-      continue;
-    }
-    uploaded.push({ path, name: file.name, contentType: file.contentType, size: file.bytes.byteLength });
-  }
-  if (uploaded.length === 0) return { kept: [], unkept };
-  try {
-    const kept = (await recordAttachments(core, userId, messageFilesRef(messageId), uploaded)).map(toFile);
-    return { kept, unkept };
-  } catch (error) {
-    console.error('the files a bot made were not recorded', error);
-    await core.storage.from(ATTACHMENTS_BUCKET).remove(uploaded.map((file) => file.path)).catch(() => undefined);
-    return { kept: [], unkept: [...unkept, ...uploaded.map((file) => ({ name: file.name, why: 'it could not be recorded with the reply' }))] };
-  }
+  const { kept, unkept } = await keepMadeFilesAt(core, userId, messageFilesRef(messageId), files);
+  return { kept: kept.map(toFile), unkept };
 }
 
 /**

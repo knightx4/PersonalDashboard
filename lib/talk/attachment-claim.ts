@@ -13,18 +13,19 @@
  * text, as Ask Dash does. A reply that drew one may say so; a reply that
  * names a file, a picture or a PDF is still flagged, chart or not.
  *
- * A bot in a direct thread can send what its code makes (plan #3050.3.1).
- * A reply whose code made a file is not checked at all: what was kept shows
- * under it, and what could not be kept is said in a text of its own
+ * A bot in a direct thread can send what its code makes (plan #3050.3.1),
+ * and so can each bot speaking in a group (plan #3050.3.3). A reply whose
+ * code made a file is not checked at all: what was kept shows under it, and
+ * what could not be kept is said in a text of its own
  * (lib/talk/made-files.ts).
  *
  * Pure: nothing here reads a database or the network.
  */
 
 /**
- * What a bot in a direct thread is told, after its own rules (plan
- * #3050.3.1): it can draw a chart, and it can send a file its code makes,
- * so it never says it sent one it did not make.
+ * What a bot in a direct thread or a group is told, after its own rules
+ * (plans #3050.3.1 and #3050.3.3): it can draw a chart, and it can send a
+ * file its code makes, so it never says it sent one it did not make.
  */
 export const ATTACH_RULES = `YOU CAN DRAW A CHART, AND YOU CAN SEND FILES YOUR CODE MAKES. When they ask
 for a chart or a table of figures, call show_chart with the figures a lookup
@@ -38,7 +39,7 @@ Say in a sentence what you sent. Never write that you attached or sent a file
 your code did not make, and never name one (such as markets.png) as though it
 were there.`;
 
-/** What a group's speakers are told, who cannot run code yet: a chart is drawn, no file is sent. */
+/** What a bot is told where nothing keeps what its code makes: a chart is drawn, no file is sent. */
 export const CHART_ONLY_RULES = `YOU CAN DRAW A CHART, BUT YOU CANNOT SEND FILES. When they ask for a chart
 or a table of figures, call show_chart with the figures a lookup or a search
 gave you, and it is drawn under your text; then say in a sentence what it
@@ -53,12 +54,18 @@ a chart, the figures in words, or a link to a page that has them.`;
 export const NOTHING_ATTACHED =
   'Sorry, no file came through with that: nothing was made to send. Ask again and I will make it.';
 
-/** The closing text a group's text that claimed an attachment gets, where only a chart can be sent. */
+/** The closing text a text that claimed an attachment gets where only a chart can be sent. */
 export const NOTHING_ATTACHED_CHART_ONLY =
   'Sorry, no file came through with that: I can draw a chart here, but I cannot send files or pictures yet.';
 
-/** Ask Dash's closing sentence, where the chart it draws counts as sent. */
-export const NOTHING_ATTACHED_ASK =
+/**
+ * Ask Dash's closing sentence when it claimed a file its code did not make
+ * (plan #3050.3.2): a chart it drew counts as sent.
+ */
+export const NOTHING_ATTACHED_ASK = 'Nothing is attached to this answer: no file was made to send. Ask again and Dash will make it.';
+
+/** Ask Dash's closing sentence where nothing its code makes could be kept, so a chart is the one thing sent. */
+export const NOTHING_ATTACHED_ASK_CHART_ONLY =
   'Nothing is attached to this answer: Dash can draw a chart here but cannot send a file or picture yet.';
 
 const FILE_EXTENSIONS = 'png|jpe?g|gif|webp|svg|pdf|csv|xlsx?|docx?|pptx?|zip|json|txt|html?|md';

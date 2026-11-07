@@ -281,6 +281,42 @@ function expectLinkedRows(result: Awaited<ReturnType<typeof executeAskTool>>) {
   return result.rows;
 }
 
+describe('attach_saved (plan #3050.4)', () => {
+  const PAGE = '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11';
+  const FILE = '1a9e5c3b-6d2f-4e7a-8b0c-5f3d1e9a7c22';
+  const OTHER = '00000000-0000-4000-8000-00000000000b';
+  const tables = {
+    'core.files': [
+      { id: PAGE, user_id: ME, title: 'Northwind prep', format: 'html', archived_at: null },
+      { id: OTHER, user_id: OTHER, title: 'Not theirs', format: 'markdown', archived_at: null },
+    ],
+    'core.attachments': [{ id: FILE, user_id: ME, name: 'offer.pdf', content_type: 'application/pdf', size_bytes: 2048 }],
+  };
+
+  it("keeps a card for the person's own page, from a table and ref or a full ref", async () => {
+    for (const input of [{ table: 'core.files', ref: PAGE }, { ref: `core.files:${PAGE}` }]) {
+      const result = await executeAskTool('attach_saved', input, context(tables));
+      expect(result).toMatchObject({
+        ok: true,
+        kept: { attached: { table: 'core.files', id: PAGE, title: 'Northwind prep', kind: 'page', href: `/goals/files/${PAGE}` } },
+      });
+    }
+  });
+
+  it('keeps a card for a file they added, with its type and size', async () => {
+    const result = await executeAskTool('attach_saved', { table: 'core.attachments', ref: FILE }, context(tables));
+    expect(result).toMatchObject({
+      ok: true,
+      kept: { attached: { kind: 'file', title: 'offer.pdf', href: `/attachments/${FILE}`, contentType: 'application/pdf', size: 2048 } },
+    });
+  });
+
+  it('finds nothing of another account, and refuses a ref that names neither table', async () => {
+    expect((await executeAskTool('attach_saved', { table: 'core.files', ref: OTHER }, context(tables))).ok).toBe(false);
+    expect((await executeAskTool('attach_saved', { table: 'goals.items', ref: PAGE }, context(tables))).ok).toBe(false);
+  });
+});
+
 describe('the tool definitions', () => {
   it('define every tool the dispatcher runs, once each, as objects with no other keys', () => {
     expect(ASK_TOOLS.map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
