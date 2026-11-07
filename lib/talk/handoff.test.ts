@@ -101,8 +101,17 @@ describe('session hand-offs (plan #3005.1)', () => {
         refs: [{ ref: 'public.plan_items:abc', note: 'the step' }],
         subject_ref: 'public.plan_items:abc',
         request_key: `you.advisor_chats:${CHAT}#${MESSAGE}`,
+        browser_task: false,
       },
     });
+  });
+
+  it('marks a browser task only when the bot said so (plan #3040.1)', () => {
+    const base = { thread: chat, messageId: MESSAGE, request: 'Check the opening hours on their site', asked: 'check their hours' };
+    const marked = sessionHandoffRow('u1', { ...base, browserTask: true });
+    expect(marked.ok && marked.row.browser_task).toBe(true);
+    const plain = sessionHandoffRow('u1', base);
+    expect(plain.ok && plain.row.browser_task).toBe(false);
   });
 
   it('puts an Ask Dash hand-off on its conversation with no bot', () => {

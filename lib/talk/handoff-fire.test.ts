@@ -54,6 +54,9 @@ const HANDOFF: SessionHandoff = {
   firedAt: null,
   finishedAt: null,
   lastSeenAt: null,
+  browserTask: false,
+  browser: null,
+  browserReason: null,
 };
 
 const ROUTINE = () => ({ id: 'trig_1', token: 'tok' });

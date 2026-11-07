@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { costMicrosFor } from '@/lib/core/spend/pricing';
 import {
+  BROWSER_TASK_LINE,
   closeRefusal,
   sessionHandoffBrief,
   sessionReceipts,
@@ -40,6 +41,12 @@ describe('sessionHandoffBrief', () => {
     expect(brief).toContain('\nchat chat1, bot bot1\n');
     expect(brief).toContain('no summary was kept');
     expect(brief).toContain('- none named');
+  });
+
+  it('says a browser task after the kind, and nothing for one that is not (plan #3040.1)', () => {
+    const lines = sessionHandoffBrief({ ...HANDOFF, browserTask: true }, 'u1').split('\n');
+    expect(lines.slice(0, 4)).toEqual(['Hand-off h1', 'kind session', BROWSER_TASK_LINE, 'user_id u1']);
+    expect(sessionHandoffBrief({ ...HANDOFF, browserTask: false }, 'u1')).not.toContain(BROWSER_TASK_LINE);
   });
 
   it('cuts very long words and says the row keeps them', () => {

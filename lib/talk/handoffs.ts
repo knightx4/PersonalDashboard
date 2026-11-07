@@ -196,10 +196,19 @@ export type SessionHandoff = {
   firedAt: string | null;
   finishedAt: string | null;
   lastSeenAt: string | null;
+  /** The bot marked it as needing a web browser (plan #3040.1). */
+  browserTask: boolean;
+  /** The browser the session used, once it chose one. */
+  browser: HandoffBrowser | null;
+  /** Why that browser, or why none could be used. */
+  browserReason: string | null;
 };
 
+/** The browsers a session hand-off can drive (dash_handoffs_browser_ck). */
+export type HandoffBrowser = 'chrome' | 'headless';
+
 const SESSION_SELECT =
-  'id, advisor_id, conversation_id, advisor_chat_id, request, asked, summary, refs, subject_ref, request_key, status, run_id, error, cost_micros, created_at, fired_at, finished_at, last_seen_at';
+  'id, advisor_id, conversation_id, advisor_chat_id, request, asked, summary, refs, subject_ref, request_key, status, run_id, error, cost_micros, created_at, fired_at, finished_at, last_seen_at, browser_task, browser, browser_reason';
 
 type SessionHandoffDbRow = {
   id: string;
@@ -220,6 +229,9 @@ type SessionHandoffDbRow = {
   fired_at: string | null;
   finished_at: string | null;
   last_seen_at: string | null;
+  browser_task: boolean | null;
+  browser: HandoffBrowser | null;
+  browser_reason: string | null;
 };
 
 function toSessionHandoff(row: SessionHandoffDbRow): SessionHandoff {
@@ -242,6 +254,9 @@ function toSessionHandoff(row: SessionHandoffDbRow): SessionHandoff {
     firedAt: row.fired_at,
     finishedAt: row.finished_at,
     lastSeenAt: row.last_seen_at,
+    browserTask: row.browser_task === true,
+    browser: row.browser ?? null,
+    browserReason: row.browser_reason ?? null,
   };
 }
 
