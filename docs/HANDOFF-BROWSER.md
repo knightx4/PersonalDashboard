@@ -73,3 +73,15 @@ on session hand-offs only:
   the bot can pass on.
 
 No passwords and no page contents are kept.
+
+## How a session picks (plan #3040.2)
+
+The dash-backup skill's **A browser task** section has the order. A session
+with Claude in Chrome's tools, which only a session on the person's own
+computer has, checks that the extension answers and uses it. Without them it
+reads public pages in the headless Chromium through `scripts/browse.ts`. When
+a page needs a sign-in and Chrome is not there, it uses neither and closes
+failed with the reason. In each case it first records the route with
+`npx tsx scripts/handoff-session.ts browser <id> --route chrome|headless|none
+--reason "…"`, and `close --done` refuses a browser task that has not. A
+session never buys, sends or submits a form in either browser.
