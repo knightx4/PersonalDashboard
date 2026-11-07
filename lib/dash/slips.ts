@@ -10,7 +10,8 @@
 
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 
-export type DashSlipKind = 'thin_step' | 'repeated_step' | 'out_of_budget';
+/** claimed_attachment: a reply said a file was attached when none was sent (plan #3050.1). */
+export type DashSlipKind = 'thin_step' | 'repeated_step' | 'out_of_budget' | 'claimed_attachment';
 export type DashSlipSurface = 'ask' | 'people' | 'thread';
 
 /** Where a write or a turn was asked, as a slip names it. */

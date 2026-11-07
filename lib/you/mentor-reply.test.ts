@@ -17,6 +17,7 @@ import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { ATTACH_RULES, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -220,6 +221,28 @@ describe('replyToMentor', () => {
     expect(tools).toContain('todos');
     expect(tools).not.toContain('show_chart');
     expect(tools.at(-1)).toBe('answer');
+  });
+
+  it('says nothing came through, and keeps a slip, when a reply claims a file it never sent (plan #3050.1)', async () => {
+    const tables = world();
+    const { stub, streamed } = anthropicStub(["Choppy week.", "\n\nHere's your chart, attached as stocks_week.png!"]);
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act }).promise;
+
+    expect(mentorRows(tables).map((m) => m.text)).toEqual(['Choppy week.', "Here's your chart, attached as stocks_week.png!", NOTHING_ATTACHED]);
+    expect(recordSlip).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'claimed_attachment', surface: 'people', conversation: `people:${CHAT}`, what: expect.stringContaining('stocks_week.png') }),
+    );
+    const system = (streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
+    expect(system).toContain(ATTACH_RULES);
+  });
+
+  it('adds nothing to a reply that claims no file', async () => {
+    const tables = world();
+    const { stub } = anthropicStub(['The S&P rose 1.2% on the week.']);
+    await run(tables, stub).promise;
+    expect(mentorRows(tables).map((m) => m.text)).toEqual(['The S&P rose 1.2% on the week.']);
   });
 
   it("acts with Ask Dash's tools and rules when it is given them (plan #2854.2)", async () => {

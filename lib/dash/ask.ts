@@ -7,6 +7,8 @@ import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/chang
 import type { DashHandoff, SessionHandoffInput } from '@/lib/talk/handoff';
 import { startSessionHandoff } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT, HAND_TO_BOT_TOOL_NAME, type BotPasser } from '@/lib/talk/hand-to-bot';
+import { claimSlip, falseAttachment, NOTHING_ATTACHED_ASK } from '@/lib/talk/attachment-claim';
+import { turnCharts } from '@/lib/talk/chart';
 import { DASH_MODELS } from './models';
 import { dashWebSearch, WEB_RULES } from './web-search';
 import type { DashChoiceId } from '@/lib/core/models';
@@ -153,6 +155,8 @@ A NUMBER CAN BE DRAWN, AND SO CAN WHAT IT IS MADE OF. Call show_chart with
 figures exactly as a lookup gave them, then answer; the chart is drawn under
 your answer, so say in a sentence or two what it shows (the change, the
 largest row) rather than listing every figure again.
+The chart is the one thing that can go with an answer: you cannot send an
+image, a PDF or any other file, so never write that you attached or sent one.
 - When they ask for one amount for a period, such as what they spent in
   September or how many applications they sent this month, draw it as a
   figure with the usual amount as its reference. For spending, ask
@@ -911,6 +915,13 @@ export async function askDash(
     await stores.recordSlip?.({ ...slip, surface: 'ask', conversation: `ask:${subject.ref}`, href: `/chat/dash/${subject.ref}` });
   }
 
+  // An answer that says a file is attached when only a chart can be sent says so after all (plan #3050.1).
+  const claim = falseAttachment(answer.body, turnCharts(answer.toolCalls).length);
+  const body = claim ? `${answer.body.trimEnd()}\n\n${NOTHING_ATTACHED_ASK}` : answer.body;
+  if (claim) {
+    await stores.recordSlip?.({ ...claimSlip('Ask Dash', claim), surface: 'ask', conversation: `ask:${subject.ref}`, href: `/chat/dash/${subject.ref}` });
+  }
+
   let answered: TalkTurn[];
   try {
     // A thought-through answer keeps its mark and its cost, read by the line under it.
@@ -921,7 +932,7 @@ export async function askDash(
         ]
       : answer.toolCalls;
     answered = await stores.append(subject, [
-      { role: 'assistant', body: answer.body, toolCalls, citations: answer.citations },
+      { role: 'assistant', body, toolCalls, citations: answer.citations },
     ]);
   } catch (error) {
     await discard();

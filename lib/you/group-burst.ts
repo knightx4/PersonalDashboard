@@ -43,6 +43,8 @@ import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } 
 import { HAND_OFF_TOOL, HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
 import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT_TOOL, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
+import { ATTACH_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
+import type { DashSlip } from '@/lib/dash/slips';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -113,6 +115,11 @@ export type GroupBurstInput = {
    * it. Absent: no bot in the group can pass things on.
    */
   passToBot?: BotPasser;
+  /**
+   * Keeps a slip when a bot's text says it attached a file that was never
+   * sent (plan #3050.1). Absent: the text still says nothing came through.
+   */
+  recordSlip?: (slip: DashSlip) => Promise<void>;
   /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
   timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
@@ -386,6 +393,7 @@ export async function speakWithModel(
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
   const rules = [
     SPEAKER_RULES,
+    ATTACH_RULES,
     ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
     ...(input.page ? [PAGE_RULES] : []),
     ...(input.handOn ? [SESSION_RULES] : []),
@@ -571,6 +579,14 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
               },
               spent['group-speaker'],
             );
+            // A text that says a file is attached when nothing was sent says so after all (plan #3050.1).
+            const claim = text ? falseAttachment(text, 0) : null;
+            if (text && claim) {
+              text = `${text}\n\n${NOTHING_ATTACHED}`;
+              await input
+                .recordSlip?.({ ...claimSlip(member.name, claim), surface: 'people', conversation: `people:${chatId}`, href: `/chat/groups/${chatId}` })
+                .catch((error) => console.error('the attachment slip was not kept', error));
+            }
             if (text) {
               const wait = turnPauseMs(text) - (now() - turnStarted);
               if (wait > 0) await sleep(wait);

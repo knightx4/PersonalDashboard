@@ -6,6 +6,7 @@ import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-loo
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { NOTHING_ATTACHED } from '@/lib/talk/attachment-claim';
 import {
   MAX_BOT_MESSAGES,
   MAX_OPENERS,
@@ -191,6 +192,19 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     const { client, tables } = group('@cy what do you think');
     await runGroupBurst({ ...base(client), director: async () => ({ wait: true, picks: [], reactions: [] }), speak: async () => 'I think so.' });
     expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
+  });
+
+  it('says nothing came through, and keeps a slip, when a bot claims a file it never sent (plan #3050.1)', async () => {
+    const { client, tables } = group('@cy chart the markets');
+    const recordSlip = vi.fn(async () => undefined);
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async () => "Here's the chart, attached as markets.png.",
+    });
+    expect(botMessages(tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED}`]);
+    expect(recordSlip).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claimed_attachment', surface: 'people' }));
   });
 
   it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
