@@ -127,6 +127,7 @@ export const youActions: ModuleActions = {
     retryReply: none('own', "Asking a mentor to answer again after a failed reply is the person's own press on their thread (plan #2854.4)."),
     decideThreadWatch: none('theirs', "Approving or declining a watch Dash wrote for a mentor is the person's word on what Dash may run for them (plan #3030.1.2)."),
     threadChanges: none('page', 'Reads the cards for what a person did in a thread; it serves the page (plan #2854.2.1).'),
+    threadMessageFiles: none('page', "Reads the files a bot's code made for one message, once an open thread hears their count; it serves the page (plan #3050.3.1)."),
     threadBuilds: none('page', 'Reads where the builds confirmed in a thread stand; it serves the page (plan #2854.3).'),
     savePersonCard: none(
       'theirs',
