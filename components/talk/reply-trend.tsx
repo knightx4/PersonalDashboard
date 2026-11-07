@@ -115,7 +115,7 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
   );
 
   return (
-    <div style={seriesHues()}>
+    <div style={seriesHues()} className={cn(large && 'flex h-full flex-col')}>
       {many && (
         <ul aria-label="Series" className="mb-2 flex flex-wrap gap-x-1 gap-y-1">
           {series.map((s, index) => (
@@ -140,7 +140,7 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
       )}
       <div
         aria-hidden
-        className={cn('w-full', large ? 'h-[calc(100dvh-11rem)] min-h-64 sm:h-[calc(100dvh-14rem)]' : 'h-44 sm:h-52')}
+        className={cn('w-full', large ? 'min-h-56 flex-1' : 'h-44 sm:h-52')}
       >
         <ResponsiveContainer width="100%" height="100%">
           {chart.kind === 'area' ? (

@@ -90,7 +90,7 @@ function Rows({ chart }: { chart: DashChart }) {
   useEffect(() => {
     const box = scroller.current;
     if (!box || !wide) return;
-    const measure = () => setMore(box.scrollLeft + box.clientWidth < box.scrollWidth - 1);
+    const measure = () => setMore(box.scrollLeft + box.clientWidth < box.scrollWidth - 4);
     measure();
     box.addEventListener('scroll', measure, { passive: true });
     const watch = new ResizeObserver(measure);
@@ -113,7 +113,7 @@ function Rows({ chart }: { chart: DashChart }) {
         aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
         className={cn(
           'pb-1.5 align-bottom font-normal',
-          column < 0 ? 'text-left' : 'pl-3 text-right',
+          column < 0 ? 'text-left' : wide ? 'pl-2.5 text-right' : 'pl-3 text-right',
           column < 0 && wide && 'sticky left-0 z-10 bg-sunken',
         )}
       >
@@ -142,7 +142,7 @@ function Rows({ chart }: { chart: DashChart }) {
   return (
     <div className={cn(wide && 'relative')}>
       <div ref={scroller} className={cn(wide && 'overflow-x-auto')}>
-      <table className={cn('w-full border-collapse text-ui', wide && 'min-w-max')}>
+      <table className="w-full border-collapse text-ui">
         <thead>
           <tr>{headings.map((text, i) => heading(text, i - 1))}</tr>
         </thead>
@@ -150,12 +150,12 @@ function Rows({ chart }: { chart: DashChart }) {
           {rows.map((row, i) => (
             <tr key={`${i}-${row.label}`}>
               <td
-                className={cn('py-2 text-ink', wide && 'sticky left-0 z-10 min-w-24 max-w-32 bg-sunken pr-2')}
+                className={cn('py-2 text-ink', wide && 'sticky left-0 z-10 min-w-20 max-w-32 bg-sunken pr-2')}
               >
                 {row.label}
               </td>
               {headings.slice(1).map((_, index) => (
-                <td key={index} className="tabular whitespace-nowrap py-2 pl-3 text-right text-ink">
+                <td key={index} className={cn('tabular whitespace-nowrap py-2 text-right text-ink', wide ? 'pl-2.5' : 'pl-3')}>
                   {cell(row, index)}
                 </td>
               ))}
@@ -343,7 +343,9 @@ function FullScreen({ chart, caption, onClose }: { chart: DashChart; caption?: s
             id={titleId}
             tabIndex={-1}
             autoFocus
-            className="min-w-0 pt-1 font-display text-title font-semibold tracking-tight text-ink outline-none"
+            // Focus is put here only so Close is not lit on opening; a heading is never a stop to ring.
+            data-focus-ring="none"
+            className="min-w-0 pt-1 font-display text-title font-semibold tracking-tight text-ink"
           >
             {chart.title}
             {unit && <span className="ml-2 text-ui font-normal text-ink-muted">{unit}</span>}
@@ -354,7 +356,7 @@ function FullScreen({ chart, caption, onClose }: { chart: DashChart; caption?: s
             </IconButton>
           </Tooltip>
         </div>
-        <div className="mt-4 min-h-0 flex-1 overflow-auto rounded-card bg-sunken px-3 pb-3 pt-3">
+        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-auto rounded-card bg-sunken px-3 pb-3 pt-3 [&>*]:flex-1">
           <Body chart={chart} large />
         </div>
         {caption && <p className="mt-3 line-clamp-3 max-w-prose text-small text-ink-muted">{caption}</p>}
