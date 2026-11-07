@@ -223,6 +223,10 @@ quiet is noticed:
 npx tsx scripts/handoff-session.ts seen <id>
 ```
 
+**A brief with a `browser task` line** (its third line, after `kind
+session`) needs a web browser: read **A browser task** below before you
+start, and record the route it gives before you close.
+
 **Do all of it.** You have the room the chat turn did not, so finish the
 work rather than a first part of it. A plan step goes through
 `scripts/plan.ts` and the plan skill's rules, a goal through the goals
@@ -271,6 +275,81 @@ If you go quiet, the thread hears it anyway (`you.watch_bot_pages`, every two
 minutes): 20 minutes with no `seen` posts that it is taking longer than it
 should, and 90 fails the hand-off and says so. One closed done with nothing
 posted is reported after 10 minutes with a link to Home.
+
+## A browser task
+
+The bot marked the hand-off as needing a real browser (`browser_task`, plan
+#3040): clicking through a site, filling in a form, or reading a page that
+needs the person signed in. There are two browsers, and you pick one before
+you open any page. docs/HANDOFF-BROWSER.md says where these sessions run.
+
+**1. Is Claude in Chrome here?** It is when your tools include
+`mcp__claude-in-chrome__*`, or an `enable__mcp__claude-in-chrome` tool that
+turns them on. Load them with ToolSearch (`select:` and the names, in one
+call) and read `anthropic-skills:chrome-browser` before the first step.
+Then check it answers: list the tabs. If it lists them, Chrome is open with
+the extension connected, and it is your browser. It has the person's own
+sign-ins, so work in a new tab and leave their open tabs alone.
+
+A cloud session never has these tools: the person's Chrome is on their own
+computer, and only a session started there by the runner on their PC or Mac
+can reach it (plan #3040.5 and #3040.6). Nothing is wrong when they are
+missing, and there is nothing to retry.
+
+**2. Without Chrome, a headless browser on public pages.** The session has a
+headless Chromium, the one Playwright installs, with no paid browser service
+behind it. Read a page with
+
+```sh
+npx tsx scripts/browse.ts <url>
+npx tsx scripts/browse.ts <url> --eval "document.querySelector('a.next').click()" --eval "document.title" --shot /tmp/page.png
+```
+
+which prints the address it ended on, the title, the page's text, each
+`--eval`'s value and `signInWall`. Each call starts a fresh browser, so for
+a longer path through a site, write a short script in your scratchpad on
+`launch()` from `tests/interaction/browser.ts` and drive that one page. The
+headless browser has none of the person's sign-ins and keeps nothing between
+runs.
+
+**3. A sign-in with no Chrome: stop.** When the page needs the person signed
+in (`signInWall` is true, or the page says so) and Chrome is not here, do
+not try to sign in, and never ask for or type a password. Record route
+`none`, then close `--failed` with the reason in a sentence the person can
+act on: "That page needs you signed in, and I couldn't reach your Chrome, so
+start the browser runner on your PC or Mac first." The thread adds "Ask me
+again" after it. A request whose
+whole point is behind a sign-in (their bank, their orders) is this case from
+the start: you need not open it headless first.
+
+**Record the route before you close.** Once you know which browser did the
+work, or that neither could:
+
+```sh
+npx tsx scripts/handoff-session.ts browser <id> --route chrome --reason "Your Chrome was open with Claude in Chrome connected."
+npx tsx scripts/handoff-session.ts browser <id> --route headless --reason "Your Chrome wasn't reachable, and the page is public."
+npx tsx scripts/handoff-session.ts browser <id> --route none --reason "The page needs you signed in, and your Chrome wasn't reachable."
+```
+
+It writes `browser` (chrome, headless, or null for `none`) and
+`browser_reason` on the row. Run it again if the route changes partway, for
+instance when a headless run hits a sign-in. `close --done` refuses a browser
+task with no route recorded.
+
+**Name the route in the reply.** Say which browser did it, in the person's
+words: "I checked it in your Chrome" or "Your Chrome wasn't open, so I read
+the public page in a browser with none of your sign-ins". The People reply
+and the Ask reply turn both carry it.
+
+**Nothing is bought, sent or submitted.** Step 2 holds in either browser.
+A purchase, a message sent, or a form submitted (a sign-up, a booking, an
+application, a contact form) is the person's to press. Stop at the last
+step before it: fill in what you can in Chrome, then close the hand-off
+done with a reply that says what is ready, where, and that the press is
+theirs. Their request does not count as a yes, and neither does a yes later
+in the thread. Search boxes, filters and "next page" links are not
+submissions. No password, card number or one-time code goes into a row, a
+note, a reply or a file.
 
 ## Report
 
