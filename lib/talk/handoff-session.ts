@@ -272,7 +272,7 @@ export const SESSION_NUDGE_MINUTES = 20;
 export const SESSION_GIVE_UP_MINUTES = 90;
 
 /** The hand-off's thread, read before closing so the right telling is checked. $1 id, $2 owner. */
-export const THREAD_SQL = `select id, conversation_id, advisor_chat_id, state
+export const THREAD_SQL = `select id, conversation_id, advisor_chat_id, state, browser_task, browser, browser_reason
     from core.dash_handoffs
    where id = $1 and user_id = $2 and kind = 'session'`;
 

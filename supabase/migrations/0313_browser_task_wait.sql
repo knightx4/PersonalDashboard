@@ -14,10 +14,11 @@
 --                browser task claimed over 5 minutes ago by a computer that
 --                has sent no heartbeat in the last 5 minutes goes back to
 --                unclaimed. It has waited past the 3 minutes already, so the
---                same pass starts it in the cloud. A runner keeps its
---                heartbeat going while it works a task, so a long task in
---                Chrome is never let go while its runner is alive. Returns
---                how many were let go.
+--                same pass starts it in the cloud. A runner moves a task it
+--                works in Chrome to fired, and clears its own claim when
+--                Chrome does not answer (#3040.6), so this catches only a
+--                runner that died between its claim and either move.
+--                Returns how many were let go.
 --   core.say_in_handoff_thread(handoff, text)
 --                posts one line into the thread a session hand-off was
 --                asked in: in an Ask Dash conversation as Dash's turn, in a
