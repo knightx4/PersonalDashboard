@@ -222,7 +222,11 @@ export function TalkChartFullSurface() {
   return (
     <PageColumn className="py-4">
       <Card padding="standard">
-        <ReplyChart chart={MARKETS_LINE} defaultOpen />
+        <ReplyChart
+          chart={MARKETS_LINE}
+          caption="All three indices ended the week up, after a dip on Wednesday. The Nasdaq gained most, 1.71% since Monday, and the Dow least at 0.55%."
+          defaultOpen
+        />
       </Card>
     </PageColumn>
   );

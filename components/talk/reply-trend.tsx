@@ -4,12 +4,16 @@ import { useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { cn } from '@/lib/cn';
 import { hueFill } from '@/lib/learn/map/view';
-import { axisNumber, chartSeries, rowValue, seriesValue, type DashChart } from '@/lib/talk/chart';
+import { axisNumber, niceTicks, chartSeries, rowValue, seriesValue, type DashChart } from '@/lib/talk/chart';
 
 /**
  * A line or an area Dash drew (plan #3050.2.1), with up to four series over
  * the same labels, drawn with recharts as the Learn chart figure is
  * (lib/learn/figures/kinds/chart-plot.tsx).
+ *
+ * Points are joined by straight lines: the figures are one a day or a
+ * month, and a smoothed curve would draw movement between them nobody
+ * measured. The scale steps in round amounts (lib/talk/chart.ts niceTicks).
  *
  * One series is the accent: it is what the question is about. Several are
  * peers, such as three indices, so each takes one of the fixed category hues
@@ -71,7 +75,9 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
   const tick = (value: number) => (percent ? `${axisNumber(value)}%` : axisNumber(value));
   // Wide enough for the longest tick, a minus sign and a % included, so none is clipped.
   const values = data.flatMap((point) => keys.map((key) => point[key])).filter((v): v is number => typeof v === 'number');
-  const longest = Math.max(...[Math.min(...values), Math.max(...values)].map((v) => tick(v).length + 1));
+  // Round steps (0.5%, 1,000) rather than whatever recharts divides the range into.
+  const ticks = niceTicks(chart.kind === 'area' ? Math.min(0, ...values) : Math.min(...values), Math.max(...values));
+  const longest = Math.max(...ticks.map((v) => tick(v).length + 1));
   const axisWidth = Math.max(36, 8 + longest * 7);
   const strength = (index: number) => (picked === null || picked === index ? 1 : 0.25);
   const many = series.length > 1;
@@ -94,7 +100,8 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
         axisLine={false}
         width={axisWidth}
         tickFormatter={tick}
-        domain={chart.kind === 'area' ? [(min: number) => Math.min(0, min), 'auto'] : ['auto', 'auto']}
+        ticks={ticks}
+        domain={[ticks[0]!, ticks[ticks.length - 1]!]}
       />
       <Tooltip
         {...TOOLTIP}
@@ -144,7 +151,7 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
                   key={key}
                   dataKey={key}
                   name={key}
-                  type="monotone"
+                  type="linear"
                   stroke={seriesColour(index, series.length)}
                   strokeWidth={2} /* ui-ok: a chart's line, drawn as the Learn chart's are, not an icon */
                   strokeOpacity={strength(index)}
@@ -165,7 +172,7 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
                   key={key}
                   dataKey={key}
                   name={key}
-                  type="monotone"
+                  type="linear"
                   stroke={seriesColour(index, series.length)}
                   strokeWidth={picked === index ? 2.5 : 2}
                   strokeOpacity={strength(index)}

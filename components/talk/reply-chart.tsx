@@ -72,7 +72,9 @@ function Bars({ chart }: { chart: DashChart }) {
  * fades its right edge on a phone to show it scrolls, and a column of figures
  * this narrow never needs to, so the fade only hid the numbers. A table with
  * several series can be wider than a phone; it scrolls sideways under its
- * labels, which stay put.
+ * labels, which stay put and wrap rather than take the width. While more
+ * lies to the right, the edge fades over a column partly shown, so the cut
+ * reads as more to come rather than as a figure.
  *
  * Each heading is a button that sorts by its column: figures largest first,
  * labels A to Z, then the other way, then back to the order Dash gave.
@@ -83,6 +85,21 @@ function Rows({ chart }: { chart: DashChart }) {
   const series = chart.series && chart.series.length > 0 ? chart.series : null;
   const wide = series !== null && series.length > 1;
   const rows = sortRows(chart, sort);
+  const scroller = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const box = scroller.current;
+    if (!box || !wide) return;
+    const measure = () => setMore(box.scrollLeft + box.clientWidth < box.scrollWidth - 1);
+    measure();
+    box.addEventListener('scroll', measure, { passive: true });
+    const watch = new ResizeObserver(measure);
+    watch.observe(box);
+    return () => {
+      box.removeEventListener('scroll', measure);
+      watch.disconnect();
+    };
+  }, [wide]);
   const cell = (row: DashChart['rows'][number], index: number) =>
     series ? seriesValue(chart, series[index], rowValue(chart, row, index)) : chartValue(chart, row.value);
 
@@ -95,7 +112,7 @@ function Rows({ chart }: { chart: DashChart }) {
         scope="col"
         aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
         className={cn(
-          'pb-1.5 font-normal',
+          'pb-1.5 align-bottom font-normal',
           column < 0 ? 'text-left' : 'pl-3 text-right',
           column < 0 && wide && 'sticky left-0 z-10 bg-sunken',
         )}
@@ -104,11 +121,17 @@ function Rows({ chart }: { chart: DashChart }) {
           type="button"
           onClick={() => setSort((current) => nextSort(current, column))}
           className={cn(
-            'press -mx-1 inline-flex items-center gap-1 rounded-control px-1 py-0.5 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2',
-            column >= 0 && 'flex-row-reverse',
+            'press -mx-1 inline-flex items-end gap-1 rounded-control px-1 py-0.5 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2',
+            column >= 0 && 'flex-row-reverse text-right',
           )}
         >
-          {text ? <SectionLabel as="span">{text}</SectionLabel> : <span className="sr-only">Row</span>}
+          {text ? (
+            <SectionLabel as="span" className={cn(wide && 'max-w-20 whitespace-normal')}>
+              {text}
+            </SectionLabel>
+          ) : (
+            <span className="sr-only">Row</span>
+          )}
           <Arrow aria-hidden strokeWidth={1.75} className={cn('size-3 text-ink-muted', !sorted && 'opacity-0')} />
           <span className="sr-only">, sort</span>
         </button>
@@ -117,7 +140,8 @@ function Rows({ chart }: { chart: DashChart }) {
   };
 
   return (
-    <div className={cn(wide && '-mx-3 overflow-x-auto px-3')}>
+    <div className={cn(wide && 'relative')}>
+      <div ref={scroller} className={cn(wide && 'overflow-x-auto')}>
       <table className={cn('w-full border-collapse text-ui', wide && 'min-w-max')}>
         <thead>
           <tr>{headings.map((text, i) => heading(text, i - 1))}</tr>
@@ -126,8 +150,7 @@ function Rows({ chart }: { chart: DashChart }) {
           {rows.map((row, i) => (
             <tr key={`${i}-${row.label}`}>
               <td
-                className={cn('py-2 text-ink', wide && 'sticky left-0 max-w-40 truncate bg-sunken pr-2')}
-                title={wide ? row.label : undefined}
+                className={cn('py-2 text-ink', wide && 'sticky left-0 z-10 min-w-24 max-w-32 bg-sunken pr-2')}
               >
                 {row.label}
               </td>
@@ -140,6 +163,10 @@ function Rows({ chart }: { chart: DashChart }) {
           ))}
         </tbody>
       </table>
+      </div>
+      {more && (
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-sunken to-transparent" />
+      )}
     </div>
   );
 }
@@ -285,9 +312,11 @@ function captionUnit(chart: DashChart): string | null {
 /**
  * The chart over the whole screen, a native modal so the page behind is
  * inert and focus stays inside. Escape, Close or a press on the backdrop
- * shuts it.
+ * shuts it. Focus starts on the title, so Close shows no ring or tip until
+ * it is reached. Under the chart, the words of the reply it came with say
+ * what it shows, since the reply is hidden behind it.
  */
-function FullScreen({ chart, onClose }: { chart: DashChart; onClose: () => void }) {
+function FullScreen({ chart, caption, onClose }: { chart: DashChart; caption?: string; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -310,7 +339,12 @@ function FullScreen({ chart, onClose }: { chart: DashChart; onClose: () => void 
     >
       <div className="flex h-full flex-col px-4 pb-5 pt-3 sm:px-6">
         <div className="flex items-start justify-between gap-3">
-          <h2 id={titleId} className="min-w-0 pt-1 font-display text-title font-semibold tracking-tight text-ink">
+          <h2
+            id={titleId}
+            tabIndex={-1}
+            autoFocus
+            className="min-w-0 pt-1 font-display text-title font-semibold tracking-tight text-ink outline-none"
+          >
             {chart.title}
             {unit && <span className="ml-2 text-ui font-normal text-ink-muted">{unit}</span>}
           </h2>
@@ -323,13 +357,25 @@ function FullScreen({ chart, onClose }: { chart: DashChart; onClose: () => void 
         <div className="mt-4 min-h-0 flex-1 overflow-auto rounded-card bg-sunken px-3 pb-3 pt-3">
           <Body chart={chart} large />
         </div>
+        {caption && <p className="mt-3 line-clamp-3 max-w-prose text-small text-ink-muted">{caption}</p>}
       </div>
     </dialog>
   );
 }
 
 /** One chart under a reply; `defaultOpen` draws it full screen at once, as the gallery shows it. */
-export function ReplyChart({ chart, defaultOpen = false, className }: { chart: DashChart; defaultOpen?: boolean; className?: string }) {
+export function ReplyChart({
+  chart,
+  caption,
+  defaultOpen = false,
+  className,
+}: {
+  chart: DashChart;
+  /** The reply's words, shown under the chart full screen. */
+  caption?: string;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
   const [open, setOpen] = useState(defaultOpen && opens(chart));
   const unit = captionUnit(chart);
   return (
@@ -348,7 +394,7 @@ export function ReplyChart({ chart, defaultOpen = false, className }: { chart: D
         )}
       </figcaption>
       <Body chart={chart} />
-      {open && <FullScreen chart={chart} onClose={() => setOpen(false)} />}
+      {open && <FullScreen chart={chart} caption={caption} onClose={() => setOpen(false)} />}
     </figure>
   );
 }
@@ -358,25 +404,25 @@ export function ReplyChart({ chart, defaultOpen = false, className }: { chart: D
  * message, under its bubble in the run: the same charts Ask draws, a card's
  * width wide. Voice reads the bubble's words and never these.
  */
-export function MessageCharts({ charts }: { charts: readonly DashChart[] | undefined }) {
+export function MessageCharts({ charts, caption }: { charts: readonly DashChart[] | undefined; caption?: string }) {
   if (!charts || charts.length === 0) return null;
   return (
     <MessageCard wide>
       {charts.map((chart, i) => (
-        <ReplyChart key={`${i}-${chart.title}`} chart={chart} className="mt-0.5" />
+        <ReplyChart key={`${i}-${chart.title}`} chart={chart} caption={caption} className="mt-0.5" />
       ))}
     </MessageCard>
   );
 }
 
 /** Every chart an answer drew; nothing for an answer that drew none. */
-export function ReplyCharts({ calls }: { calls: readonly TalkToolCall[] | undefined }) {
+export function ReplyCharts({ calls, caption }: { calls: readonly TalkToolCall[] | undefined; caption?: string }) {
   const charts = turnCharts(calls);
   if (charts.length === 0) return null;
   return (
     <>
       {charts.map((chart, i) => (
-        <ReplyChart key={`${i}-${chart.title}`} chart={chart} />
+        <ReplyChart key={`${i}-${chart.title}`} chart={chart} caption={caption} />
       ))}
     </>
   );

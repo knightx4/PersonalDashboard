@@ -465,7 +465,7 @@ export function GroupThreadView({
                 </VoicedBubble>
                 {reactions[m.id]?.length ? <Reactions list={reactions[m.id]} members={[...members, ...former]} from={block.from} /> : null}
                 {/* A chart the bot drew with this text (plan #3050.2.2). */}
-                <MessageCharts charts={m.charts} />
+                <MessageCharts charts={m.charts} caption={m.text} />
                 {m.receipts.map((r) => (
                   <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                     {r.label}

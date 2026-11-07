@@ -16,6 +16,7 @@ import {
   chartColumns,
   chartValue,
   nextSort,
+  niceTicks,
   parseChart,
   seriesValue,
   sortRows,
@@ -227,6 +228,15 @@ describe('several series (plan #3050.2.1)', () => {
   it('tells the model about lines, areas and series', () => {
     expect(CHART_TOOL_DEFINITION.description).toMatch(/- line: up to 4 series/);
     expect(CHART_TOOL_DEFINITION.input_schema.properties.series).toBeDefined();
+  });
+});
+
+describe('niceTicks', () => {
+  it('steps an axis in round amounts that cover the figures', () => {
+    expect(niceTicks(-0.62, 1.71)).toEqual([-1, 0, 1, 2]);
+    expect(niceTicks(0, 412.8)).toEqual([0, 200, 400, 600]);
+    expect(niceTicks(6700, 6900)).toEqual([6700, 6750, 6800, 6850, 6900]);
+    expect(niceTicks(5, 5)).toEqual([2, 4, 6, 8]);
   });
 });
 

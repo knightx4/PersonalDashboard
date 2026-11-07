@@ -675,7 +675,7 @@ export function ThreadView({
                     <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
                   )}
                   {/* A chart the bot drew with this text (plan #3050.2.2), drawn as Ask draws one. */}
-                  <MessageCharts charts={m.charts} />
+                  <MessageCharts charts={m.charts} caption={words ?? undefined} />
                   {m.receipts.map((r) => (
                     <MessageLink key={`${r.link}-${r.label}`} href={r.link}>
                       {r.label}

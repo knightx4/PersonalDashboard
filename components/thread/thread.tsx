@@ -1697,7 +1697,7 @@ function TalkThread({
               </>
             )}
             {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
-            {!mine && <ReplyCharts calls={turn.toolCalls} />}
+            {!mine && <ReplyCharts calls={turn.toolCalls} caption={turn.body} />}
             {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
             {isPending(turn.id)
               ? undefined
@@ -1779,7 +1779,7 @@ function TalkThread({
                 )}
                 {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
-                {!mine && <ReplyCharts calls={turn.toolCalls} />}
+                {!mine && <ReplyCharts calls={turn.toolCalls} caption={turn.body} />}
                 {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
                 {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}

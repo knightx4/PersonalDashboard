@@ -278,6 +278,26 @@ export function axisNumber(value: number): string {
   return String(Number(value.toPrecision(3)));
 }
 
+/**
+ * Round steps for an axis from min to max: three to six ticks at 1, 2, 2.5
+ * or 5 times a power of ten, starting at or below min and ending at or above
+ * max, so a scale reads 0%, 0.5%, 1% rather than 0.65%, 1.3%.
+ */
+export function niceTicks(min: number, max: number): number[] {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 1];
+  if (min === max) {
+    const pad = Math.abs(min) || 1;
+    return niceTicks(min - pad / 2, max + pad / 2);
+  }
+  const rough = (max - min) / 4;
+  const power = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * power).find((s) => s >= rough) ?? 10 * power;
+  const first = Math.floor(min / step) * step;
+  const ticks: number[] = [];
+  for (let at = first; at < max + step * 0.999; at += step) ticks.push(Number(at.toPrecision(12)));
+  return ticks;
+}
+
 /** How a table is sorted: column -1 is the labels, 0 and on the series; null is the order it was sent in. */
 export type ChartSort = { column: number; direction: 'asc' | 'desc' } | null;
 
