@@ -55,6 +55,8 @@ export type SessionRequest = {
   summary: string | null;
   refs: HandoffRef[];
   subjectRef: string | null;
+  /** The bot marked it as needing a web browser (plan #3040.1). */
+  browserTask: boolean;
 };
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -85,7 +87,14 @@ export function sessionRequest(
     const note = text(row.note);
     refs.push(note ? { ref: toRef(table, ref), note } : { ref: toRef(table, ref) });
   }
-  return { ok: true, request: parsed.request, summary: summary || null, refs, subjectRef: parsed.subjectRef };
+  return {
+    ok: true,
+    request: parsed.request,
+    summary: summary || null,
+    refs,
+    subjectRef: parsed.subjectRef,
+    browserTask: args.browser === true,
+  };
 }
 
 /**
@@ -106,6 +115,7 @@ export function sessionHandoffInput(asker: SessionAsker, request: SessionRequest
     summary: request.summary,
     refs: [thread, ...request.refs.filter((r) => r.ref !== thread.ref)].slice(0, MAX_HANDOFF_REFS),
     subjectRef: request.subjectRef,
+    browserTask: request.browserTask,
   };
 }
 

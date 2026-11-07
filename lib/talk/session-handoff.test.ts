@@ -47,7 +47,19 @@ describe('sessionRequest', () => {
       summary: 'They want CSV.',
       refs: [{ ref: 'public.plan_items:p1', note: 'the feature' }],
       subjectRef: 'public.plan_items:p1',
+      browserTask: false,
     });
+  });
+
+  it('reads browser as a browser task only when it is true (plan #3040.1)', () => {
+    const read = (browser: unknown) => {
+      const parsed = sessionRequest({ request: 'Check the opening hours on their site', browser });
+      return parsed.ok && parsed.browserTask;
+    };
+    expect(read(true)).toBe(true);
+    expect(read(false)).toBe(false);
+    expect(read('yes')).toBe(false);
+    expect(read(undefined)).toBe(false);
   });
 
   it('refuses what Ask hand-off refuses', () => {
@@ -58,7 +70,13 @@ describe('sessionRequest', () => {
 
 describe('sessionHandoffInput', () => {
   it('puts the thread first among the refs, naming the bot and its link, and makes a valid row', () => {
-    const input = sessionHandoffInput(asker, { request: 'Add a step', summary: null, refs: [{ ref: 'public.plan_items:p1' }], subjectRef: null });
+    const input = sessionHandoffInput(asker, {
+      request: 'Add a step',
+      summary: null,
+      refs: [{ ref: 'public.plan_items:p1' }],
+      subjectRef: null,
+      browserTask: true,
+    });
     expect(input.refs).toEqual([
       { ref: `you.advisor_chats:${CHAT}`, note: 'The thread this was asked in, with Gert: /chat/people/gert' },
       { ref: 'public.plan_items:p1' },
@@ -70,6 +88,7 @@ describe('sessionHandoffInput', () => {
       advisor_chat_id: CHAT,
       asked: asker.asked,
       request_key: `you.advisor_chats:${CHAT}#${MESSAGE}`,
+      browser_task: true,
     });
   });
 });
