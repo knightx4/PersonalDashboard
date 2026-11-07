@@ -10,7 +10,6 @@ import { cn } from '@/lib/cn';
 import { SectionLabel } from '@/components/ui/section-heading';
 import {
   chartChange,
-  chartSeries,
   chartValue,
   isTrend,
   nextSort,
@@ -278,11 +277,8 @@ function Body({ chart, large = false }: { chart: DashChart; large?: boolean }) {
 /** What a caption names beside the title: the currency or unit every value is in. */
 function captionUnit(chart: DashChart): string | null {
   if (chart.kind === 'bar' || chart.kind === 'columns') return chart.currency ?? chart.unit;
-  if (isTrend(chart.kind)) {
-    const units = new Set(chartSeries(chart).map((s) => s.unit));
-    if (units.size === 1 && [...units][0]) return [...units][0];
-    return chart.currency ?? chart.unit;
-  }
+  // A series' own unit, such as %, is on the axis's ticks already.
+  if (isTrend(chart.kind)) return chart.currency ?? chart.unit;
   return null;
 }
 

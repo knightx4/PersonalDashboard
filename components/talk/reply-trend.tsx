@@ -69,6 +69,10 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
   });
   const percent = series.every((s) => s.unit === '%');
   const tick = (value: number) => (percent ? `${axisNumber(value)}%` : axisNumber(value));
+  // Wide enough for the longest tick, a minus sign and a % included, so none is clipped.
+  const values = data.flatMap((point) => keys.map((key) => point[key])).filter((v): v is number => typeof v === 'number');
+  const longest = Math.max(...[Math.min(...values), Math.max(...values)].map((v) => tick(v).length + 1));
+  const axisWidth = Math.max(36, 8 + longest * 7);
   const strength = (index: number) => (picked === null || picked === index ? 1 : 0.25);
   const many = series.length > 1;
 
@@ -88,7 +92,7 @@ export function ReplyTrend({ chart, large = false }: { chart: DashChart; large?:
         tick={AXIS_TICK}
         tickLine={false}
         axisLine={false}
-        width={44}
+        width={axisWidth}
         tickFormatter={tick}
         domain={chart.kind === 'area' ? [(min: number) => Math.min(0, min), 'auto'] : ['auto', 'auto']}
       />
