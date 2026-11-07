@@ -13258,7 +13258,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-activity',
-    label: 'Now · the Activity tab',
+    label: 'Jobs · Activity',
     module: 'jobs',
     width: 'wide',
     render: () => <JobsActivitySurface />,
