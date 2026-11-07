@@ -95,6 +95,17 @@ describe('the attachments store', () => {
     expect(byRef.has('todo.tasks:t1')).toBe(false);
   });
 
+  it('reads the files of a long chat in pieces, oldest first (plan #3050.3.2)', async () => {
+    const { client } = fakeClient();
+    const late = uploaded('1', 'late.png');
+    const early = uploaded('2', 'early.png');
+    await recordAttachments(client, USER, 'core.conversation_turns:t1', [early]);
+    await recordAttachments(client, USER, 'core.conversation_turns:t249', [late]);
+    const refs = Array.from({ length: 250 }, (_, i) => `core.conversation_turns:t${i}`);
+    const byRef = await listAttachments(client, refs);
+    expect([...byRef.keys()]).toEqual(['core.conversation_turns:t1', 'core.conversation_turns:t249']);
+  });
+
   it('records a file against a row once', async () => {
     const { client, rows } = fakeClient();
     const shot = uploaded('1', 'shot.png');

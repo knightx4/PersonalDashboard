@@ -81,7 +81,11 @@ export type TalkTurn = {
   /** Dash's turns in an `ask` conversation only; absent everywhere else. */
   toolCalls?: TalkToolCall[];
   citations?: TalkCitation[];
-  /** Files the person sent with this turn, in an `ask` conversation; absent when there are none. */
+  /**
+   * In an `ask` conversation, the files the person sent with this turn, or
+   * on an answer the files Dash's code made for it (plan #3050.3.2); absent
+   * when there are none.
+   */
   files?: TalkFile[];
   /** Their thumbs on one of Dash's answers (plan #2285.2); absent when unrated. */
   rating?: 'up' | 'down';

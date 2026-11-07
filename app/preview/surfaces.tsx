@@ -530,6 +530,7 @@ import {
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
 import {
   TalkThreadChartFullSurface,
+  TalkThreadMadeFilesSurface,
   TalkThreadChartsSurface,
   TalkThreadFilesSurface,
   TalkThreadSurface,
@@ -8997,6 +8998,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadChartFullSurface />,
+  },
+  {
+    /* Files Dash's code made (plan #3050.3.2): asked for the markets chart
+     * as an image and a PDF, the answer has the PNG under it as a picture
+     * that opens full size, the PDF as a chip with its name, and a last
+     * sentence naming the file that could not be kept. */
+    id: 'ask-dash-made-files',
+    label: 'Ask Dash · Files its code made under the answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadMadeFilesSurface />,
   },
   {
     /* A question with a bill's photo and PDF added (plan #1716): Dash reads
