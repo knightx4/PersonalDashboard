@@ -6,7 +6,18 @@ import type { AskContext } from '@/lib/ask/db';
 import { ReplyChart, ReplyCharts } from '@/components/talk/reply-chart';
 import { turnLookups } from './lookups';
 import { toTalkTurn } from './talk';
-import { CHART_TOOL, MAX_CHART_LABEL, MAX_CHART_ROWS, chartChange, chartColumns, chartValue, parseChart, turnCharts } from './chart';
+import {
+  CHART_TOOL,
+  MAX_CHART_LABEL,
+  MAX_CHART_ROWS,
+  chartChange,
+  chartColumns,
+  chartValue,
+  parseChart,
+  sortedRows,
+  tableHeadings,
+  turnCharts,
+} from './chart';
 
 const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ label: `Shop ${i + 1}`, value: (n - i) * 10 }));
 
@@ -221,5 +232,116 @@ describe('ReplyChart', () => {
     expect(html.match(/<li/g)).toHaveLength(3);
     expect(html).toContain('Jul: $276');
     expect(html).toContain('Target, <span class="tabular">$300');
+  });
+});
+
+describe('line and area charts with several series (plan #3050.2.1)', () => {
+  const MARKETS = {
+    kind: 'line',
+    title: 'The markets, 2 to 6 November',
+    unit: '%',
+    series: ['S&P 500', 'Nasdaq', 'Dow'],
+    rows: [
+      { label: 'Mon', values: [0, 0, 0] },
+      { label: 'Tue', values: [0.6, 0.9, 0.3] },
+      { label: 'Wed', values: [-0.4, -0.8, 0.1] },
+      { label: 'Thu', values: [0.9, 1.4, 0.5] },
+      { label: 'Fri', values: [1.3, 1.9, 0.8] },
+    ],
+  };
+
+  it('takes a line with a value per series on each row', () => {
+    const parsed = parseChart(MARKETS);
+    expect(parsed.ok && parsed.chart.series).toEqual(['S&P 500', 'Nasdaq', 'Dow']);
+    expect(parsed.ok && parsed.chart.rows[2]).toEqual({ label: 'Wed', value: -0.4, values: [-0.4, -0.8, 0.1] });
+  });
+
+  it('names the one series of a line sent with plain values', () => {
+    const parsed = parseChart({
+      kind: 'area',
+      title: 'Balance',
+      currency: 'USD',
+      rows: [
+        { label: '1 Nov', value: 10 },
+        { label: '2 Nov', value: 12 },
+      ],
+    });
+    expect(parsed.ok && parsed.chart.series).toEqual(['USD']);
+    expect(parsed.ok && parsed.chart.rows[1].values).toEqual([12]);
+  });
+
+  it('refuses a row whose values do not match the series, too many series, or series on a bar', () => {
+    const short = { ...MARKETS, rows: [{ label: 'Mon', values: [0, 0] }, ...MARKETS.rows.slice(1)] };
+    expect(expectError(short)).toMatch(/3 numbers, one for each of S&P 500, Nasdaq, Dow/);
+    expect(expectError({ ...MARKETS, series: ['A', 'B', 'C', 'D', 'E'] })).toMatch(/the most is 4/);
+    expect(expectError({ kind: 'bar', title: 'T', rows: rows(2), series: ['A'] })).toMatch(/Only a line, an area or a table/);
+    expect(expectError({ ...MARKETS, rows: MARKETS.rows.slice(0, 1) })).toMatch(/two or more points/);
+  });
+
+  it('takes a month of days on a line, and no more', () => {
+    const days = (n: number) => Array.from({ length: n }, (_, i) => ({ label: `${i + 1} Oct`, value: i }));
+    expect(parseChart({ kind: 'line', title: 'T', rows: days(31) }).ok).toBe(true);
+    expect(expectError({ kind: 'line', title: 'T', rows: days(32) })).toMatch(/the most is 31/);
+  });
+
+  it('draws the key, the open-full-screen button and the figures a screen reader hears', () => {
+    const parsed = parseChart(MARKETS);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const html = renderToStaticMarkup(createElement(ReplyChart, { chart: parsed.chart }));
+    for (const name of ['S&amp;P 500', 'Nasdaq', 'Dow']) expect(html).toContain(name);
+    expect(html).toContain('aria-label="Open full screen"');
+    expect(html).toContain('+1.9%');
+    expect(html).toContain('-0.8%');
+  });
+
+  it('draws a kept line again from the turn', () => {
+    const parsed = parseChart(MARKETS);
+    if (!parsed.ok) throw new Error(parsed.error);
+    const calls = [{ name: CHART_TOOL, input: MARKETS, result: { ok: true, chart: parsed.chart } }];
+    expect(turnCharts(calls)).toEqual([parsed.chart]);
+  });
+});
+
+describe('a table with series sorts by column (plan #3050.2.1)', () => {
+  const parsed = parseChart({
+    kind: 'table',
+    title: 'Roles by stage',
+    columns: ['Stage'],
+    series: ['Roles', 'Median days'],
+    rows: [
+      { label: 'Applied', values: [14, 9] },
+      { label: 'First interview', values: [3, 23] },
+      { label: 'Recruiter screen', values: [5, 14] },
+    ],
+  });
+  if (!parsed.ok) throw new Error(parsed.error);
+  const chart = parsed.chart;
+
+  it('heads the label column and one column per series', () => {
+    expect(tableHeadings(chart)).toEqual(['Stage', 'Roles', 'Median days']);
+  });
+
+  it('sorts by any column either way, and keeps the sent order with no sort', () => {
+    const labels = (sort: Parameters<typeof sortedRows>[1]) => sortedRows(chart, sort).map((row) => row.label);
+    expect(labels(null)).toEqual(['Applied', 'First interview', 'Recruiter screen']);
+    expect(labels({ column: 2, descending: true })).toEqual(['First interview', 'Recruiter screen', 'Applied']);
+    expect(labels({ column: 1, descending: false })).toEqual(['First interview', 'Recruiter screen', 'Applied']);
+    expect(labels({ column: 0, descending: true })).toEqual(['Recruiter screen', 'First interview', 'Applied']);
+  });
+
+  it('draws a sort button in every heading, and scrolls sideways', () => {
+    const html = renderToStaticMarkup(createElement(ReplyChart, { chart }));
+    expect(html.match(/aria-sort="none"/g)).toHaveLength(3);
+    expect(html).toContain('overflow-x-auto');
+    expect(html).toContain('Median days');
+  });
+
+  it('keeps an older two-column table as it was, sortable too', () => {
+    const old = parseChart({ kind: 'table', title: 'T', rows: rows(2), columns: ['Stage', 'Median days'] });
+    if (!old.ok) throw new Error(old.error);
+    expect(tableHeadings(old.chart)).toEqual(['Stage', 'Median days']);
+    const html = renderToStaticMarkup(createElement(ReplyChart, { chart: old.chart }));
+    expect(html).not.toContain('overflow-x-auto');
+    expect(html).not.toContain('Open full screen');
   });
 });

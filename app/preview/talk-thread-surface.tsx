@@ -2,6 +2,7 @@
 
 import { Thread, type TalkSend } from '@/components/thread/thread';
 import type { DashChart } from '@/lib/talk/chart';
+import { ReplyChart } from '@/components/talk/reply-chart';
 import { Card } from '@/components/ui/card';
 import { CostHint } from '@/components/ui/cost-hint';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
@@ -351,5 +352,111 @@ export function TalkThreadWaitingSurface() {
         </Card>
       </PageColumn>
     </AskDashProvider>
+  );
+}
+
+/** The week the markets chart covers, as the change since Monday's close, in percent. */
+const MARKETS: DashChart = {
+  kind: 'line',
+  title: 'The markets, 2 to 6 November 2026',
+  rows: [
+    { label: 'Mon 2', value: 0, values: [0, 0, 0] },
+    { label: 'Tue 3', value: 0.62, values: [0.62, 0.94, 0.31] },
+    { label: 'Wed 4', value: -0.41, values: [-0.41, -0.87, 0.12] },
+    { label: 'Thu 5', value: 0.88, values: [0.88, 1.42, 0.47] },
+    { label: 'Fri 6', value: 1.27, values: [1.27, 1.91, 0.78] },
+  ],
+  currency: null,
+  unit: '%',
+  columns: null,
+  reference: null,
+  series: ['S&P 500', 'Nasdaq Composite', 'Dow Jones'],
+};
+
+/** A month of a balance, the longest a line draws. */
+const BALANCE: DashChart = {
+  kind: 'area',
+  title: 'Current account balance, October 2026',
+  rows: Array.from({ length: 31 }, (_, i) => {
+    const value = 2400 + i * 38 - (i >= 25 ? 1450 : 0) - (i % 7 === 4 ? 120 : 0);
+    return { label: `${i + 1} Oct`, value, values: [value] };
+  }),
+  currency: 'USD',
+  unit: null,
+  columns: null,
+  reference: null,
+  series: ['USD'],
+};
+
+/** Roles by stage with three figures each, wider than a phone. */
+const STAGES: DashChart = {
+  kind: 'table',
+  title: 'Applications by stage, this year',
+  rows: [
+    { label: 'Applied', value: 41, values: [41, 9, 12] },
+    { label: 'Recruiter screen', value: 11, values: [11, 14, 6] },
+    { label: 'First interview', value: 7, values: [7, 23, 3] },
+    { label: 'Final round', value: 2, values: [2, 6, 1] },
+    { label: 'Offer', value: 1, values: [1, 4, 0] },
+  ],
+  currency: null,
+  unit: null,
+  columns: ['Stage', ''],
+  reference: null,
+  series: ['Roles', 'Median days waiting', 'No word in 30 days'],
+};
+
+const keep = (chart: DashChart): TalkToolCall => ({ name: 'show_chart', input: chart, result: { ok: true, chart } });
+
+const CHART_TURNS: TalkTurn[] = [
+  { id: 'c-q1', role: 'user', body: 'Can you show me a chart of the stock markets past week?', createdAt: at(12) },
+  {
+    id: 'c-a1',
+    role: 'assistant',
+    body: "All three ended the week higher. The Nasdaq led, finishing 1.9% above Monday's close despite the one down day on Wednesday, and the Dow gained least at 0.8%.",
+    createdAt: at(12),
+    toolCalls: [keep(MARKETS)],
+  },
+  { id: 'c-q2', role: 'user', body: 'How did my balance move last month?', createdAt: at(12, 10) },
+  {
+    id: 'c-a2',
+    role: 'assistant',
+    body: 'It climbed most of October, then fell by $1,450 on the 26th when the rent went out, to finish at $2,090.',
+    createdAt: at(12, 10),
+    toolCalls: [keep(BALANCE)],
+  },
+  { id: 'c-q3', role: 'user', body: 'Where are my applications stuck?', createdAt: at(12, 20) },
+  {
+    id: 'c-a3',
+    role: 'assistant',
+    body: 'First interviews wait longest, a median of 23 days, and three of the seven there have had no word in a month.',
+    createdAt: at(12, 20),
+    toolCalls: [keep(STAGES)],
+  },
+];
+
+/**
+ * Charts with several series (plan #3050.2.1): the markets over a week as
+ * three lines, a month's balance as an area, and a table of three figures a
+ * stage that sorts by any heading and, on a phone, scrolls sideways.
+ */
+export function TalkThreadChartsSurface() {
+  return (
+    <PageColumn className="py-4">
+      <Card padding="standard">
+        <Thread id="talk-thread-charts-preview" turns={CHART_TURNS} send={send} label="Ask a follow-up" placeholder="Ask more about this" />
+      </Card>
+    </PageColumn>
+  );
+}
+
+/** The markets chart opened full screen, with the tooltip held on Thursday (plan #3050.2.1). */
+export function TalkThreadChartFullSurface() {
+  return (
+    <PageColumn className="py-4">
+      <Card padding="standard">
+        <ReplyChart chart={MARKETS} startFull tipAt={3} />
+      </Card>
+    </PageColumn>
   );
 }

@@ -528,7 +528,13 @@ import {
   ChatTypingMomentSurface,
 } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
+import {
+  TalkThreadChartFullSurface,
+  TalkThreadChartsSurface,
+  TalkThreadFilesSurface,
+  TalkThreadSurface,
+  TalkThreadWaitingSurface,
+} from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
   FinancesSpendingCategoriesSurface,
@@ -8972,6 +8978,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadSurface />,
+  },
+  {
+    /* Charts with several series (plan #3050.2.1): the markets over a week
+     * as three lines, a month's balance as an area, and a table with three
+     * figures a row that sorts by any heading and scrolls sideways on a phone. */
+    id: 'ask-dash-charts',
+    label: 'Ask Dash · Lines, areas and a sortable table',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadChartsSurface />,
+  },
+  {
+    /* The markets chart opened full screen, its tooltip held on Thursday
+     * (plan #3050.2.1): the hidden parts of a line, drawn open. */
+    id: 'ask-dash-charts-full',
+    label: 'Ask Dash · A chart full screen',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadChartFullSurface />,
   },
   {
     /* A question with a bill's photo and PDF added (plan #1716): Dash reads

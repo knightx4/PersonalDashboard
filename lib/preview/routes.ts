@@ -419,6 +419,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-paid-declined': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-made-changes': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-thread': ['/chat/dash/[ref]'],
+  'ask-dash-charts': ['/chat/dash/[ref]'],
+  'ask-dash-charts-full': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
@@ -1124,7 +1126,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The one thread (plan #1964.3), with a subject or none: a change to it is
   // looked at here and on the dev-comment-thread surfaces, rather than on
   // every page that draws a thread.
-  'ask-dash-thread': ['components/thread/thread.tsx'],
+  'ask-dash-thread': ['components/thread/thread.tsx', 'components/talk/reply-chart.tsx'],
+  // The charts an answer draws (plan #3050.2.1): lines, areas, a sortable
+  // table, and a chart opened full screen with its tooltip showing.
+  'ask-dash-charts': ['components/talk/reply-chart.tsx'],
+  'ask-dash-charts-full': ['components/talk/reply-chart.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],
