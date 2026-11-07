@@ -73,3 +73,41 @@ on session hand-offs only:
   the bot can pass on.
 
 No passwords and no page contents are kept.
+
+## The wait for the PC or Mac, and a claim that goes quiet
+
+Plan #3040.4. A browser task is not started in the cloud when it is kept.
+`fireSessionHandoff` leaves a row with `browser_task` true pending, so the
+runner on the PC or the Mac can claim it (`core.claim_browser_task`,
+migration 0312) and do it in the person's own Chrome.
+
+Every minute pg_cron calls `/api/cron/browser-handoffs` (migration 0313,
+`inngest/core/browser-wait.ts`, rules in `lib/talk/browser-wait.ts`). One pass:
+
+1. Lets go of a claim whose computer has gone quiet.
+   `core.release_stale_browser_claims()` sets `claimed_by` and `claimed_at`
+   back to null on a pending browser task claimed over 5 minutes ago by a
+   computer whose last heartbeat in `core.browser_runners` is over 5 minutes
+   old, or which never sent one.
+2. Starts the cloud session on every browser task still pending and
+   unclaimed 3 minutes after it was kept (`BROWSER_WAIT_MS` in
+   lib/talk/handoff-fire.ts). The update that marks it fired also requires
+   `claimed_by is null`, so a computer that claims it in the meantime keeps
+   it and no cloud session starts.
+3. Says in the thread, as the bot that handed it on, that none of the
+   person's computers picked it up and that the cloud session can use public
+   pages only. If the cloud session will not start, the line says why
+   instead.
+
+A task let go in step 1 has already waited past the 3 minutes, so step 2
+starts it in the cloud on the same pass. It does not go back to the other
+computer first: a computer that died partway through a task may have left
+it half done, and the cloud session starting from the request is the
+predictable outcome.
+
+This puts one duty on the runner (#3040.6): it keeps calling
+`core.browser_runner_heartbeat` while it works a task, not only while idle.
+A runner that stops its heartbeat during a long task loses the task to the
+cloud 5 minutes later.
+
+Hand-offs that are not browser tasks start at once, as before.
