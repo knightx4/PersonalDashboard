@@ -1,5 +1,6 @@
-import { Chip, type ChipTone } from '@/components/ui/chip';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { whenDate, whenTime } from '@/lib/core/when';
 import {
   bytesWords,
@@ -8,11 +9,12 @@ import {
   type AppRouteRunStatus,
 } from '@/lib/dev/app-route-runs';
 
-const STATUS: Record<AppRouteRunStatus, { label: string; tone: ChipTone }> = {
-  running: { label: 'Running', tone: 'accent' },
-  ok: { label: 'Done', tone: 'positive' },
-  failed: { label: 'Failed', tone: 'danger' },
-  refused: { label: 'Refused', tone: 'caution' },
+/** A shape and plain words; colour only for the two states that need a look. */
+const STATUS: Record<AppRouteRunStatus, { label: string; glyph: GlyphName; tone: string }> = {
+  running: { label: 'Running', glyph: 'half', tone: 'text-ink' },
+  ok: { label: 'Done', glyph: 'check', tone: 'text-ink' },
+  failed: { label: 'Failed', glyph: 'cross', tone: 'text-danger' },
+  refused: { label: 'Refused', glyph: 'slash', tone: 'text-caution' },
 };
 
 /** In UTC, as the stored stamp is, so the server and the browser draw the same words. */
@@ -54,9 +56,9 @@ export function AppRouteRuns({ runs }: { runs: readonly AppRouteRunRow[] }) {
           const took = run.status === 'refused' ? null : tookWords(run.startedAt, run.endedAt);
           return (
             <TR key={run.id}>
-              <TD primary>
+              <TD primary className="max-md:px-0">
                 <div className="min-w-0">
-                  <span className="block break-all font-mono text-small">{run.path}</span>
+                  <span className="block break-words font-mono text-small">{run.path}</span>
                   {run.error && (
                     <span className="mt-0.5 block text-small font-normal text-ink-muted">
                       {run.error}
@@ -64,25 +66,26 @@ export function AppRouteRuns({ runs }: { runs: readonly AppRouteRunRow[] }) {
                   )}
                 </div>
               </TD>
-              <TD muted label="Asked by">
+              <TD muted label="Asked by" className="max-md:px-0 lg:max-w-80">
                 <span className="break-words">{run.askedBy}</span>
               </TD>
-              <TD muted label="Started">
+              <TD muted label="Started" className="max-md:px-0">
                 <span className="tabular whitespace-nowrap">{at(run.startedAt)}</span>
               </TD>
-              <TD muted label="Ended">
+              <TD muted label="Ended" className="max-md:px-0">
                 <span className="tabular whitespace-nowrap">
                   {run.endedAt ? at(run.endedAt) : '—'}
                   {took && ` (${took})`}
                 </span>
               </TD>
-              <TD label="Status">
-                <Chip tone={status.tone} size="sm">
+              <TD label="Status" className="max-md:px-0">
+                <span className={`tabular inline-flex items-center gap-1.5 whitespace-nowrap ${status.tone}`}>
+                  <StatusGlyph glyph={status.glyph} size={14} />
                   {status.label}
                   {run.httpStatus !== null && ` ${run.httpStatus}`}
-                </Chip>
+                </span>
               </TD>
-              <TD num muted label="Result">
+              <TD num muted label="Result" className="max-md:px-0">
                 {run.resultBytes === null ? '—' : bytesWords(run.resultBytes)}
               </TD>
             </TR>

@@ -114,7 +114,6 @@ export function DevSettingsView({
         {
           id: 'route-runs',
           title: 'App route runs',
-          hint: 'The app’s own cron routes that a session, Dash or a bot asked the server to run, newest first.',
           content: <AppRouteRuns runs={routeRuns} />,
         },
       ]}
