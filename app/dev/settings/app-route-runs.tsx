@@ -23,6 +23,20 @@ function at(iso: string): string {
   return `${whenDate(iso, zone)}, ${whenTime(iso, zone)}`;
 }
 
+/** How a run ended: its shape, its word and the HTTP status when there is one. */
+function RunStatus({ run, className = '' }: { run: AppRouteRunRow; className?: string }) {
+  const status = STATUS[run.status];
+  return (
+    <span
+      className={`tabular inline-flex items-center gap-1.5 whitespace-nowrap ${status.tone} ${className}`}
+    >
+      <StatusGlyph glyph={status.glyph} size={14} />
+      {status.label}
+      {run.httpStatus !== null && ` ${run.httpStatus}`}
+    </span>
+  );
+}
+
 /**
  * The runs of the app's own routes (plan #3070.4): who asked, which path, when
  * it started and ended, how it ended and how much it returned. Newest first.
@@ -52,13 +66,28 @@ export function AppRouteRuns({ runs }: { runs: readonly AppRouteRunRow[] }) {
       </THead>
       <TBody>
         {runs.map((run) => {
-          const status = STATUS[run.status];
           const took = run.status === 'refused' ? null : tookWords(run.startedAt, run.endedAt);
           return (
             <TR key={run.id}>
               <TD primary className="max-md:px-0">
-                <div className="min-w-0">
-                  <span className="block break-words font-mono text-small">{run.path}</span>
+                <div className="min-w-0 max-md:w-full">
+                  {/* On a phone the run is two lines, the path with how it
+                      ended, then who asked, when, how long and how much, in
+                      place of five labelled lines. */}
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0 break-words font-mono text-small">{run.path}</span>
+                    <RunStatus run={run} className="shrink-0 font-normal md:hidden" />
+                  </span>
+                  <span className="mt-0.5 block text-small font-normal text-ink-muted md:hidden">
+                    {[
+                      run.askedBy,
+                      at(run.startedAt),
+                      took,
+                      run.resultBytes === null ? null : bytesWords(run.resultBytes),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
                   {run.error && (
                     <span className="mt-0.5 block text-small font-normal text-ink-muted">
                       {run.error}
@@ -66,26 +95,22 @@ export function AppRouteRuns({ runs }: { runs: readonly AppRouteRunRow[] }) {
                   )}
                 </div>
               </TD>
-              <TD muted label="Asked by" className="max-md:px-0 lg:max-w-80">
+              <TD muted className="max-md:hidden lg:max-w-80">
                 <span className="break-words">{run.askedBy}</span>
               </TD>
-              <TD muted label="Started" className="max-md:px-0">
+              <TD muted className="max-md:hidden">
                 <span className="tabular whitespace-nowrap">{at(run.startedAt)}</span>
               </TD>
-              <TD muted label="Ended" className="max-md:px-0">
+              <TD muted className="max-md:hidden">
                 <span className="tabular whitespace-nowrap">
                   {run.endedAt ? at(run.endedAt) : '—'}
                   {took && ` (${took})`}
                 </span>
               </TD>
-              <TD label="Status" className="max-md:px-0">
-                <span className={`tabular inline-flex items-center gap-1.5 whitespace-nowrap ${status.tone}`}>
-                  <StatusGlyph glyph={status.glyph} size={14} />
-                  {status.label}
-                  {run.httpStatus !== null && ` ${run.httpStatus}`}
-                </span>
+              <TD className="max-md:hidden">
+                <RunStatus run={run} />
               </TD>
-              <TD num muted label="Result" className="max-md:px-0">
+              <TD num muted className="max-md:hidden">
                 {run.resultBytes === null ? '—' : bytesWords(run.resultBytes)}
               </TD>
             </TR>
