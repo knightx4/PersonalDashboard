@@ -491,6 +491,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-person-edit-photo-failed': ['/chat/bots/[key]'],
   'chat-person-edit-voice': ['/chat/bots/[key]'],
   'chat-person-edit-voice-picker': ['/chat/bots/[key]'],
+  'chat-person-edit-voice-picker-empty': ['/chat/bots/[key]'],
   'chat-person-edit-voice-gone': ['/chat/bots/[key]'],
   'chat-person-edit-voice-no-key': ['/chat/bots/[key]'],
   'chat-person-edit-versions': ['/chat/bots/[key]'],
