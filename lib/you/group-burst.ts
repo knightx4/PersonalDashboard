@@ -9,8 +9,11 @@ import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { loadGroup } from '@/lib/you/group-chats';
 import { loadCarryOver } from '@/lib/you/carry-over';
 import {
+  askOf,
   asksPerson,
+  BRIEF_RULES,
   BURST_REQUEST_MS,
+  burstFull,
   CHAIN_RESERVE_MS,
   cleanSpeech,
   DIRECTOR_MAX_TOKENS,
@@ -18,16 +21,19 @@ import {
   DIRECTOR_TOOL,
   directorPlanOf,
   directorPrompt,
+  isPass,
   MAX_REPLANS,
-  mentionedIn,
+  PASS_RULES,
   planReactions,
   planTurns,
+  quietestFirst,
   SPEAKER_MAX_TOKENS,
   SPEAKER_RULES,
   THREAD_READ,
   transcriptOf,
   turnPauseMs,
   WAIT,
+  type BurstAsk,
   type BurstLine,
   type BurstMember,
   type BurstState,
@@ -73,11 +79,17 @@ export type GroupSpendOperation = 'group-director' | 'group-speaker';
 /** The bot whose turn it is, with what it reads before writing. */
 export type Speaker = BurstMember & { system: string };
 
-export type DirectorInput = { members: (BurstMember & { card: string })[]; lines: BurstLine[]; transcript: string; state: BurstState };
+export type DirectorInput = { members: (BurstMember & { card: string })[]; lines: BurstLine[]; transcript: string; state: BurstState; ask?: BurstAsk };
 export type SpeakerInput = {
   speaker: Speaker;
   members: BurstMember[];
   transcript: string;
+  /**
+   * How this turn may go (plan #3080). `mayPass`: the bot may write only
+   * PASS_WORD, and nothing is posted. `brief`: the person asked several bots
+   * to answer, so it keeps to a sentence or two. Absent: neither.
+   */
+  turn?: { mayPass: boolean; brief: boolean };
   /** Starts a page for this speaker, answering the person's newest message (plan #2997). Absent: no make_page. */
   page?: (input: unknown) => Promise<AskToolResult>;
   /** Hands heavy work to a session for this speaker (plan #3005.2). Absent: no hand_off. */
@@ -461,6 +473,8 @@ export async function speakWithModel(
   const code = Boolean(input.made);
   const rules = [
     SPEAKER_RULES,
+    ...(input.turn?.brief ? [BRIEF_RULES] : []),
+    ...(input.turn?.mayPass ? [PASS_RULES] : []),
     code ? ATTACH_RULES : CHART_ONLY_RULES,
     ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
     ...(input.page ? [PAGE_RULES] : []),
@@ -578,22 +592,28 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
       const spent: Record<GroupSpendOperation, SpendReport[]> = { 'group-director': [], 'group-speaker': [] };
       const state: BurstState = { round: carriedRound ?? (spoken.length > 0 ? 1 : 0), spoken: [...spoken] };
       carriedRound = null;
-      const mentioned = mentionedIn(said, members);
+      const ask = askOf(said, members);
       const thread = [...lines];
       let interrupted = false;
       let over = false;
 
-      while (!over && !interrupted) {
+      while (!over && !interrupted && !burstFull(state, members.length, ask)) {
         const transcript = transcriptOf(thread, members, formerNames);
-        const plan = await direct({ members: withCards, lines: thread, transcript, state }, spent['group-director']);
+        const plan = await direct({ members: withCards, lines: thread, transcript, state, ask }, spent['group-director']);
         for (const r of planReactions(plan, thread, members)) {
           const { error } = await client
             .from('advisor_message_reactions')
             .upsert({ user_id: userId, message_id: r.messageId, advisor_id: r.advisorId, reaction: r.reaction }, { onConflict: 'message_id,advisor_id' });
           if (!error) outcome.reactions += 1;
         }
-        const turns = planTurns(plan, state, members, state.round === 0 ? mentioned : []);
+        const turns = planTurns(plan, state, members, state.round === 0 ? ask : undefined, ask.keepGoing ? quietestFirst(lines, members) : []);
         if (turns.length === 0) break;
+        // A bot the person spoke to answers and cannot pass; in a round where several were spoken to, a
+        // question to the person waits until the last of them has answered (plan #3080).
+        const asked = new Set(state.round === 0 ? [...ask.named, ...ask.addressed] : []);
+        const addressedRound = state.round === 0 && ask.addressed.length > 0;
+        const wroteBefore = state.spoken.length;
+        let askedPerson = false;
 
         for (const advisorId of turns) {
           if (now() > deadline - CHAIN_RESERVE_MS && input.chain) {
@@ -666,9 +686,13 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                 ...(passToBot ? { passToBot } : {}),
                 charts,
                 ...(input.keepFiles ? { made } : {}),
+                // Somebody answers the person: the first bot of the opening round does not pass.
+                turn: { mayPass: !asked.has(advisorId) && !(state.round === 0 && state.spoken.length === 0), brief: addressedRound },
               },
               spent['group-speaker'],
             );
+            // A pass is silent: nothing is posted, and the turn costs only the call (plan #3080).
+            if (text && isPass(text)) text = null;
             // A text that says a file is attached when nothing was sent says so after all (plan #3050.1).
             // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
             // A file its code made is said for once it is kept (plan #3050.3.3).
@@ -717,10 +741,16 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
             break;
           }
           if (text && asksPerson(text, advisorId, members)) {
+            if (addressedRound) {
+              askedPerson = true;
+              continue;
+            }
             over = true;
             break;
           }
         }
+        // A round where everyone picked passed has nothing new, and the group waits for the person.
+        if (askedPerson || (!interrupted && state.spoken.length === wroteBefore)) over = true;
         state.round += 1;
       }
 
