@@ -484,6 +484,25 @@ describe('replyToMentor', () => {
     expect(spent.map((s) => s.op).sort()).toEqual(['mentor-ack', 'mentor-reply']);
   });
 
+  it('keeps every bubble of a three-bubble reply whole when its first text runs long (plan #3067)', async () => {
+    const tables = world();
+    const ack =
+      "Better, but it's still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes. The interviewer wants a story.";
+    const { stub } = anthropicStub(['Tell the Ramp story.\n\n', 'Name the process you changed.\n\n', 'Then the number it moved.'], {
+      delayMs: 60,
+      ack,
+    });
+    await run(tables, stub, { ackAfterMs: 5 }).promise;
+    const rows = mentorRows(tables).map((m) => [m.kind, m.text]);
+    expect(rows).toEqual([
+      ['ack', "Better, but it's still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes."],
+      ['reply', 'Tell the Ramp story.'],
+      ['reply', 'Name the process you changed.'],
+      ['reply', 'Then the number it moved.'],
+    ]);
+    for (const [, text] of rows) expect(text).toMatch(/[.!?]$/);
+  });
+
   it('marks the chat failed, with the reason, when the reply cannot be written', async () => {
     const tables = world();
     const { stub } = anthropicStub([], { fail: true });
