@@ -381,19 +381,28 @@ export function bubbleVoice(state: SpeechState, key: string): BubbleVoice {
   return state.notes[key] === SPEAK_HELD_BACK ? 'blocked' : 'rest';
 }
 
+/**
+ * Where the switch is kept. Dash's chat and the one-on-one threads share one
+ * switch (`SPEAKING_KEY`); a group chat keeps its own under its id, so voice
+ * on in one group is not on in every chat (plan #3082).
+ */
+export function speakingKeyOf(scope?: string | null): string {
+  return scope ? `${SPEAKING_KEY}.${scope}` : SPEAKING_KEY;
+}
+
 /** Whether new replies play aloud in this browser; off until switched on. */
-export function readSpeaking(): boolean {
+export function readSpeaking(key: string = SPEAKING_KEY): boolean {
   try {
-    return window.localStorage.getItem(SPEAKING_KEY) === '1';
+    return window.localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
 
-export function rememberSpeaking(on: boolean): void {
+export function rememberSpeaking(on: boolean, key: string = SPEAKING_KEY): void {
   try {
-    if (on) window.localStorage.setItem(SPEAKING_KEY, '1');
-    else window.localStorage.removeItem(SPEAKING_KEY);
+    if (on) window.localStorage.setItem(key, '1');
+    else window.localStorage.removeItem(key);
   } catch {
     /* Storage blocked: the switch lasts until the page is left. */
   }
