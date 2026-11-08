@@ -734,7 +734,8 @@ async function firstText(
     );
     spent.push({ model: MODELS.mentorAck, usage: usageFrom(response.usage) });
     const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
-    return cleanAck(text);
+    // A first text stopped at its token cap ends part-way through; only its whole sentences are kept.
+    return cleanAck(text, response.stop_reason === 'max_tokens');
   } catch (error) {
     if (!signal.aborted) console.error('mentor first text failed', error);
     return null;
