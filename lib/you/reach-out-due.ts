@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { zoneDay } from '@/lib/core/when';
+import { goalRowsInView, type ChainItem, type CountsTowards } from '@/lib/goals/in-view';
 import { asText, listableSource, ownerColumn, viaTitle } from '@/lib/ask/list-rows';
 import { readableName, type Source } from '@/lib/sources/types';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
@@ -428,6 +430,80 @@ export async function readWatchRows(db: SchemaReader, userId: string, table: str
   });
 }
 
+/** How many rounds of parents the goal tree read climbs; goals sit a few levels deep at most. */
+const CHAIN_READS = 8;
+
+function chainItemOf(row: Record<string, unknown>): ChainItem {
+  return {
+    id: String(row.id ?? ''),
+    parentId: asText(row.parent_id),
+    level: String(row.level ?? ''),
+    status: String(row.status ?? ''),
+    activity: row.activity ?? null,
+    archivedAt: asText(row.archived_at),
+    startsOn: asText(row.starts_on),
+  };
+}
+
+/**
+ * The goals.items rows a text may name: none from a passive goal, a goal not
+ * open, or a step set aside until a later day (lib/goals/in-view.ts, plan
+ * #3069). Reads each row's chain of parents, and the goals a step also
+ * counts towards with theirs, all scoped to the person. Rows of any other
+ * table pass through.
+ */
+export async function keepGoalRowsInView(
+  db: SchemaReader,
+  userId: string,
+  rows: readonly CandidateRow[],
+  today: string,
+): Promise<CandidateRow[]> {
+  const steps = rows.filter((r) => r.table === 'goals.items');
+  if (steps.length === 0) return [...rows];
+  const goals = db('goals');
+  const items = new Map<string, ChainItem>();
+  const readItems = async (ids: Iterable<string>) => {
+    let wanted = [...new Set(ids)].filter((id) => !items.has(id));
+    for (let round = 0; wanted.length > 0 && round < CHAIN_READS; round += 1) {
+      const { data, error } = await goals
+        .from('items')
+        .select('id, parent_id, level, status, activity, archived_at, starts_on')
+        .eq('user_id', userId)
+        .in('id', wanted);
+      if (error) throw new Error(`goals.items: ${error.message}`);
+      for (const row of (data ?? []) as Record<string, unknown>[]) {
+        const item = chainItemOf(row);
+        if (item.id) items.set(item.id, item);
+      }
+      wanted = [
+        ...new Set(
+          wanted.flatMap((id) => {
+            const parent = items.get(id)?.parentId;
+            return parent && !items.has(parent) ? [parent] : [];
+          }),
+        ),
+      ];
+    }
+  };
+  const ids = steps.map((r) => r.ref);
+  await readItems(ids);
+  const { data: links, error } = await goals
+    .from('item_goals')
+    .select('item_id, goal_id')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .in('item_id', ids);
+  if (error) throw new Error(`goals.item_goals: ${error.message}`);
+  const countsTowards: CountsTowards[] = ((links ?? []) as Record<string, unknown>[]).flatMap((l) => {
+    const itemId = asText(l.item_id);
+    const goalId = asText(l.goal_id);
+    return itemId && goalId ? [{ itemId, goalId }] : [];
+  });
+  await readItems(countsTowards.map((l) => l.goalId));
+  const keep = new Set(goalRowsInView({ ids, items: [...items.values()], countsTowards, today }));
+  return rows.filter((r) => r.table !== 'goals.items' || keep.has(r.ref));
+}
+
 /** The person's zone from their settings, UTC when none is kept or it cannot be read. */
 async function readTimezone(db: SchemaReader, userId: string): Promise<string> {
   try {
@@ -471,7 +547,9 @@ export async function loadReachOutDue(input: {
       const rows: CandidateRow[] = [];
       if (watch.kind) {
         try {
-          rows.push(...(await readKindRows(watch, { db, userId, since: clock.since, now, timezone })));
+          const read = await readKindRows(watch, { db, userId, since: clock.since, now, timezone });
+          // A stalled goal that is passive asks for nothing either (plan #3069).
+          rows.push(...(read.some((r) => r.table === 'goals.items') ? await keepGoalRowsInView(db, userId, read, zoneDay(new Date(now), await timezone())) : read));
         } catch (error) {
           // An unreadable kind gives this watch nothing to say today.
           console.error(`reach-out: ${watch.kind} could not be read`, error instanceof Error ? error.message : error);
@@ -479,7 +557,9 @@ export async function loadReachOutDue(input: {
       }
       for (const table of watch.kind ? [] : watch.tables) {
         try {
-          rows.push(...(await readWatchRows(db, userId, table, clock.since)));
+          const read = await readWatchRows(db, userId, table, clock.since);
+          // A passive goal's steps stay on the Goals page (plan #3069).
+          rows.push(...(table === 'goals.items' ? await keepGoalRowsInView(db, userId, read, zoneDay(new Date(now), await timezone())) : read));
         } catch {
           // An unreadable table gives this watch nothing to say today.
         }
