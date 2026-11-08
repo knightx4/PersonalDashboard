@@ -6,6 +6,7 @@ import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-loo
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { DIRECT_ASKED_RULES, DIRECT_RULES } from '@/lib/you/group-direct-message';
 import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import {
   groupCaps,
@@ -622,6 +623,18 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     expect(said).toBe('Passed to Maya.');
   });
 
+  it('offers message_person_directly with its rules (plan #3083), and the asked line only to a bot that was asked', async () => {
+    const { anthropic, sent } = scripted([text('Sure.'), text('Sure.')]);
+    const direct = vi.fn(async () => ({ ok: true as const, rows: [] }));
+    await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, direct, turn: { mayPass: false, brief: false, direct: true } }, []);
+    await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, direct }, []);
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['message_person_directly']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(DIRECT_RULES);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(DIRECT_ASKED_RULES);
+    expect(sent[1].system.map((b) => b.text).join('\n')).toContain(DIRECT_RULES);
+    expect(sent[1].system.map((b) => b.text).join('\n')).not.toContain(DIRECT_ASKED_RULES);
+  });
+
   it('sends no tools when there is no way to look places up', async () => {
     const { anthropic, sent } = scripted([text('Try the noodle place.')]);
     expect(await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [])).toBe('Try the noodle place.');
@@ -693,4 +706,84 @@ describe('what a bot heard in its other chats (plan #2983)', () => {
     expect(system).not.toContain('keep this between us');
     expect(system).not.toContain('what do you think I should cook');
   });
+});
+
+describe('a bot messaging the person in its own chat (plan #3083)', () => {
+  const pickAll = async (input: DirectorInput): Promise<DirectorPlan> =>
+    input.state.round === 0
+      ? { wait: false, picks: input.members.slice(0, 3).map((m) => ({ key: m.key, why: 'answer' as const })), reactions: [] }
+      : { wait: true, picks: [], reactions: [] };
+
+  it('sends the asked bot\'s message to its chat, leaves a short line with a link in the group, and the others still answer', async () => {
+    const { client, tables } = group('Ada can you message me individually to tell me more about your Cornell cafeteria situation. Anyone else, thoughts on what Ada is saying?', 3);
+    const messageDirectly = vi.fn(async () => ({ ok: true as const, directChatId: 'dm-ada' }));
+    const turns: { key: string; turn: SpeakerInput['turn'] }[] = [];
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly,
+      speak: async (input) => {
+        turns.push({ key: input.speaker.key, turn: input.turn });
+        if (input.speaker.key !== 'ada') return `${input.speaker.name} thinks the cafeteria sounds rough.`;
+        expect(input.direct).toBeDefined();
+        const result = await input.direct!({ ask: 'the full Cornell cafeteria story' });
+        expect(result.ok && result.note).toContain('Sent');
+        // A bot that tells the story here anyway is cut back to the pointer.
+        return 'So it started in 2019 when the dining hall closed.\n\nThen the whole floor ate cereal for a month and the dean got involved, which was its own saga.';
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-ben', 'id-cy']);
+    expect(said[0].text).toBe('Sent you the full thing in our chat.');
+    expect(said[0].receipts).toEqual([{ label: 'Open your chat with Ada', link: '/chat/people/ada' }]);
+    expect(said[1].receipts).toBeUndefined();
+    expect(turns.map((t) => [t.key, t.turn?.direct])).toEqual([['ada', true], ['ben', false], ['cy', false]]);
+    expect(messageDirectly).toHaveBeenCalledTimes(1);
+    const [asker] = messageDirectly.mock.calls[0] as unknown as [{ bot: { key: string }; chatId: string; said: string; transcript: string }];
+    expect(asker.bot.key).toBe('ada');
+    expect(asker.chatId).toBe(CHAT);
+    expect(asker.said).toContain('message me individually');
+    expect(asker.transcript).toContain('The person:');
+  });
+
+  it('sends one message per bot when several are asked, and a second call in one turn sends nothing more', async () => {
+    const { client, tables } = group('Ada and Ben, DM me your takes', 3);
+    const messageDirectly = vi.fn(async () => ({ ok: true as const, directChatId: 'dm' }));
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly,
+      speak: async (input) => {
+        await input.direct!({ ask: 'your take' });
+        const again = await input.direct!({ ask: 'your take' });
+        expect(again.ok && again.note).toContain('Already sent');
+        return 'Sent you my take in our chat.';
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-ben']);
+    expect(said.map((m) => m.text)).toEqual(['Sent you my take in our chat.', 'Sent you my take in our chat.']);
+    expect(messageDirectly).toHaveBeenCalledTimes(2);
+  });
+
+  it('says in the group that it was not sent when the message fails, with no link', async () => {
+    const { client, tables } = group('Ada, text me privately about it', 3);
+    let told = '';
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly: async () => ({ ok: false as const, error: 'your chat with them could not be opened.' }),
+      speak: async (input) => {
+        if (input.speaker.key !== 'ada') return PASS_WORD;
+        const result = await input.direct!({ ask: 'it' });
+        told = result.ok ? (result.note ?? '') : '';
+        return 'I could not get it into our chat just now, sorry.';
+      },
+    });
+    expect(told).toContain('It was not sent: your chat with them could not be opened.');
+    const said = botMessages(tables);
+    expect(said.map((m) => m.text)).toEqual(['I could not get it into our chat just now, sorry.']);
+    expect(said[0].receipts).toBeUndefined();
+  });
+
 });

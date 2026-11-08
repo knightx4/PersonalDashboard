@@ -348,6 +348,8 @@ Waiting for the person is the default. Pick a bot only when it has something of 
 
 When the person names a bot, that bot answers. When the person speaks to everyone or names several bots, every one of them answers once: list them all in speakers, in an order where each can add something the one before did not. When the person asks the group to keep going, pick one or two bots who can carry the conversation on with something new.
 
+When the person asks a bot to message them individually or privately ("Richard, DM me about it"), that bot still takes its turn here: it sends the message to its own chat from its turn and leaves a short line in the group. Whatever else the message asks ("anyone else, thoughts?") is answered by the others as usual.
+
 After bots have spoken, look again. A bot may answer another bot only when it was asked a direct question, disagrees with what was said, or has to correct a mistake; say which in why. Otherwise wait. If a bot asked the person something, wait.
 
 Answer only through plan_turns.`;
