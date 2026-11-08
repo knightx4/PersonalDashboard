@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUBBLE_GAP_MS, bubbleVoice, createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
+import {
+  BUBBLE_GAP_MS,
+  bubbleVoice,
+  createSpeechPlayer,
+  pillShows,
+  SPEAK_HELD_BACK,
+  SPEAK_UNREACHABLE,
+  type SpeechAudio,
+  type SpeechFailure,
+} from './player';
 
 function audioResponse() {
   return new Response(new Blob(['mp3'], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
@@ -273,5 +282,91 @@ describe('bubbleVoice (plan #3043)', () => {
     expect(bubbleVoice(player.get(), 'a')).toBe('playing');
     player.stop();
     expect(bubbleVoice(player.get(), 'a')).toBe('rest');
+  });
+});
+
+describe('playing means sounding (plan #3068)', () => {
+  function reporting(responses: (() => Promise<Response>)[], play: () => Promise<void> = async () => {}) {
+    const failures: SpeechFailure[] = [];
+    const audios: SpeechAudio[] = [];
+    const player = createSpeechPlayer({
+      wait: async () => {},
+      fetch: () => (responses.shift() ?? (() => Promise.resolve(audioResponse())))(),
+      audio: () => {
+        const audio: SpeechAudio = { play: vi.fn(play), pause: vi.fn(), onended: null, onerror: null };
+        audios.push(audio);
+        return { audio, release: () => {} };
+      },
+      report: (failure) => failures.push(failure),
+    });
+    return { player, failures, audios };
+  }
+
+  it('keeps the pill down until the audio says it sounds', async () => {
+    let sound: () => void = () => {};
+    const { player } = reporting([], () => new Promise<void>((resolve) => (sound = resolve)));
+    player.play('a', 'Hello.');
+    await settle();
+    expect(player.get().phase).toBe('loading');
+    expect(pillShows(player.get())).toBe(false);
+    sound();
+    await settle();
+    expect(player.get().phase).toBe('playing');
+    expect(pillShows(player.get())).toBe(true);
+  });
+
+  it('keeps the pill up between the bubbles of a run once one has sounded, and down when the run ends', async () => {
+    const { player, audios } = reporting([]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    audios[0].onended?.();
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'loading' });
+    expect(pillShows(player.get())).toBe(true);
+    await settle();
+    audios[1].onended?.();
+    expect(pillShows(player.get())).toBe(false);
+  });
+
+  it('never shows the pill for a reply the browser held back, and logs the error name', async () => {
+    const held = Object.assign(new Error('StalledError: the clock did not move'), { name: 'StalledError' });
+    const { player, failures } = reporting([], () => Promise.reject(held));
+    player.play('a', 'Hello.');
+    await settle();
+    expect(pillShows(player.get())).toBe(false);
+    expect(player.get().notes.a).toBe(SPEAK_HELD_BACK);
+    expect(failures).toEqual([{ stage: 'play', key: 'a', name: 'StalledError', message: 'StalledError: the clock did not move' }]);
+  });
+
+  it("logs the route's status and why when voice is paused or not set up", async () => {
+    const { player, failures } = reporting([() => Promise.resolve(refusal(429, 'paused', 'Voice is paused until next month.'))]);
+    player.play('a', 'Hello.');
+    await settle();
+    await settle();
+    expect(player.get().notes.a).toBe('Voice is paused until next month.');
+    expect(failures).toEqual([{ stage: 'fetch', key: 'a', status: 429, why: 'paused' }]);
+  });
+
+  it('counts an empty body as not read aloud', async () => {
+    const empty = () => Promise.resolve(new Response(new Blob([], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    const { player, failures, audios } = reporting([empty]);
+    player.play('a', 'Hello.');
+    await settle();
+    await settle();
+    expect(audios).toHaveLength(0);
+    expect(player.get().notes.a).toBe(SPEAK_UNREACHABLE);
+    expect(failures[0]).toMatchObject({ stage: 'fetch', why: 'empty body' });
+  });
+
+  it('shows the play press when the sound stops part way, and reads the next bubble', async () => {
+    const { player, failures, audios } = reporting([]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    audios[0].onerror?.(true);
+    expect(player.get().notes.a).toBe(SPEAK_HELD_BACK);
+    expect(failures).toEqual([{ stage: 'playback', key: 'a', name: 'Interrupted' }]);
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
   });
 });

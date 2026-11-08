@@ -27,6 +27,19 @@
  * locked, say) while the element is still open: each swaps in its own src.
  * A clip that neither can play throws, and the player falls back to the play
  * press. The silent clip is built here and never asks /api/speak for anything.
+ *
+ * A clip counts as playing only once its clock moves (plan #3068): the
+ * context's currentTime after the source starts, or the element's
+ * currentTime after its `playing` event. iPhone Safari can report a context
+ * as running while nothing renders, and then a started source never ends
+ * and the chat said "speaking" over silence. A context whose clock stays
+ * still for STALL_MS is marked stalled and the clip, and every clip after it
+ * on this page, goes through the element a press opened; with no open
+ * element the clip throws and the player shows the play press. A clip that
+ * stops sounding part way (a call, another app taking the sound) calls its
+ * `onerror` with `held`, which shows the same press. Each such failure is
+ * handed to the reporter `onSpeechFailure` sets, with what the context and
+ * the element were doing, so a silent phone can be read about afterwards.
  */
 
 import type { SpeechAudio } from './player';
@@ -41,6 +54,12 @@ const QUIET_AFTER_S = 1.5;
 const RESUME_WAIT_MS = 1500;
 /** How long an <audio> element is given to buffer before it plays anyway. */
 const BUFFER_WAIT_MS = 6000;
+/** How long a started clip's clock is given to move before the clip counts as silent. */
+const STALL_MS = 1500;
+/** How often a clip's clock is read while it is checked. */
+const POLL_MS = 50;
+/** How often a sounding clip's clock is read for a stop part way. */
+const WATCH_MS = 500;
 
 type AudioContextCtor = new () => AudioContext;
 
@@ -55,6 +74,69 @@ let opening = false;
 let elementOwner: object | null = null;
 /** When, on the context's clock, the last clip stops sounding. */
 let soundingUntil = Number.NEGATIVE_INFINITY;
+/** Whether the context said it was running while its clock stood still; the element plays from then on. */
+let contextStalled = false;
+
+/** One thing that kept a clip from sounding, for the log. */
+export type SpeechOutputFailure = { stage: string; name: string; message: string };
+
+let reporter: ((failure: SpeechOutputFailure) => void) | null = null;
+
+/** Where failures the player never hears of (a stall the element covered, an unlock refused) are sent. */
+export function onSpeechFailure(report: ((failure: SpeechOutputFailure) => void) | null): void {
+  reporter = report;
+}
+
+function report(stage: string, name: string, message: string) {
+  try {
+    reporter?.({ stage, name, message });
+  } catch {
+    /* The log never stops the sound. */
+  }
+}
+
+/** An error whose name the player logs: NotAllowedError, StalledError. The message starts with the name. */
+function failure(name: string, why: string): Error {
+  const error = new Error(`${name}: ${why}`);
+  error.name = name;
+  return error;
+}
+
+/** What the sound is doing now, for a failure's log line. */
+export function speechOutputState(): Record<string, string | boolean | number | null> {
+  let session: string | null = null;
+  try {
+    session = (navigator as unknown as { audioSession?: { type: string; state?: string } }).audioSession?.type ?? null;
+  } catch {
+    session = null;
+  }
+  return {
+    context: context?.state ?? null,
+    contextStalled,
+    elementOpen,
+    elementPaused: element ? element.paused : null,
+    elementReady: element ? element.readyState : null,
+    audioSession: session,
+  };
+}
+
+/**
+ * Resolves true once `read` moves past where it was, or once `settled` says
+ * the clip was stopped or has ended; false when STALL_MS passes first.
+ */
+function clockMoves(read: () => number, settled: () => boolean, ready: () => boolean = () => true): Promise<boolean> {
+  const from = read();
+  const begun = Date.now();
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (settled()) return resolve(true);
+      if (ready() && read() > from) return resolve(true);
+      if (Date.now() - begun >= STALL_MS) return resolve(false);
+      setTimeout(tick, POLL_MS);
+    };
+    tick();
+  });
+}
 
 function theContext(): AudioContext | null {
   if (context) return context;
@@ -84,29 +166,32 @@ function theElement(): HTMLAudioElement | null {
   return element;
 }
 
-/** A tenth of a second of silence as a WAV, made here so opening the sound costs no request. */
+/**
+ * A tenth of a second of silence as a 16-bit WAV at 22,050 a second, a rate
+ * and depth every Safari plays, made here so opening the sound costs no
+ * request.
+ */
 export function silentClip(): string {
-  const rate = 8000;
-  const samples = rate / 10;
-  const bytes = new Uint8Array(44 + samples);
+  const rate = 22050;
+  const samples = Math.round(rate / 10);
+  const bytes = new Uint8Array(44 + samples * 2);
   const view = new DataView(bytes.buffer);
   const text = (at: number, word: string) => {
     for (let i = 0; i < word.length; i += 1) bytes[at + i] = word.charCodeAt(i);
   };
   text(0, 'RIFF');
-  view.setUint32(4, 36 + samples, true);
+  view.setUint32(4, 36 + samples * 2, true);
   text(8, 'WAVE');
   text(12, 'fmt ');
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true); // PCM
   view.setUint16(22, 1, true); // mono
   view.setUint32(24, rate, true);
-  view.setUint32(28, rate, true); // bytes a second at one byte a sample
-  view.setUint16(32, 1, true);
-  view.setUint16(34, 8, true);
+  view.setUint32(28, rate * 2, true); // bytes a second at two bytes a sample
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
   text(36, 'data');
-  view.setUint32(40, samples, true);
-  bytes.fill(128, 44); // 8-bit silence sits at the midpoint
+  view.setUint32(40, samples * 2, true); // 16-bit silence is zero, as the array starts
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return `data:audio/wav;base64,${btoa(binary)}`;
@@ -125,8 +210,9 @@ function openElement() {
   let played: Promise<void> | undefined;
   try {
     played = el.play();
-  } catch {
+  } catch (error) {
     opening = false;
+    report('unlock', errorName(error), errorMessage(error));
     return;
   }
   void Promise.resolve(played).then(
@@ -135,10 +221,19 @@ function openElement() {
       elementOpen = true;
       if (!elementOwner) el.pause();
     },
-    () => {
+    (error: unknown) => {
       opening = false;
+      report('unlock', errorName(error), errorMessage(error));
     },
   );
+}
+
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Whether a press has opened the sound for replies that arrive later. */
@@ -231,20 +326,38 @@ function canPlayThrough(element: HTMLAudioElement): Promise<void> {
  */
 function throughElement(src: string, audio: SpeechAudio, owner: object, isStopped: () => boolean): Promise<void> {
   const el = theElement();
-  if (!el) return Promise.reject(new Error('NotAllowedError'));
+  if (!el) return Promise.reject(failure('NotAllowedError', 'there is no audio element'));
   elementOwner = owner;
+  let sawPlaying = false;
+  /** Set before the element is paused here, so only Safari's own pause counts as a stop part way. */
+  let pausedHere = false;
+  const gone = () => isStopped() || elementOwner !== owner;
   el.onended = () => {
     if (elementOwner === owner) audio.onended?.();
   };
   el.onerror = () => {
     if (elementOwner === owner) audio.onerror?.();
   };
+  el.onplaying = () => {
+    if (elementOwner === owner) sawPlaying = true;
+  };
+  el.onpause = null;
   el.src = src;
-  return canPlayThrough(el).then(() => {
-    if (isStopped() || elementOwner !== owner) return;
-    return el.play().then(() => {
-      elementOpen = true;
-    });
+  return canPlayThrough(el).then(async () => {
+    if (gone()) return;
+    await el.play();
+    elementOpen = true;
+    // Safari pauses the element itself when a call or another app takes the sound.
+    el.onpause = () => {
+      if (pausedHere || gone() || el.ended) return;
+      report('playback', 'Interrupted', 'the audio element was paused part way');
+      audio.onerror?.(true);
+    };
+    const moving = await clockMoves(() => el.currentTime, () => gone() || el.ended, () => sawPlaying && !el.paused);
+    if (gone() || moving) return;
+    pausedHere = true;
+    el.pause();
+    throw failure('StalledError', `the audio element played but ${sawPlaying ? 'its time did not move' : 'never said it was playing'} (ready ${el.readyState})`);
   });
 }
 
@@ -258,6 +371,8 @@ function releaseElement(owner: object) {
   elementOwner = null;
   element.onended = null;
   element.onerror = null;
+  element.onplaying = null;
+  element.onpause = null;
   element.pause();
   element.removeAttribute('src');
 }
@@ -283,7 +398,42 @@ export function clipOf(blob: Blob): { audio: SpeechAudio; release: () => void } 
   let source: AudioBufferSourceNode | null = null;
   let url: string | null = null;
   let stopped = false;
+  let watch: ReturnType<typeof setInterval> | null = null;
   const owner = {};
+
+  const unwatch = () => {
+    if (watch) clearInterval(watch);
+    watch = null;
+  };
+
+  const hush = (node: AudioBufferSourceNode, ctx: AudioContext) => {
+    try {
+      node.stop();
+    } catch {
+      /* Already stopped. */
+    }
+    node.disconnect();
+    if (source === node) source = null;
+    soundingUntil = Math.min(soundingUntil, ctx.currentTime);
+  };
+
+  /** Reads the context's clock while the clip sounds, for a context Safari stops part way. */
+  const watchClock = (ctx: AudioContext, node: AudioBufferSourceNode) => {
+    let last = ctx.currentTime;
+    let still = 0;
+    watch = setInterval(() => {
+      if (stopped || source !== node) return unwatch();
+      const nowAt = ctx.currentTime;
+      still = nowAt > last ? 0 : still + WATCH_MS;
+      last = nowAt;
+      if (ctx.state === 'running' && still < STALL_MS) return;
+      unwatch();
+      contextStalled = true;
+      report('playback', 'Interrupted', `the audio context went ${ctx.state} part way through a clip`);
+      hush(node, ctx);
+      audio.onerror?.(true);
+    }, WATCH_MS);
+  };
 
   const viaElement = () => {
     url ??= URL.createObjectURL(blob);
@@ -296,12 +446,12 @@ export function clipOf(blob: Blob): { audio: SpeechAudio; release: () => void } 
     play: async () => {
       const ctx = theContext();
       if (!ctx) return viaElement();
-      if (ctx.state !== 'running' && elementOpen) {
-        // Safari shut the context (the phone was locked, another app took the sound) but the element a press opened still plays.
-        void ctx.resume().catch(() => {});
+      if ((ctx.state !== 'running' || contextStalled) && elementOpen) {
+        // Safari shut the context (the phone was locked, another app took the sound), or ran it in silence, but the element a press opened still plays.
+        if (ctx.state !== 'running') void ctx.resume().catch(() => {});
         return viaElement();
       }
-      if (!(await running(ctx))) throw new Error('NotAllowedError');
+      if (!(await running(ctx))) throw failure('NotAllowedError', `the audio context stayed ${ctx.state}`);
       let buffer: AudioBuffer;
       try {
         buffer = await decode(ctx, await blob.arrayBuffer());
@@ -312,17 +462,36 @@ export function clipOf(blob: Blob): { audio: SpeechAudio; release: () => void } 
       const node = ctx.createBufferSource();
       node.buffer = buffer;
       node.connect(ctx.destination);
+      let ended = false;
       node.onended = () => {
-        if (!stopped) audio.onended?.();
+        ended = true;
+        unwatch();
+        if (!stopped && source === node) audio.onended?.();
       };
       const quiet = ctx.currentTime > soundingUntil + QUIET_AFTER_S;
       const at = ctx.currentTime + (quiet ? WAKE_LEAD_S : NEXT_LEAD_S);
       node.start(at);
       soundingUntil = at + buffer.duration;
       source = node;
+      // Running is not sounding: on iPhone the clock is the only sign the context renders.
+      const moving = await clockMoves(() => ctx.currentTime, () => stopped || ended);
+      if (stopped || ended) return;
+      if (moving) {
+        watchClock(ctx, node);
+        return;
+      }
+      contextStalled = true;
+      hush(node, ctx);
+      const why = `the audio context said ${ctx.state} but its clock did not move`;
+      if (elementOpen) {
+        report('play', 'StalledError', `${why}; playing through the element`);
+        return viaElement();
+      }
+      throw failure('StalledError', why);
     },
     pause: () => {
       stopped = true;
+      unwatch();
       if (source) {
         try {
           source.stop();
@@ -339,6 +508,7 @@ export function clipOf(blob: Blob): { audio: SpeechAudio; release: () => void } 
   return {
     audio,
     release: () => {
+      unwatch();
       source?.disconnect();
       source = null;
       releaseElement(owner);
