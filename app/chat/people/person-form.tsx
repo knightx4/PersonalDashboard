@@ -42,7 +42,7 @@ import {
 import { ReachOutSection } from './reach-out-section';
 import { BotPhotoField, type BotPhotoActions } from './bot-photo-field';
 import { BotVoiceField, type BotVoiceActions, type VoiceStatus } from './bot-voice-field';
-import type { VoiceList } from '@/lib/talk/speech/voices-model';
+import type { VoicePickerFixture } from './voice-picker';
 
 /**
  * Adding a bot, or editing one already there (plan #2748.11), on Chat's Bots
@@ -161,7 +161,7 @@ export function PersonForm({
   /** For the gallery: the voice picker open. */
   voiceOpen?: boolean;
   /** For the gallery: the voices the picker lists. */
-  voiceList?: VoiceList | null;
+  voiceList?: VoicePickerFixture | null;
 }) {
   const router = useRouter();
   const adding = !card.id;
