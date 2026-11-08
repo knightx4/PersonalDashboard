@@ -53,7 +53,7 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # A title line, a blank line, then what the idea
                                                # is, where it came from and why it would be
                                                # useful: a bare title is refused
-npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then name=value ...]]
+npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then [name=value ...]]]
                                                # run one of the app's own cron routes through the app, which
                                                # holds CRON_SECRET. Use this instead of raising for the secret.
                                                # Only /api/cron/<name> on the app's own domain; anything else is
@@ -100,8 +100,8 @@ One line takes seconds and is how the next builder is spared it
 to call one of the app's cron routes (`/api/cron/broker-wake-test?start=1`, an
 `area-check` pass) runs `plan.ts run-route /api/cron/<name>`, which asks the app
 to make the call with the secret attached on its side and prints the JSON. Add
-`--until <field>` to call again until that field is true (`--then` sets the query
-for the later calls). Never write a setup step or a raise asking the person for
+`--until <field>` to call again until that field is true (`--then name=value` sets the query
+for the later calls; a bare `--then` makes them empty). Never write a setup step or a raise asking the person for
 CRON_SECRET, and never try to read it. The command needs the same
 `SUPABASE_SERVICE_ROLE_KEY` as the rest of `plan.ts`, and only
 `/api/cron/<name>` paths run; another path or host is refused. When the app

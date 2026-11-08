@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppRouteStore } from '@/lib/dev/app-route';
 import { handleRunRoute, isSessionAuthorised } from '@/lib/dev/run-route';
-import { parseQueryPairs, runRouteFromCli } from '@/lib/dev/run-route-client';
+import { parseQueryPairs, parseThenQuery, runRouteFromCli } from '@/lib/dev/run-route-client';
 
 const KEY = 'service-role-key-abc';
 const SECRET = 'cron-secret-value-123';
@@ -130,5 +130,12 @@ describe('runRouteFromCli', () => {
   it('parses name=value pairs', () => {
     expect(parseQueryPairs(['start=1', 'x=a=b', 'on=true'])).toEqual({ start: 1, x: 'a=b', on: true });
     expect(() => parseQueryPairs(['nope'])).toThrow();
+  });
+
+  it('reads --then: absent repeats the first query, bare gives an empty one', () => {
+    expect(parseThenQuery(['--until', 'finished'])).toBeUndefined();
+    expect(parseThenQuery(['--until', 'finished', '--then'])).toEqual({});
+    expect(parseThenQuery(['--then', '--every', '5'])).toEqual({});
+    expect(parseThenQuery(['--then', 'a=1', '--then', 'b=x'])).toEqual({ a: 1, b: 'x' });
   });
 });
