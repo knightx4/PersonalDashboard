@@ -113,17 +113,17 @@ export function BotVoiceField({
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={`Choose voice. Now: ${current}`}
-          className="min-w-0 max-w-full justify-start"
+          className="h-auto min-h-(--control-h) min-w-0 max-w-full justify-start py-1.5 text-left whitespace-normal"
           onClick={() => setOpen(true)}
         >
           <AudioLines aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-ink-muted" />
-          <span className="min-w-0 truncate">{current}</span>
+          <span className="min-w-0 break-words">{current}</span>
           <ChevronRight aria-hidden strokeWidth={1.75} className="size-4 shrink-0 text-ink-muted" />
         </Button>
-        {voice && status !== 'gone' && <SamplePress voice={{ id: voice.id, name: current, author: '', sample: null }} botName={botName} />}
+        {status !== 'gone' && <SamplePress voice={{ id: voice?.id ?? '', name: current, author: '', sample: null }} botName={botName} />}
       </div>
       {voice && status === 'gone' && <p className="mt-1 text-small text-caution">Voice unavailable, using default</p>}
-      {voice && <SampleNote id={voice.id} />}
+      <SampleNote id={voice?.id ?? ''} />
       {!open && <FieldError>{error}</FieldError>}
 
       {open && (

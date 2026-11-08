@@ -54,6 +54,8 @@ export type VoicePageResult = ({ configured: true } & VoicePage) | { configured:
 export type VoicePickerFixture = { page: VoicePage | null; filters?: VoiceFilters; loading?: boolean };
 
 const SEARCH_WAIT_MS = 350;
+/** Style tags shown on one line at phone width before More. */
+const PHONE_TAGS = 4;
 const FILTERS_KEY = 'bot-voice-filters';
 
 function readFilters(): VoiceFilters {
@@ -108,6 +110,7 @@ export function VoicePicker({
   const [loading, setLoading] = useState(fixture?.loading ?? false);
   const [listError, setListError] = useState<string | null>(null);
   const [pasted, setPasted] = useState('');
+  const [allTags, setAllTags] = useState(false);
   const asked = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const lastSearch = useRef(filters.search);
@@ -169,6 +172,11 @@ export function VoicePicker({
 
   const set = (change: Partial<VoiceFilters>) => setFilters((f) => ({ ...f, ...change }));
   const toggleTag = (tag: string) => set({ tags: filters.tags.includes(tag) ? filters.tags.filter((t) => t !== tag) : [...filters.tags, tag] });
+  const styleTags = [...new Set([...VOICE_STYLE_TAGS, ...filters.tags])];
+  // At phone width one line holds PHONE_TAGS chips and More: the chosen ones
+  // that sit further along, then the first of the rest, in their own order.
+  const chosenLater = styleTags.slice(PHONE_TAGS).filter((tag) => filters.tags.includes(tag));
+  const phoneTags = new Set([...styleTags.filter((tag) => !chosenLater.includes(tag)).slice(0, Math.max(0, PHONE_TAGS - chosenLater.length)), ...chosenLater]);
   const pastedId = voiceIdOf(pasted);
   const name = botName.trim();
   const search = filters.search.trim();
@@ -223,13 +231,30 @@ export function VoicePicker({
               </ToggleChip>
             </div>
             <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Style">
-              {[...new Set([...VOICE_STYLE_TAGS, ...filters.tags])].map((tag) => (
-                <ToggleChip key={tag} on={filters.tags.includes(tag)} onClick={() => toggleTag(tag)}>
+              {styleTags.map((tag) => (
+                <ToggleChip
+                  key={tag}
+                  on={filters.tags.includes(tag)}
+                  onClick={() => toggleTag(tag)}
+                  className={cn(!allTags && !phoneTags.has(tag) && 'max-sm:hidden')}
+                >
                   {tag}
                 </ToggleChip>
               ))}
+              {!allTags && phoneTags.size < styleTags.length && (
+                <ToggleChip on={false} className="sm:hidden" aria-label="More style tags" onClick={() => setAllTags(true)}>
+                  More
+                </ToggleChip>
+              )}
             </div>
-            <p className="text-small text-ink-muted">Tags are set by the uploader, so untagged voices only appear under Any.</p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-small text-ink-muted">Tags are set by the uploader, so untagged voices only appear under Any.</p>
+              {filtersActive(filters) && (
+                <Button type="button" variant="link" className="shrink-0" onClick={() => setFilters(DEFAULT_VOICE_FILTERS)}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
               <label className="flex min-w-0 flex-1 basis-40 flex-col gap-1 text-small text-ink-muted">
                 Language
@@ -255,17 +280,14 @@ export function VoicePicker({
             </div>
           </div>
 
-          <div className="flex min-h-9 items-center justify-between gap-3 pt-2" aria-live="polite">
-            <p className="text-small text-ink-muted">
-              {listError ? '' : page ? `${formatNumber(page.total)} ${page.total === 1 ? 'voice' : 'voices'}` : loading ? 'Finding voices…' : ''}
+          {!page && loading && !listError && (
+            <p className="pt-3 text-small text-ink-muted" aria-live="polite">
+              Finding voices…
             </p>
-            {filtersActive(filters) && (
-              <Button type="button" variant="link" onClick={() => setFilters(DEFAULT_VOICE_FILTERS)}>
-                Clear filters
-              </Button>
-            )}
+          )}
+          <div className="pt-2">
+            <FieldError>{error}</FieldError>
           </div>
-          <FieldError>{error}</FieldError>
           {listError ? (
             <p className="py-2 text-small text-danger">{listError}</p>
           ) : page && page.voices.length === 0 ? (
@@ -279,11 +301,16 @@ export function VoicePicker({
               ))}
             </ul>
           ) : null}
-          {page?.more && !listError && (
-            <div className="flex justify-center pt-2">
-              <Button type="button" variant="secondary" size="sm" pending={loading} onClick={() => void more()}>
-                Show more voices
-              </Button>
+          {page && page.voices.length > 0 && !listError && (
+            <div className="flex items-center justify-between gap-3 pt-2" aria-live="polite">
+              <p className="tabular text-small text-ink-muted">
+                {page.voices.length < page.total ? `${formatNumber(page.voices.length)} of ${formatNumber(page.total)} voices` : `${formatNumber(page.total)} ${page.total === 1 ? 'voice' : 'voices'}`}
+              </p>
+              {page.more && (
+                <Button type="button" variant="secondary" size="sm" pending={loading} onClick={() => void more()}>
+                  Show more voices
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -321,14 +348,19 @@ export function VoicePicker({
 function VoiceRow({ voice, botName, chosen, saving, onUse }: { voice: FishVoice; botName: string; chosen: boolean; saving: string | null; onUse: () => void }) {
   const languages = (voice.languages ?? []).map(languageName);
   const uses = usesLabel(voice.uses);
-  const facts = [languages.slice(0, 2).join(', '), voice.author ? `by ${voice.author}` : '', uses ?? ''].filter(Boolean);
+  const facts = [languages.slice(0, 2).join(', '), uses ?? ''].filter(Boolean);
   return (
     <li className="flex flex-col gap-0.5 border-b border-border py-2.5 last:border-b-0">
       <div className="flex items-start gap-2">
         <SamplePress voice={voice} botName={botName} />
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-ui font-medium break-words text-ink">{voice.name}</p>
-          {facts.length > 0 && <p className="tabular truncate text-small text-ink-muted">{facts.join(' · ')}</p>}
+          {(facts.length > 0 || voice.author) && (
+            <p className="tabular flex min-w-0 text-small text-ink-muted">
+              <span className="shrink-0">{facts.join(' · ')}</span>
+              {voice.author && <span className="min-w-0 truncate">{facts.length > 0 ? '\u00a0· ' : ''}by {voice.author}</span>}
+            </p>
+          )}
           {voice.tags && voice.tags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1">
               {voice.tags.slice(0, 5).map((tag) => (
@@ -355,7 +387,8 @@ function VoiceRow({ voice, botName, chosen, saving, onUse }: { voice: FishVoice;
 
 /** Play a voice's sample: Fish's own recording, or a line spoken in it (counted against the month). */
 export function SamplePress({ voice, botName }: { voice: FishVoice; botName: string }) {
-  const sample = useVoiceSample(`voice-sample:${voice.id}`);
+  // An empty id is the default voice, Dash's: the line is spoken with no voice named.
+  const sample = useVoiceSample(`voice-sample:${voice.id || 'default'}`);
   const label = sample.busy ? 'Stop the sample' : `Play a sample of ${voice.name}`;
   return (
     <Tooltip label={label}>
@@ -373,7 +406,7 @@ export function SamplePress({ voice, botName }: { voice: FishVoice; botName: str
 }
 
 export function SampleNote({ id }: { id: string }) {
-  const note = useSpeechNote(`voice-sample:${id}`);
+  const note = useSpeechNote(`voice-sample:${id || 'default'}`);
   return note ? (
     <p role="status" className="text-small text-ink-muted">
       {note}
