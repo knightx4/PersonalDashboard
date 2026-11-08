@@ -139,10 +139,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  (lib/dash/bulk-roles.ts).
  * set_goal_done_when  the goal, the done-when it now has (null: cleared) and
  *                  the one it had before (notes 06d36ab2, fa2ac6fe).
- * add_quick_note   a quick note written to the vault's Inbox (plan #1894.2):
- *                  its title, its path and the text as given. Undo takes the
- *                  file back out of the notes repository, by the blob SHA
- *                  kept in `undo.vault_blob_sha`, as capture's Undo does.
+ * add_quick_note   a quick note added to Quick note triage (plan #1894.2, #3063):
+ *                  its title, Quick note triage's path and the text as given.
+ *                  Undo takes its section back out of that note, by the id
+ *                  and text kept in `undo`, as capture's Undo does.
  * Learn's six     a reading changed, a reading list started, a reading added
  *                  to one, an idea reworded, a note on an idea and a video
  *                  marked or moved (plan #1894.8): the sentence and link the

@@ -3,10 +3,11 @@ import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import { fakeVaultNotes } from '../../tests/stubs/fake-vault-notes';
 import type { DashWriteContext } from './registry';
+import { parseQuickSections } from '@/lib/vault/notes/quick-sections';
 
 /**
  * Each Vault tool writes the rows its button writes (plan #2473.5): a new
- * note and a quick note in the Inbox, a theme renamed, and the question of a
+ * note in the Inbox and a quick note in Quick note triage, a theme renamed, and the question of a
  * thread with Maya rewritten. The button's own server action runs on one copy
  * of the person's rows, the tool on another, from the same input, and the two
  * copies are compared. The vault's repository is the in-memory one in
@@ -40,6 +41,10 @@ vi.mock('@/lib/vault/db/ports', async (importOriginal) => {
   return {
     ...(await importOriginal<typeof import('@/lib/vault/db/ports')>()),
     noteCreatePorts: () => fake((state.tables['obsidian.notes'] ??= []), '00000000-0000-4000-8000-0000000000aa').ports.create,
+    quickNotePorts: () => {
+      const { ports } = fake((state.tables['obsidian.notes'] ??= []), '00000000-0000-4000-8000-0000000000aa');
+      return { save: ports.save, create: ports.create };
+    },
   };
 });
 
@@ -102,12 +107,18 @@ describe('the Vault tools write what their buttons write', () => {
       seen: () => true,
       goals: async () => db('goals') as unknown as GoalsSupabaseClient,
       createTask: async () => ({ id: null, error: 'unused' }),
-      quickNotePorts: async () => fakeVaultNotes(dash['obsidian.notes'], ME).ports.create,
+      quickNotePorts: async () => {
+        const { ports } = fakeVaultNotes(dash['obsidian.notes'], ME);
+        return { save: ports.save, create: ports.create };
+      },
     };
     const result = await WRITE_TOOLS.find((tool) => tool.name === 'add_quick_note')!.apply(ctx, { text: 'Call Ana about the lease' });
     expect(result.ok).toBe(true);
-    expect(dash['obsidian.notes']).toEqual(page['obsidian.notes']);
-    expect(dash['obsidian.notes']).toHaveLength(1);
+    // Both add a section to the one Quick note triage note; the id and the minute are each their own.
+    const sections = (tables: FakeTables) =>
+      tables['obsidian.notes'].map((row) => [row.path, parseQuickSections(String(row.body)).map((section) => section.text)]);
+    expect(sections(dash)).toEqual(sections(page));
+    expect(sections(dash)).toEqual([['Quick note triage.md', ['Call Ana about the lease']]]);
   });
 
   it('rename_theme renames the theme as the map does, and leaves another account alone', async () => {

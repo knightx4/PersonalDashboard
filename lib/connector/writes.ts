@@ -877,7 +877,7 @@ function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool
 
 const addQuickNote = sharedWrite(
   'add_quick_note',
-  'Save a quick thought to the person\'s vault in Dash, as a quick note in its Inbox, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought on Dash"). Write it word for word as they gave it. It waits in Quick note triage to be sorted, and is listed on Home with an Undo.',
+  'Save a quick thought to the person\'s vault in Dash, as a quick note in their Quick note triage note, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought on Dash"). Write it word for word as they gave it. It goes in as a section of that one note, waits there to be sorted, and is listed on Home with an Undo.',
 );
 
 const addIdea = sharedWrite(

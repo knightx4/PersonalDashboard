@@ -30,8 +30,9 @@ import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/go
 import type { ModuleId } from '@/lib/modules';
 import { taskInput } from '@/lib/todo/tasks/input';
 import { todayIn } from '@/lib/todo/tasks/model';
-import { openConnectedSource, noteCreatePorts } from '@/lib/vault/db/ports';
-import { createCapturedNote } from '@/lib/vault/notes/create';
+import { openConnectedSource, quickNotePorts } from '@/lib/vault/db/ports';
+import { addQuickNote } from '@/lib/vault/notes/quick-notes';
+import { vaultUndoRecord } from '@/lib/vault/notes/undo';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { checkWriteAccess } from '@/lib/vault/notes/write-access';
 
@@ -199,7 +200,7 @@ async function captureAccount(userId: string): Promise<CaptureAccount> {
     },
     vault: async (text) => {
       if (!vault) return { ok: false as const, error: 'Your vault is switched off.' };
-      const ports = noteCreatePorts({
+      const ports = quickNotePorts({
         supabase: vault,
         userId,
         afterSave: () => {
@@ -212,9 +213,16 @@ async function captureAccount(userId: string): Promise<CaptureAccount> {
           });
         },
       });
-      const result = await createCapturedNote(ports, text);
+      // A section of Quick note triage, as the capture box adds one (plan #3063).
+      const result = await addQuickNote({ ...ports, timeZone: settings.timezone }, text);
       if (!result.ok) return { ok: false as const, error: result.error };
-      return { ok: true as const, noteId: result.noteId, title: result.title, blobSha: result.blobSha };
+      return {
+        ok: true as const,
+        noteId: result.noteId,
+        title: result.title,
+        blobSha: result.blobSha,
+        undo: vaultUndoRecord(result.blobSha, { kind: 'section', id: result.section.id, text: result.section.text }) as unknown as Record<string, unknown>,
+      };
     },
     // The kinds only an Add button makes (plan #1950.5). The sort never
     // files into them, so a shortcut never reaches these.

@@ -92,7 +92,7 @@ export const CAPTURE_ACTIONS: readonly CaptureAction[] = [
     keywords: ['log', 'what happened', 'log progress', 'goal progress', 'capture goal'],
   },
   {
-    // A quick note in the vault's Inbox, the one the Vault page's Add a quick
+    // A quick note in Quick note triage (plan #3063), the one the Vault page's Add a quick
     // note writes (note 4a7935d3), so it can be set down from any page and
     // sorted later in Quick note triage. Dash chooses nothing for it.
     id: 'vault',
@@ -338,7 +338,7 @@ export const CAPTURE_KINDS: Readonly<Record<CaptureKindId, CaptureKind>> = {
     place: 'vault',
     module: 'vault',
     label: 'Add a quick note',
-    placeholder: 'Whatever is on your mind. It waits in the Inbox.',
+    placeholder: 'Whatever is on your mind. It waits in Quick note triage.',
     field: 'prose',
     needs: null,
     makes: 'row',

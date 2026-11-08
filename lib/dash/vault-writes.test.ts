@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { VAULT_CHANGE_KINDS, VAULT_FILE_KINDS } from '@/lib/ask/vault-changes';
 import { MAYA_QUESTION_MAX } from '@/lib/vault/maya/thought-model';
 import { readVaultUndo, undoVaultWrite } from '@/lib/vault/notes/undo';
+import { parseQuickSections, withQuickSections } from '@/lib/vault/notes/quick-sections';
 import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
 import { fakeVaultNotes } from '../../tests/stubs/fake-vault-notes';
 import { QUESTION_MAX, VAULT_WRITES, runVaultWrite, type VaultMade, type VaultWriteEnv } from './vault-writes';
@@ -24,7 +25,17 @@ function setup(tables: FakeTables = {}) {
   const rows = (tables['obsidian.notes'] ??= []);
   const vault = fakeVaultNotes(rows, ME);
   rows.push(vault.note(NOTE, 'Home/Flat.md', '# Flat\n\nThe boiler is due a service.\n', 'b-flat'));
-  rows.push(vault.note(QUICK, 'Inbox/Call Ana.md', 'Call Ana about the lease\n', 'b-quick'));
+  rows.push(
+    vault.note(
+      QUICK,
+      'Quick note triage.md',
+      withQuickSections('', [
+        { id: 'qn-ana', capturedAt: '2026-10-09T08:00:00.000Z', heading: '9 October 2026, 8:00 AM', text: 'Call Ana about the lease' },
+        { id: 'qn-kite', capturedAt: '2026-10-09T09:00:00.000Z', heading: '9 October 2026, 9:00 AM', text: 'Buy a kite' },
+      ]),
+      'b-quick',
+    ),
+  );
   const db = fakeSchemaDb(tables);
   const uploads: string[] = [];
   const you = db('you');
@@ -105,35 +116,41 @@ describe('the Vault writes', () => {
     expect(rows.find((row) => row.id === NOTE)?.path).toBe('Home/Flat.md');
   });
 
-  it('files a quick note into a note, and the Undo puts both back', async () => {
+  const waiting = (rows: Record<string, unknown>[]) =>
+    parseQuickSections(String(rows.find((row) => row.id === QUICK)?.body)).map((section) => section.id);
+
+  it('files a quick note into a note by the start of its text, and the Undo puts both back', async () => {
     const { env, rows } = setup();
-    const change = await made(env, 'file_quick_note', { quick_note_ref: QUICK, into_note_ref: NOTE });
+    const change = await made(env, 'file_quick_note', { quick_note: 'call ana', into_note_ref: NOTE });
     expect(change).toMatchObject({ op: 'update', subjectRef: `obsidian.notes:${NOTE}` });
     expect(rows.find((row) => row.id === NOTE)?.body).toContain('Call Ana about the lease');
-    expect(rows.find((row) => row.id === QUICK)?.deleted_at).not.toBeNull();
+    expect(waiting(rows)).toEqual(['qn-kite']);
 
     expect(await undo(env, change)).toEqual({ ok: true });
     expect(rows.find((row) => row.id === NOTE)?.body).toBe('# Flat\n\nThe boiler is due a service.\n');
-    expect(rows.find((row) => row.path === 'Inbox/Call Ana.md')).toMatchObject({ deleted_at: null, body: 'Call Ana about the lease\n' });
+    expect(waiting(rows)).toEqual(['qn-kite', 'qn-ana']);
   });
 
-  it('makes a quick note a note of its own, and the Undo takes it back to the Inbox', async () => {
+  it('makes a quick note a note of its own by its id, and the Undo puts its section back', async () => {
     const { env, rows } = setup();
-    const change = await made(env, 'file_quick_note', { quick_note_ref: QUICK });
+    const change = await made(env, 'file_quick_note', { quick_note: 'qn-ana' });
     expect(change.op).toBe('insert');
     const own = rows.find((row) => row.path === 'Call Ana about the lease.md');
     expect(own?.deleted_at).toBeNull();
+    expect(waiting(rows)).toEqual(['qn-kite']);
     expect(await undo(env, change)).toEqual({ ok: true });
     expect(own?.deleted_at).not.toBeNull();
-    expect(rows.find((row) => row.path === 'Inbox/Call Ana.md')?.deleted_at).toBeNull();
+    expect(waiting(rows)).toEqual(['qn-kite', 'qn-ana']);
   });
 
-  it('refuses a note that is not theirs, and a note outside the Inbox as a quick note', async () => {
+  it('refuses a note that is not theirs, a quick note it cannot find, and filing into Quick note triage', async () => {
     const { env, rows } = setup();
     rows.find((row) => row.id === NOTE)!.user_id = SOMEONE;
     expect(await refused(env, 'edit_vault_note', { note_ref: NOTE, append: 'x' })).toMatch(/no note of theirs/);
     rows.find((row) => row.id === NOTE)!.user_id = ME;
-    expect(await refused(env, 'file_quick_note', { quick_note_ref: NOTE })).toMatch(/not a quick note/);
+    expect(await refused(env, 'file_quick_note', { quick_note: 'the boiler' })).toMatch(/No quick note in Quick note triage matches/);
+    expect(await refused(env, 'file_quick_note', { quick_note: 'qn-ana', into_note_ref: QUICK })).toMatch(/cannot be filed into Quick note triage/);
+    expect(await refused(env, 'edit_vault_note', { note_ref: QUICK, append: 'x' })).toMatch(/file_quick_note/);
   });
 
   it('renames a theme by its name, and refuses one that is not on the map', async () => {

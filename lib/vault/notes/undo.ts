@@ -8,6 +8,8 @@ import {
 } from '@/lib/vault/notes/create';
 import { renameNote, type RenameNotePorts } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNotePorts } from '@/lib/vault/notes/save';
+import { removeQuickSection, restoreQuickSection } from '@/lib/vault/notes/quick-notes';
+import { quickSectionFingerprint } from '@/lib/vault/notes/quick-sections';
 
 /**
  * Taking back a note Dash changed in the vault (plan #1894.9.3), from what its
@@ -24,7 +26,14 @@ import { saveNote, type SaveNotePorts } from '@/lib/vault/notes/save';
  *   rename   a rename: the note goes back to its old name.
  *   unfile   a quick note filed: it comes back to the Inbox, then the note it
  *            went into gets its old body back, or the note it became is
- *            taken out.
+ *            taken out. Records from before plan #3063, when a quick note
+ *            was a file of its own.
+ *   section  a quick note added (plan #3063): its section comes out of Quick
+ *            note triage while its text is as Dash wrote it. Other sections
+ *            may have come and gone since, so the note's blob is not checked.
+ *   unfile_section  a quick note filed since plan #3063: its section goes
+ *            back into Quick note triage, then the note it went into gets
+ *            its old body back, or the note it became is taken out.
  *
  * Ports as the writes use them, so the order is tested without either side.
  */
@@ -33,16 +42,20 @@ export type VaultUndo =
   | { kind: 'remove' }
   | { kind: 'restore'; body: string }
   | { kind: 'rename'; name: string }
-  | { kind: 'unfile'; body: string | null; quick: { path: string; text: string } };
+  | { kind: 'unfile'; body: string | null; quick: { path: string; text: string } }
+  | { kind: 'section'; id: string; text: string }
+  | { kind: 'unfile_section'; body: string | null; section: { id: string; capturedAt: string; text: string } };
 
 /** The columns of the record's `undo` this reads and the writes fill. */
 export type VaultUndoRecord = {
   vault_blob_sha: string;
-  vault_undo?: 'restore' | 'rename' | 'unfile';
+  vault_undo?: 'restore' | 'rename' | 'unfile' | 'section' | 'unfile_section';
   vault_body?: string;
   vault_name?: string;
   vault_quick_path?: string;
   vault_quick_text?: string;
+  vault_section_id?: string;
+  vault_section_at?: string;
 };
 
 /** The record's `undo` for one of these, as a write keeps it. */
@@ -62,6 +75,17 @@ export function vaultUndoRecord(blobSha: string, undo: VaultUndo): VaultUndoReco
         vault_quick_path: undo.quick.path,
         vault_quick_text: undo.quick.text,
       };
+    case 'section':
+      return { vault_blob_sha: blobSha, vault_undo: 'section', vault_section_id: undo.id, vault_quick_text: undo.text };
+    case 'unfile_section':
+      return {
+        vault_blob_sha: blobSha,
+        vault_undo: 'unfile_section',
+        ...(undo.body === null ? {} : { vault_body: undo.body }),
+        vault_section_id: undo.section.id,
+        vault_section_at: undo.section.capturedAt,
+        vault_quick_text: undo.section.text,
+      };
   }
 }
 
@@ -80,6 +104,22 @@ export function readVaultUndo(undo: Record<string, unknown> | null | undefined):
     case 'unfile':
       if (typeof undo.vault_quick_path !== 'string' || typeof undo.vault_quick_text !== 'string') return null;
       return { kind: 'unfile', body, quick: { path: undo.vault_quick_path, text: undo.vault_quick_text } };
+    case 'section':
+      if (typeof undo.vault_section_id !== 'string' || typeof undo.vault_quick_text !== 'string') return null;
+      return { kind: 'section', id: undo.vault_section_id, text: undo.vault_quick_text };
+    case 'unfile_section':
+      if (
+        typeof undo.vault_section_id !== 'string' ||
+        typeof undo.vault_section_at !== 'string' ||
+        typeof undo.vault_quick_text !== 'string'
+      ) {
+        return null;
+      }
+      return {
+        kind: 'unfile_section',
+        body,
+        section: { id: undo.vault_section_id, capturedAt: undo.vault_section_at, text: undo.vault_quick_text },
+      };
     default:
       return null;
   }
@@ -92,7 +132,7 @@ export type VaultUndoPorts = {
   save: SaveNotePorts;
   /** Moves a note back to its old name. */
   rename: RenameNotePorts;
-  /** Writes a filed quick note back into the Inbox. */
+  /** Writes a filed quick note back into the Inbox, or makes Quick note triage. */
   create: CreateNotePorts;
 };
 
@@ -176,6 +216,34 @@ export async function undoVaultWrite(
       if (!taken.ok) {
         // Take the copy back out, so the text is not left in two places.
         const out = await removeCapturedNote(ports.remove, back.noteId, back.blobSha);
+        if (!out.ok) console.error('[vault undo] taking the quick note back out', out.error);
+        return taken;
+      }
+      return { ok: true };
+    }
+    case 'section': {
+      const out = await removeQuickSection(ports, undo.id, quickSectionFingerprint(undo.text));
+      if (out.ok) return { ok: true };
+      if (out.reason === 'not-quick') return { ok: false, error: 'That quick note is not in Quick note triage any more, so there is nothing to undo.' };
+      if (out.reason === 'quick-changed') return CHANGED;
+      return { ok: false, error: out.error };
+    }
+    case 'unfile_section': {
+      // Checked before anything is written, so a refusal leaves both notes as they are.
+      const note = await ports.remove.loadNote(noteId);
+      if (!note || note.deleted) return DELETED;
+      if (note.blobSha !== blobSha) return CHANGED;
+
+      // The quick note comes back first, so the text is never in neither place.
+      const back = await restoreQuickSection(ports, undo.section);
+      if (!back.ok) return { ok: false, error: `The quick note could not go back into Quick note triage. Nothing was changed. ${back.error}` };
+      const taken =
+        undo.body === null
+          ? await removeCapturedNote(ports.remove, noteId, blobSha)
+          : await restoreBody(ports, noteId, blobSha, undo.body);
+      if (!taken.ok) {
+        // Take the section back out, so the text is not left in two places.
+        const out = await removeQuickSection(ports, undo.section.id);
         if (!out.ok) console.error('[vault undo] taking the quick note back out', out.error);
         return taken;
       }

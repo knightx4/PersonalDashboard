@@ -24,8 +24,7 @@ import { allSearchSources } from '@/lib/search/registry';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { insertTask } from '@/lib/todo/tasks/write';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { noteCreatePorts } from '@/lib/vault/db/ports';
-import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import { quickNotePorts as quickNoteWritePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { insertMadeChange } from './changes';
 import { appendTurns, loadConversation, startAsk } from './store';
@@ -59,9 +58,9 @@ function goalsClient(accessToken: string, history: Parameters<typeof historyHead
   }) as unknown as GoalsSupabaseClient;
 }
 
-/** The note-create ports on the session's vault client, each note embedded once the reply has gone. */
-function quickNotePorts(userId: string, vault: VaultSupabaseClient, core: CoreSupabaseClient): CreateNotePorts {
-  return noteCreatePorts({
+/** The quick note ports on the session's vault client, each note embedded once the reply has gone. */
+function quickNotePorts(userId: string, vault: VaultSupabaseClient, core: CoreSupabaseClient) {
+  return quickNoteWritePorts({
     supabase: vault,
     userId,
     afterSave: () => {

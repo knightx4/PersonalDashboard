@@ -174,7 +174,10 @@ describe('the writes shared with Ask Dash', () => {
       userId: ME,
       core: client('core'),
       db: async (schema) => client(schema),
-      quickNotePorts: async () => fakeVaultNotes(tables['obsidian.notes'], ME).ports.create,
+      quickNotePorts: async () => {
+        const { ports } = fakeVaultNotes(tables['obsidian.notes'], ME);
+        return { save: ports.save, create: ports.create };
+      },
       account,
     };
     return { tables, context };
@@ -192,7 +195,7 @@ describe('the writes shared with Ask Dash', () => {
         status: 'done',
         subject_ref: `obsidian.notes:${NOTE}`,
         op: 'insert',
-        undo: { vault_blob_sha: 'n1' },
+        undo: expect.objectContaining({ vault_blob_sha: 'n1', vault_undo: 'section', vault_quick_text: 'A thought worth keeping' }),
       }),
     ]);
   });

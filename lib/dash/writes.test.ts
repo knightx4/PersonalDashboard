@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { parseQuickSections } from '@/lib/vault/notes/quick-sections';
 import type { AskContext } from '@/lib/ask/db';
 import { undoChange, type ChangeDeps } from '@/lib/ask/changes';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
@@ -426,14 +427,15 @@ describe('add_quick_note', () => {
   /** The first note the fake vault stores, and the blob its commit makes. */
   const NOTE = '00000000-0000-4000-8000-000000000100';
   const SHA = 'n1';
-  const PATH = 'Inbox/AI and the death of software.md';
+  const PATH = 'Quick note triage.md';
   const thought = 'AI and the death of software.\nSoftware may become largely open source.';
 
-  /** Writes the note through createCapturedNote into the fake obsidian.notes, as fileVaultNote would. */
+  /** Adds the section to Quick note triage in the fake obsidian.notes, as addVaultQuickNote would. */
   function filing(): DashWriteContext {
+    const { ports } = fakeVaultNotes(tables['obsidian.notes'], ME);
     return {
       ...context(['vault']),
-      quickNotePorts: async () => fakeVaultNotes(tables['obsidian.notes'], ME).ports.create,
+      quickNotePorts: async () => ({ save: ports.save, create: ports.create }),
     };
   }
 
@@ -441,18 +443,19 @@ describe('add_quick_note', () => {
     tables['obsidian.notes'] = [];
   });
 
-  it('saves the thought word for word in the vault Inbox, keeps the blob SHA, and Undo takes the file back out', async () => {
+  it('saves the thought word for word as a section of Quick note triage, and keeps what its Undo needs', async () => {
     const result = ok(await apply('add_quick_note', { text: thought }, filing()));
     expect(tables['obsidian.notes']).toEqual([expect.objectContaining({ path: PATH, blob_sha: SHA })]);
-    expect(String(tables['obsidian.notes'][0].body).trim()).toBe(thought);
+    const sections = parseQuickSections(String(tables['obsidian.notes'][0].body));
+    expect(sections.map((s) => s.text)).toEqual([thought]);
     expect(result).toMatchObject({
       kind: 'add_quick_note',
       op: 'insert',
       subjectRef: `obsidian.notes:${NOTE}`,
       input: { noteId: NOTE, path: PATH, body: thought },
-      undo: { vault_blob_sha: SHA },
-      row: { table: 'obsidian.notes', ref: NOTE, href: '/vault/n/Inbox/AI%20and%20the%20death%20of%20software.md' },
-      summary: 'Dash saved the quick note "AI and the death of software." to your vault\'s Inbox.',
+      undo: { vault_blob_sha: SHA, vault_undo: 'section', vault_section_id: sections[0].id, vault_quick_text: thought },
+      row: { table: 'obsidian.notes', ref: NOTE, href: '/vault/n/Quick%20note%20triage.md' },
+      summary: 'Dash saved the quick note "AI and the death of software." to Quick note triage.',
     });
 
     const removed: unknown[] = [];
@@ -464,21 +467,26 @@ describe('add_quick_note', () => {
       return { ok: true };
     });
     expect(undone.ok).toBe(true);
-    expect(removed).toEqual([expect.objectContaining({ subjectRef: `obsidian.notes:${NOTE}`, undo: { vault_blob_sha: SHA } })]);
+    expect(removed).toEqual([
+      expect.objectContaining({ subjectRef: `obsidian.notes:${NOTE}`, undo: expect.objectContaining({ vault_undo: 'section' }) }),
+    ]);
   });
 
   it('says why when the vault cannot write, and saves nothing', async () => {
     const ctx: DashWriteContext = {
       ...context(['vault']),
       quickNotePorts: async () => ({
-        openSource: async () =>
-          ({
-            createNote: async () => {
-              throw new VaultReadOnlyError('read only');
-            },
-          }) as unknown as VaultSource,
-        storeNote: async () => 'unused',
-        afterSave: () => {},
+        save: { ...fakeVaultNotes([], ME).ports.save, loadNote: async () => null },
+        create: {
+          openSource: async () =>
+            ({
+              createNote: async () => {
+                throw new VaultReadOnlyError('read only');
+              },
+            }) as unknown as VaultSource,
+          storeNote: async () => 'unused',
+          afterSave: () => {},
+        },
       }),
     };
     const result = await apply('add_quick_note', { text: thought }, ctx);
