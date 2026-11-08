@@ -420,6 +420,8 @@ function GroupThread({
       name={title}
       // A group with no name of its own is already called by its members, so the line under says how many.
       detail={title === groupDetailOf(members) ? `Group of ${members.length}` : groupDetailOf(members)}
+      // One line, so the voice switch beside Settings does not push the header taller on a phone (plan #3082).
+      detailOneLine
       avatar={<GroupMark members={members} size="sm" />}
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: title, href: groupHref(chatId) }]}

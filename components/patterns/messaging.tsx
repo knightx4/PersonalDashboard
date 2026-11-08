@@ -86,6 +86,7 @@ export function Messaging({
 export function MessagingThread({
   name,
   detail,
+  detailOneLine = false,
   avatar,
   back,
   crumbs = [],
@@ -100,6 +101,8 @@ export function MessagingThread({
   name: React.ReactNode;
   /** One quiet line under the name, such as what they help with. */
   detail?: string;
+  /** Keep the line under the name to one line on a phone too, ending in an ellipsis: a group's members (plan #3082). */
+  detailOneLine?: boolean;
   avatar?: React.ReactNode;
   /** On a phone, the way back to the list of people. */
   back: { href: string; label: string };
@@ -136,7 +139,7 @@ export function MessagingThread({
           {avatar}
           <div className="min-w-0 flex-1">
             {typeof name === 'string' ? <h1 className="truncate text-body font-semibold text-ink">{name}</h1> : name}
-            {detail && <p className="line-clamp-2 text-small text-ink-muted min-[720px]:truncate">{detail}</p>}
+            {detail && <p className={cn('text-small text-ink-muted', detailOneLine ? 'truncate' : 'line-clamp-2 min-[720px]:truncate')}>{detail}</p>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
