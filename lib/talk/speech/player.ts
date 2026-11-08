@@ -125,9 +125,18 @@ export type SpeechVoice = { bot?: string | null; voice?: string | null };
 /** One bubble to read, as a run's press hands them in. */
 export type SpeechItem = { key: string; text: string; voice?: SpeechVoice };
 
-function voiceFields(voice: SpeechVoice | undefined): { bot?: string; voice?: string } {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type VoiceFields = { bot?: string; voice?: string; message?: string };
+
+/**
+ * What the route is told besides the text. A bot's bubble is keyed by its
+ * message's id, which goes as `message`, so the route keeps the bubble's
+ * spoken version on that row and a second hearing reuses it (plan #3079).
+ */
+function voiceFields(voice: SpeechVoice | undefined, key: string): VoiceFields {
   if (voice?.voice) return { voice: voice.voice };
-  if (voice?.bot) return { bot: voice.bot };
+  if (voice?.bot) return UUID.test(key) ? { bot: voice.bot, message: key } : { bot: voice.bot };
   return {};
 }
 
@@ -181,7 +190,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
 
   /** Asks the route for a bubble's audio once. A refusal is not kept, so a press can ask again. */
   function clipFor(item: SpeechItem): Promise<Clip> {
-    const fields = voiceFields(item.voice);
+    const fields = voiceFields(item.voice, item.key);
     const id = JSON.stringify([item.key, item.text, fields.voice ?? null, fields.bot ?? null]);
     const kept = fetched.get(id);
     if (kept) return kept;
@@ -194,7 +203,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
     return clip;
   }
 
-  async function ask(key: string, text: string, fields: { bot?: string; voice?: string }): Promise<Clip> {
+  async function ask(key: string, text: string, fields: VoiceFields): Promise<Clip> {
     let response: Response;
     try {
       response = await deps.fetch('/api/speak', {

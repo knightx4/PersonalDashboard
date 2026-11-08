@@ -97,7 +97,7 @@ export function plainSpeech(reply: string): string {
 }
 
 /** Lines become sentences: one with no closing mark of its own gets a full stop, so a list is read as a list. */
-function asSentences(plain: string): string {
+export function asSentences(plain: string): string {
   return plain
     .split('\n')
     .map((line) => line.trim())
