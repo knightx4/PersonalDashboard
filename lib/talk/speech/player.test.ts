@@ -4,7 +4,11 @@ import {
   bubbleVoice,
   createSpeechPlayer,
   pillShows,
+  readSpeaking,
+  rememberSpeaking,
   SPEAK_HELD_BACK,
+  SPEAKING_KEY,
+  speakingKeyOf,
   SPEAK_UNREACHABLE,
   type SpeechAudio,
   type SpeechFailure,
@@ -412,5 +416,36 @@ describe('playing means sounding (plan #3068)', () => {
     expect(failures).toEqual([{ stage: 'playback', key: 'a', name: 'Interrupted' }]);
     await settle();
     expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
+  });
+});
+
+describe('a group chat keeps its own voice switch (plan #3082)', () => {
+  it('keeps the shared switch under SPEAKING_KEY and a group under its own key', () => {
+    expect(speakingKeyOf()).toBe(SPEAKING_KEY);
+    expect(speakingKeyOf(null)).toBe(SPEAKING_KEY);
+    expect(speakingKeyOf('group.abc')).toBe(`${SPEAKING_KEY}.group.abc`);
+  });
+
+  it('remembers a group switched on without turning on the shared one, and across a reload', () => {
+    const kept = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (k: string) => kept.get(k) ?? null,
+        setItem: (k: string, v: string) => void kept.set(k, v),
+        removeItem: (k: string) => void kept.delete(k),
+      },
+    });
+    try {
+      const group = speakingKeyOf('group.abc');
+      expect(readSpeaking(group)).toBe(false);
+      rememberSpeaking(true, group);
+      expect(readSpeaking(group)).toBe(true);
+      expect(readSpeaking()).toBe(false);
+      expect(readSpeaking(speakingKeyOf('group.other'))).toBe(false);
+      rememberSpeaking(false, group);
+      expect(readSpeaking(group)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

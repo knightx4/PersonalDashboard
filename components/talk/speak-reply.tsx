@@ -16,6 +16,7 @@ import {
   rememberSpeaking,
   SPEAK_HELD_BACK,
   SPEAKING_KEY,
+  speakingKeyOf,
   type SpeechItem,
   type SpeechState,
 } from '@/lib/talk/speech/player';
@@ -71,10 +72,21 @@ function thePlayer() {
 const IDLE: SpeechState = { key: null, phase: 'idle', notes: {}, heard: false };
 const speakingListeners = new Set<() => void>();
 
+/**
+ * Which switch the thread inside reads and sets: Dash's chat and the
+ * one-on-one threads share one, and a group chat keeps its own (plan #3082).
+ */
+const SpeakingKey = createContext<string>(SPEAKING_KEY);
+
+/** Gives the thread inside a speaking switch of its own, kept under `scope`. */
+export function SpeakingScope({ scope, children }: { scope: string; children: React.ReactNode }) {
+  return <SpeakingKey.Provider value={speakingKeyOf(scope)}>{children}</SpeakingKey.Provider>;
+}
+
 function subscribeSpeaking(listener: () => void) {
   speakingListeners.add(listener);
   const onStorage = (event: StorageEvent) => {
-    if (event.key === SPEAKING_KEY) listener();
+    if (event.key === null || event.key.startsWith(SPEAKING_KEY)) listener();
   };
   window.addEventListener('storage', onStorage);
   return () => {
@@ -83,18 +95,19 @@ function subscribeSpeaking(listener: () => void) {
   };
 }
 
-function setSpeaking(on: boolean) {
-  rememberSpeaking(on);
+function setSpeaking(on: boolean, key: string) {
+  rememberSpeaking(on, key);
   // The switch is a press: the moment to open the sound for the replies that follow.
   if (on) unlockSpeechOutput();
   else thePlayer().stop();
   for (const listener of speakingListeners) listener();
 }
 
-/** Whether new replies play aloud, as the switch was left in this browser. */
+/** Whether new replies play aloud, as this thread's switch was left in this browser. */
 export function useSpeaking(): boolean {
   const fixture = useContext(SpeechFixture);
-  const live = useSyncExternalStore(subscribeSpeaking, readSpeaking, () => false);
+  const key = useContext(SpeakingKey);
+  const live = useSyncExternalStore(subscribeSpeaking, () => readSpeaking(key), () => false);
   return fixture ? fixture.speaking : live;
 }
 
@@ -170,8 +183,9 @@ const SWITCH_TIP_OFF = 'Read new replies aloud as they arrive.';
 export function SpeakSwitch({ look }: { look: 'quiet' | 'icon' }) {
   const on = useSpeaking();
   const fixture = useContext(SpeechFixture);
+  const key = useContext(SpeakingKey);
   const toggle = () => {
-    if (!fixture) setSpeaking(!on);
+    if (!fixture) setSpeaking(!on, key);
   };
   const Icon = on ? Volume2 : VolumeX;
   if (look === 'icon') {

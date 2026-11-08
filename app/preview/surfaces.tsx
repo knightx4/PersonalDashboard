@@ -514,7 +514,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
+import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatGroupSpeakingSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
 import {
   ChatArrivalMomentSurface,
   ChatBuilderTextSurface,
@@ -9508,6 +9508,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatGroupSurface state="made-files" />,
+  },
+  {
+    /* A group with its voice switch on (plan #3082): the switch lit in the
+     * header beside Settings, a speaker on each bot's bubble, and the CFO's
+     * newest text being read in the CFO's voice, named in the pill. */
+    id: 'chat-group-speaking',
+    label: 'Chat · A group chat, voice on and a reply being read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSpeakingSurface />,
   },
   {
     /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
