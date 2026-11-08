@@ -9606,7 +9606,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="photo-failed" />,
   },
   {
-    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture names it, with a sample to hear, Change voice and Use default. */
+    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture is one Choose voice button naming it, with a sample to hear beside it (plan #3081). */
     id: 'chat-person-edit-voice',
     label: 'Chat · Editing a bot, with their own voice',
     module: 'chat',
@@ -9614,12 +9614,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="voice" />,
   },
   {
-    /* The voice picker open: a search over Fish voices, the person's own voices first, then the library, each with a sample and Use; the voice in use says so; a pasted ID or link at the foot. */
+    /* The voice picker's pop-up (plan #3081): a modal on a laptop, a full-height sheet on a phone. Search, gender chips and Mine, style tag chips with the note on uploaders' tags, language and sort; Male and calm on, so Clear filters shows; each voice with its tags, language, uses, a sample and Use this voice; the voice in use says so; Show more voices; a pasted ID or link and Dash's default at the foot. */
     id: 'chat-person-edit-voice-picker',
     label: 'Chat · Editing a bot, choosing a voice',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="voice-picker" />,
+  },
+  {
+    /* The voice picker's pop-up with nothing for its filters (plan #3081): Mine, Female, young, Japanese and a search on, the empty line, and Clear filters. */
+    id: 'chat-person-edit-voice-picker-empty',
+    label: 'Chat · Editing a bot, no voice for these filters',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-picker-empty" />,
   },
   {
     /* A saved voice Fish no longer offers: the row says Voice unavailable, using default. */
