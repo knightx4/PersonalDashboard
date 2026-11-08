@@ -1101,6 +1101,52 @@ export function DevSettingsSurface() {
         pendingEdits: 2,
       }}
       autoApprove={false}
+      routeRuns={[
+        {
+          id: 'rr1',
+          askedBy: 'session cse_015EJYHXTMNeHd69rnKtKri3',
+          path: '/api/cron/broker-wake-test',
+          status: 'running',
+          httpStatus: null,
+          startedAt: '2026-10-06T07:58:10Z',
+          endedAt: null,
+          resultBytes: null,
+          error: null,
+        },
+        {
+          id: 'rr2',
+          askedBy: 'Dash',
+          path: '/api/cron/goals-morning',
+          status: 'ok',
+          httpStatus: 200,
+          startedAt: '2026-10-06T07:40:02Z',
+          endedAt: '2026-10-06T07:40:14Z',
+          resultBytes: 1240,
+          error: null,
+        },
+        {
+          id: 'rr3',
+          askedBy: 'People bot, Marcus Lindqvist-Oyelaran',
+          path: '/api/cron/learn-catalogue-judgements-with-a-long-name',
+          status: 'failed',
+          httpStatus: 500,
+          startedAt: '2026-10-05T21:12:40Z',
+          endedAt: '2026-10-05T21:17:45Z',
+          resultBytes: 48_000,
+          error: 'The route answered 500 after 5 minutes.',
+        },
+        {
+          id: 'rr4',
+          askedBy: 'session cse_01Xy',
+          path: '/api/admin/purge',
+          status: 'refused',
+          httpStatus: null,
+          startedAt: '2026-10-05T09:03:00Z',
+          endedAt: '2026-10-05T09:03:00Z',
+          resultBytes: null,
+          error: 'That path is not one of the app’s routes that may be run.',
+        },
+      ]}
       now={Date.parse('2026-10-06T08:00:00Z')}
     />
   );
