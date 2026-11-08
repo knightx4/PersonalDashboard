@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { handleRunRoute, RUN_ROUTE_MAX_DURATION_SECONDS } from '@/lib/dev/run-route';
+import { handleRunRoute } from '@/lib/dev/run-route';
 
-export const maxDuration = RUN_ROUTE_MAX_DURATION_SECONDS;
+// Next reads this as a literal; keep it equal to RUN_ROUTE_MAX_DURATION_SECONDS.
+export const maxDuration = 300;
 
 /**
  * Run one of the app's own cron routes for a Claude Code session (plan

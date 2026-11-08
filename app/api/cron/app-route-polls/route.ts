@@ -4,7 +4,7 @@ import { runAppRoutePolls } from '@/lib/dev/app-route-polls';
 import { appRoutePollPorts } from '@/lib/dev/app-route-polls-store';
 
 // One pass calls up to three routes at once, each allowed up to 300 seconds.
-export const maxDuration = 320;
+export const maxDuration = 300;
 
 /**
  * The background polls Dash and the People bots start with run_app_route
