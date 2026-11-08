@@ -16,8 +16,9 @@ import type { SessionHandoff } from './handoffs';
  *    unclaimed BROWSER_WAIT_MS after it was kept. The fire claims the row
  *    only where claimed_by is still null, so a computer that claims it in
  *    the meantime keeps it;
- * 3. says so in the thread: no computer of theirs took it, so it runs on
- *    public pages only. A start that fails says why instead, since nobody
+ * 3. says so in the thread: no computer of theirs took it, why (the
+ *    runner's status: never run, last seen when, or up with no Chrome;
+ *    plan #3075), and that it runs on public pages only. A start that fails says why instead, since nobody
  *    else is left to tell the thread.
  *
  * This file has no database; inngest/core/browser-wait.ts binds the ports.
@@ -27,10 +28,20 @@ import type { SessionHandoff } from './handoffs';
 export const CLOUD_FALLBACK_LINE =
   "None of your computers picked this up within 3 minutes, so I've started it in the cloud. It can only use public pages there, not sites you're signed in to.";
 
+/**
+ * The fallback line with why no computer took it (plan #3075): the runner's
+ * status (runnerStatusSentence, lib/talk/browser-runners.ts) as its second
+ * sentence, when it could be read.
+ */
+export function cloudFallbackLine(runners: string | null): string {
+  if (!runners) return CLOUD_FALLBACK_LINE;
+  return `None of your computers picked this up within 3 minutes. ${runners} So I've started it in the cloud, which can only use public pages, not sites you're signed in to.`;
+}
+
 /** Said in the thread when the cloud session would not start either. */
-export function cloudFailedLine(error: string | null): string {
+export function cloudFailedLine(error: string | null, runners: string | null = null): string {
   const why = (error ?? '').trim();
-  return `None of your computers picked this up within 3 minutes, and the cloud session would not start${why ? `: ${why.replace(/[.\s]+$/, '')}` : ''}. Nothing has been done with it.`;
+  return `None of your computers picked this up within 3 minutes, and the cloud session would not start${why ? `: ${why.replace(/[.\s]+$/, '')}` : ''}. Nothing has been done with it.${runners ? ` ${runners}` : ''}`;
 }
 
 export type BrowserWaitPorts = {
@@ -42,6 +53,8 @@ export type BrowserWaitPorts = {
   fire: (handoff: SessionHandoff) => Promise<FireSessionResult>;
   /** Posts one line into the thread the hand-off was asked in. */
   say: (handoff: SessionHandoff, text: string) => Promise<void>;
+  /** The runner's status in a sentence (runnerStatusSentence), or null when it could not be read. */
+  runners?: () => Promise<string | null>;
 };
 
 export type BrowserWaitResult = {
@@ -60,7 +73,17 @@ export async function runBrowserWait(
   const released = await ports.releaseStale();
   const keptBy = new Date(now.getTime() - waitMs).toISOString();
   const result: BrowserWaitResult = { released, started: [], failed: [], skipped: [] };
-  for (const handoff of await ports.waited(keptBy)) {
+  const waited = await ports.waited(keptBy);
+  // Read once a pass, and only when something is falling back.
+  let runners: string | null = null;
+  if (waited.length > 0 && ports.runners) {
+    try {
+      runners = await ports.runners();
+    } catch (error) {
+      console.error('the browser runners were not read', error);
+    }
+  }
+  for (const handoff of waited) {
     let fired: FireSessionResult;
     try {
       fired = await ports.fire(handoff);
@@ -72,10 +95,10 @@ export async function runBrowserWait(
     let line: string | null = null;
     if (fired.started) {
       result.started.push(handoff.id);
-      line = CLOUD_FALLBACK_LINE;
+      line = cloudFallbackLine(runners);
     } else if (fired.state === 'failed') {
       result.failed.push(handoff.id);
-      line = cloudFailedLine(fired.error);
+      line = cloudFailedLine(fired.error, runners);
     } else {
       result.skipped.push(handoff.id);
     }

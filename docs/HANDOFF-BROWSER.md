@@ -150,3 +150,50 @@ covers: a runner that claimed a task and then died or lost its connection
 before either move.
 
 Hand-offs that are not browser tasks start at once, as before.
+
+## Why no computer picked one up, to 8 November 2026 (plan #3075)
+
+Every browser task up to 8 November 2026 fell back to the cloud: the four of
+7 and 8 November (a0a12685, 8c235e97, e344355a, 5d14309f) were never
+claimed, and `core.browser_runners` had no row at all, for any account. No
+runner had ever sent a heartbeat. The functions and the service-role path
+were checked from a session the same day and answer as they should, so the
+runner was never started. Chrome open with Claude in Chrome connected is not
+enough on its own: something on the computer has to claim the task.
+
+What changed so that is easier to start and easier to see:
+
+- `npm run browser-runner -- pc --install` (or `mac`) checks the setup,
+  sends a first heartbeat, then writes a script into the Windows Startup
+  folder or a launchd agent into `~/Library/LaunchAgents` and starts it. The
+  runner then starts at sign-in and again 30 seconds after it stops.
+  `--uninstall` removes it. The text written is in
+  lib/talk/browser-runner-install.ts.
+- The runner reads `.env.local` and `.env` in the checkout, so the key need
+  not be set in the computer's environment, and it stops with what to fix
+  when the key is missing, `claude` does not run, or the first heartbeat
+  fails.
+- Home in Dev has a **Browser runner** chip: "PC up", "PC seen 3 hours ago"
+  or "Never run" (lib/talk/browser-runners.ts).
+- When a task falls back, the thread's line says why: the runner has never
+  run, when it was last seen on each computer, or that it is up and did not
+  take the task, which means Claude in Chrome did not answer there. A cloud
+  session gets the same sentence from `npx tsx scripts/handoff-session.ts
+  runners` and uses it in place of "I couldn't reach your Chrome".
+
+### The music studio's banner and its /api/jobs 500
+
+These are not the browser runner. The studio (knightx4/music-pipeline,
+studio-app, served at map-studio-liard.vercel.app) looks for the PC's own
+studio server by asking two addresses for `/api/jobs`: the page's own
+origin, then `http://127.0.0.1:8765`, which `Map Studio.cmd` serves on the
+PC. The first is a function on the studio's Vercel deployment that answers
+500 (`FUNCTION_INVOCATION_FAILED`) on every load; the studio catches it and
+moves on. The second answers only while Map Studio.cmd is running, and when
+neither does the studio shows "The PC's studio is not running". So the
+banner and the 500 share a cause only in that both come from that probe: the
+banner means Map Studio.cmd is not running, and the 500 is the studio's own
+deployment, fixed in the music-pipeline repository (stop probing the page's
+origin, or give `/api/jobs` there an answer that does not crash). Neither
+lives in this repository. A cloud session cannot reach 127.0.0.1 on the PC
+either, so a studio task that needs the PC's tracks needs the runner there.

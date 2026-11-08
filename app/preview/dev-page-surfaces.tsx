@@ -999,6 +999,7 @@ export function DevRaisedSurface() {
           inbox={3}
           slips={{ count: 3, newestHref: '/chat/people/builder' }}
           sessions={{ working: 2, waiting: 1 }}
+          browserRunner={{ value: 'Never run', up: false }}
         />
         <AskBox />
       </div>
