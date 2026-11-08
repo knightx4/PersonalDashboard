@@ -53,6 +53,22 @@ import { ATTACH_RULES, CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATT
 import { dashCodeExecution, fetchMadeFiles, madeFileIds, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
 import { CHART_DRAWN, CHART_TOOL, CHART_TOOL_DEFINITION, parseChart, type DashChart } from '@/lib/talk/chart';
 import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
+import type { CouncilReceipt } from '@/lib/you/council-model';
+import {
+  ALREADY_SENT_NOTE,
+  askedDirect,
+  DIRECT_ASKED_RULES,
+  DIRECT_MESSAGE_TOOL,
+  DIRECT_MESSAGE_TOOL_NAME,
+  DIRECT_RULES,
+  DIRECT_TRANSCRIPT_LINES,
+  directReceipt,
+  notSentNote,
+  pointerText,
+  sentNote,
+  type DirectMessenger,
+} from '@/lib/you/group-direct-message';
+import { firstName } from '@/lib/you/group-chats-model';
 import type { DashSlip } from '@/lib/dash/slips';
 
 export * from '@/lib/you/group-burst-model';
@@ -89,7 +105,13 @@ export type SpeakerInput = {
    * PASS_WORD, and nothing is posted. `brief`: the person asked several bots
    * to answer, so it keeps to a sentence or two. Absent: neither.
    */
-  turn?: { mayPass: boolean; brief: boolean };
+  turn?: { mayPass: boolean; brief: boolean; direct?: boolean };
+  /**
+   * Messages the person in this speaker's own one-on-one chat (plan #3083),
+   * offered as message_person_directly. `turn.direct` says the person asked
+   * this speaker to. Absent: no message_person_directly.
+   */
+  direct?: (input: unknown) => Promise<AskToolResult>;
   /** Starts a page for this speaker, answering the person's newest message (plan #2997). Absent: no make_page. */
   page?: (input: unknown) => Promise<AskToolResult>;
   /** Hands heavy work to a session for this speaker (plan #3005.2). Absent: no hand_off. */
@@ -142,6 +164,12 @@ export type GroupBurstInput = {
    * it. Absent: no bot in the group can pass things on.
    */
   passToBot?: BotPasser;
+  /**
+   * Messages the person in a speaker's own one-on-one chat when they ask it
+   * to (plan #3083), offered to each speaker as message_person_directly. One
+   * message per bot per message of the person's. Absent: no bot can.
+   */
+  messageDirectly?: DirectMessenger;
   /**
    * Keeps a slip when a bot's text says it attached a file that was never
    * sent (plan #3050.1). Absent: the text still says nothing came through.
@@ -450,6 +478,9 @@ function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, 
   if (call.name === HAND_TO_BOT_TOOL_NAME && input.passToBot) {
     return handOffCall(input.passToBot, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
   }
+  if (call.name === DIRECT_MESSAGE_TOOL_NAME && input.direct) {
+    return handOffCall(input.direct, call, notSentNote('something went wrong while it was being written.'));
+  }
   return placesCall(findPlaces, call);
 }
 
@@ -480,6 +511,8 @@ export async function speakWithModel(
     ...(input.page ? [PAGE_RULES] : []),
     ...(input.handOn ? [SESSION_RULES] : []),
     ...(input.passToBot ? [BOT_HANDOFF_RULES] : []),
+    ...(input.direct ? [DIRECT_RULES] : []),
+    ...(input.direct && input.turn?.direct ? [DIRECT_ASKED_RULES] : []),
     `In this group with the person: ${others.join(', ')}.`,
   ].join('\n\n');
   const tools: Anthropic.ToolUnion[] = [
@@ -489,6 +522,7 @@ export async function speakWithModel(
     ...(input.page ? [MAKE_PAGE_TOOL] : []),
     ...(input.handOn ? [HAND_OFF_TOOL] : []),
     ...(input.passToBot ? [HAND_TO_BOT_TOOL] : []),
+    ...(input.direct ? [DIRECT_MESSAGE_TOOL] : []),
   ];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
@@ -577,6 +611,8 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
 
     let carriedRound = input.round ?? null;
     let answered: string | null = null;
+    // One message to its own chat per bot per message of the person's (plan #3083).
+    const sentDirect = new Set<string>();
     for (let burst = 0; burst <= MAX_REPLANS; burst++) {
       // Texts sent in a row are one turn: wait, the lease held, until the person stops (plan #2988).
       if (input.round === undefined || burst > 0) {
@@ -612,6 +648,8 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
         // question to the person waits until the last of them has answered (plan #3080).
         const asked = new Set(state.round === 0 ? [...ask.named, ...ask.addressed] : []);
         const addressedRound = state.round === 0 && ask.addressed.length > 0;
+        // The bots the person asked to message them in their own chat (plan #3083).
+        const directAsked = new Set(state.round === 0 ? askedDirect(said, ask, members.map((m) => m.id)) : []);
         const wroteBefore = state.spoken.length;
         let askedPerson = false;
 
@@ -673,6 +711,29 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                     args,
                   )
               : undefined;
+            // A message sent to its own chat puts a link to that chat under this text (plan #3083).
+            const pointers: CouncilReceipt[] = [];
+            const messenger = input.messageDirectly;
+            const direct = messenger
+              ? async (args: unknown): Promise<AskToolResult> => {
+                  const once = `${advisorId}:${anchor.id}`;
+                  if (sentDirect.has(once)) return { ok: true, rows: [], note: ALREADY_SENT_NOTE };
+                  const sent = await messenger(
+                    {
+                      bot: member,
+                      chatId,
+                      groupTitle: group.title,
+                      said: personWords(said.split('\n')) || anchor.text,
+                      transcript: transcriptOf(thread.slice(-DIRECT_TRANSCRIPT_LINES), members, formerNames),
+                    },
+                    args,
+                  );
+                  if (!sent.ok) return { ok: true, rows: [], note: notSentNote(sent.error) };
+                  sentDirect.add(once);
+                  pointers.push(directReceipt(member));
+                  return { ok: true, rows: [], note: sentNote(firstName(member.name) || member.name) };
+                }
+              : undefined;
             // What show_chart draws goes on this text (plan #3050.2.2), and what its code makes under it (plan #3050.3.3).
             const charts: DashChart[] = [];
             const made: string[] = [];
@@ -684,15 +745,22 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                 ...(page ? { page } : {}),
                 ...(handOn ? { handOn } : {}),
                 ...(passToBot ? { passToBot } : {}),
+                ...(direct ? { direct } : {}),
                 charts,
                 ...(input.keepFiles ? { made } : {}),
                 // Somebody answers the person: the first bot of the opening round does not pass.
-                turn: { mayPass: !asked.has(advisorId) && !(state.round === 0 && state.spoken.length === 0), brief: addressedRound },
+                turn: {
+                  mayPass: !asked.has(advisorId) && !(state.round === 0 && state.spoken.length === 0),
+                  brief: addressedRound,
+                  direct: directAsked.has(advisorId),
+                },
               },
               spent['group-speaker'],
             );
             // A pass is silent: nothing is posted, and the turn costs only the call (plan #3080).
             if (text && isPass(text)) text = null;
+            // Sent to its own chat: the group gets one short line pointing there, never the message again (plan #3083).
+            if (pointers.length > 0) text = pointerText(text);
             // A text that says a file is attached when nothing was sent says so after all (plan #3050.1).
             // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
             // A file its code made is said for once it is kept (plan #3050.3.3).
@@ -708,7 +776,16 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
               if (wait > 0) await sleep(wait);
               const saved = await client
                 .from('advisor_messages')
-                .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind: 'reply', speaker_id: advisorId, text, ...(charts.length > 0 ? { charts } : {}) })
+                .insert({
+                  user_id: userId,
+                  chat_id: chatId,
+                  role: 'advisor',
+                  kind: 'reply',
+                  speaker_id: advisorId,
+                  text,
+                  ...(charts.length > 0 ? { charts } : {}),
+                  ...(pointers.length > 0 ? { receipts: pointers } : {}),
+                })
                 .select('id, created_at')
                 .single();
               if (saved.error || typeof saved.data?.id !== 'string') throw new Error(`A message was written but not saved: ${saved.error?.message ?? 'no row came back'}`);
