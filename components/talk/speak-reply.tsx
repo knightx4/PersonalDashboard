@@ -6,10 +6,12 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { QUIET_PICKER } from '@/components/talk/think-switch';
 import { cn } from '@/lib/cn';
-import { clipOf, linkClip, listenForUnlock, unlockSpeechOutput } from '@/lib/talk/speech/output';
+import { clipOf, linkClip, listenForUnlock, onSpeechFailure, unlockSpeechOutput } from '@/lib/talk/speech/output';
+import { reportSpeechFailure } from '@/lib/talk/speech/report';
 import {
   bubbleVoice,
   createSpeechPlayer,
+  pillShows,
   readSpeaking,
   rememberSpeaking,
   SPEAK_HELD_BACK,
@@ -50,18 +52,23 @@ export function SpeechFixtureProvider({ value, children }: { value: SpeechFixtur
 let player: ReturnType<typeof createSpeechPlayer> | null = null;
 
 function thePlayer() {
-  if (!player) listenForUnlock();
+  if (!player) {
+    listenForUnlock();
+    // Why a reply was not heard goes to the server log (plan #3068).
+    onSpeechFailure(reportSpeechFailure);
+  }
   player ??= createSpeechPlayer({
     fetch: (url, init) => fetch(url, init),
     // Decoded and played through one Web Audio context, so no word is lost off the start (plan #3028).
     audio: clipOf,
     // Through the page's one <audio> element, which a press opened for iPhone Safari (plan #3036).
     audioUrl: linkClip,
+    report: reportSpeechFailure,
   });
   return player;
 }
 
-const IDLE: SpeechState = { key: null, phase: 'idle', notes: {} };
+const IDLE: SpeechState = { key: null, phase: 'idle', notes: {}, heard: false };
 const speakingListeners = new Set<() => void>();
 
 function subscribeSpeaking(listener: () => void) {
@@ -347,6 +354,8 @@ export function SpeakBubble({
  * Stop that ends the reply and empties the queue. It stays up across a run
  * of queued bubbles, since the player moves from one to the next without
  * going idle, and a press on its words scrolls to the bubble being read.
+ * It comes up only once the audio sounds (plan #3068), never while the first
+ * bubble is still on its way or when the browser held it back.
  *
  * It is drawn as the first thing in the thread's scrolling part and finds
  * the bubble among its siblings by `data-speech-key`, so a pill shows only
@@ -359,7 +368,7 @@ export function SpeakingPill({ className }: { className?: string }) {
   const fixture = useContext(SpeechFixture);
   const anchor = useRef<HTMLDivElement>(null);
   const [found, setFound] = useState<{ key: string; name: string } | null>(null);
-  const key = speaking && speech.phase !== 'idle' ? speech.key : null;
+  const key = speaking && pillShows(speech) ? speech.key : null;
 
   // Read after the bubbles are drawn, since the pill sits above them.
   useEffect(() => {
