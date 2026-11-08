@@ -294,7 +294,19 @@ sign-ins, so work in a new tab and leave their open tabs alone.
 A cloud session never has these tools: the person's Chrome is on their own
 computer, and only a session started there by the runner on their PC or Mac
 can reach it (plan #3040.5 and #3040.6). Nothing is wrong when they are
-missing, and there is nothing to retry.
+missing, and there is nothing to retry. What the person needs to hear is why
+no runner took the task, so read it once:
+
+```sh
+npx tsx scripts/handoff-session.ts runners
+```
+
+It prints each computer's last heartbeat and a `sentence` such as "The
+browser runner has never run on your PC or your Mac…" or "…it was last seen
+on your PC 3 hours ago". Wherever this section has you say you could not
+reach their Chrome (the route's `--reason`, a `--failed` reason, the reply),
+say that sentence instead of "I couldn't reach your Chrome" alone (plan
+#3075).
 
 **2. Without Chrome, a headless browser on public pages.** The session has a
 headless Chromium, the one Playwright installs, with no paid browser service
@@ -316,8 +328,10 @@ runs.
 in (`signInWall` is true, or the page says so) and Chrome is not here, do
 not try to sign in, and never ask for or type a password. Record route
 `none`, then close `--failed` with the reason in a sentence the person can
-act on: "That page needs you signed in, and I couldn't reach your Chrome, so
-start the browser runner on your PC or Mac first." The thread adds "Ask me
+act on: "That page needs you signed in, and the browser runner has never run
+on your PC or your Mac, so start it on your PC first (npm run browser-runner
+-- pc --install)." with the runner's sentence from `runners` in place of the
+middle. The thread adds "Ask me
 again" after it. A request whose
 whole point is behind a sign-in (their bank, their orders) is this case from
 the start: you need not open it headless first.

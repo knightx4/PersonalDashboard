@@ -5,6 +5,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { runBrowserWait, type BrowserWaitPorts, type BrowserWaitResult } from '@/lib/talk/browser-wait';
 import { BROWSER_WAIT_MS, fireSessionHandoff } from '@/lib/talk/handoff-fire';
 import { loadWaitedBrowserHandoffs } from '@/lib/talk/handoffs';
+import { loadRunnerStatuses, runnerStatusSentence } from '@/lib/talk/browser-runners';
 
 /**
  * The browser task sweep (plan #3040.4), called every minute by pg_cron
@@ -28,6 +29,11 @@ export function browserWaitPorts(core: CoreSupabaseClient, ownerId: string): Bro
     async say(handoff, text) {
       const { error } = await core.rpc('say_in_handoff_thread', { p_handoff: handoff.id, p_text: text });
       if (error) throw new Error(error.message);
+    },
+    async runners() {
+      const now = Date.now();
+      const statuses = await loadRunnerStatuses(core, ownerId, now);
+      return statuses ? runnerStatusSentence(statuses, now) : null;
     },
   };
 }
