@@ -2,7 +2,7 @@ import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
 import { stepHref } from '@/lib/goals/all-goals';
 import { statusLabel } from '@/lib/jobs/status-label';
-import { noteHref } from '@/lib/vault/paths';
+import { isTriageNotePath, noteHref } from '@/lib/vault/paths';
 import { learnChangeWords } from './learn-changes';
 import { isWrittenCard } from './todo-changes';
 import { whenDate } from '@/lib/core/when';
@@ -240,7 +240,8 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return {
         verb: done ? 'Saved the quick note' : 'Save the quick note',
         what: quoted(change.input.body),
-        rest: " in your vault's Inbox",
+        // A quick note is a section of Quick note triage (plan #3063); an answer saved with a title is a note in the Inbox.
+        rest: isTriageNotePath(change.input.path) ? ' in Quick note triage' : " in your vault's Inbox",
       };
     case 'start_build':
       return {

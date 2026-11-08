@@ -376,6 +376,8 @@ export async function findSuggestedNotes(
   return found.filter(outsideInbox).slice(0, limit);
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * The suggested notes for each quick note, keyed by the quick note's id. A
  * quick note with no usable text, or whose lookup fails, gets an empty list
@@ -394,8 +396,9 @@ export async function suggestedNotesForInbox(
   const found = await Promise.all(
     inbox.map(async (note): Promise<[string, RelatedNote[]]> => {
       try {
-        // The quick note leaves its own row out; other Inbox notes are dropped by path.
-        const exclude = [...(options.exclude ?? []), note.id];
+        // A quick note kept as a note leaves its own row out; a section of Quick
+        // note triage (plan #3063) has no row, and that note is dropped by path.
+        const exclude = UUID.test(note.id) ? [...(options.exclude ?? []), note.id] : (options.exclude ?? []);
         return [note.id, await findSuggestedNotes(ports, note.body, { ...options, exclude })];
       } catch (error) {
         console.error('[vault suggested notes]', error instanceof Error ? error.message : error);

@@ -6,16 +6,16 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { noteCreatePorts, noteRemovePorts, noteSavePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
-import { FILE_ERRORS, fileQuickNote, isInInbox, type FileQuickNoteFailure } from '@/lib/vault/notes/file';
+import { noteCreatePorts, noteSavePorts } from '@/lib/vault/db/ports';
+import { FILE_ERRORS, fileQuickNote, type FileQuickNoteFailure } from '@/lib/vault/notes/file';
 import { loadNotes } from '@/lib/vault/notes/load';
-import { rebuildTriageNote } from '@/lib/vault/notes/triage-note-run';
-import { isTriageNotePath, noteHref } from '@/lib/vault/paths';
+import { folderOf, INBOX_FOLDER, isTriageNotePath, noteHref, TRIAGE_NOTE_PATH } from '@/lib/vault/paths';
 
 /**
  * Filing a quick note out of Quick note triage (plan #1728, feature #1726):
- * into another note, or as a note of its own. The order and the refusals are
+ * into another note, or as a note of its own. A quick note is a section of
+ * that one note (plan #3063), and filing takes its section out. The order and the refusals are
  * in lib/vault/notes/file.ts; this binds them to the signed-in person's
  * session, so RLS decides whether the notes and the connection are theirs.
  */
@@ -24,7 +24,7 @@ export type FileQuickNoteState = {
   /** Where the text went, once it has been filed. */
   filedPath?: string;
   filedTitle?: string;
-  /** Said when the text was filed but the Inbox file is still there. */
+  /** Said when the text was filed but its section is still in Quick note triage. */
   warning?: string;
   reason?: FileQuickNoteFailure;
   error?: string;
@@ -32,8 +32,18 @@ export type FileQuickNoteState = {
 
 const path = z.string().trim().min(1).max(1024);
 
+/** A quick note's path: Quick note triage, then its section's id (plan #3063). */
+function sectionIdOf(quickPath: string): string | null {
+  const prefix = `${TRIAGE_NOTE_PATH}#`;
+  if (!quickPath.startsWith(prefix)) return null;
+  const id = quickPath.slice(prefix.length);
+  return /^qn-[a-z0-9-]+$/.test(id) ? id : null;
+}
+
 const FileInput = z.object({
-  quickPath: path,
+  /** `Quick note triage.md#<section id>`, as loadTriageNotes gives it. */
+  quickPath: z.string().trim().refine((value) => sectionIdOf(value) !== null),
+  /** The fingerprint of the text it was shown with (quickSectionFingerprint). */
   quickBlobSha: z.string().trim().min(1).optional(),
   /** A note's path, or empty to make the quick note a note of its own. */
   targetPath: path.optional(),
@@ -51,7 +61,8 @@ function field(formData: FormData, name: string): string | undefined {
 }
 
 /**
- * Takes `quickPath` and `quickBlobSha` (the quick note as shown), and either
+ * Takes `quickPath` and `quickBlobSha` (the quick note as shown: its section
+ * and the fingerprint of its text), and either
  * `targetPath` with `targetBlobSha` (the note to add it to) or neither, to
  * make it a note of its own, named `title` when one is given.
  */
@@ -91,11 +102,10 @@ export async function fileQuickNoteAction(
       {
         save: noteSavePorts({ supabase: vault, afterSave }),
         create: noteCreatePorts({ supabase: vault, afterSave }),
-        remove: noteRemovePorts(vault),
       },
       {
-        quickPath: input.data.quickPath,
-        quickBlobSha: input.data.quickBlobSha,
+        sectionId: sectionIdOf(input.data.quickPath)!,
+        fingerprint: input.data.quickBlobSha,
         target: input.data.targetPath
           ? { kind: 'note', path: input.data.targetPath, blobSha: input.data.targetBlobSha }
           : { kind: 'own', title: input.data.title },
@@ -108,10 +118,9 @@ export async function fileQuickNoteAction(
 
   if (!result.ok) return { reason: result.reason, error: result.error };
 
-  after(() => rebuildTriageNote(vault));
   revalidatePath('/vault');
   revalidatePath(noteHref(result.path));
-  revalidatePath(noteHref(input.data.quickPath));
+  revalidatePath(noteHref(TRIAGE_NOTE_PATH));
   return { filedPath: result.path, filedTitle: result.title, warning: result.warning };
 }
 
@@ -134,7 +143,7 @@ export async function searchTriagePlaces(query: string): Promise<TriagePlace[]> 
   const vault = await createVaultClient();
   const found = await loadNotes(vault, { search, limit: SEARCH_PLACES_SHOWN * 4 });
   return found
-    .filter((note) => !isInInbox(note.path) && !isTriageNotePath(note.path))
+    .filter((note) => folderOf(note.path) !== INBOX_FOLDER && !isTriageNotePath(note.path))
     .slice(0, SEARCH_PLACES_SHOWN)
     .map((note) => ({ path: note.path, title: note.title, href: noteHref(note.path) }));
 }

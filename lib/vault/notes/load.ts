@@ -244,7 +244,7 @@ export async function loadNotes(
  * A quick note waiting in the Inbox: the note, its whole text, and the blob
  * SHA it was read at, which filing checks so an edit since is refused.
  */
-export type InboxNote = NoteSummary & { body: string; blobSha: string };
+export type InboxNote = NoteSummary & { body: string; blobSha: string; writtenAt: string | null };
 
 /** Quick notes read at once; an Inbox is a short list, and this bounds a runaway one. */
 export const INBOX_NOTES_MAX = 200;
@@ -263,7 +263,7 @@ export async function loadInboxNotes(
 ): Promise<InboxNote[]> {
   const { data, error } = await supabase
     .from('notes')
-    .select('id, path, title, body, blob_sha, git_updated_at')
+    .select('id, path, title, body, blob_sha, git_updated_at, written_at')
     .is('deleted_at', null)
     .like('path', `${INBOX_FOLDER}/%`)
     .order('written_at', { ascending: false, nullsFirst: false })
@@ -273,9 +273,9 @@ export async function loadInboxNotes(
   assertSchemaExposed(error, VAULT_SCHEMA);
   if (error) throw new Error(`Reading the Inbox failed: ${error.message}`);
 
-  return ((data ?? []) as (NoteRow & { blob_sha: string })[])
+  return ((data ?? []) as (NoteRow & { blob_sha: string; written_at: string | null })[])
     .filter((row) => folderOf(row.path) === INBOX_FOLDER)
-    .map((row) => ({ ...toSummary(row, row.body), body: row.body, blobSha: row.blob_sha }));
+    .map((row) => ({ ...toSummary(row, row.body), body: row.body, blobSha: row.blob_sha, writtenAt: row.written_at }));
 }
 
 type DetailRow = NoteRow & {

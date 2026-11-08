@@ -7,13 +7,14 @@ import type { ModuleId } from '@/lib/modules';
 import { noteCreatePorts, noteRemovePorts, noteRenamePorts, noteSavePorts } from '@/lib/vault/db/ports';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { createCapturedNote } from '@/lib/vault/notes/create';
-import { fileQuickNote, isInInbox } from '@/lib/vault/notes/file';
+import { fileQuickNote } from '@/lib/vault/notes/file';
+import { parseQuickSections, quickSectionFingerprint, type QuickSection } from '@/lib/vault/notes/quick-sections';
 import { renameNote } from '@/lib/vault/notes/rename';
 import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { vaultUndoRecord, type VaultUndo, type VaultUndoPorts } from '@/lib/vault/notes/undo';
 import { renameThemeRow, themeNameProblem } from '@/lib/vault/map/rename-theme';
 import { renameQuestion } from '@/lib/vault/maya/store';
-import { basenameOf, isTriageNotePath, mayaThreadHref, noteHref } from '@/lib/vault/paths';
+import { basenameOf, isTriageNotePath, mayaThreadHref, noteHref, TRIAGE_NOTE_PATH } from '@/lib/vault/paths';
 import { COURSE_FIELD_NAMES, EDUCATION_HREF, parseCourse, schoolField } from '@/lib/you/education';
 import { saveTranscriptWithCourses, updateCourse } from '@/lib/you/transcript-store';
 import { TRANSCRIPTS_BUCKET, transcriptStoragePath } from '@/lib/you/transcripts';
@@ -49,8 +50,8 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
  * made with the user id too, so each of their reads and writes names them.
  *
  * A note an agent writes is embedded by the next sync, not straight after the
- * write as the page does, and Quick note triage's own note is rebuilt the next
- * time a quick note is added or filed on the page.
+ * write as the page does. A quick note is a section of Quick note triage
+ * (plan #3063), which file_quick_note takes out once its text is filed.
  */
 
 export type VaultWriteEnv = {
@@ -236,7 +237,9 @@ export function appendToBody(body: string, addition: string): string {
 async function editVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
   const before = await ownNote(env, idOf(args, 'note_ref', 'note'));
   const path = before.path as string;
-  if (isTriageNotePath(path)) throw new VaultRefused('Quick note triage is rewritten by the app, so it is not edited by hand.');
+  if (isTriageNotePath(path)) {
+    throw new VaultRefused('Quick note triage holds the quick notes waiting, one section each: add one with add_quick_note and file one with file_quick_note.');
+  }
   const replace = typeof args.body === 'string' ? (args.body as string) : null;
   const append = text(args, 'append');
   if ((replace === null) === !append) throw new VaultRefused('Give body to replace the note\'s text, or append to add to its foot, not both.');
@@ -283,18 +286,48 @@ async function renameVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMad
 // file_quick_note
 // ---------------------------------------------------------------------------
 
+/**
+ * The quick note `quick_note` names among the sections of Quick note triage
+ * (plan #3063): its id, the heading's day and time, or the start of its text.
+ * Refused when none matches or more than one does, naming them.
+ */
+function pickSection(sections: readonly QuickSection[], wanted: string): QuickSection {
+  const plain = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase();
+  const want = plain(wanted);
+  const byId = sections.find((section) => section.id === wanted.trim());
+  if (byId) return byId;
+  const found = sections.filter(
+    (section) => plain(section.heading) === want || plain(section.text).startsWith(want),
+  );
+  if (found.length === 1) return found[0];
+  const list = sections
+    .slice(-10)
+    .map((section) => `${section.id} (${section.heading}): "${named(section.text, '')}"`)
+    .join('; ');
+  if (found.length === 0) {
+    throw new VaultRefused(
+      sections.length === 0
+        ? 'Quick note triage has no quick notes waiting.'
+        : `No quick note in Quick note triage matches that. The latest are: ${list}.`,
+    );
+  }
+  throw new VaultRefused(`More than one quick note matches that; give its id. The latest are: ${list}.`);
+}
+
 async function fileQuickNoteTool(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
-  const quick = await ownNote(env, idOf(args, 'quick_note_ref', 'quick note'));
-  const quickPath = quick.path as string;
-  if (!isInInbox(quickPath)) throw new VaultRefused('That note is not a quick note: it is not in the Inbox folder.');
+  const wanted = text(args, 'quick_note');
+  if (!wanted) throw new VaultRefused('quick_note is missing: give the start of its text, or its id from Quick note triage.');
+  const triage = await env.notes.save.loadNote(TRIAGE_NOTE_PATH);
+  if (!triage) throw new VaultRefused('Quick note triage has no quick notes waiting.');
+  const section = pickSection(parseQuickSections(triage.body), wanted);
   const into = text(args, 'into_note_ref') ? await ownNote(env, idOf(args, 'into_note_ref', 'note')) : null;
-  if (into && isTriageNotePath(into.path as string)) throw new VaultRefused('Quick note triage is rewritten by the app, so nothing is filed into it.');
+  if (into && isTriageNotePath(into.path as string)) throw new VaultRefused('A quick note cannot be filed into Quick note triage itself.');
 
   const filed = await fileQuickNote(
-    { save: env.notes.save, create: env.notes.create, remove: env.notes.remove },
+    { save: env.notes.save, create: env.notes.create },
     {
-      quickPath,
-      quickBlobSha: quick.blob_sha as string,
+      sectionId: section.id,
+      fingerprint: quickSectionFingerprint(section.text),
       target: into ? { kind: 'note', path: into.path as string, blobSha: into.blob_sha as string } : { kind: 'own' },
     },
   );
@@ -302,15 +335,18 @@ async function fileQuickNoteTool(env: VaultWriteEnv, args: Args): Promise<VaultM
 
   const note = await noteAt(env, filed.path);
   const what = named(filed.title, basenameOf(filed.path));
-  const quickText = quick.body as string;
   const body = into ? (into.body as string) : null;
-  // A quick note still in the Inbox is not written back by the Undo, which would meet it there.
+  // A section still in Quick note triage is not written back by the Undo, which would meet it there.
   const undo: VaultUndo = filed.removed
-    ? { kind: 'unfile', body, quick: { path: quickPath, text: quickText } }
+    ? {
+        kind: 'unfile_section',
+        body,
+        section: { id: section.id, capturedAt: section.capturedAt ?? new Date().toISOString(), text: section.text },
+      }
     : body === null
       ? { kind: 'remove' }
       : { kind: 'restore', body };
-  const quickName = named(quick.title, basenameOf(quickPath));
+  const quickName = named(section.text, section.heading);
   const made = noteMade('file_quick_note', into ? 'update' : 'insert', note, into, undo, {
     verb: 'Filed',
     what,
@@ -318,7 +354,7 @@ async function fileQuickNoteTool(env: VaultWriteEnv, args: Args): Promise<VaultM
     summary: into
       ? `Dash filed the quick note "${quickName}" into the note "${what}".`
       : `Dash made the quick note "${quickName}" a note of its own, "${what}".`,
-  }, [noteHref(quickPath)]);
+  }, [noteHref(TRIAGE_NOTE_PATH)]);
   return filed.warning ? { ...made, summary: `${made.summary} ${filed.warning}` } : made;
 }
 
@@ -590,14 +626,17 @@ export const VAULT_WRITES: readonly VaultWrite[] = [
     runs: sameAs(['app/vault/triage/actions.ts#fileQuickNoteAction', 'lib/vault/notes/file.ts#fileQuickNote']),
     modules: ['vault'],
     description:
-      'File one of their quick notes out of the Inbox, when they ask: into another note, where its text is added at the foot under the day\'s date, or as a note of its own at the top of the vault when into_note_ref is left out. Name both by the obsidian.notes refs a lookup returned.',
+      'File one of their quick notes out of Quick note triage, when they ask: into another note, where its text is added at the foot under the day\'s date, or as a note of its own at the top of the vault when into_note_ref is left out. Its section then comes out of Quick note triage. Each quick note is a section of that one note, under a heading with the day and time it was captured.',
     input_schema: {
       type: 'object',
       properties: {
-        quick_note_ref: { type: 'string', description: 'The obsidian.notes ref of the quick note, in the Inbox folder.' },
+        quick_note: {
+          type: 'string',
+          description: 'Which quick note: the start of its text as they gave it, the day and time on its heading in Quick note triage, or its id (the qn- one in the line under that heading).',
+        },
         into_note_ref: { type: 'string', description: 'The obsidian.notes ref of the note to add it to. Left out, it becomes a note of its own.' },
       },
-      required: ['quick_note_ref'],
+      required: ['quick_note'],
       additionalProperties: false,
     },
     run: fileQuickNoteTool,

@@ -25,7 +25,8 @@ import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { DISPOSAL_METHODS } from '@/lib/inventory/status-actions';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
 import { insertIdea } from '@/lib/ideas/insert';
-import { createCapturedNote } from '@/lib/vault/notes/create';
+import { addQuickNote as addQuickNoteSection } from '@/lib/vault/notes/quick-notes';
+import { vaultUndoRecord } from '@/lib/vault/notes/undo';
 import { noteHref } from '@/lib/vault/paths';
 import { LEARN_WRITE_TOOLS } from './learn-writes';
 import { TODO_WRITE_TOOLS } from './todo-writes';
@@ -901,12 +902,11 @@ async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
 const QUICK_NOTE_MAX = 4000;
 
 /**
- * Save a quick thought as a quick note: a new note in the vault's Inbox,
- * committed to the notes repository as the Vault page's quick note box and
- * the capture box write it (fileVaultNote), and left there to be sorted in
- * Quick note triage. Undo takes the file back out of the repository while it
- * is still as written (undoVaultCapture), which is why the blob SHA it was
- * written at is kept.
+ * Save a quick thought as a quick note: a section at the foot of Quick note
+ * triage, committed to the notes repository as the Vault page's quick note
+ * box and the capture box write it (addVaultQuickNote, plan #3063), and left
+ * there to be sorted. Undo takes that section back out while its text is as
+ * written (undoVaultCapture), which is why the record keeps its id and text.
  */
 async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'vault');
@@ -915,9 +915,9 @@ async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWrit
   if (body.length > QUICK_NOTE_MAX) throw new Refused(`Keep the note under ${QUICK_NOTE_MAX} characters.`);
   if (!ctx.quickNotePorts) throw new Refused('Quick notes cannot be saved from here.');
 
-  // The Vault page's own write (addQuickNote through fileVaultNote): the note
-  // in the Inbox, named from its text.
-  const filed = await createCapturedNote(await ctx.quickNotePorts(), body);
+  // The Vault page's own write (addQuickNote through addVaultQuickNote): a
+  // section of Quick note triage.
+  const filed = await addQuickNoteSection({ ...(await ctx.quickNotePorts()), timeZone: ctx.timezone }, body);
   if (!filed.ok) throw new Refused(filed.error);
   const ref = toRef(TABLE.note, filed.noteId);
   const line = body.split('\n')[0].trim();
@@ -930,8 +930,11 @@ async function addQuickNote(ctx: DashWriteContext, args: Args): Promise<DashWrit
       op: 'insert',
       before: null,
       after: await readSubject(ctx.db, ref),
-      summary: `Dash saved the quick note "${short}" to your vault's Inbox.`,
-      undo: { vault_blob_sha: filed.blobSha },
+      summary: `Dash saved the quick note "${short}" to Quick note triage.`,
+      undo: vaultUndoRecord(filed.blobSha, { kind: 'section', id: filed.section.id, text: filed.section.text }) as unknown as Record<
+        string,
+        unknown
+      >,
       row: { table: TABLE.note, ref: filed.noteId, title: filed.title, href: noteHref(filed.path) },
     },
   );
@@ -1265,8 +1268,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_quick_note',
-    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/vault/notes/create.ts#createCapturedNote']),
-    'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in the vault\'s Inbox, where Quick note triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
+    sameAs(['app/vault/actions.ts#addQuickNote', 'lib/vault/notes/quick-notes.ts#addQuickNote']),
+    'Save a quick thought as a quick note in their vault, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought"). It goes in as a section at the foot of their Quick note triage note, where triage sorts it later. Write it word for word as they gave it. Not for a todo, an idea for the app, a goal or a note on a role, which have tools of their own.',
     {
       type: 'object',
       properties: {

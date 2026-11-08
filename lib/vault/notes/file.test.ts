@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CreateNotePorts, NewNoteRow, RemoveNotePorts } from '@/lib/vault/notes/create';
+import type { CreateNotePorts, NewNoteRow } from '@/lib/vault/notes/create';
 import { appendQuickNote, FILE_ERRORS, fileQuickNote, filedLine, type FileQuickNotePorts } from '@/lib/vault/notes/file';
 import type { SaveNotePorts } from '@/lib/vault/notes/save';
+import { parseQuickSections, quickSectionFingerprint, withQuickSections } from '@/lib/vault/notes/quick-sections';
 import { VaultConflictError, VaultReadOnlyError, type VaultSource } from '@/lib/vault/providers/types';
 
 const NOW = new Date('2026-10-10T09:00:00Z');
@@ -65,19 +66,17 @@ function vault(notes: Row[], source: Partial<VaultSource> = {}) {
     afterSave: vi.fn(),
     now: () => NOW,
   };
-  const remove: RemoveNotePorts = {
-    openSource: async () => repo,
-    loadNote: async (id) => byId(id),
-    markDeleted: async (id) => {
-      byId(id)!.deleted = true;
-    },
-  };
-  const ports: FileQuickNotePorts = { save, create, remove, now: () => NOW };
+  const ports: FileQuickNotePorts = { save, create, now: () => NOW };
   return { ports, rows, commits, blobs };
 }
 
-const quick: Row = { id: 'q1', path: 'Inbox/Ask Ana about the lease.md', title: 'Ask Ana about the lease', body: 'Ask Ana about the lease\nbefore Friday\n', blobSha: 'qb', deleted: false };
+const ANA = { id: 'qn-ana', capturedAt: '2026-10-09T08:00:00.000Z', heading: '9 October 2026, 8:00 AM', text: 'Ask Ana about the lease\nbefore Friday' };
+const KITE = { id: 'qn-kite', capturedAt: '2026-10-09T09:00:00.000Z', heading: '9 October 2026, 9:00 AM', text: 'Buy a kite' };
+const TRIAGE_BODY = withQuickSections('', [ANA, KITE]);
+const triage: Row = { id: 'tr', path: 'Quick note triage.md', title: 'Quick note triage', body: TRIAGE_BODY, blobSha: 'trb', deleted: false };
 const flat: Row = { id: 't1', path: 'Home/Flat.md', title: 'Flat', body: '# Flat\n\nThe boiler is due a service.\n', blobSha: 'tb', deleted: false };
+
+const sectionsIn = (rows: Map<string, Row>) => parseQuickSections(rows.get('Quick note triage.md')!.body).map((s) => s.id);
 
 describe('appendQuickNote', () => {
   it('puts the text at the foot under a dated line', () => {
@@ -93,118 +92,93 @@ describe('appendQuickNote', () => {
 });
 
 describe('filing a quick note into a note', () => {
-  it('saves the text to the target first, then removes the Inbox file', async () => {
-    const { ports, rows, commits } = vault([quick, flat]);
-    const result = await fileQuickNote(ports, { quickPath: quick.path, quickBlobSha: 'qb', target: { kind: 'note', path: flat.path, blobSha: 'tb' } });
+  it('saves the text to the target first, then takes out that section alone', async () => {
+    const { ports, rows, commits } = vault([triage, flat]);
+    const result = await fileQuickNote(ports, {
+      sectionId: ANA.id,
+      fingerprint: quickSectionFingerprint(ANA.text),
+      target: { kind: 'note', path: flat.path, blobSha: 'tb' },
+    });
 
-    expect(result).toEqual({ ok: true, path: flat.path, title: 'Flat', removed: true });
-    expect(commits).toEqual([
-      'write Home/Flat.md: Edit Flat from Dash',
-      'delete Inbox/Ask Ana about the lease.md: Remove Ask Ana about the lease from Dash',
-    ]);
+    expect(result).toMatchObject({ ok: true, path: flat.path, title: 'Flat', removed: true, section: { id: ANA.id, text: ANA.text } });
     expect(rows.get(flat.path)!.body).toBe(
       '# Flat\n\nThe boiler is due a service.\n\n*Added 10 October 2026*\n\nAsk Ana about the lease\nbefore Friday\n',
     );
-    expect(rows.get(quick.path)!.deleted).toBe(true);
+    expect(sectionsIn(rows)).toEqual([KITE.id]);
+    expect(commits).toEqual(['write Home/Flat.md: Edit Flat from Dash', 'write Quick note triage.md: Edit Quick note triage from Dash']);
   });
 
-  it('leaves the Inbox note untouched when the save is refused', async () => {
-    // The target was changed in Obsidian and pushed: the repository refuses the stale write.
-    const { ports, rows, commits } = vault([quick, flat], {
-      writeNote: async (path: string) => {
-        throw new VaultConflictError('stale', path);
-      },
+  it('refuses a section edited since it was shown, and changes nothing', async () => {
+    const { ports, rows, commits } = vault([triage, flat]);
+    const result = await fileQuickNote(ports, {
+      sectionId: ANA.id,
+      fingerprint: quickSectionFingerprint('Ask Ana'),
+      target: { kind: 'note', path: flat.path },
     });
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: flat.path } });
+    expect(result).toEqual({ ok: false, reason: 'quick-changed', error: FILE_ERRORS['quick-changed'] });
+    expect(commits).toEqual([]);
+    expect(sectionsIn(rows)).toEqual([ANA.id, KITE.id]);
+  });
 
+  it('refuses a section that is gone, and Quick note triage as the target', async () => {
+    const { ports, commits } = vault([triage, flat]);
+    expect(await fileQuickNote(ports, { sectionId: 'qn-gone', target: { kind: 'own' } })).toMatchObject({ ok: false, reason: 'not-quick' });
+    expect(await fileQuickNote(ports, { sectionId: ANA.id, target: { kind: 'note', path: 'Quick note triage.md' } })).toMatchObject({
+      ok: false,
+      reason: 'same-note',
+    });
+    expect(commits).toEqual([]);
+  });
+
+  it('leaves the section where it is when the target changed in Obsidian', async () => {
+    const { ports, rows, commits } = vault([triage, flat]);
+    const result = await fileQuickNote(ports, { sectionId: ANA.id, target: { kind: 'note', path: flat.path, blobSha: 'older' } });
     expect(result).toEqual({ ok: false, reason: 'changed', error: FILE_ERRORS.changed });
     expect(commits).toEqual([]);
-    expect(rows.get(quick.path)).toMatchObject({ deleted: false, blobSha: 'qb' });
+    expect(sectionsIn(rows)).toEqual([ANA.id, KITE.id]);
   });
 
-  it('refuses a target the person saw at an older version, before writing anything', async () => {
-    const { ports, commits } = vault([quick, flat]);
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: flat.path, blobSha: 'old' } });
-    expect(result).toMatchObject({ ok: false, reason: 'changed' });
-    expect(commits).toEqual([]);
-  });
-
-  it('says so when the token cannot write, and moves nothing', async () => {
-    const { ports, rows } = vault([quick, flat], {
+  it('says what happened when the vault cannot be written', async () => {
+    const { ports, rows } = vault([triage, flat], {
       writeNote: async () => {
         throw new VaultReadOnlyError('read only');
       },
     });
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: flat.path } });
+    const result = await fileQuickNote(ports, { sectionId: ANA.id, target: { kind: 'note', path: flat.path } });
     expect(result).toMatchObject({ ok: false, reason: 'read-only' });
-    expect(rows.get(quick.path)!.deleted).toBe(false);
-  });
-
-  it('refuses a quick note edited since it was shown, a missing target, itself, and a note outside the Inbox', async () => {
-    const { ports, commits } = vault([quick, flat]);
-    const into = { kind: 'note' as const, path: flat.path };
-    expect(await fileQuickNote(ports, { quickPath: quick.path, quickBlobSha: 'older', target: into })).toMatchObject({ reason: 'quick-changed' });
-    expect(await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: 'Gone.md' } })).toMatchObject({ reason: 'not-found' });
-    expect(await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: quick.path } })).toMatchObject({ reason: 'same-note' });
-    expect(await fileQuickNote(ports, { quickPath: flat.path, target: { kind: 'own' } })).toMatchObject({ reason: 'not-quick' });
-    expect(commits).toEqual([]);
-  });
-
-  it('reports the text filed but the Inbox file kept when only the removal fails', async () => {
-    const { ports, rows } = vault([quick, flat], {
-      deleteNote: async (path: string) => {
-        throw new VaultConflictError('stale', path);
-      },
-    });
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'note', path: flat.path } });
-    expect(result).toMatchObject({ ok: true, path: flat.path, removed: false });
-    expect(result.ok && result.warning).toContain('Flat');
-    expect(rows.get(flat.path)!.body).toContain('before Friday');
-    expect(rows.get(quick.path)!.deleted).toBe(false);
+    expect(sectionsIn(rows)).toEqual([ANA.id, KITE.id]);
   });
 });
 
 describe('making a quick note a note of its own', () => {
-  it('writes it at the top of the vault, named from its first line, then removes the Inbox file', async () => {
-    const { ports, rows, commits } = vault([quick]);
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'own' } });
-
-    expect(result).toEqual({ ok: true, path: 'Ask Ana about the lease.md', title: 'Ask Ana about the lease', removed: true });
-    expect(commits).toEqual([
-      'create Ask Ana about the lease.md: Add Ask Ana about the lease from Dash',
-      'delete Inbox/Ask Ana about the lease.md: Remove Ask Ana about the lease from Dash',
-    ]);
+  it('writes it at the top of the vault named from its first line, then takes out its section', async () => {
+    const { ports, rows, commits } = vault([triage]);
+    const result = await fileQuickNote(ports, { sectionId: ANA.id, target: { kind: 'own' } });
+    expect(result).toMatchObject({ ok: true, path: 'Ask Ana about the lease.md', title: 'Ask Ana about the lease', removed: true });
     expect(rows.get('Ask Ana about the lease.md')!.body).toBe('Ask Ana about the lease\nbefore Friday\n');
-    expect(rows.get(quick.path)!.deleted).toBe(true);
+    expect(sectionsIn(rows)).toEqual([KITE.id]);
+    expect(commits[0]).toBe('create Ask Ana about the lease.md: Add Ask Ana about the lease from Dash');
   });
 
-  it('takes the name the person gave it in place of its first line (note 24fd1e02)', async () => {
-    const { ports, rows } = vault([quick]);
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'own', title: 'Lease call' } });
-
-    expect(result).toMatchObject({ ok: true, path: 'Lease call.md', removed: true });
-    expect(rows.get('Lease call.md')!.body).toBe('Ask Ana about the lease\nbefore Friday\n');
-    expect(rows.get(quick.path)!.deleted).toBe(true);
+  it('takes the name the person typed', async () => {
+    const { ports, rows } = vault([triage]);
+    const result = await fileQuickNote(ports, { sectionId: KITE.id, target: { kind: 'own', title: 'Kites' } });
+    expect(result).toMatchObject({ ok: true, path: 'Kites.md', removed: true });
+    expect(rows.get('Kites.md')!.body).toBe('Buy a kite\n');
   });
 
-  it('takes the next number when the name is already taken', async () => {
-    const taken: Row = { id: 't2', path: 'Ask Ana about the lease.md', title: 'Ask Ana about the lease', body: 'Older\n', blobSha: 'ob', deleted: false };
-    const { ports, rows } = vault([quick, taken]);
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'own' } });
-
-    expect(result).toMatchObject({ ok: true, path: 'Ask Ana about the lease 2.md', removed: true });
-    expect(rows.get(taken.path)!.body).toBe('Older\n');
-  });
-
-  it('leaves the Inbox note where it was when the new note cannot be written', async () => {
-    const { ports, rows, commits } = vault([quick], {
-      createNote: async () => {
-        throw new VaultReadOnlyError('read only');
+  it('warns when the text is filed but the section could not be taken out', async () => {
+    let writes = 0;
+    const { ports, rows } = vault([triage, flat], {
+      writeNote: async (path: string) => {
+        writes += 1;
+        if (path === 'Quick note triage.md') throw new VaultReadOnlyError('read only');
+        return { blobSha: `w${writes}`, commitSha: `c${writes}` };
       },
     });
-    const result = await fileQuickNote(ports, { quickPath: quick.path, target: { kind: 'own' } });
-    expect(result).toMatchObject({ ok: false, reason: 'read-only' });
-    expect(commits).toEqual([]);
-    expect(rows.get(quick.path)!.deleted).toBe(false);
+    const result = await fileQuickNote(ports, { sectionId: ANA.id, target: { kind: 'note', path: flat.path } });
+    expect(result).toMatchObject({ ok: true, removed: false });
+    expect(result.ok && result.warning).toMatch(/could not be taken out of Quick note triage/);
+    expect(sectionsIn(rows)).toEqual([ANA.id, KITE.id]);
   });
 });

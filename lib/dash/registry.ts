@@ -17,6 +17,7 @@ import { PAID_TOOLS } from './paid-tools';
 import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
 import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import type { SaveNotePorts } from '@/lib/vault/notes/save';
 import type { RoutineTarget } from '@/lib/feedback/routine';
 import type { TakeOnOrigin } from '@/lib/goals/take-on';
 import type { SlipWhere } from './slips';
@@ -127,14 +128,14 @@ export type DashWriteContext = AskContext & {
    */
   readPosting?: (url: string) => Promise<FetchOutcome>;
   /**
-   * The note-create ports on the person's vault, embedding each note once
-   * the reply has gone, for add_quick_note (plan #1894.2): sessionInboxPorts
-   * from lib/capture/vault.ts on the person's session, or the connector's
-   * service-role ports for the person its token names. The tool calls
-   * createCapturedNote on them, as the Vault page's quick note does (plan
-   * #2473.5). Absent: the note is refused.
+   * The ports a quick note is written with on the person's vault, for
+   * add_quick_note (plan #1894.2): sessionInboxPorts from
+   * lib/capture/vault.ts on the person's session, or the connector's
+   * service-role ports for the person its token names. The tool adds a
+   * section to Quick note triage with them (addQuickNote, plan #3063), as
+   * the Vault page's quick note does. Absent: the note is refused.
    */
-  quickNotePorts?: () => Promise<CreateNotePorts>;
+  quickNotePorts?: () => Promise<{ save: SaveNotePorts; create: CreateNotePorts }>;
   /**
    * Whether this person may start the goals routine, and the routine it is
    * fired at, for start_goal_run and work_goal_step (lib/dash/goal-run-writes.ts).

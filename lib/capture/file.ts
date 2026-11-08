@@ -45,7 +45,17 @@ export type CaptureWriters = {
   /** createCapturedNote: a new note in the vault's Inbox, committed and stored. */
   vault: (
     text: string,
-  ) => Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }>;
+  ) => Promise<
+    | {
+        ok: true;
+        noteId: string;
+        title: string;
+        blobSha: string;
+        /** What Undo needs: a quick note's section (plan #3063). Left out, Undo removes the note. */
+        undo?: Record<string, unknown>;
+      }
+    | { ok: false; error: string }
+  >;
   /** A goal, by its title alone, in one of their areas (plan #1950.5). */
   goal: (areaId: string, title: string) => Promise<CaptureRowWrite>;
   /** A goals area, by its name. */
@@ -426,9 +436,9 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
     const where = filedDestination('vault', {});
     const subjectRef = `obsidian.notes:${result.noteId}`;
     const files = await attachTo(writers, [subjectRef], errors);
-    // Undo removes the file from the repository as well as the row, so it
-    // is capture's own (lib/capture/vault.ts), told apart by the blob SHA
-    // the note was written at.
+    // A quick note is a section of Quick note triage (plan #3063). Undo takes
+    // that section out of the repository's note, so it is capture's own
+    // (lib/capture/vault.ts), told apart by what `undo` keeps.
     const actionId = await writers.record({
       surface: 'capture',
       kind: 'add_vault_note',
@@ -436,9 +446,9 @@ export const CAPTURE_MAKERS: Readonly<Record<CaptureKindId, Maker>> = {
       op: 'insert',
       summary:
         by === 'dash'
-          ? `Dash added the note "${quoted(result.title)}" to your vault's Inbox from capture.`
-          : `You added the note "${quoted(result.title)}" to your vault's Inbox.`,
-      undo: aimedUndo(by, { vault_blob_sha: result.blobSha }),
+          ? `Dash added the quick note "${quoted(result.title)}" to Quick note triage from capture.`
+          : `You added the quick note "${quoted(result.title)}" to Quick note triage.`,
+      undo: aimedUndo(by, result.undo ?? { vault_blob_sha: result.blobSha }),
     });
     return {
       ok: true,
