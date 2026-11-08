@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth/server';
 import { speakReply, SPEAK_INPUT_MAX } from '@/lib/talk/speech/speak';
-import { speakDeps } from '@/lib/talk/speech/speak-server';
+import { speakDeps, spokenTextFor } from '@/lib/talk/speech/speak-server';
 import { VOICE_ID } from '@/lib/talk/speech/voices-model';
 import { createYouClient } from '@/lib/you/auth/server';
 import { readBotVoice } from '@/lib/you/bot-voices';
@@ -17,6 +17,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * the default. A bot's form posts `voice`, a Fish voice id, to hear a sample
  * of a voice that has no recording of its own; it counts against the month
  * like a reply.
+ *
+ * A reply is not read word for word (plan #3079): it is rewritten into a
+ * short spoken version first (lib/talk/speech/script.ts), with no step
+ * outlines, ids, addresses or lists read out, and the bubble on screen is
+ * left as it was. With `message`, the id of the bot's message the bubble is,
+ * the version is kept on that row and a second hearing reuses it. When the
+ * rewrite fails, the reply is read as it was before. A sample is never
+ * rewritten.
  *
  * The text is cut to what is worth hearing and to 600 characters before it
  * goes (lib/talk/speech/text.ts), and its bytes are counted against the
@@ -55,12 +63,15 @@ export async function POST(request: Request) {
   } catch {
     fields = {};
   }
-  const { text, bot, voice } = fields;
+  const { text, bot, voice, message } = fields;
   if (typeof text !== 'string' || text.length > SPEAK_INPUT_MAX) {
     return NextResponse.json({ error: `Send the reply as text of at most ${SPEAK_INPUT_MAX} characters.` }, { status: 400 });
   }
   if ((bot !== undefined && (typeof bot !== 'string' || !UUID.test(bot))) || (voice !== undefined && (typeof voice !== 'string' || !VOICE_ID.test(voice)))) {
     return NextResponse.json({ error: 'Name the bot by its id, or the voice by a Fish voice id.' }, { status: 400 });
+  }
+  if (message !== undefined && (typeof message !== 'string' || !UUID.test(message))) {
+    return NextResponse.json({ error: 'Name the message by its id.' }, { status: 400 });
   }
 
   // A sample names the voice itself; a reply names its bot, whose own voice it is read in.
@@ -73,7 +84,17 @@ export async function POST(request: Request) {
     }
   }
 
-  const outcome = await speakReply(text, await speakDeps(user.id, voiceId));
+  // A reply is heard as its short spoken version; a voice's sample line as written.
+  let spoken = text;
+  if (typeof voice !== 'string' && text.trim()) {
+    try {
+      spoken = await spokenTextFor(user.id, text, typeof message === 'string' ? message : null);
+    } catch (error) {
+      console.error('[speech] spoken version not made, reading the reply', error instanceof Error ? error.message : error);
+    }
+  }
+
+  const outcome = await speakReply(spoken, await speakDeps(user.id, voiceId));
   if (!outcome.ok) {
     return NextResponse.json(
       { why: outcome.why, message: outcome.message },
