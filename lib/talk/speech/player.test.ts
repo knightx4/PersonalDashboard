@@ -214,6 +214,35 @@ describe('the speech player', () => {
     expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
   });
 
+  it('reads eight bots answering in a row one after another, each in its own voice, fetching all at once (plan #3080)', async () => {
+    const bodies: { text: string; bot?: string }[] = [];
+    const audios: SpeechAudio[] = [];
+    const player = createSpeechPlayer({
+      wait: async () => {},
+      fetch: (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(audioResponse());
+      },
+      audio: () => {
+        const audio: SpeechAudio = { play: vi.fn(async () => {}), pause: vi.fn(), onended: null, onerror: null };
+        audios.push(audio);
+        return { audio, release: () => {} };
+      },
+    });
+    const bots = ['ada', 'ben', 'cy', 'dee', 'eve', 'fay', 'gus', 'hal'];
+    for (const bot of bots) player.speakOnce(`m-${bot}`, `${bot} says one thing.`, { bot });
+    await settle();
+    expect(bodies.map((b) => b.bot)).toEqual(bots);
+    const heard: (string | null)[] = [];
+    for (let i = 0; i < bots.length; i++) {
+      heard.push(player.get().key);
+      audios[i].onended?.();
+      await settle();
+    }
+    expect(heard).toEqual(bots.map((b) => `m-${b}`));
+    expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
+  });
+
   it('pauses briefly between bubbles, and not before the first', async () => {
     const { player, audios, waits } = setup([]);
     player.queue('a', 'One.');

@@ -8,9 +8,9 @@ import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
 import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import {
-  MAX_BOT_MESSAGES,
-  MAX_OPENERS,
+  groupCaps,
   MAX_PER_BOT,
+  PASS_WORD,
   runGroupBurst,
   SPEAKER_CODE_MAX_TOKENS,
   SPEAKER_MAX_LOOKUPS,
@@ -152,8 +152,8 @@ function madeFilesClient(files: Record<string, { filename: string; mime_type: st
 }
 
 /** Checks every cap over the bot messages after one message from the person. */
-function expectCapsHold(said: Row[]) {
-  expect(said.length).toBeLessThanOrEqual(MAX_BOT_MESSAGES);
+function expectCapsHold(said: Row[], most = groupCaps(8).messages) {
+  expect(said.length).toBeLessThanOrEqual(most);
   const count = new Map<unknown, number>();
   for (const [i, m] of said.entries()) {
     count.set(m.speaker_id, (count.get(m.speaker_id) ?? 0) + 1);
@@ -164,7 +164,7 @@ function expectCapsHold(said: Row[]) {
 
 describe('runGroupBurst (plan #2879.1.2)', () => {
   it('holds every cap when every bot is prompted to keep talking', async () => {
-    const { client, tables } = group('Everyone, argue about this forever.');
+    const { client, tables } = group('Argue about this forever.');
     const looks: DirectorInput[] = [];
     // A director that always wants every bot to answer, for a reason that would let them.
     const director = async (input: DirectorInput): Promise<DirectorPlan> => {
@@ -179,15 +179,94 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     const outcome = await runGroupBurst({ ...base(client), director, speak });
     const said = botMessages(tables);
     expectCapsHold(said);
-    expect(said).toHaveLength(MAX_BOT_MESSAGES);
-    expect(outcome.messages).toBe(MAX_BOT_MESSAGES);
-    // The opening round is three; the director looked at most once per round, three rounds in all.
+    // Eight bots: four answer the person and eight messages in all (plan #3080).
+    expect(said).toHaveLength(groupCaps(8).messages);
+    expect(outcome.messages).toBe(groupCaps(8).messages);
+    // The director looked at most once per round, three rounds in all.
     expect(looks.length).toBeLessThanOrEqual(3);
     expect(looks[0].state.round).toBe(0);
-    expect(said.slice(0, MAX_OPENERS).every((m) => typeof m.speaker_id === 'string')).toBe(true);
+    expect(said.slice(0, groupCaps(8).openers).every((m) => typeof m.speaker_id === 'string')).toBe(true);
     // The lease is let go at the end, with every bot's typing.
     expect(tables.advisor_chats[0].typing_until).toBeNull();
     expect(tables.advisor_chat_members.every((m) => m.typing_until === null)).toBe(true);
+  });
+
+  it('holds three openers and six messages in a group of three, as before (plan #3080)', async () => {
+    const { client, tables } = group('Argue about this forever.', 3);
+    const director = async (input: DirectorInput): Promise<DirectorPlan> => ({
+      wait: false,
+      picks: input.members.map((m) => ({ key: m.key, why: input.state.round === 0 ? 'answer' : 'question' })),
+      reactions: [],
+    });
+    const speak = async (input: SpeakerInput) => `${input.members.find((m) => m.id !== input.speaker.id)!.name.split(' ')[0]}, what do you say?`;
+    await runGroupBurst({ ...base(client), director, speak });
+    const said = botMessages(tables);
+    expectCapsHold(said, 6);
+    expect(said).toHaveLength(6);
+  });
+
+  it('gives all eight one turn each when the person asks everyone, even when one asks the person something (plan #3080)', async () => {
+    const { client, tables } = group('Everyone say one thing');
+    const turns: SpeakerInput['turn'][] = [];
+    await runGroupBurst({
+      ...base(client),
+      // A director that would pick only two, and then wait.
+      director: async (input) =>
+        input.state.round === 0 ? { wait: false, picks: [{ key: 'eve', why: 'answer' }, { key: 'ben', why: 'answer' }], reactions: [] } : { wait: true, picks: [], reactions: [] },
+      speak: async (input) => {
+        turns.push(input.turn);
+        return input.speaker.key === 'cy' ? 'What would you say yourself?' : `${input.speaker.name} says one thing.`;
+      },
+    });
+    const said = botMessages(tables).map((m) => m.speaker_id);
+    expect(said).toEqual(['id-eve', 'id-ben', 'id-ada', 'id-cy', 'id-dee', 'id-fay', 'id-gus', 'id-hal']);
+    // Each was asked, so none may pass, and each keeps it short.
+    expect(turns.every((t) => t?.mayPass === false && t.brief === true)).toBe(true);
+  });
+
+  it('answers an ordinary message in a group of eight with a few, lets the others pass silently, and stops when nobody has more (plan #3080)', async () => {
+    const { client, tables } = group('I am thinking about moving to Lisbon.');
+    const looks: DirectorInput[] = [];
+    const turns: { key: string; turn: SpeakerInput['turn'] }[] = [];
+    await runGroupBurst({
+      ...base(client),
+      director: async (input) => {
+        looks.push({ ...input, state: { ...input.state, spoken: [...input.state.spoken] } });
+        return { wait: false, picks: input.members.map((m) => ({ key: m.key, why: input.state.round === 0 ? 'answer' : 'disagreement' })), reactions: [] };
+      },
+      speak: async (input) => {
+        turns.push({ key: input.speaker.key, turn: input.turn });
+        // Ada and Cy each have one thing to say; after that, and for everyone else, there is nothing new.
+        const before = turns.filter((t) => t.key === input.speaker.key).length;
+        if ((input.speaker.key === 'ada' || input.speaker.key === 'cy') && before === 1) return `${input.speaker.name} has a view.`;
+        return PASS_WORD;
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-cy']);
+    expect(said.every((m) => m.text !== PASS_WORD)).toBe(true);
+    expectCapsHold(said);
+    // Four were asked in the opening round; the first had to answer, the rest could pass.
+    expect(turns.slice(0, 4).map((t) => t.key)).toEqual(['ada', 'ben', 'cy', 'dee']);
+    expect(turns.slice(0, 4).map((t) => t.turn?.mayPass)).toEqual([false, true, true, true]);
+    // Round 1 picked three; every one passed, so the director did not look a third time.
+    expect(looks.map((l) => l.state.round)).toEqual([0, 1]);
+  });
+
+  it('gives "keep going" another short round from the quietest bots when the director picks nobody (plan #3080)', async () => {
+    const { client, tables } = group('Tell me about Lisbon.');
+    tables.advisor_messages.push(
+      { id: 'b1', user_id: USER, chat_id: CHAT, role: 'advisor', speaker_id: 'id-ada', text: 'Hills.', created_at: '2026-11-04T09:59:10Z' },
+      { id: 'b2', user_id: USER, chat_id: CHAT, role: 'advisor', speaker_id: 'id-ben', text: 'Trams.', created_at: '2026-11-04T09:59:20Z' },
+      { id: 'p2', user_id: USER, chat_id: CHAT, role: 'person', speaker_id: null, text: 'keep going', created_at: '2026-11-04T09:59:30Z' },
+    );
+    await runGroupBurst({
+      ...base(client),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => `${input.speaker.name} adds something.`,
+    });
+    const after = botMessages(tables).slice(2).map((m) => m.speaker_id);
+    expect(after).toEqual(['id-cy', 'id-dee', 'id-eve', 'id-fay']);
   });
 
   it('waits on the person when the director says so, and writes nothing', async () => {
