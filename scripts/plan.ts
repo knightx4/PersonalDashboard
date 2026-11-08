@@ -77,6 +77,10 @@
  *                                # rewrite a step nobody has started, under the same
  *                                # feature, from what building an earlier step found;
  *                                # the old wording stays in its comment
+ *   npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...]
+ *                                [--until <field> [--then name=value ...] [--every <s>] [--max-minutes <n>]]
+ *                                # run one of the app's own cron routes through the app,
+ *                                # which holds CRON_SECRET; never ask the person for it
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
  *                                # ending a run with the step neither closed nor
@@ -248,6 +252,7 @@ import { createClient } from '@supabase/supabase-js';
 import { decisionKindRefusal } from '../lib/plan/decision-titles';
 import { PLAN_MOCKUPS_BUCKET, mockupRefusal, mockupStoragePath, optionLettersIn } from '../lib/plan/mockups';
 import { shootMockup, type MockupShot } from './mockup-shoot';
+import { parseQueryPairs, runRouteFromCli } from '../lib/dev/run-route-client';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -993,8 +998,32 @@ function printRaise(row: RaisedListRow): void {
   }
 }
 
+/**
+ * Run one of the app's own cron routes through the app (plan #3070.2). Needs
+ * no database and no CRON_SECRET: the secret stays on the server.
+ */
+async function runRoute(path: string | undefined): Promise<void> {
+  if (!path) fail('Usage: plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then name=value ...] [--every <seconds>] [--max-minutes <n>]]');
+  try {
+    const out = await runRouteFromCli({
+      path,
+      query: parseQueryPairs(args('--query')),
+      untilField: arg('--until') ?? undefined,
+      thenQuery: has('--then') ? parseQueryPairs(args('--then')) : undefined,
+      everySeconds: arg('--every') ? Number(arg('--every')) : undefined,
+      maxMinutes: arg('--max-minutes') ? Number(arg('--max-minutes')) : undefined,
+      askedBy: `session:${process.env.CLAUDE_CODE_SESSION_ID ?? process.env.CLAUDE_SESSION_ID ?? 'unknown'}`,
+    });
+    console.log(JSON.stringify({ ...out.body, ...(out.done === null ? {} : { done: out.done, calls: out.calls }) }, null, 2));
+    if (out.status >= 300) process.exit(1);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+}
+
 async function main(): Promise<void> {
   const [command = 'list', target, extra] = positional();
+  if (command === 'run-route') return runRoute(target);
   const sql = connect();
   const userId = await resolveUser(sql);
   projects = await loadProjects(sql, userId);
