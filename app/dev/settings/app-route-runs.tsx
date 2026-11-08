@@ -51,16 +51,18 @@ export function AppRouteRuns({ runs }: { runs: readonly AppRouteRunRow[] }) {
       <TBody>
         {runs.map((run) => {
           const status = STATUS[run.status];
-          const took = tookWords(run.startedAt, run.endedAt);
+          const took = run.status === 'refused' ? null : tookWords(run.startedAt, run.endedAt);
           return (
             <TR key={run.id}>
               <TD primary>
-                <span className="block break-all font-mono text-small">{run.path}</span>
-                {run.error && (
-                  <span className="mt-0.5 block text-small font-normal text-ink-muted">
-                    {run.error}
-                  </span>
-                )}
+                <div className="min-w-0">
+                  <span className="block break-all font-mono text-small">{run.path}</span>
+                  {run.error && (
+                    <span className="mt-0.5 block text-small font-normal text-ink-muted">
+                      {run.error}
+                    </span>
+                  )}
+                </div>
               </TD>
               <TD muted label="Asked by">
                 <span className="break-words">{run.askedBy}</span>
