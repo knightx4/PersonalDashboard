@@ -72,7 +72,7 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # idea is, where it came from and why it
                                                # would be useful; a bare title is refused.
 npx tsx scripts/plan.ts idea --file <path.md>  # one idea per "## " heading
-npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then name=value ...]]
+npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then [name=value ...]]]
                                                # run one of the app's own cron routes through the app, which
                                                # holds CRON_SECRET. Use this instead of raising for the secret.
                                                # Only /api/cron/<name> on the app's own domain; anything else is

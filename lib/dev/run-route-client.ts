@@ -40,6 +40,23 @@ export function parseQueryPairs(pairs: string[]): AppRouteQuery {
   return query;
 }
 
+/**
+ * The query for the later polls from the command line (plan #3070.5). Absent
+ * `--then` gives undefined (the first query repeats); `--then` with no
+ * name=value after it (bare, or followed by another flag) gives an empty query.
+ */
+export function parseThenQuery(argv: string[]): AppRouteQuery | undefined {
+  const pairs: string[] = [];
+  let seen = false;
+  argv.forEach((value, index) => {
+    if (value !== '--then') return;
+    seen = true;
+    const next = argv[index + 1];
+    if (next !== undefined && !next.startsWith('--')) pairs.push(next);
+  });
+  return seen ? parseQueryPairs(pairs) : undefined;
+}
+
 async function post(deps: RunRouteCliDeps, origin: string, key: string, payload: object) {
   const res = await deps.fetch(`${origin}/api/dev/run-route`, {
     method: 'POST',

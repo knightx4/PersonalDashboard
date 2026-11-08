@@ -78,7 +78,7 @@
  *                                # feature, from what building an earlier step found;
  *                                # the old wording stays in its comment
  *   npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...]
- *                                [--until <field> [--then name=value ...] [--every <s>] [--max-minutes <n>]]
+ *                                [--until <field> [--then [name=value ...]] [--every <s>] [--max-minutes <n>]]
  *                                # run one of the app's own cron routes through the app,
  *                                # which holds CRON_SECRET; never ask the person for it
  *   npx tsx scripts/plan.ts reopen <n>
@@ -252,7 +252,7 @@ import { createClient } from '@supabase/supabase-js';
 import { decisionKindRefusal } from '../lib/plan/decision-titles';
 import { PLAN_MOCKUPS_BUCKET, mockupRefusal, mockupStoragePath, optionLettersIn } from '../lib/plan/mockups';
 import { shootMockup, type MockupShot } from './mockup-shoot';
-import { parseQueryPairs, runRouteFromCli } from '../lib/dev/run-route-client';
+import { parseQueryPairs, parseThenQuery, runRouteFromCli } from '../lib/dev/run-route-client';
 
 /**
  * A direct connection rather than lib/db/admin.ts: that module is marked
@@ -1003,13 +1003,13 @@ function printRaise(row: RaisedListRow): void {
  * no database and no CRON_SECRET: the secret stays on the server.
  */
 async function runRoute(path: string | undefined): Promise<void> {
-  if (!path) fail('Usage: plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then name=value ...] [--every <seconds>] [--max-minutes <n>]]');
+  if (!path) fail('Usage: plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then [name=value ...]] [--every <seconds>] [--max-minutes <n>]]');
   try {
     const out = await runRouteFromCli({
       path,
       query: parseQueryPairs(args('--query')),
       untilField: arg('--until') ?? undefined,
-      thenQuery: has('--then') ? parseQueryPairs(args('--then')) : undefined,
+      thenQuery: parseThenQuery(argv),
       everySeconds: arg('--every') ? Number(arg('--every')) : undefined,
       maxMinutes: arg('--max-minutes') ? Number(arg('--max-minutes')) : undefined,
       askedBy: `session:${process.env.CLAUDE_CODE_SESSION_ID ?? process.env.CLAUDE_SESSION_ID ?? 'unknown'}`,
