@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadSlipCount } from '@/lib/dash/slips';
 import { loadOpenSessionCount } from '@/lib/talk/handoff-count';
+import { loadRunnerStatuses, runnerChipValue } from '@/lib/talk/browser-runners';
 import { loadFlaggedLines } from '@/lib/talk/bot-handoff-flags-load';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { PageHeader } from '@/components/shell/page-header';
@@ -97,6 +98,7 @@ export default async function DevRaisedPage() {
     sessions,
     flagged,
     settings,
+    browserRunners,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -145,6 +147,10 @@ export default async function DevRaisedPage() {
     // Bot-to-bot hand-offs that failed or went unanswered (plan #3003.4).
     loadFlaggedLines(user.id, now),
     loadAccountSettings(user.id).catch(() => null),
+    // Whether the browser runner is up on the PC or the Mac (plan #3075).
+    createCoreClient()
+      .then((core) => loadRunnerStatuses(core, user.id, now))
+      .catch(() => null),
   ]);
 
   // The tree once, for the two things below that read it: how much is
@@ -213,6 +219,7 @@ export default async function DevRaisedPage() {
           inbox={onYou}
           slips={slips}
           sessions={sessions}
+          browserRunner={browserRunners ? runnerChipValue(browserRunners, now) : null}
         />
         <AskBox />
       </div>

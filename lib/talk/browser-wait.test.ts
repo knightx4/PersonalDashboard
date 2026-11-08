@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CLOUD_FALLBACK_LINE, cloudFailedLine, runBrowserWait, type BrowserWaitPorts } from './browser-wait';
+import {
+  CLOUD_FALLBACK_LINE,
+  cloudFailedLine,
+  cloudFallbackLine,
+  runBrowserWait,
+  type BrowserWaitPorts,
+} from './browser-wait';
 import type { FireSessionResult } from './handoff-fire';
 import type { SessionHandoff } from './handoffs';
 
@@ -77,6 +83,33 @@ describe('runBrowserWait', () => {
     expect(result.failed).toEqual(['h1']);
     expect(said[0][1]).toBe(cloudFailedLine('The session could not be started: 401.'));
     expect(said[0][1]).toContain('started: 401. Nothing has been done');
+  });
+
+  it('says why no computer took it: the runner status, read once a pass (plan #3075)', async () => {
+    const status = "The browser runner isn't running: it was last seen on your PC 3 hours ago, and it has never run on your Mac.";
+    const runners = vi.fn(async () => status);
+    const { p, said } = ports({ waited: async () => [task('h1'), task('h2')] });
+    p.runners = runners;
+    await runBrowserWait(p, NOW, 3 * 60_000);
+    expect(runners).toHaveBeenCalledTimes(1);
+    expect(said[0][1]).toBe(cloudFallbackLine(status));
+    expect(said[0][1]).toContain('last seen on your PC 3 hours ago');
+    expect(said[0][1]).toContain('public pages');
+  });
+
+  it('reads no runner status on a pass with nothing to start, and falls back to the plain line when it cannot', async () => {
+    const runners = vi.fn(async () => {
+      throw new Error('down');
+    });
+    const empty = ports({});
+    empty.p.runners = runners;
+    await runBrowserWait(empty.p, NOW, 3 * 60_000);
+    expect(runners).not.toHaveBeenCalled();
+
+    const { p, said } = ports({ waited: async () => [task('h1')] });
+    p.runners = runners;
+    await runBrowserWait(p, NOW, 3 * 60_000);
+    expect(said).toEqual([['h1', CLOUD_FALLBACK_LINE]]);
   });
 
   it('lets go of quiet claims before reading, and carries on past one that throws', async () => {
