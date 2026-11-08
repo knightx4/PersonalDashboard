@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { whenDate } from '@/lib/core/when';
 import { recordSpend, recordSpendReports } from '@/lib/core/spend/record';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { todayInTimezone } from '@/lib/money';
@@ -19,9 +20,7 @@ export const SCRIPT_SPEND_OPERATION = 'write-spoken-script';
 
 /** An ISO day as it is said, for the rewrite's "yesterday" and "on Friday": `Sunday 8 November 2026`. */
 function sayDay(iso: string): string {
-  const day = new Date(`${iso}T12:00:00Z`);
-  if (Number.isNaN(day.getTime())) return iso;
-  return day.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return whenDate(`${iso}T12:00:00Z`, { timeZone: 'UTC', month: 'long', weekday: 'long' });
 }
 
 /**
