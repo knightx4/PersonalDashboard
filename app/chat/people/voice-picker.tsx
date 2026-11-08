@@ -194,7 +194,6 @@ export function VoicePicker({
           </Tooltip>
         </div>
         <div className="relative px-4 pb-3">
-          <Search aria-hidden strokeWidth={1.75} className="pointer-events-none absolute top-[calc(50%-0.375rem)] left-6.5 size-4 -translate-y-1/2 text-ink-muted" />
           <PressLabel htmlFor="voice-picker-search" />
           <Input
             ref={searchRef}
@@ -207,6 +206,7 @@ export function VoicePicker({
             className="relative pl-8"
             autoComplete="off"
           />
+          <Search aria-hidden strokeWidth={1.75} className="pointer-events-none absolute top-[calc(50%-0.375rem)] left-6.5 size-4 -translate-y-1/2 text-ink-muted" />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
