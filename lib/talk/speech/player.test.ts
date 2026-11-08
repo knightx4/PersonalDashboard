@@ -88,6 +88,21 @@ describe('the speech player', () => {
     ]);
   });
 
+  it("names a bot's bubble by its message id, so the route keeps its spoken version on the row (plan #3079)", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const player = createSpeechPlayer({
+      fetch: (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(audioResponse());
+      },
+      audio: () => ({ audio: { play: async () => {}, pause: () => {}, onended: null, onerror: null }, release: () => {} }),
+    });
+    const id = '3f2a1b4c-1d2e-4f5a-8b9c-0d1e2f3a4b5c';
+    player.queue(id, 'From Zena.', { bot: 'zena-id' });
+    await settle();
+    expect(bodies).toEqual([{ text: 'From Zena.', bot: 'zena-id', message: id }]);
+  });
+
   it("keeps the route's message under the reply when voice is paused or not set up", async () => {
     const paused = "Voice is paused until next month: this month's 330,000 characters have been spoken.";
     const { player } = setup([
