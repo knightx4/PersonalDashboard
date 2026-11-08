@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { appRoutePortInRequest } from '@/lib/dash/app-route-port';
 import { createClient, requireUser } from '@/lib/auth/server';
 import {
   confirmChange,
@@ -238,6 +239,7 @@ export async function askDashInRequest(input: {
             createTask,
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
+            appRoute: appRoutePortInRequest(user.id, { conversationId }),
             origin: { kind: 'ask_dash', ref: conversationId },
             slipWhere: { surface: 'ask', conversation: `ask:${conversationId}`, href: `/chat/dash/${conversationId}` },
           },
@@ -393,6 +395,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          appRoute: appRoutePortInRequest(userId, null),
           // A question handed to a goal from a thread is answered on the page it was asked on.
           origin: { kind: 'goal_page', ref: null },
           thread: acts,
@@ -427,6 +430,8 @@ export async function peopleDashInRequest(userId: string): Promise<PeopleDash & 
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          // A route run from People says its finish in that thread, as the bot (plan #3070.3).
+          appRoute: appRoutePortInRequest(userId, cause ? { advisorChatId: cause.chatId, advisorId: cause.advisorId } : null),
           // A question handed to a goal from a People thread is answered from Chat.
           origin: { kind: 'chat', ref: null },
           slipWhere: {

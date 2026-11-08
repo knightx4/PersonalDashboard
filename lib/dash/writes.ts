@@ -41,6 +41,7 @@ import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 import { POST_WRITE_TOOLS } from './post-writes';
 import { MODEL_WRITE_TOOLS } from './model-writes';
 import { PROJECT_WRITE_TOOLS } from './project-writes';
+import { APP_ROUTE_WRITE_TOOLS } from './app-route-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -1304,6 +1305,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...POST_WRITE_TOOLS,
   // A repository added as a Dev project (plan #2553.5).
   ...PROJECT_WRITE_TOOLS,
+  // One of the app's own cron routes run, and polled in the background (plan #3070.3).
+  ...APP_ROUTE_WRITE_TOOLS,
   ...MODEL_WRITE_TOOLS,
 ];
 
