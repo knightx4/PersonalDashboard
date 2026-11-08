@@ -156,6 +156,7 @@ export const devSources: ModuleSources = {
     'public.build_friction',
     'public.build_reviews',
     'public.app_route_runs',
+    'public.app_route_polls',
     'public.plan_commit_checks',
     'public.plan_main_checks',
     'public.plan_overnight_runs',

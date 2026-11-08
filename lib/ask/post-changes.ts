@@ -5,7 +5,8 @@ import type { LearnChangeInput } from './learn-changes';
  * the Posts tab in Dev rewritten when asked (plan #2202.1), a new draft
  * saved there when asked for one (plan #2384.3), and a GitHub repository
  * added as a project on the Projects tab (plan #2553.5,
- * lib/dash/project-writes.ts).
+ * lib/dash/project-writes.ts), and one of the app's own cron routes run
+ * (plan #3070.3, lib/dash/app-route-writes.ts).
  *
  * They take the shape Learn's six set out (lib/ask/learn-changes.ts): the
  * tool that made the change wrote the sentence and the link when it made it
@@ -14,7 +15,7 @@ import type { LearnChangeInput } from './learn-changes';
  */
 
 /** The post write tools, by name, which is the kind each change is kept under. */
-export const POST_CHANGE_KINDS = ['rewrite_post', 'suggest_post', 'add_project', 'add_plan_step'] as const;
+export const POST_CHANGE_KINDS = ['rewrite_post', 'suggest_post', 'add_project', 'add_plan_step', 'run_app_route'] as const;
 
 export type PostChangeKind = (typeof POST_CHANGE_KINDS)[number];
 
