@@ -318,6 +318,39 @@ export function pipelineHref(
   return addressHref(PIPELINE_ADDRESS, params, changes);
 }
 
+/** Every param that narrows which applications show, and so what Clear all takes off. */
+const PIPELINE_FILTER_KEYS = [
+  'status',
+  'source',
+  'excitement',
+  'minfit',
+  'minchance',
+  'q',
+  'stage',
+  'sent',
+  'ready',
+  'questions',
+  'letter',
+  'material',
+  'company',
+] as const satisfies readonly (keyof PipelineParams)[];
+
+/** Whether anything narrows the page beyond the live applications. */
+export function hasPipelineFilters(params: PipelineParams): boolean {
+  return PIPELINE_FILTER_KEYS.some((key) => Boolean(params[key]?.trim()));
+}
+
+/**
+ * The page with every filter off (note 7a9e47d2): the live applications,
+ * keeping the view and the table's sort, grouping and columns.
+ */
+export function clearPipelineFiltersHref(params: PipelineParams): string {
+  return pipelineHref(params, {
+    ...Object.fromEntries(PIPELINE_FILTER_KEYS.map((key) => [key, undefined])),
+    page: undefined,
+  });
+}
+
 /**
  * Where interviews are listed since the Interviews page folded into Pipeline
  * (plan #1496.7.1): the roles in process, each opening on its rounds.
