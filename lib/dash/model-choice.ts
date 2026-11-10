@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { isDashChoice, type DashChoiceId } from '@/lib/core/models';
+import { isDashChoice, SONNET, type DashChoiceId } from '@/lib/core/models';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { DASH_MODELS } from '@/lib/dash/models';
 
@@ -70,5 +70,51 @@ export async function saveDashModel(
     return { ok: true, before: isDashChoice(saved) ? saved : null, after: model };
   } catch {
     return failed;
+  }
+}
+
+/** The model People bots write with when the account has not picked one. */
+export const BOT_MODEL: DashChoiceId = SONNET;
+
+/**
+ * The model this account's People bots write with, apart from Dash's
+ * (`core.account_settings.bot_model`, migration 0317). Null, a value outside
+ * the three models, a failed read and a deploy that lands before the column
+ * exists all read as BOT_MODEL, so a bot always replies.
+ */
+export async function botModelFor(
+  core: Pick<CoreSupabaseClient, 'from'>,
+  userId: string,
+): Promise<DashChoiceId> {
+  try {
+    const { data, error } = await core
+      .from('account_settings')
+      .select('bot_model')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error || !data) return BOT_MODEL;
+    const value = (data as { bot_model?: unknown }).bot_model;
+    return isDashChoice(value) ? value : BOT_MODEL;
+  } catch {
+    return BOT_MODEL;
+  }
+}
+
+/** Save the model this account's bots write with, or null for the default. */
+export async function saveBotModel(
+  core: Pick<CoreSupabaseClient, 'from'>,
+  userId: string,
+  model: string | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (model !== null && !isDashChoice(model)) {
+    return { ok: false, error: 'Bots can write with Haiku, Sonnet or Opus.' };
+  }
+  try {
+    const { error } = await core
+      .from('account_settings')
+      .upsert({ user_id: userId, bot_model: model }, { onConflict: 'user_id' });
+    return error ? { ok: false, error: 'Could not save that choice. Try again.' } : { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not save that choice. Try again.' };
   }
 }

@@ -3,7 +3,7 @@ import 'server-only';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
-import { dashModelFor } from '@/lib/dash/model-choice';
+import { botModelFor } from '@/lib/dash/model-choice';
 import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import { endBotHandoff, loadBotHandoff, pickUpBotHandoff } from '@/lib/talk/bot-handoffs';
 import { createYouClient } from '@/lib/you/auth/server';
@@ -29,7 +29,7 @@ export async function answerBotHandoffInRequest(userId: string, handoffId: strin
     loadAccountSettings(userId),
     peopleDashInRequest(userId),
   ]);
-  const model = await dashModelFor(core, userId);
+  const model = await botModelFor(core, userId);
 
   let roster: HandoffBot[] | null = null;
   const bots = async () =>

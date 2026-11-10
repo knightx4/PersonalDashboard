@@ -14,7 +14,12 @@ import { recordSpend } from '@/lib/core/spend/record';
 import { devAccess } from '@/lib/ask/dev';
 import { answerQuestion } from '@/lib/dash/ask';
 import { codeDeps } from '@/lib/dash/think-code';
-import { dashModelFor } from '@/lib/dash/model-choice';
+import { botModelFor, dashModelFor } from '@/lib/dash/model-choice';
+import { runDash, type DashVoice } from '@/lib/dash/loop';
+import { rehearseProposal, rehearseWrite } from '@/lib/dash/quality/rehearse-write';
+import { mentorRow } from '@/lib/you/chat-context';
+import { personaLayer } from '@/lib/you/chat-context-model';
+import { peopleVoice } from '@/lib/you/mentor-reply';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
 import { runModelCheck, type ModelCheckPorts } from '@/lib/dash/quality/model-replies';
 import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
@@ -102,14 +107,14 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
     },
 
     async cases(userId, only) {
-      let query = core.from('dash_eval_cases').select('id, question, expect, advisor, think').eq('user_id', userId);
+      let query = core.from('dash_eval_cases').select('id, question, expect, advisor, think, bot').eq('user_id', userId);
       query = only ? query.eq('id', only) : query.eq('active', true);
       const { data, error } = await query.order('created_at', { ascending: true });
       if (error) throw new Error(`Reading the cases failed: ${error.message}`);
-      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null; think: boolean }[];
+      return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null; think: boolean; bot?: boolean }[];
     },
 
-    async ask(userId, question, advisor, think) {
+    async ask(userId, question, advisor, think, bot) {
       if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
       const settings = await loadAccountSettings(userId, core);
       const today = todayInTimezone(settings.timezone);
@@ -129,8 +134,27 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       const execute = (name: string, args: unknown) => executeAskTool(name, args, ctx);
       // A case put to an advisor (plan #2581.6) is their reply to a first
       // message, from their brain and memory; nothing is kept.
+      // A case put to a People bot (migration 0318) is a first text to it,
+      // through the voice a text uses, its writes rehearsed and never made.
+      let botVoice: DashVoice | null = null;
+      if (advisor && bot) {
+        const you = createServiceSchemaSupabase('you') as unknown as YouSupabaseClient;
+        const { data, error } = await you
+          .from('board_advisors')
+          .select('id, key, name, kind, question, focus, persona, brain, made_by_you')
+          .eq('user_id', userId)
+          .eq('key', advisor)
+          .maybeSingle();
+        if (error || !data) throw new Error(`There is no bot ${advisor} on People.`);
+        botVoice = peopleVoice({
+          persona: personaLayer(mentorRow(data as Record<string, unknown>)).text,
+          model: await botModelFor(core, userId),
+          keepFiles: false,
+          acting: true,
+        });
+      }
       let talk: Awaited<ReturnType<typeof loadTalkContext>> = null;
-      if (advisor) {
+      if (advisor && !bot) {
         talk = await loadTalkContext(
           createServiceSchemaSupabase('you') as unknown as YouSupabaseClient,
           createServiceSchemaSupabase('goals') as unknown as GoalsSupabaseClient,
@@ -140,7 +164,23 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         if (!talk) throw new Error(`There is no advisor ${advisor} on the board.`);
       }
       const started = Date.now();
-      const answer = talk
+      const asBot = botVoice
+        ? runDash({
+            voice: botVoice,
+            context: { surface: 'thread', subject: null, page: null },
+            turns: [{ role: 'user', body: question }],
+            today,
+            execute,
+            write: rehearseWrite,
+            propose: rehearseProposal,
+            queue: rehearsePaid(ctx),
+            anthropicApiKey: apiKey,
+            onSpend: (report) => spent.push(report),
+          })
+        : null;
+      const answer = asBot
+        ? await asBot
+        : talk
         ? await answerAsAdvisor({
             context: talk.context,
             turns: [{ role: 'user', body: question }],

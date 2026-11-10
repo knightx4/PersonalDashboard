@@ -3,7 +3,7 @@
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import type { DashChoiceId } from '@/lib/core/models';
-import { dashModelFor, saveDashModel } from '@/lib/dash/model-choice';
+import { dashModelFor, saveBotModel, saveDashModel } from '@/lib/dash/model-choice';
 
 export type SetDashModelResult = { ok: true } | { ok: false; error: string };
 
@@ -30,4 +30,15 @@ export async function getDashModel(): Promise<DashChoiceId> {
   const user = await requireUser();
   const core = await createCoreClient();
   return dashModelFor(core, user.id);
+}
+
+/**
+ * Save the model the person's People bots write with, apart from Dash's
+ * (migration 0317). Null clears it back to the default, Sonnet.
+ */
+// latency: instant -- the picker shows the pick itself and does not wait for the write
+export async function setBotModel(model: string | null): Promise<SetDashModelResult> {
+  const user = await requireUser();
+  const core = await createCoreClient();
+  return saveBotModel(core, user.id, model);
 }

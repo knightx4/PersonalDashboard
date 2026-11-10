@@ -10,6 +10,7 @@ import { LOOKUP_NOT_RUN, MAX_TURN, stoppedBody, toModelMessages, type TalkCitati
 import { parseRef } from '@/lib/core/refs';
 import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashPaidTool, type DashTool, type DashWriteTool } from './registry';
+import { OPEN_AREA_TOOL, openArea, openAreaTool, type ToolBranches } from './tool-areas';
 import { whenDate, whenWeekday } from '@/lib/core/when';
 import { SET_CAP, setName, type DashSeen, type RowSet } from './sets';
 import { searchedPages, textCitedPages } from './web-search';
@@ -165,10 +166,42 @@ export function modelTools(
   ];
 }
 
-/** Every tool a voice is sent: its server tools first, then modelTools. */
-function voiceTools(voice: DashVoice): Anthropic.ToolUnion[] {
-  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish, voice.acknowledge === true)];
+/**
+ * Every tool a voice is sent: its server tools first, then modelTools. A
+ * voice with branches (lib/dash/tool-areas.ts) has its deferred tools marked
+ * `defer_loading: true` and open_area put before the finishing tool, which
+ * keeps the cache breakpoint: a deferred tool may not carry one. A voice with
+ * the 1-hour TTL has it on that breakpoint.
+ */
+export function voiceTools(voice: DashVoice): Anthropic.ToolUnion[] {
+  const tools = modelTools(voice.tools, voice.finish, voice.acknowledge === true);
+  const branches = voice.branches;
+  const shaped: Anthropic.ToolUnion[] = branches
+    ? [
+        ...tools.slice(0, -1).map((tool) =>
+          branches.deferred.has(tool.name) ? ({ ...tool, defer_loading: true } as Anthropic.Tool) : tool,
+        ),
+        ...(branches.areas.length > 0 ? [openAreaTool(branches.areas)] : []),
+        tools[tools.length - 1],
+      ]
+    : tools;
+  if (voice.cacheTtl === '1h') {
+    const last = shaped[shaped.length - 1] as Anthropic.Tool;
+    shaped[shaped.length - 1] = { ...last, cache_control: HOUR_CACHE } as Anthropic.Tool;
+  }
+  return [...(voice.serverTools ?? []), ...shaped];
 }
+
+/** Whether the API refused the request as malformed (a 400), as opposed to failing to answer it. */
+function refusedRequest(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as { status?: unknown }).status === 400);
+}
+
+/**
+ * The 1-hour cache breakpoint (voice.cacheTtl). Widened: the installed SDK's
+ * cache_control type predates `ttl`.
+ */
+const HOUR_CACHE = { type: 'ephemeral', ttl: '1h' } as unknown as Anthropic.CacheControlEphemeral;
 
 /** The surfaces Dash talks on, as core.dash_actions names them. */
 export type DashSurface = 'ask' | 'thread' | 'capture';
@@ -200,6 +233,20 @@ export type DashVoice = {
    * (plan #1649). Threads only: Ask Dash's voice never sets it.
    */
   acknowledge?: boolean;
+  /**
+   * Tools loaded on demand (lib/dash/tool-areas.ts): the deferred ones are
+   * sent with `defer_loading: true`, and open_area loads an area's. People
+   * bots set it; absent, every tool is sent as it is.
+   */
+  branches?: ToolBranches;
+  /**
+   * The cache lifetime of the tools and the rules: '1h' for a voice whose
+   * turns come further apart than the 5-minute default, such as a chat
+   * where the person texts back twenty minutes later. A 1-hour write costs
+   * twice input and a 5-minute one a quarter again, so it pays only where the
+   * gaps are that long. Absent: 5 minutes.
+   */
+  cacheTtl?: '1h';
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
   /**
@@ -917,7 +964,9 @@ export type DashRun = {
 export async function runDash(input: DashRun): Promise<DashAnswer> {
   const { voice, context } = input;
   const model = voice.model;
-  const tools = voiceTools(voice);
+  let tools = voiceTools(voice);
+  // Set once a request with branches was refused and the full list sent instead.
+  let unbranched = false;
   const finishName = voice.finish?.name ?? ANSWER_TOOL;
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
   const timeBudget = voice.timeBudgetMs ?? TIME_BUDGET_MS;
@@ -1056,7 +1105,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const started = now();
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
   const system: Anthropic.TextBlockParam[] = [
-    { type: 'text', text: voice.system, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: voice.system, cache_control: voice.cacheTtl === '1h' ? HOUR_CACHE : { type: 'ephemeral' } },
     { type: 'text', text: dateLine(input.today) },
   ];
   const onPage = pageLine(context.page);
@@ -1176,6 +1225,16 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       );
     } catch (error) {
       if (signal?.aborted) return stoppedAnswer();
+      // A request with deferred tools refused before any area was opened is
+      // sent again with every tool loaded, so loading tools by area can cost
+      // a reply its tokens but never the reply itself.
+      if (voice.branches && !unbranched && refusedRequest(error) && !toolCalls.some((c) => c.name === OPEN_AREA_TOOL)) {
+        unbranched = true;
+        console.error('a request with deferred tools was refused; sending every tool', error instanceof Error ? error.message : error);
+        tools = voiceTools({ ...voice, branches: undefined });
+        round -= 1;
+        continue;
+      }
       const message = error instanceof Error ? error.message : 'The answer failed.';
       heardCall({ stop: null, blocks: [], outputTokens: 0, inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 0, error: message.slice(0, 500) });
       return fail(message, 'the model could not be reached.');
@@ -1424,10 +1483,24 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         if (use.name === ACKNOWLEDGE_TOOL) {
           return { ok: false, error: context.surface === 'thread' && input.acknowledge ? ACKNOWLEDGE_ALONE : NO_ACKNOWLEDGE };
         }
+        if (use.name === OPEN_AREA_TOOL) return { ok: true, rows: [] };
         return run(use.name, use.input);
       }),
     );
     const blocks: Anthropic.ToolResultBlockParam[] = uses.map((use, i) => {
+      if (use.name === OPEN_AREA_TOOL) {
+        // Its tools are loaded as tool_reference blocks (lib/dash/tool-areas.ts).
+        const opened = voice.branches
+          ? openArea(voice.branches, use.input)
+          : { ok: false as const, error: `There is no tool called ${OPEN_AREA_TOOL}.` };
+        const kept = opened.ok ? { ok: true, opened: opened.key } : opened;
+        toolCalls.push({ name: use.name, input: use.input, result: kept });
+        hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: opened.ok, result: kept });
+        return opened.ok
+          ? // Widened: the installed SDK's tool_result content predates tool_reference.
+            ({ type: 'tool_result', tool_use_id: use.id, content: opened.blocks } as unknown as Anthropic.ToolResultBlockParam)
+          : { type: 'tool_result', tool_use_id: use.id, content: opened.error, is_error: true };
+      }
       const result = named(results[i]);
       const kept = keptResult(result);
       toolCalls.push({ name: use.name, input: use.input, result: kept });

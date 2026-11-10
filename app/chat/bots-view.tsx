@@ -6,6 +6,8 @@ import { PageColumn } from '@/components/shell/page-width';
 import { cn } from '@/lib/cn';
 import { botLineOf, botsOf, personInitials, type PersonRow } from '@/lib/you/chat-threads-model';
 import { ADD_HREF, editHref } from '@/lib/you/people-cards-model';
+import type { DashChoiceId } from '@/lib/core/models';
+import { BotModelPicker } from './bot-model-picker';
 
 /**
  * Chat's Bots tab (plan #2879.3), the messaging pattern as Messages draws
@@ -19,6 +21,7 @@ export function BotsView({
   failed = false,
   current = null,
   adding = false,
+  botModel = null,
   children,
 }: {
   /** Everyone on the roster, in any order. */
@@ -28,6 +31,8 @@ export function BotsView({
   current?: string | null;
   /** The form for a new bot is open. */
   adding?: boolean;
+  /** The model every bot writes with, picked at the foot of the list; null leaves the picker out. */
+  botModel?: DashChoiceId | null;
   /** The open form, when one is. */
   children?: React.ReactNode;
 }) {
@@ -66,7 +71,7 @@ export function BotsView({
     );
   }
   return (
-    <Messaging label="Bots" open={Boolean(children)} list={<BotsList rows={rows} current={current} adding={adding} />}>
+    <Messaging label="Bots" open={Boolean(children)} list={<BotsList rows={rows} current={current} adding={adding} botModel={botModel} />}>
       {children ?? (
         <MessagingPlaceholder>
           <p className="text-body font-medium text-ink">Choose a bot to edit it here.</p>
@@ -76,7 +81,17 @@ export function BotsView({
   );
 }
 
-function BotsList({ rows, current, adding }: { rows: readonly PersonRow[]; current: string | null; adding: boolean }) {
+function BotsList({
+  rows,
+  current,
+  adding,
+  botModel,
+}: {
+  rows: readonly PersonRow[];
+  current: string | null;
+  adding: boolean;
+  botModel: DashChoiceId | null;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-4 pb-2">
@@ -114,6 +129,7 @@ function BotsList({ rows, current, adding }: { rows: readonly PersonRow[]; curre
           );
         })}
       </ul>
+      {botModel && <BotModelPicker model={botModel} />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { after } from 'next/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
-import { dashModelFor } from '@/lib/dash/model-choice';
+import { botModelFor } from '@/lib/dash/model-choice';
 import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { createYouClient } from '@/lib/you/auth/server';
@@ -82,7 +82,7 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       userId,
       chatId,
       timeZone: settings.timezone,
-      model: await dashModelFor(core, userId),
+      model: await botModelFor(core, userId),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       execute: dash.execute,
       // Ask Dash's own actions, kept as this mentor's (plan #2854.2).

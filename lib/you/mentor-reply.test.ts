@@ -315,11 +315,12 @@ describe('replyToMentor', () => {
     expect(outcome.rounds[0].costMicros).toBeGreaterThan(0);
     expect(spent.map((s) => s.op)).toEqual(['mentor-reply']);
 
-    // The persona and the texting rules are cached; the rest follows uncached.
+    // The persona and the texting rules are cached for an hour, since texts come further apart than five
+    // minutes; the rest follows uncached.
     const system = streamed[0].system as { text: string; cache_control?: unknown }[];
     expect(system[0].text).toContain('You talk plainly about cash.');
     expect(system[0].text).toContain(REPLY_RULES);
-    expect(system[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(system[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     const tools = (streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toContain('todos');
     expect(tools).toContain('show_chart');

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { SONNET } from '@/lib/core/models';
 import {
   asBatch,
   costMicrosFor,
   EMPTY_USAGE,
   MODEL_PRICES,
+  ONE_HOUR_WRITE_RATE,
   sumByModel,
   totalMicros,
   usageFrom,
@@ -206,5 +208,39 @@ describe('one report per model', () => {
       [120, false],
       [40, true],
     ]);
+  });
+});
+
+describe('cache writes with the 1-hour TTL', () => {
+  it('reads the 1-hour part of the writes off the response', () => {
+    const usage = usageFrom({
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_creation_input_tokens: 3_000,
+      cache_creation: { ephemeral_5m_input_tokens: 1_000, ephemeral_1h_input_tokens: 2_000 },
+    });
+    expect(usage.cacheWriteTokens).toBe(3_000);
+    expect(usage.hourWriteTokens).toBe(2_000);
+  });
+
+  it('prices a 1-hour write at twice input and a 5-minute one at the card rate', () => {
+    // Sonnet 5.5: input $2, 5-minute write $2.50 per million tokens.
+    const cost = costMicrosFor(SONNET, {
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      cacheWriteTokens: 3_000,
+      hourWriteTokens: 2_000,
+      outputTokens: 0,
+    });
+    expect(cost).toBe(1_000 * 2.5 + 2_000 * 2 * ONE_HOUR_WRITE_RATE);
+  });
+
+  it('keeps the 1-hour writes when reports are summed per model', () => {
+    const one = { inputTokens: 0, cachedInputTokens: 0, cacheWriteTokens: 100, hourWriteTokens: 100, outputTokens: 0 };
+    const [sum] = sumByModel([
+      { model: SONNET, usage: one },
+      { model: SONNET, usage: one },
+    ]);
+    expect(sum.usage.hourWriteTokens).toBe(200);
   });
 });

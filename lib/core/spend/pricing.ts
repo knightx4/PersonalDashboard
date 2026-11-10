@@ -29,7 +29,11 @@ export type ModelPrice = {
   input: number;
   /** Reading a cached prefix. A tenth of input, except on Opus 5.5. */
   cachedInput: number;
-  /** Writing one. A quarter again more than input, for the 5-minute TTL. */
+  /**
+   * Writing one. A quarter again more than input, for the 5-minute TTL. A
+   * write with the 1-hour TTL is twice input (ONE_HOUR_WRITE_RATE), which
+   * needs no column of its own.
+   */
   cacheWrite: number;
   output: number;
   /**
@@ -59,9 +63,10 @@ export const GOOGLE_GEOCODING = 'google-geocoding';
  * -- so nothing is guessed here from a family resemblance.
  */
 export const MODEL_PRICES: Record<string, ModelPrice> = {
-  // Opus 5.5 reads its cache at a twentieth of input, not the usual tenth.
+  // Opus 5.5 and Sonnet 5.5 read their cache at a twentieth of input, not
+  // the usual tenth: $0.20 and $0.10.
   [OPUS]: { input: 4, cachedInput: 0.2, cacheWrite: 5, output: 20 },
-  [SONNET]: { input: 2, cachedInput: 0.2, cacheWrite: 2.5, output: 10 },
+  [SONNET]: { input: 2, cachedInput: 0.1, cacheWrite: 2.5, output: 10 },
   [HAIKU]: {
     input: 0.1,
     cachedInput: 0.01,
@@ -119,6 +124,12 @@ export type TokenUsage = {
   inputTokens: number;
   cachedInputTokens: number;
   cacheWriteTokens: number;
+  /**
+   * The part of cacheWriteTokens written with the 1-hour TTL
+   * (`usage.cache_creation.ephemeral_1h_input_tokens`), priced at
+   * ONE_HOUR_WRITE_RATE times input. Absent: every write was a 5-minute one.
+   */
+  hourWriteTokens?: number;
   outputTokens: number;
   /**
    * Searches run by the web search tool (`usage.server_tool_use`). Absent
@@ -138,6 +149,9 @@ export type TokenUsage = {
  * rate, so a batch that searched can read high but never low.
  */
 export const BATCH_TOKEN_RATE = 0.5;
+
+/** A 1-hour cache write costs this many times the input rate. */
+export const ONE_HOUR_WRITE_RATE = 2;
 
 /** The same usage, marked as billed through the Message Batches API. */
 export function asBatch(usage: TokenUsage): TokenUsage {
@@ -163,10 +177,12 @@ export function costMicrosFor(model: string, usage: TokenUsage): number | null {
   const promptTokens = usage.inputTokens + usage.cachedInputTokens + usage.cacheWriteTokens;
   const price = card.longPrompt && promptTokens > card.longPrompt.aboveTokens ? card.longPrompt : card;
 
+  const hourWrites = Math.min(usage.hourWriteTokens ?? 0, usage.cacheWriteTokens);
   const tokens =
     usage.inputTokens * price.input +
     usage.cachedInputTokens * price.cachedInput +
-    usage.cacheWriteTokens * price.cacheWrite +
+    (usage.cacheWriteTokens - hourWrites) * price.cacheWrite +
+    hourWrites * price.input * ONE_HOUR_WRITE_RATE +
     usage.outputTokens * price.output;
   const micros =
     tokens * (usage.batch ? BATCH_TOKEN_RATE : 1) +
@@ -196,11 +212,17 @@ export function usageFrom(raw: unknown): TokenUsage {
     serverTools && typeof serverTools === 'object'
       ? count((serverTools as Record<string, unknown>).web_search_requests)
       : 0;
+  const creation = usage.cache_creation;
+  const hourWrites =
+    creation && typeof creation === 'object'
+      ? count((creation as Record<string, unknown>).ephemeral_1h_input_tokens)
+      : 0;
 
   return {
     inputTokens: count(usage.input_tokens),
     cachedInputTokens: count(usage.cache_read_input_tokens),
     cacheWriteTokens: count(usage.cache_creation_input_tokens),
+    ...(hourWrites > 0 ? { hourWriteTokens: hourWrites } : {}),
     outputTokens: count(usage.output_tokens),
     ...(searches > 0 ? { webSearchRequests: searches } : {}),
   };
@@ -252,6 +274,8 @@ export function sumByModel(reports: SpendReport[]): SpendReport[] {
     seen.usage.cachedInputTokens += report.usage.cachedInputTokens;
     seen.usage.cacheWriteTokens += report.usage.cacheWriteTokens;
     seen.usage.outputTokens += report.usage.outputTokens;
+    const hourWrites = (seen.usage.hourWriteTokens ?? 0) + (report.usage.hourWriteTokens ?? 0);
+    if (hourWrites > 0) seen.usage.hourWriteTokens = hourWrites;
     const searches = (seen.usage.webSearchRequests ?? 0) + (report.usage.webSearchRequests ?? 0);
     if (searches > 0) seen.usage.webSearchRequests = searches;
   }

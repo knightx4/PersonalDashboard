@@ -1,6 +1,8 @@
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { botModelFor } from '@/lib/dash/model-choice';
 import { loadPeople, type PersonRow } from '@/lib/you/chat-threads';
 import { newPersonCard } from '@/lib/you/people-cards-model';
 import { correctPersonMemory, deletePersonCard, draftPersonCard, removePersonMemory, saveBotPhoto, savePersonCard } from '../actions';
@@ -24,7 +26,7 @@ export default async function ChatBotsPage({ searchParams }: { searchParams: Pro
   const { add } = await searchParams;
   const user = await requireUser();
   const client = await createYouClient();
-  const [found, settings] = await Promise.all([
+  const [found, settings, botModel] = await Promise.all([
     loadPeople(client, user.id).then(
       (rows): { rows: PersonRow[]; failed?: true } => ({ rows }),
       (error: unknown): { rows: PersonRow[]; failed?: true } => {
@@ -33,10 +35,11 @@ export default async function ChatBotsPage({ searchParams }: { searchParams: Pro
       },
     ),
     loadAccountSettings(user.id),
+    createCoreClient().then((core) => botModelFor(core, user.id)),
   ]);
   if (add === '1' && !found.failed) {
     return (
-      <BotsView rows={found.rows} adding>
+      <BotsView rows={found.rows} adding botModel={botModel}>
         <PersonForm
           card={newPersonCard(found.rows.map((r) => r.colour))}
           timezone={settings.timezone}
@@ -46,5 +49,5 @@ export default async function ChatBotsPage({ searchParams }: { searchParams: Pro
       </BotsView>
     );
   }
-  return <BotsView rows={found.rows} failed={found.failed} />;
+  return <BotsView rows={found.rows} failed={found.failed} botModel={botModel} />;
 }

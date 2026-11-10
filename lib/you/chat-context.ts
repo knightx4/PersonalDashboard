@@ -61,7 +61,8 @@ function episodeRow(row: Record<string, unknown>): ContextEpisode | null {
   };
 }
 
-function mentorRow(row: Record<string, unknown>): ContextMentor {
+/** One board_advisors row as the mentor a reply speaks as; the daily check reads a bot the same way. */
+export function mentorRow(row: Record<string, unknown>): ContextMentor {
   return {
     id: str(row.id),
     key: str(row.key),

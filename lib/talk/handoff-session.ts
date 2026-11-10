@@ -1,4 +1,4 @@
-import { costMicrosFor, MODEL_PRICES, usageFrom, type TokenUsage } from '@/lib/core/spend/pricing';
+import { costMicrosFor, usageFrom, type TokenUsage } from '@/lib/core/spend/pricing';
 import type { HandoffRef } from './handoff';
 
 /**
@@ -94,9 +94,8 @@ type Line = {
  * content block, every one carrying the same usage, so a message is counted
  * once by its id, keeping the line with the most output. Summed per model.
  *
- * Claude Code writes its prompt cache with the one-hour lifetime, which is
- * priced at twice input rather than the five-minute rate the price table
- * holds, so those writes are charged the difference on top.
+ * Claude Code writes its prompt cache with the one-hour lifetime, which
+ * costMicrosFor prices at twice input from the usage's hourWriteTokens.
  */
 export function transcriptSpend(transcripts: readonly string[]): SessionSpend[] {
   const messages = new Map<string, { model: string; usage: TokenUsage; oneHour: number }>();
@@ -133,6 +132,7 @@ export function transcriptSpend(transcripts: readonly string[]): SessionSpend[] 
     const searches = (sum.usage.webSearchRequests ?? 0) + (usage.webSearchRequests ?? 0);
     if (searches > 0) sum.usage.webSearchRequests = searches;
     sum.oneHour += oneHour;
+    if (sum.oneHour > 0) sum.usage.hourWriteTokens = sum.oneHour;
     byModel.set(model, sum);
   }
 
@@ -141,7 +141,7 @@ export function transcriptSpend(transcripts: readonly string[]): SessionSpend[] 
       model,
       usage,
       oneHourCacheWrites: oneHour,
-      costMicros: sessionCostMicros(model, usage, oneHour),
+      costMicros: sessionCostMicros(model, usage),
     }))
     .sort((a, b) => a.model.localeCompare(b.model));
 }
@@ -154,12 +154,9 @@ function oneHourWrites(raw: unknown, cacheWrites: number): number {
   return Math.min(tokens, cacheWrites);
 }
 
-/** The ledger's price for the usage, with one-hour cache writes at twice input. */
-function sessionCostMicros(model: string, usage: TokenUsage, oneHour: number): number | null {
-  const base = costMicrosFor(model, usage);
-  const card = MODEL_PRICES[model];
-  if (base === null || !card) return null;
-  return base + Math.round(oneHour * Math.max(0, 2 * card.input - card.cacheWrite));
+/** The ledger's price for the usage; its one-hour cache writes are in hourWriteTokens. */
+function sessionCostMicros(model: string, usage: TokenUsage): number | null {
+  return costMicrosFor(model, usage);
 }
 
 /** The session's whole cost, or null when no model in it had a rate. */

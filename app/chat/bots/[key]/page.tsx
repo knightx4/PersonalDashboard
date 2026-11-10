@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { botModelFor } from '@/lib/dash/model-choice';
 import { loadPeople } from '@/lib/you/chat-threads';
 import { loadPersonCard } from '@/lib/you/people-cards';
 import { botVoiceStatus } from '@/lib/talk/speech/fish';
@@ -42,15 +44,16 @@ export default async function ChatBotPage({ params }: { params: Promise<{ key: s
   const user = await requireUser();
   const client = await createYouClient();
   const now = readAt();
-  const [rows, card, settings] = await Promise.all([
+  const [rows, card, settings, botModel] = await Promise.all([
     loadPeople(client, user.id),
     loadPersonCard(client, user.id, key, now),
     loadAccountSettings(user.id),
+    createCoreClient().then((core) => botModelFor(core, user.id)),
   ]);
   if (!card) notFound();
   const voiceStatus = await botVoiceStatus(card.voice?.id ?? null);
   return (
-    <BotsView rows={rows} current={key}>
+    <BotsView rows={rows} current={key} botModel={botModel}>
       <PersonForm
         key={`${card.id}-${card.persona.length}`}
         card={card}

@@ -35,6 +35,7 @@ export function ModelChip({
   onModel,
   initialOpen = false,
   quiet = false,
+  heading = 'Dash answers with',
 }: {
   model: DashChoiceId;
   onModel: (model: DashChoiceId) => void;
@@ -42,6 +43,8 @@ export function ModelChip({
   quiet?: boolean;
   /** For the gallery: the list drawn open. */
   initialOpen?: boolean;
+  /** Who the pick is for, read before the list and the model: "Bots write with" on the Bots tab. */
+  heading?: string;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const root = useRef<HTMLDivElement>(null);
@@ -81,7 +84,7 @@ export function ModelChip({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Dash answers with ${label}`}
+        aria-label={`${heading} ${label}`}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && open) {
@@ -98,7 +101,7 @@ export function ModelChip({
       {open && (
         <div
           role="listbox"
-          aria-label="Dash answers with"
+          aria-label={heading}
           className={cn(popoverSurface, 'absolute bottom-full left-0 z-overlay mb-1.5 w-72 p-1')}
           style={
             place
@@ -106,7 +109,7 @@ export function ModelChip({
               : undefined
           }
         >
-          <p className="px-2.5 pb-0.5 pt-1 text-small text-ink-muted">Dash answers with</p>
+          <p className="px-2.5 pb-0.5 pt-1 text-small text-ink-muted">{heading}</p>
           {DASH_CHOICES.map((choice) => {
             const on = choice.id === model;
             return (

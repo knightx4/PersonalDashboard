@@ -3,7 +3,7 @@ import 'server-only';
 import { after } from 'next/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
-import { dashModelFor } from '@/lib/dash/model-choice';
+import { botModelFor } from '@/lib/dash/model-choice';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createYouClient } from '@/lib/you/auth/server';
 import { cleanMessage } from '@/lib/you/council-model';
@@ -113,7 +113,7 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
   const client = await createYouClient();
   try {
     const [core, settings, owner] = await Promise.all([createCoreClient(), loadAccountSettings(userId), isOwner()]);
-    const model = await dashModelFor(core, userId);
+    const model = await botModelFor(core, userId);
     await runGroupBurst({
       client,
       userId,

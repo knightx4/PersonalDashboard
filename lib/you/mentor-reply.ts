@@ -5,6 +5,7 @@ import { zoneDay } from '@/lib/core/when';
 import { DASH_TOOLS } from '@/lib/dash/registry';
 import type { DashFile } from '@/lib/dash/files';
 import { runDash, type DashExecutor, type DashVoice } from '@/lib/dash/loop';
+import { toolBranches } from '@/lib/dash/tool-areas';
 import { budgetSlip } from '@/lib/dash/slips';
 import type { YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { chatPrompt, loadChatContext, newestFromPerson, type PromptMessage } from '@/lib/you/chat-context';
@@ -76,6 +77,61 @@ export * from '@/lib/you/mentor-reply-model';
  * (plan #3050.2.2), which is drawn under the reply's last bubble.
  */
 export const MENTOR_LOOKUPS = DASH_TOOLS.filter((tool) => tool.kind === 'lookup');
+
+/**
+ * How a People bot speaks in its own thread: its card and the reply rules,
+ * the tools it may call, loaded by area (lib/dash/tool-areas.ts), and the
+ * 1-hour cache. One place, so the daily check (inngest/core/dash-quality.ts)
+ * asks a bot exactly as a text does.
+ */
+export function peopleVoice(opts: {
+  persona: string;
+  model: string;
+  /** Whether what the reply makes is kept, which lets it run code (plan #3050.3.1). */
+  keepFiles: boolean;
+  /** Whether it may change the person's rows, with Ask's tools (plan #2861). */
+  acting: boolean;
+  makePage?: boolean;
+  handOn?: boolean;
+  passBot?: boolean;
+  /** The rules for a request another bot handed it (plan #3003.3). */
+  handoffRules?: string | null;
+}): DashVoice {
+  const tools = [
+    ...(opts.acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS),
+    ...(opts.makePage ? [MAKE_PAGE] : []),
+    ...(opts.handOn ? [HAND_OFF] : []),
+    ...(opts.passBot ? [HAND_TO_BOT] : []),
+  ];
+  return {
+    model: opts.model,
+    system: [
+      opts.persona,
+      REPLY_RULES,
+      opts.keepFiles ? ATTACH_RULES : CHART_ONLY_RULES,
+      SAVED_RULES,
+      PEOPLE_WEB_RULES,
+      ...(opts.acting ? [peopleActionRules(Boolean(opts.handOn))] : []),
+      ...(opts.makePage ? [PAGE_RULES] : []),
+      ...(opts.handOn ? [SESSION_RULES] : []),
+      ...(opts.passBot ? [BOT_HANDOFF_RULES] : []),
+      ...(opts.handoffRules ? [opts.handoffRules] : []),
+    ].join('\n\n'),
+    tools,
+    // Everyday tools loaded, the rest opened by area (lib/dash/tool-areas.ts):
+    // about 75,000 tokens of tools were sent with every text before.
+    branches: toolBranches(tools),
+    // The person texts back minutes or an hour later; a 5-minute cache was
+    // written afresh for most texts.
+    cacheTtl: '1h',
+    // Code runs only where what it makes is kept (plan #3050.3.1).
+    serverTools: opts.keepFiles ? replyServerTools(opts.model) : peopleServerTools(opts.model),
+    // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
+    maxTokens: opts.acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
+    // A reply that reaches a limit gets one more stretch to make the change it was asked for.
+    extend: opts.acting,
+  };
+}
 
 export type MentorSpendOperation = 'mentor-reply' | 'mentor-ack';
 
@@ -533,33 +589,16 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
           );
         }
       : undefined;
-  const voice: DashVoice = {
+  const voice = peopleVoice({
+    persona: ctx.layers.persona.text,
     model: input.model,
-    system: [
-      ctx.layers.persona.text,
-      REPLY_RULES,
-      input.keepFiles ? ATTACH_RULES : CHART_ONLY_RULES,
-      SAVED_RULES,
-      PEOPLE_WEB_RULES,
-      ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
-      ...(makePage ? [PAGE_RULES] : []),
-      ...(handOn ? [SESSION_RULES] : []),
-      ...(passBot ? [BOT_HANDOFF_RULES] : []),
-      ...(handoff ? [handoff.rules] : []),
-    ].join('\n\n'),
-    tools: [
-      ...(acting ? PEOPLE_TOOLS : MENTOR_LOOKUPS),
-      ...(makePage ? [MAKE_PAGE] : []),
-      ...(handOn ? [HAND_OFF] : []),
-      ...(passBot ? [HAND_TO_BOT] : []),
-    ],
-    // Code runs only where what it makes is kept (plan #3050.3.1).
-    serverTools: input.keepFiles ? replyServerTools(input.model) : peopleServerTools(input.model),
-    // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
-    maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
-    // A reply that reaches a limit gets one more stretch to make the change it was asked for.
-    extend: acting !== null,
-  };
+    keepFiles: Boolean(input.keepFiles),
+    acting: acting !== null,
+    makePage: Boolean(makePage),
+    handOn: Boolean(handOn),
+    passBot: Boolean(passBot),
+    handoffRules: handoff?.rules ?? null,
+  });
   // What the mentor heard in its groups and has not yet folded into memory (plan #2983); a reply still goes without it.
   let carried = '';
   try {
