@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState, type ComponentProps } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -12,6 +12,8 @@ import { SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
 import {
   EXCITEMENT_MINIMUMS,
   PIPELINE_PATH,
+  clearPipelineFiltersHref,
+  hasPipelineFilters,
   pipelineHref,
   type PipelineParams,
   type PipelineState,
@@ -215,6 +217,15 @@ export function PipelineFilters({
         <Button type="button" variant="ghost" size="xs" onClick={() => setMore(true)} className="sm:hidden">
           More
         </Button>
+      )}
+      {hasPipelineFilters(params) && (
+        <Link
+          href={clearPipelineFiltersHref(params)}
+          scroll={false}
+          className={cn(linkVariants({ tone: 'quiet' }), 'press-area ml-1 text-small font-medium')}
+        >
+          Clear all
+        </Link>
       )}
       <noscript>
         <Button type="submit" variant="link">

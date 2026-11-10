@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
 import { AimButton } from '@/components/shell/aim-button';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
@@ -22,6 +22,7 @@ import { APPLICATION_SOURCES, isLive } from '@/lib/jobs/pipeline';
 import { openApplications } from '@/lib/jobs/board-moment';
 import { pipelineColumnFilters } from '@/lib/jobs/pipeline-columns';
 import {
+  clearPipelineFiltersHref,
   filterPipeline,
   pageOf,
   parsePipeline,
@@ -229,7 +230,12 @@ export function PipelinePage({
       {searchedOut ? (
         <SearchEmpty query={params.q ?? ''} />
       ) : filtered.length === 0 ? (
-        <p className="text-ui text-ink-muted">No applications match these filters.</p>
+        <p className="text-ui text-ink-muted">
+          No applications match these filters.{' '}
+          <Link href={clearPipelineFiltersHref(params)} scroll={false} className={linkVariants({ tone: 'quiet' })}>
+            Clear all
+          </Link>
+        </p>
       ) : (
         <div className="space-y-5">
           {/* ui-ok: one card per group of rows, each holding its rows as one table, not a card per row */ sections.map((section) => (

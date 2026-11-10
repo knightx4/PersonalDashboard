@@ -3,7 +3,9 @@ import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { formatCompBand } from '@/lib/jobs/applications/load';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import {
+  clearPipelineFiltersHref,
   filterPipeline,
+  hasPipelineFilters,
   parsePipeline,
   pipelineDescription,
   pipelineHref,
@@ -196,5 +198,29 @@ describe('formatCompBand', () => {
   it('draws one figure when both ends match', () => {
     expect(formatCompBand(21_000_000, 21_000_000)).toBe('$210k');
     expect(formatCompBand(18_000_000, 24_000_000)).toBe('$180k–$240k');
+  });
+});
+
+describe('clearing the filters (note 7a9e47d2)', () => {
+  it('takes every filter off and keeps the view and the display', () => {
+    const params = {
+      view: 'table',
+      status: 'closed',
+      source: 'referral',
+      ready: 'yes',
+      company: 'acme',
+      q: 'design',
+      page: '3',
+      sort: 'company',
+      group: 'stage',
+    };
+    expect(hasPipelineFilters(params)).toBe(true);
+    expect(clearPipelineFiltersHref(params)).toBe('/jobs/pipeline?view=table&sort=company&group=stage');
+  });
+
+  it('finds nothing to clear on the plain page', () => {
+    expect(hasPipelineFilters({})).toBe(false);
+    expect(hasPipelineFilters({ view: 'board', sort: 'company' })).toBe(false);
+    expect(clearPipelineFiltersHref({ view: 'board' })).toBe('/jobs/pipeline?view=board');
   });
 });
