@@ -695,6 +695,7 @@ import {
   DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import { DevLookupCapsEmptySurface, DevLookupCapsSurface } from './dev-lookup-caps-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
 import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
@@ -13296,6 +13297,27 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageEmptySurface />,
+  },
+  {
+    id: 'dev-lookup-caps',
+    label: "Dev · Ran out of lookups",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface />,
+  },
+  {
+    id: 'dev-lookup-caps-open',
+    label: "Dev · Ran out of lookups, lookups open",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface open />,
+  },
+  {
+    id: 'dev-lookup-caps-empty',
+    label: "Dev · Ran out of lookups, none yet",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsEmptySurface />,
   },
   {
     id: 'dev-modules',

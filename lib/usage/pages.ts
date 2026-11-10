@@ -37,6 +37,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/dev/ui',
   '/dev/ui/review',
   '/dev/usage',
+  '/dev/usage/lookups',
   '/finances',
   '/finances/accounts',
   '/finances/accounts/[id]',

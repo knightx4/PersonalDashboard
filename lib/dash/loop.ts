@@ -455,6 +455,11 @@ export type DashAnswer =
        */
       extended?: true;
       /**
+       * The model's words were longer than a turn holds (MAX_TURN), so their
+       * end was cut to fit (plan #3092). Absent: kept whole.
+       */
+      cutShort?: true;
+      /**
        * The comment was marked seen in place of a reply (plan #1649): the
        * body is empty and nothing is to be written into the thread.
        */
@@ -1267,6 +1272,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         toolCalls,
         citations,
         stop,
+        ...(answer.length > MAX_TURN - note.length ? { cutShort: true as const } : {}),
         ...extras(),
         ...(voice.finish ? { report: answered.input } : {}),
         ...(couldNot && !voice.finish ? { couldNot } : {}),
@@ -1362,6 +1368,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           toolCalls,
           citations: pages,
           stop,
+          ...(text.length > MAX_TURN - note.length ? { cutShort: true as const } : {}),
           ...(madeFiles.length > 0 ? { madeFiles: [...madeFiles] } : {}),
           ...(extended ? { extended: true as const } : {}),
         };

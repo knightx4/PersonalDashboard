@@ -13,6 +13,8 @@ import { costMicrosFor, usageFrom, type SpendReport } from '@/lib/core/spend/pri
 import { recordSpend } from '@/lib/core/spend/record';
 import { devAccess } from '@/lib/ask/dev';
 import { answerQuestion } from '@/lib/dash/ask';
+import { keepLookupCap } from '@/lib/dash/lookup-caps';
+import type { DashCall } from '@/lib/dash/loop';
 import { codeDeps } from '@/lib/dash/think-code';
 import { dashModelFor } from '@/lib/dash/model-choice';
 import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
@@ -109,7 +111,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
       return (data ?? []) as { id: string; question: string; expect: unknown; advisor: string | null; think: boolean }[];
     },
 
-    async ask(userId, question, advisor, think) {
+    async ask(userId, question, advisor, think, asked) {
       if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set on this deployment.');
       const settings = await loadAccountSettings(userId, core);
       const today = todayInTimezone(settings.timezone);
@@ -139,6 +141,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         );
         if (!talk) throw new Error(`There is no advisor ${advisor} on the board.`);
       }
+      const calls: DashCall[] = [];
       const started = Date.now();
       const answer = talk
         ? await answerAsAdvisor({
@@ -159,8 +162,24 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
             // Think it through (plan #2937.6): Opus, the code and the mockup, as the person's press asks it.
             think: think ? { ...codeDeps(), codeAccess: () => devAccess(ctx) } : null,
             onSpend: (report) => spent.push(report),
+            onCall: (call) => calls.push(call),
           });
       const seconds = (Date.now() - started) / 1000;
+      // A case Ask Dash answered on all its lookups is listed on Dev with real ones (plan #3092).
+      if (!talk && answer.ok && answer.stop === 'lookups') {
+        await keepLookupCap(core, userId, {
+          surface: 'eval',
+          question,
+          model: spent[spent.length - 1]?.model ?? model,
+          toolCalls: answer.toolCalls,
+          answer,
+          calls,
+          spent,
+          seconds,
+          evalRunId: asked?.runId ?? null,
+          evalCaseId: asked?.caseId ?? null,
+        });
+      }
       let costMicros = 0;
       for (const report of spent) {
         costMicros += costMicrosFor(report.model, report.usage) ?? 0;

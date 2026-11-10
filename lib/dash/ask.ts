@@ -17,6 +17,7 @@ import type { DashChoiceId } from '@/lib/core/models';
 import type { DashFile } from './files';
 import { UNFINISHED_REASON, type DashFailure } from './failures';
 import { budgetSlip, type DashSlip } from './slips';
+import type { LookupCap } from './lookup-caps';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkFile, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
@@ -547,6 +548,12 @@ export type AskStores = {
    */
   recordSlip?: (slip: DashSlip) => Promise<void>;
   /**
+   * Keeps an answer that stopped because it used all its lookups, with its
+   * lookups in order, time and cost (plan #3092, lib/dash/lookup-caps.ts),
+   * for the list on Dev. Never throws. Absent: not kept.
+   */
+  recordLookupCap?: (cap: LookupCap) => Promise<void>;
+  /**
    * Think it through in a session thread (plan #2789.11): starts a thread on
    * this app whose first message is the conversation so far, ending with the
    * question, and wakes the broker. Present only when the broker is set up;
@@ -925,6 +932,8 @@ export async function askDash(
       console.error('the files sent with a question were not read', error);
     }
   }
+  const clock = input.now ?? Date.now;
+  const answerStarted = clock();
   const answer = await answerQuestion({
     turns: conversationSoFar.map((turn, index) =>
       index === newest && files?.length ? turn : { ...turn, body: bodyWithFileNames(turn) },
@@ -996,6 +1005,27 @@ export async function askDash(
     return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
   }
   const turnId = answered[answered.length - 1].id;
+  // An answer that used all its lookups is kept for the list on Dev (plan #3092).
+  if (answer.stop === 'lookups' && stores.recordLookupCap) {
+    try {
+      await stores.recordLookupCap({
+        surface: 'ask',
+        question: askedTurn?.body ?? question,
+        model: spent[spent.length - 1]?.model ?? (input.think ? THINK_MODEL : (input.model ?? ASK_MODEL)),
+        toolCalls: answer.toolCalls,
+        answer,
+        calls,
+        spent,
+        seconds: (clock() - answerStarted) / 1000,
+        conversationId: subject.ref,
+        turnId,
+        pagePath: input.page?.path ?? null,
+        scope: input.scope ?? null,
+      });
+    } catch (error) {
+      console.error('the answer that ran out of lookups was not recorded', error);
+    }
+  }
   if (made.length > 0 && stores.keepFiles) {
     answered = await keepAnswerFiles(answered, made, stores, input.client ?? new Anthropic({ apiKey: input.anthropicApiKey }));
   }
