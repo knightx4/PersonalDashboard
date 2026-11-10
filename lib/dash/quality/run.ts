@@ -39,7 +39,14 @@ export type DashQualityPorts = {
    * Asks one question as a new chat, read-only, and kept nowhere: of Ask
    * Dash, or of the advisor named, as a first message to them.
    */
-  ask(userId: string, question: string, advisor?: string | null, think?: boolean): Promise<{ outcome: CaseOutcome; costMicros: number }>;
+  ask(
+    userId: string,
+    question: string,
+    advisor?: string | null,
+    think?: boolean,
+    /** The run and case asking, kept with an answer that ran out of lookups (plan #3092). */
+    asked?: { runId: string; caseId: string },
+  ): Promise<{ outcome: CaseOutcome; costMicros: number }>;
   turns(userId: string, since: string): Promise<HealthTurn[]>;
   spend(userId: string, since: string): Promise<HealthSpend[]>;
   /** What connected apps called through the connector (core.connector_calls). */
@@ -121,7 +128,7 @@ export async function runDashQuality(
       // A question put to an advisor names them, so the note says who failed it.
       const asked = c.advisor ? `(to ${c.advisor}) ${c.question}` : c.think ? `(thinking it through) ${c.question}` : c.question;
       try {
-        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null, c.think === true);
+        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null, c.think === true, { runId, caseId: c.id });
         const failures = gradeAnswer(parseExpect(c.expect), outcome);
         return {
           case: c.id,
