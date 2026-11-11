@@ -37,7 +37,8 @@ import { madeFileIds } from '@/lib/talk/made-files';
  * naming a row can only name a row a lookup returned, as citations do.
  *
  * Three limits stop the looking, and when one is reached the next call is
- * made to answer with what it has: MAX_LOOKUPS lookups, an input token budget, and
+ * made to answer with what it has: ANSWER_AT lookups (MAX_LOOKUPS is the hard
+ * stop for calls made together), an input token budget, and
  * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
  *
@@ -59,6 +60,14 @@ import { madeFileIds } from '@/lib/talk/made-files';
  * and token budgets below still bound the answer.
  */
 export const MAX_LOOKUPS = 12;
+/**
+ * The lookup at which the answer is forced (plan #3093). A deep question was
+ * reaching MAX_LOOKUPS with the answer still to write, and the one call left
+ * to write it came back cut short (plan #3092's list). From this many lookups
+ * the next call must give the answer, which leaves MAX_LOOKUPS as the hard
+ * stop for a turn that makes several calls at once.
+ */
+export const ANSWER_AT = 10;
 /**
  * Input tokens across the calls of one answer before it must answer, with a
  * cache read counted at a tenth, as it is priced (budgetTokens). Counted in
@@ -371,7 +380,7 @@ const LIMIT_REACHED = LOOKUP_NOT_RUN;
 export type DashStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished' | 'stopped';
 
 /** The sentence an answer written under a limit ends with. */
-export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>, lookups: number = MAX_LOOKUPS): string {
+export function limitNote(stop: Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'>, lookups: number = ANSWER_AT): string {
   return stop === 'lookups'
     ? `I stopped after ${lookups} lookups, so this answer rests only on what those found.`
     : 'I stopped looking before I had checked everything, so this answer rests only on what I found by then.';
@@ -1132,7 +1141,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   let callMax = maxTokens;
   let cutOff = false;
   const reached = (): Exclude<DashStop, 'answered' | 'unfinished' | 'stopped'> | null =>
-    lookups >= lookupCap ? 'lookups' : inputTokens >= tokenCap ? 'budget' : now() - started >= timeCap ? 'time' : null;
+    lookups >= lookupCap - (MAX_LOOKUPS - ANSWER_AT) ? 'lookups' : inputTokens >= tokenCap ? 'budget' : now() - started >= timeCap ? 'time' : null;
 
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard, with room for the
@@ -1265,7 +1274,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       }
       const stop: DashStop = limit ?? 'answered';
-      const note = stop === 'answered' ? '' : `\n\n${limitNote(stop, lookupCap)}`;
+      const note = stop === 'answered' ? '' : `\n\n${limitNote(stop, lookups)}`;
       return {
         ok: true,
         body: answer ? `${answer.slice(0, MAX_TURN - note.length)}${note}` : '',
@@ -1360,7 +1369,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       // Told to call a tool and did not: a reply cut off, or prose instead.
       if (uses.length === 0 && text && stopped !== 'max_tokens') {
         const stop: DashStop = limit ?? 'answered';
-        const note = stop === 'answered' ? '' : `\n\n${limitNote(stop, lookupCap)}`;
+        const note = stop === 'answered' ? '' : `\n\n${limitNote(stop, lookups)}`;
         const pages = textCitedPages(response.content as { type: string; citations?: unknown }[]);
         return {
           ok: true,

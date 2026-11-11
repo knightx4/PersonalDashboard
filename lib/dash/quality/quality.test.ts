@@ -68,7 +68,7 @@ describe('grading an answer', () => {
   });
 
   it('holds limits, names to avoid, and the vendor name', () => {
-    const outcome = answered('Claude found it. I stopped after 12 lookups, so this answer rests only on what those found.', { seconds: 50 });
+    const outcome = answered('Claude found it. I stopped after 10 lookups, so this answer rests only on what those found.', { seconds: 50 });
     const failures = gradeAnswer(parseExpect({ mentions_none: ['fabrikam'], max_seconds: 30, max_lookups: 0 }), outcome);
     expect(failures).toContain('The answer says "Claude".');
     expect(failures).toContain('A limit cut the answer short.');
@@ -111,7 +111,7 @@ describe('the day of real answers', () => {
     const health = dashHealth(
       [
         turn('t1', 'I could not finish this answer: …', [{ name: 'open_row', input: {}, result: { ok: false, error: LOOKUP_NOT_RUN } }]),
-        turn('t2', 'Here.\n\nI stopped after 12 lookups, so this answer rests only on what those found.'),
+        turn('t2', 'Here.\n\nI stopped after 10 lookups, so this answer rests only on what those found.'),
         turn('t3', 'Found.', [{ name: 'recall', input: {}, result: { ok: false, error: 'That lookup failed to read the database.' } }]),
         turn('t4', 'Saved.', [badArg, badArg], 'down'),
       ],
