@@ -21,7 +21,7 @@ import type { LookupCap } from './lookup-caps';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkCitation, type TalkFile, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
-  MAX_LOOKUPS,
+  ANSWER_AT,
   runDash,
   type DashAnswer,
   type DashCall,
@@ -117,7 +117,7 @@ fewer, say so rather than counting the rows you were given.
 LOOK IT UP. Answer from what the lookup tools return, never from memory or a
 guess about what they probably have. Work out which lookups the question needs
 and make them; where two are independent, make them in the same turn. You
-have at most ${MAX_LOOKUPS} lookups for one answer, so choose them well.
+have at most ${ANSWER_AT} lookups for one answer, so choose them well.
 When they ask what they said, wrote or think about something, start with
 recall, and keep their own words apart from anything Dash wrote for them.
 When you describe them, as in a summary, a bio or a cover letter, read their

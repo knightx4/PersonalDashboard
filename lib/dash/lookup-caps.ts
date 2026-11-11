@@ -1,7 +1,8 @@
 /**
  * The Ask Dash answers that stopped because they used all their lookups
- * (plan #3092, migration 0317 core.dash_lookup_caps). The cap stays at 12
- * (MAX_LOOKUPS); each answer that reaches it is kept with its question, the
+ * (plan #3092, migration 0317 core.dash_lookup_caps). The answer is forced at
+ * 10 lookups (ANSWER_AT, plan #3093) and 12 stays the hard stop (MAX_LOOKUPS);
+ * each answer that reaches the first is kept with its question, the
  * lookups in order, its time and cost, and listed newest first on Dev
  * (/dev/usage/lookups), so the owner can decide case by case whether
  * lookups should be done differently or the question handed to a session.
