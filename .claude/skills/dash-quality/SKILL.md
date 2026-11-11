@@ -55,8 +55,11 @@ fix, re-ask the one case it is about, never all of them.
   reply check:" that names the model and the rule; the fix is the rule, or
   `readReply` in `lib/core/model-call.ts` for a new shape.
 - **One case by hand**: `npx tsx scripts/sql.ts "select core.run_dash_quality('<case id>')"`
-  re-asks one case against whatever is deployed, in under a minute, for a
-  few cents. This is how a fix is proven. `core.run_dash_quality()` with no
+  re-asks one case against whatever is deployed, in under a minute. This is
+  how a fix is proven. It is not a few cents: on 11 November, with the
+  person's model and a 95,000-token prompt, a one-lookup case cost $0.56 and
+  a ten-lookup case $1.10. Re-ask only the case the fix is about, the
+  shortest one that shows it, and never a case whose cause is still open. `core.run_dash_quality()` with no
   id asks every case for about $1: do that only when a change touches every
   answer (the prompt, the loop), and at most once a week.
 - **Code**: `lib/dash/quality/` (grade, health, run), `inngest/core/dash-quality.ts`
