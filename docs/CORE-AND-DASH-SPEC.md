@@ -300,14 +300,14 @@ more conversational paths, and 74 files hold a model id.
 
 **R1.** Every comment thread is stored in `core.conversations`, with its
 turns in `core.conversation_turns`.
-Checked by: count `thread-tables`, baseline 6, target 1.
+Checked by: count `thread-tables`, baseline 1, target 1.
 
 **R2.** Every place the person talks to Dash runs on the one loop in
 `lib/dash/`.
 Checked by: count `conversational-model-paths`, baseline 8, target 1.
 
 **R3.** A model id is written in one file, `lib/core/models.ts`.
-Checked by: count `model-id-files`, baseline 74, target 1.
+Checked by: count `model-id-files`, baseline 1, target 1.
 
 **R4.** A row points at another row by a ref, not by a column for each kind
 of row it could point at.
