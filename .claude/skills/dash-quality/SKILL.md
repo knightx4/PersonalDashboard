@@ -119,7 +119,11 @@ is not one. Work it down:
   scan over embeddings (see migrations 0275 and 0276 for how recall was
   fixed). A bad argument from the model repeated across days means the tool's
   description or input schema misleads it: fix the description, or make the
-  tool accept what the model naturally sends.
+  tool accept what the model naturally sends. A lookup that says a row
+  exists nowhere when it does is often a read cut at the API's 1,000 rows
+  a request: `read_dev_row` named #2897.6 no step for a week because the
+  outline index stopped at 1,000 of 3,061 plan rows (fixed 11 November).
+  Count the rows the read should see before blaming the model.
 - **"I could not finish", a limit, or a refused lookup.** Read the spend
   rows of that minute (`core.model_spend`, operation `ask-dash`): how many
   calls, how many tokens each. Compare with `INPUT_BUDGET`, `MAX_LOOKUPS`
