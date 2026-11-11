@@ -240,9 +240,11 @@ spec change while five are waiting.
 
 1. `## Rules` sections for [CORE-AND-DASH-SPEC.md](CORE-AND-DASH-SPEC.md) and
    [CUT-BACK-SPEC.md](CUT-BACK-SPEC.md), with their counters. For the core
-   spec these include thread tables (6 now, target 1), conversational model
-   paths (6, target 1), files holding a model id (about 60, target 1), and
-   link tables with a column per target (3, target 0).
+   spec these were thread tables (6, target 1), conversational model paths (6,
+   target 1), files holding a model id (about 60, target 1), and link tables
+   with a column per target (3, target 0). The baselines now read 1, 8, 1 and
+   4: the first and third reached their targets, and the other two were
+   counted again when the rules were written.
 2. `scripts/spec-counts.ts`, its baseline, and `tests/spec-rules.test.ts`, so
    those rules are enforced from the day they are written.
 3. The core-and-Dash overhaul's design session, with job roles moved across.
