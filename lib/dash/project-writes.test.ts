@@ -149,6 +149,71 @@ describe('add_plan_step', () => {
     const child = tables['public.plan_items'].find((row) => row.title === 'Child');
     expect(child).toMatchObject({ parent_id: 'p1', module: 'jobs', status: 'proposed' });
   });
+
+  describe('files it under the project it belongs to (plan #3095)', () => {
+    const MUSIC = {
+      id: 'music-pipeline',
+      user_id: ME,
+      label: 'music-pipeline',
+      owner: 'example-owner',
+      repo: 'music-pipeline',
+      bot_id: 'bot-maemae',
+      created_at: '2026-10-01T00:00:00Z',
+    };
+    const MUSIC_DETAIL = `Repository: example-owner/music-pipeline, studio timeline. ${FULL}`;
+
+    beforeEach(() => {
+      tables['public.dev_projects'] = [MUSIC];
+      tables['public.plan_items'] = [];
+    });
+
+    it('lands under the project its detail names as the repository', async () => {
+      const result = await step.apply(ctx(), { title: 'Make linked copies reachable', detail: MUSIC_DETAIL });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.summary).toContain('in the music-pipeline project');
+      expect(tables['public.plan_items']).toEqual([
+        expect.objectContaining({ module: 'music-pipeline', parent_id: null, status: 'proposed' }),
+      ]);
+    });
+
+    it('stays under the app as a whole when no repository is named', async () => {
+      await step.apply(ctx(), { title: 'Move the Overnight panel to Home', detail: FULL });
+      expect(tables['public.plan_items']).toEqual([expect.objectContaining({ module: null })]);
+    });
+
+    it('takes a project named outright, and refuses one that is not a project', async () => {
+      await step.apply(ctx(), { title: 'Studio tweak', detail: FULL, project: 'music-pipeline' });
+      expect(tables['public.plan_items']).toEqual([expect.objectContaining({ module: 'music-pipeline' })]);
+      const wrong = await step.apply(ctx(), { title: 'Other tweak', detail: FULL, project: 'cooking' });
+      expect(wrong).toMatchObject({ ok: false, error: expect.stringContaining('music-pipeline') });
+    });
+
+    it('lands under the project of a bot that passed it on', async () => {
+      await step.apply({ ...ctx(), bots: ['bot-bob', 'bot-maemae'] }, { title: 'Studio fix', detail: FULL });
+      expect(tables['public.plan_items']).toEqual([expect.objectContaining({ module: 'music-pipeline' })]);
+    });
+
+    it('keeps a child under its parent project', async () => {
+      tables['public.plan_items'] = [{ id: 'p1', user_id: ME, number: 3064, module: 'music-pipeline', position: 10 }];
+      await step.apply(ctx(), { title: 'Child', under: '#3064', detail: FULL });
+      expect(tables['public.plan_items'].find((row) => row.title === 'Child')).toMatchObject({
+        parent_id: 'p1',
+        module: 'music-pipeline',
+      });
+    });
+
+    it('flags a repository that is not a project and leaves the step where it was', async () => {
+      const result = await step.apply(ctx(), {
+        title: 'Fix the recipe import',
+        detail: `Repository: example-owner/recipes. ${FULL}`,
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.summary).toContain('example-owner/recipes');
+      expect(tables['public.plan_items']).toEqual([
+        expect.objectContaining({ module: null, comment: expect.stringContaining('not one of the projects in Dev') }),
+      ]);
+    });
+  });
 });
 
 describe('add_plan_step instructions', () => {

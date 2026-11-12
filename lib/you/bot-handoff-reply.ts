@@ -222,7 +222,13 @@ export async function answerBotHandoff(ports: HandoffReplyPorts, handoffId: stri
     return fail(`${bot.name}'s thread could not be written to.`);
   }
 
-  const outcome = await ports.reply(chatId, { anchor, brief: handoffBrief(picked, sender), rules: handoffRules(sender) });
+  const outcome = await ports.reply(chatId, {
+    anchor,
+    brief: handoffBrief(picked, sender),
+    rules: handoffRules(sender),
+    // So a step the reply adds goes under the sender's project (plan #3095).
+    fromBot: picked.fromBot,
+  });
   if (!outcome.ok) return fail(outcome.error ?? `${bot.name} did not reply.`);
 
   const result = handoffResult(outcome.changes, outcome.reply);

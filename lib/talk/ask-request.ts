@@ -436,6 +436,8 @@ export async function peopleDashInRequest(userId: string): Promise<PeopleDash & 
           appRoute: appRoutePortInRequest(userId, cause ? { advisorChatId: cause.chatId, advisorId: cause.advisorId } : null),
           // A question handed to a goal from a People thread is answered from Chat.
           origin: { kind: 'chat', ref: null },
+          // The bot replying and any that passed the request on, for add_plan_step's project (plan #3095).
+          bots: cause ? [cause.advisorId, ...(cause.fromBot ? [cause.fromBot] : [])] : [],
           slipWhere: {
             surface: 'people',
             conversation: cause ? `people:${cause.chatId}` : null,
