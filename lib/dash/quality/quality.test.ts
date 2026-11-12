@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 import { dashHealth, PROMPT_TOKENS_ALERT, pushesBack, type HealthTurn } from './health';
-import { qualityNote, runDashQuality, type DashQualityPorts } from './run';
+import { lookupsOf, qualityNote, runDashQuality, type DashQualityPorts } from './run';
 
 const ROLE = { table: 'job_search.applications', ref: 'a-1', title: 'Strategy Lead at Northwind', href: '/jobs/roles/r-1' };
 
@@ -281,5 +281,22 @@ describe('a run', () => {
   it('has nothing to say for a clean day', () => {
     const health = dashHealth([], []);
     expect(qualityNote([], health, 'r')).toBeNull();
+  });
+});
+
+describe('the lookups a case keeps', () => {
+  it('keeps what each lookup was asked, so a failed case can be read without re-asking it', () => {
+    const outcome = answered('Here.', {
+      toolCalls: [
+        { name: 'job_applications', input: { status: ['in_process'] }, result: { ok: true, rows: [] } },
+        { name: 'agenda', input: {}, result: { ok: true, rows: [] } },
+        { name: 'query_rows', input: { table: 'x'.repeat(400) }, result: { ok: false, error: 'bad table' } },
+      ],
+    });
+    const lookups = lookupsOf(outcome);
+    expect(lookups[0]).toEqual({ name: 'job_applications', ok: true, input: '{"status":["in_process"]}' });
+    expect(lookups[1]).toEqual({ name: 'agenda', ok: true });
+    expect(lookups[2]).toMatchObject({ name: 'query_rows', ok: false, error: 'bad table' });
+    expect(lookups[2].input).toHaveLength(300);
   });
 });

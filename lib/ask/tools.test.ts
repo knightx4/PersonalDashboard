@@ -691,6 +691,28 @@ describe('job_applications', () => {
     });
   });
 
+  it('lists live processes and unsent leads before the sent and the closed, newest first within each', async () => {
+    const many: Tables = {
+      ...tables,
+      'job_search.applications': [
+        ...Array.from({ length: 60 }, (_, i) =>
+          app(`g${i}`, ME, 'r1', 'acknowledged', `2026-10-${String((i % 28) + 1).padStart(2, '0')}`),
+        ),
+        app('old-live', ME, 'r2', 'in_process', '2026-06-01'),
+        app('lead', ME, 'r3', 'lead', '2026-07-01', { submitted_at: null }),
+        app('newer-live', ME, 'r2', 'in_process', '2026-07-15'),
+        app('closed', ME, 'r3', 'rejected', '2026-11-01'),
+      ],
+    };
+    const result = await executeAskTool('job_applications', {}, context(many));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.slice(0, 3).map((r) => r.ref)).toEqual(['newer-live', 'old-live', 'lead']);
+    expect(result.rows).toHaveLength(50);
+    expect(result.rows.map((r) => r.ref)).not.toContain('closed');
+    expect(result.totals).toMatchObject({ count: 64, by_status: { acknowledged: 60, in_process: 2, lead: 1, rejected: 1 } });
+  });
+
   it('counts as sent an application added by hand with no sent day, and not a lead', async () => {
     const added: Tables = {
       ...tables,

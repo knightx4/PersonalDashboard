@@ -25,7 +25,8 @@ export type CaseResult = {
   failures: string[];
   body: string;
   stop: string;
-  lookups: { name: string; ok: boolean; error?: string }[];
+  /** Each lookup with what it was asked (input, cut to 300 characters), so a failed case can be read without re-asking it. */
+  lookups: { name: string; ok: boolean; input?: string; error?: string }[];
   seconds: number;
   costMicros: number;
 };
@@ -64,11 +65,14 @@ export const CASE_CONCURRENCY = 3;
 /** The window of real answers the health covers. */
 export const HEALTH_HOURS = 24;
 
-function lookupsOf(outcome: CaseOutcome): CaseResult['lookups'] {
+export function lookupsOf(outcome: CaseOutcome): CaseResult['lookups'] {
   return outcome.toolCalls.map((call) => {
     const result = call.result as { ok?: unknown; error?: unknown } | undefined;
     const ok = result?.ok !== false;
-    return ok ? { name: call.name, ok } : { name: call.name, ok, error: String(result?.error ?? '').slice(0, 200) };
+    const asked = JSON.stringify(call.input ?? {}) ?? '{}';
+    const input = asked === '{}' ? undefined : asked.slice(0, 300);
+    const head = { name: call.name, ok, ...(input ? { input } : {}) };
+    return ok ? head : { ...head, error: String(result?.error ?? '').slice(0, 200) };
   });
 }
 

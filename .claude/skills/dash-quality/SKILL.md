@@ -214,7 +214,11 @@ when you see a cause of failure that one fix will not remove.
 3. **Whole answers, not a page.** Questions about all of something ("roles at
    X", "how much on Y") must reach a filtered query or a count, not the first
    50 rows of a list. Find where the tools return a page and the prompt lets
-   the model answer from it.
+   the model answer from it. Done 12 November: `job_applications` lists
+   live processes and unsent leads first (case e8554e9d). Next: the "full
+   picture" case 71b0bc38 still read interviews, todos and goals through
+   `query_rows`/`list_rows`/`table_info`; a failed case's `lookups` now keep
+   each call's input, so read them there before guessing which page it was.
 4. **Grounding.** Every factual claim about their data must rest on a row a
    lookup returned. On 22 October a thread reply said an answer "calls
    Decagon's pricing on work done a finance question"; the answer says
