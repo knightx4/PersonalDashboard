@@ -114,6 +114,15 @@ export function normaliseSubpath(subpath: string | null | undefined): string {
 }
 
 /**
+ * True when a vault folder is an email address. Nobody names a vault folder
+ * that way, but a password manager fills one into the field above the token,
+ * and saving it points the sync at a folder that holds none of the vault.
+ */
+export function subpathIsEmail(subpath: string): boolean {
+  return /^[^\s/@]+@[^\s/@]+\.[^\s/@]+$/.test(normaliseSubpath(subpath));
+}
+
+/**
  * A repository path as it should be stored, or null when it is outside the
  * vault.
  *
