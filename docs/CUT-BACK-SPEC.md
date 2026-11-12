@@ -200,7 +200,7 @@ Checked by: audit.
 **R4.** Cutting a page leaves its tables and their rows in place.
 Checked by: audit.
 
-`learn-nav-tabs` counts the entries in the nav in `app/learn/layout.tsx`, the
+`learn-nav-tabs` counts the entries in the nav in `lib/shell/tabs.ts`, the
 owner's Videos tab included. R3 is left to the audit because only the page
 views say whether a redirect is opened, and a count of redirect-only pages
 would fail the merges in Part 4, each of which adds one. There are 15 such

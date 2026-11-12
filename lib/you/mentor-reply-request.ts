@@ -8,7 +8,7 @@ import { dashModelFor } from '@/lib/dash/model-choice';
 import { peopleDashInRequest } from '@/lib/talk/ask-request';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { createYouClient } from '@/lib/you/auth/server';
-import { readMessageFiles, recordMessageFiles } from '@/lib/you/chat-message-files';
+import { keepMadeFiles, readMessageFiles, recordMessageFiles } from '@/lib/you/chat-message-files';
 import type { ThreadFile } from '@/lib/you/chat-threads-model';
 import { listRoster } from '@/lib/you/board-advisors';
 import { loadNote } from '@/lib/you/council';
@@ -91,6 +91,8 @@ async function replyInRequest(userId: string, chatId: string): Promise<void> {
       claimed: true,
       // The pictures and PDFs sent with the messages being answered (plan #2974).
       readFiles: (messageIds) => readMessageFiles(core, messageIds),
+      // What the mentor's code made, kept under its reply (plan #3050.3.1).
+      keepFiles: (messageId, files) => keepMadeFiles(core, userId, messageId, files),
       // Pages made in a session (plan #2997). The routine writes through scripts/sql.ts, which writes the owner's rows alone.
       makePage: owner ? (botPageStarter(core, userId) ?? undefined) : undefined,
       // Heavy work handed to a session (plan #3005.2), for the owner alone for the same reason.

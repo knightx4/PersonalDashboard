@@ -1,7 +1,7 @@
 'use client';
 
 import { Tooltip } from '@/components/ui/tooltip';
-import { useActionState, useState } from 'react';
+import { Fragment, useActionState, useState } from 'react';
 import { X } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
 import { PLAN_STATUS_LABEL, isClosed } from '@/lib/plan/load';
 import { checkDay } from '@/lib/plan/check-backs';
 import { Chip } from '@/components/ui/chip';
+import Link, { linkVariants } from '@/components/ui/link';
+import { planRefHref } from '@/lib/comments/refs';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
@@ -27,6 +29,34 @@ function stepHandle(ref: { number: number; outline?: string }): string | null {
 function stepName(ref: { number: number; outline?: string; title: string }): string {
   const handle = stepHandle(ref);
   return handle ? `${handle} ${ref.title}` : ref.title;
+}
+
+const STEP_LINK = `press-area min-w-0 rounded-full ${linkVariants({ tone: 'quiet' })}`;
+/**
+ * A step named in a chip, opening that step's page (plan #3094). A real
+ * anchor, so Enter, middle-click and cmd/ctrl-click work. A step with no
+ * number on this page (a goal step under another goal) has no page to open
+ * and stays plain text rather than a dead link.
+ */
+function StepLabel({
+  step,
+  suffix = '',
+}: {
+  step: { number: number; outline?: string; title: string };
+  suffix?: string;
+}) {
+  const text = `${stepName(step)}${suffix}`;
+  if (step.number <= 0)
+    return (
+      <span tabIndex={0} className="min-w-0 truncate rounded-full">
+        {text}
+      </span>
+    );
+  return (
+    <Link href={planRefHref(step.number)} className={STEP_LINK}>
+      <span className="block truncate">{text}</span>
+    </Link>
+  );
 }
 
 /**
@@ -112,11 +142,14 @@ export function Dependencies<E extends TreeCatalogEntry>({
                       : 'This step waits until that one closes, then frees itself. Nothing is needed from you.'
                   }
                 >
-                  <span tabIndex={0} className="min-w-0 truncate rounded-full">
-                    {stepName(link.item)}
-                    {isClosed(link.item.status) &&
-                      ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
-                  </span>
+                  <StepLabel
+                    step={link.item}
+                    suffix={
+                      isClosed(link.item.status)
+                        ? ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`
+                        : ''
+                    }
+                  />
                 </Tooltip>
                 <Tooltip
                   label="Stop waiting on it, so this step no longer needs it closed first."
@@ -140,8 +173,8 @@ export function Dependencies<E extends TreeCatalogEntry>({
               label="A step above this one waits on it, so this one waits too. It frees itself when that closes."
               className="max-w-full"
             >
-              <Chip tone="caution" tabIndex={0} className="max-w-full opacity-80">
-                <span className="min-w-0 truncate">{stepName(ref)} · above</span>
+              <Chip tone="caution" className="max-w-full opacity-80">
+                <StepLabel step={ref} suffix=" · above" />
               </Chip>
             </Tooltip>
           ))}
@@ -161,7 +194,24 @@ export function Dependencies<E extends TreeCatalogEntry>({
       )}
 
       {node.blocks.length > 0 && (
-        <p className="text-small text-ink-muted">Unblocks {node.blocks.map(stepName).join(', ')}</p>
+        <p className="text-small text-ink-muted">
+          Unblocks{' '}
+          {node.blocks.map((ref, index) => (
+            <Fragment key={ref.id}>
+              {index > 0 && ', '}
+              {ref.number > 0 ? (
+                <Link
+                  href={planRefHref(ref.number)}
+                  className={`press-area ${linkVariants({ tone: 'quiet' })}`}
+                >
+                  {stepName(ref)}
+                </Link>
+              ) : (
+                stepName(ref)
+              )}
+            </Fragment>
+          ))}
+        </p>
       )}
 
       {offer && picking ? (

@@ -38,6 +38,13 @@
  * guarded: where site data is blocked the switch lasts until the page is
  * left.
  *
+ * A reply is `playing` only once its audio says it sounds (plan #3068): the
+ * audio's `play` resolves when its clock has moved, and rejects when the
+ * browser held the sound back or ran it in silence, which shows the play
+ * press. Every reason a reply did not sound (the route's status and why, a
+ * body that was empty or not audio, the name of the error `play` threw, a
+ * stop part way) is handed to `report`, for the log a silent phone leaves.
+ *
  * The fetch, the audio and the wait are handed in so the order can be tested
  * (player.test.ts); the browser's side is lib/talk/speech/output.ts.
  */
@@ -50,6 +57,8 @@ export type SpeechState = {
   phase: SpeechPhase;
   /** Why a reply was not read aloud, by its key, as the route wrote it. */
   notes: Readonly<Record<string, string>>;
+  /** Whether a bubble of this run has sounded, so the speaking pill stays up between bubbles. */
+  heard?: boolean;
 };
 
 /** The part of an audio element the player uses. */
@@ -57,7 +66,21 @@ export type SpeechAudio = {
   play: () => Promise<void>;
   pause: () => void;
   onended: (() => void) | null;
-  onerror: (() => void) | null;
+  /** `held` when the sound stopped part way and a press would bring it back. */
+  onerror: ((held?: boolean) => void) | null;
+};
+
+/** Why a reply did not sound, for the log (plan #3068). */
+export type SpeechFailure = {
+  stage: 'fetch' | 'play' | 'playback';
+  key: string;
+  /** The route's status, for a fetch it answered. */
+  status?: number;
+  /** The route's `why`, or what was wrong with what came back. */
+  why?: string;
+  /** The error's name: NotAllowedError, StalledError, AbortError, TypeError. */
+  name?: string;
+  message?: string;
 };
 
 export type PlayerDeps = {
@@ -70,6 +93,8 @@ export type PlayerDeps = {
   /** The pause between bubbles: a timer unless a test hands in its own. */
   wait?: (ms: number) => Promise<void>;
   now?: () => number;
+  /** Told each reason a reply did not sound. */
+  report?: (failure: SpeechFailure) => void;
 };
 
 /** A stand-in that cannot play, for a player given no audioUrl. */
@@ -100,9 +125,18 @@ export type SpeechVoice = { bot?: string | null; voice?: string | null };
 /** One bubble to read, as a run's press hands them in. */
 export type SpeechItem = { key: string; text: string; voice?: SpeechVoice };
 
-function voiceFields(voice: SpeechVoice | undefined): { bot?: string; voice?: string } {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type VoiceFields = { bot?: string; voice?: string; message?: string };
+
+/**
+ * What the route is told besides the text. A bot's bubble is keyed by its
+ * message's id, which goes as `message`, so the route keeps the bubble's
+ * spoken version on that row and a second hearing reuses it (plan #3079).
+ */
+function voiceFields(voice: SpeechVoice | undefined, key: string): VoiceFields {
   if (voice?.voice) return { voice: voice.voice };
-  if (voice?.bot) return { bot: voice.bot };
+  if (voice?.bot) return UUID.test(key) ? { bot: voice.bot, message: key } : { bot: voice.bot };
   return {};
 }
 
@@ -111,11 +145,18 @@ type Clip = { ok: true; blob: Blob } | { ok: false; message: string };
 
 type Queued = { key: string; clip: Promise<Clip> };
 
-const IDLE: SpeechState = { key: null, phase: 'idle', notes: {} };
+const IDLE: SpeechState = { key: null, phase: 'idle', notes: {}, heard: false };
 
 export function createSpeechPlayer(deps: PlayerDeps) {
   const wait = deps.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const now = deps.now ?? (() => Date.now());
+  const report = (failure: SpeechFailure) => {
+    try {
+      deps.report?.(failure);
+    } catch {
+      /* The log never stops the sound. */
+    }
+  };
   let state: SpeechState = IDLE;
   const listeners = new Set<() => void>();
   const spoken = new Set<string>();
@@ -149,11 +190,11 @@ export function createSpeechPlayer(deps: PlayerDeps) {
 
   /** Asks the route for a bubble's audio once. A refusal is not kept, so a press can ask again. */
   function clipFor(item: SpeechItem): Promise<Clip> {
-    const fields = voiceFields(item.voice);
+    const fields = voiceFields(item.voice, item.key);
     const id = JSON.stringify([item.key, item.text, fields.voice ?? null, fields.bot ?? null]);
     const kept = fetched.get(id);
     if (kept) return kept;
-    const clip = ask(item.text, fields);
+    const clip = ask(item.key, item.text, fields);
     fetched.set(id, clip);
     void clip.then((made) => {
       if (!made.ok && fetched.get(id) === clip) fetched.delete(id);
@@ -162,7 +203,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
     return clip;
   }
 
-  async function ask(text: string, fields: { bot?: string; voice?: string }): Promise<Clip> {
+  async function ask(key: string, text: string, fields: VoiceFields): Promise<Clip> {
     let response: Response;
     try {
       response = await deps.fetch('/api/speak', {
@@ -170,25 +211,29 @@ export function createSpeechPlayer(deps: PlayerDeps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, ...fields }),
       });
-    } catch {
+    } catch (error) {
+      report({ stage: 'fetch', key, why: 'unreachable', ...named(error) });
       return { ok: false, message: SPEAK_UNREACHABLE };
     }
-    if (!response.ok || !response.headers.get('content-type')?.startsWith('audio/')) {
-      const message = await response
-        .json()
-        .then((body: unknown) =>
-          body && typeof body === 'object' && typeof (body as { message?: unknown }).message === 'string'
-            ? (body as { message: string }).message
-            : SPEAK_UNREACHABLE,
-        )
-        .catch(() => SPEAK_UNREACHABLE);
-      return { ok: false, message };
+    const type = response.headers.get('content-type') ?? '';
+    if (!response.ok || !type.startsWith('audio/')) {
+      const body: unknown = await response.json().catch(() => null);
+      const said = body && typeof body === 'object' ? (body as { message?: unknown; why?: unknown }) : {};
+      report({ stage: 'fetch', key, status: response.status, why: typeof said.why === 'string' ? said.why : `not audio (${type || 'no type'})` });
+      return { ok: false, message: typeof said.message === 'string' ? said.message : SPEAK_UNREACHABLE };
     }
+    let blob: Blob;
     try {
-      return { ok: true, blob: await response.blob() };
-    } catch {
+      blob = await response.blob();
+    } catch (error) {
+      report({ stage: 'fetch', key, status: response.status, why: 'body unread', ...named(error) });
       return { ok: false, message: SPEAK_UNREACHABLE };
     }
+    if (blob.size === 0) {
+      report({ stage: 'fetch', key, status: response.status, why: 'empty body' });
+      return { ok: false, message: SPEAK_UNREACHABLE };
+    }
+    return { ok: true, blob };
   }
 
   const enqueue = (item: SpeechItem): Queued => ({ key: item.key, clip: clipFor(item) });
@@ -198,7 +243,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
     const item = waiting.shift();
     if (!item) {
       endedAt = null;
-      set({ key: null, phase: 'idle' });
+      set({ key: null, phase: 'idle', heard: false });
       return;
     }
     set({ key: item.key, phase: 'loading', notes: note(item.key, null) });
@@ -228,16 +273,18 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       void turn(mine);
     };
     made.audio.onended = finished;
-    made.audio.onerror = () => {
+    made.audio.onerror = (held) => {
       if (mine !== run || current !== made) return;
-      set({ notes: note(key, SPEAK_UNREACHABLE) });
+      report({ stage: 'playback', key, name: held ? 'Interrupted' : 'MediaError' });
+      set({ notes: note(key, held ? SPEAK_HELD_BACK : SPEAK_UNREACHABLE) });
       finished();
     };
     try {
       await made.audio.play();
-      if (mine === run && current === made) set({ phase: 'playing' });
-    } catch {
+      if (mine === run && current === made) set({ phase: 'playing', heard: true });
+    } catch (error) {
       if (mine !== run || current !== made) return;
+      report({ stage: 'play', key, ...named(error) });
       made.release();
       current = null;
       set({ notes: note(key, SPEAK_HELD_BACK) });
@@ -251,6 +298,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
     end();
     endedAt = null;
     for (const item of items) spoken.add(item.key);
+    set({ heard: false });
     waiting = items.map(enqueue);
     void turn(run);
   }
@@ -286,7 +334,7 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       waiting = [];
       end();
       endedAt = null;
-      set({ key, phase: 'loading', notes: note(key, null) });
+      set({ key, phase: 'loading', notes: note(key, null), heard: false });
       void sound(run, key, deps.audioUrl ? deps.audioUrl(url) : { audio: silent(), release: () => {} });
     },
     /** Queues a reply the first time only: a new reply plays once. */
@@ -299,12 +347,26 @@ export function createSpeechPlayer(deps: PlayerDeps) {
       waiting = [];
       end();
       endedAt = null;
-      set({ key: null, phase: 'idle' });
+      set({ key: null, phase: 'idle', heard: false });
     },
   };
 }
 
 export type SpeechPlayer = ReturnType<typeof createSpeechPlayer>;
+
+function named(error: unknown): { name: string; message: string } {
+  if (error instanceof Error) return { name: error.name, message: error.message };
+  return { name: typeof error, message: String(error) };
+}
+
+/**
+ * Whether the speaking pill is up (plan #3068): while a bubble sounds, and
+ * between the bubbles of a run once one has sounded. Never while the first
+ * is still on its way, nor for a run the browser held back.
+ */
+export function pillShows(state: SpeechState): boolean {
+  return state.phase === 'playing' || (state.phase === 'loading' && state.heard === true);
+}
 
 /**
  * How a bubble's speaker icon is drawn (plan #3043): `playing` while its
@@ -319,19 +381,28 @@ export function bubbleVoice(state: SpeechState, key: string): BubbleVoice {
   return state.notes[key] === SPEAK_HELD_BACK ? 'blocked' : 'rest';
 }
 
+/**
+ * Where the switch is kept. Dash's chat and the one-on-one threads share one
+ * switch (`SPEAKING_KEY`); a group chat keeps its own under its id, so voice
+ * on in one group is not on in every chat (plan #3082).
+ */
+export function speakingKeyOf(scope?: string | null): string {
+  return scope ? `${SPEAKING_KEY}.${scope}` : SPEAKING_KEY;
+}
+
 /** Whether new replies play aloud in this browser; off until switched on. */
-export function readSpeaking(): boolean {
+export function readSpeaking(key: string = SPEAKING_KEY): boolean {
   try {
-    return window.localStorage.getItem(SPEAKING_KEY) === '1';
+    return window.localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
 
-export function rememberSpeaking(on: boolean): void {
+export function rememberSpeaking(on: boolean, key: string = SPEAKING_KEY): void {
   try {
-    if (on) window.localStorage.setItem(SPEAKING_KEY, '1');
-    else window.localStorage.removeItem(SPEAKING_KEY);
+    if (on) window.localStorage.setItem(key, '1');
+    else window.localStorage.removeItem(key);
   } catch {
     /* Storage blocked: the switch lasts until the page is left. */
   }

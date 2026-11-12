@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
 import { gradeAnswer, parseExpect, type CaseOutcome } from './grade';
 import { dashHealth, PROMPT_TOKENS_ALERT, pushesBack, type HealthTurn } from './health';
-import { qualityNote, runDashQuality, type DashQualityPorts } from './run';
+import { lookupsOf, qualityNote, runDashQuality, type DashQualityPorts } from './run';
 
 const ROLE = { table: 'job_search.applications', ref: 'a-1', title: 'Strategy Lead at Northwind', href: '/jobs/roles/r-1' };
 
@@ -68,7 +68,7 @@ describe('grading an answer', () => {
   });
 
   it('holds limits, names to avoid, and the vendor name', () => {
-    const outcome = answered('Claude found it. I stopped after 12 lookups, so this answer rests only on what those found.', { seconds: 50 });
+    const outcome = answered('Claude found it. I stopped after 10 lookups, so this answer rests only on what those found.', { seconds: 50 });
     const failures = gradeAnswer(parseExpect({ mentions_none: ['fabrikam'], max_seconds: 30, max_lookups: 0 }), outcome);
     expect(failures).toContain('The answer says "Claude".');
     expect(failures).toContain('A limit cut the answer short.');
@@ -111,7 +111,7 @@ describe('the day of real answers', () => {
     const health = dashHealth(
       [
         turn('t1', 'I could not finish this answer: …', [{ name: 'open_row', input: {}, result: { ok: false, error: LOOKUP_NOT_RUN } }]),
-        turn('t2', 'Here.\n\nI stopped after 12 lookups, so this answer rests only on what those found.'),
+        turn('t2', 'Here.\n\nI stopped after 10 lookups, so this answer rests only on what those found.'),
         turn('t3', 'Found.', [{ name: 'recall', input: {}, result: { ok: false, error: 'That lookup failed to read the database.' } }]),
         turn('t4', 'Saved.', [badArg, badArg], 'down'),
       ],
@@ -281,5 +281,22 @@ describe('a run', () => {
   it('has nothing to say for a clean day', () => {
     const health = dashHealth([], []);
     expect(qualityNote([], health, 'r')).toBeNull();
+  });
+});
+
+describe('the lookups a case keeps', () => {
+  it('keeps what each lookup was asked, so a failed case can be read without re-asking it', () => {
+    const outcome = answered('Here.', {
+      toolCalls: [
+        { name: 'job_applications', input: { status: ['in_process'] }, result: { ok: true, rows: [] } },
+        { name: 'agenda', input: {}, result: { ok: true, rows: [] } },
+        { name: 'query_rows', input: { table: 'x'.repeat(400) }, result: { ok: false, error: 'bad table' } },
+      ],
+    });
+    const lookups = lookupsOf(outcome);
+    expect(lookups[0]).toEqual({ name: 'job_applications', ok: true, input: '{"status":["in_process"]}' });
+    expect(lookups[1]).toEqual({ name: 'agenda', ok: true });
+    expect(lookups[2]).toMatchObject({ name: 'query_rows', ok: false, error: 'bad table' });
+    expect(lookups[2].input).toHaveLength(300);
   });
 });

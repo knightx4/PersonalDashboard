@@ -115,6 +115,10 @@ export const SPEND_OPERATIONS = {
     // S2.1 Pro, one call per reply, up to 600 characters, billed by the byte
     // and capped at 330,000 bytes a month (core.speech_usage).
     'speak-reply',
+    // A chat bubble rewritten into a short spoken version before it is read
+    // aloud (plan #3079). Haiku, one call the first time a bubble is heard,
+    // kept on the bubble; a short plain bubble skips it.
+    'write-spoken-script',
     // The weekly observations across the modules (plan #1119). Sonnet, one
     // call per person a week, from the observations cron; background.
     'write-observations',

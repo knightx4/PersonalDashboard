@@ -19,6 +19,7 @@ import {
   PEOPLE_WEB_RULES,
   peopleActing,
   peopleServerTools,
+  replyServerTools,
   type PeopleDash,
 } from '@/lib/you/people-actions';
 import {
@@ -39,6 +40,11 @@ import {
 } from '@/lib/you/mentor-reply-model';
 import { keepRenewing, waitForQuiet, waitingLast } from '@/lib/you/reply-turn';
 import type { DashChange } from '@/lib/talk/changes';
+import { ATTACH_RULES, CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { fetchMadeFiles, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
+import { turnCharts, type DashChart } from '@/lib/talk/chart';
+import { SAVED_RULES, turnAttached, type SavedAttachment } from '@/lib/talk/attached';
+import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
 
 export * from '@/lib/you/mentor-reply-model';
 
@@ -65,8 +71,11 @@ export * from '@/lib/you/mentor-reply-model';
  * is never stuck waiting for a reply that is not coming.
  */
 
-/** The lookups a mentor may make: every lookup Dash has, except the chart, which only Ask draws. */
-export const MENTOR_LOOKUPS = DASH_TOOLS.filter((tool) => tool.kind === 'lookup' && tool.name !== 'show_chart');
+/**
+ * The lookups a mentor may make: every lookup Dash has, the chart among them
+ * (plan #3050.2.2), which is drawn under the reply's last bubble.
+ */
+export const MENTOR_LOOKUPS = DASH_TOOLS.filter((tool) => tool.kind === 'lookup');
 
 export type MentorSpendOperation = 'mentor-reply' | 'mentor-ack';
 
@@ -95,6 +104,13 @@ export type MentorReplyInput = {
    * the model (plan #2974). Absent: the mentor reads the words alone.
    */
   readFiles?: (messageIds: string[]) => Promise<DashFile[]>;
+  /**
+   * Keeps the files the mentor's code made against the reply's last bubble
+   * (plan #3050.3.1), in core.attachments, and says which could not be
+   * kept. Present, the mentor is offered code execution and told it can
+   * send files; absent, it can draw a chart and send nothing else.
+   */
+  keepFiles?: (messageId: string, files: MadeFile[]) => Promise<{ kept: unknown[]; unkept: UnkeptFile[] }>;
   /**
    * Starts a page in a Claude Code session (plan #2997), offered to the
    * mentor as make_page. Absent: the mentor cannot make pages.
@@ -411,22 +427,35 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   let lastSavedAt = 0;
   let firstBubbleMs: number | null = null;
   let saveError: string | null = null;
+  // The last reply bubble saved, so a chart drawn after it streamed can be put on it.
+  let lastReplyId: string | null = null;
   // Set once the reply is in: a first text that comes back later is dropped.
   let closed = false;
-  const save = (text: string, kind: 'reply' | 'ack') => {
+  const save = (text: string, kind: 'reply' | 'ack', charts: DashChart[] = [], attached: SavedAttachment[] = []) => {
     chain = chain.then(async () => {
       if (saveError) return;
       if (saved > 0) {
         const wait = bubblePauseMs(text) - (now() - lastSavedAt);
         if (wait > 0) await sleep(wait);
       }
-      const { error } = await client
+      const { data, error } = await client
         .from('advisor_messages')
-        .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind, text });
+        .insert({
+          user_id: userId,
+          chat_id: chatId,
+          role: 'advisor',
+          kind,
+          text,
+          ...(charts.length > 0 ? { charts } : {}),
+          ...(attached.length > 0 ? { attached } : {}),
+        })
+        .select('id')
+        .single();
       if (error) {
         saveError = `A reply was written but not saved: ${error.message}`;
         return;
       }
+      if (kind === 'reply' && typeof data?.id === 'string') lastReplyId = data.id;
       saved += 1;
       lastSavedAt = now();
       if (firstBubbleMs === null) firstBubbleMs = lastSavedAt - started;
@@ -509,6 +538,8 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
     system: [
       ctx.layers.persona.text,
       REPLY_RULES,
+      input.keepFiles ? ATTACH_RULES : CHART_ONLY_RULES,
+      SAVED_RULES,
       PEOPLE_WEB_RULES,
       ...(acting ? [peopleActionRules(Boolean(handOn))] : []),
       ...(makePage ? [PAGE_RULES] : []),
@@ -522,7 +553,8 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
       ...(handOn ? [HAND_OFF] : []),
       ...(passBot ? [HAND_TO_BOT] : []),
     ],
-    serverTools: peopleServerTools(input.model),
+    // Code runs only where what it makes is kept (plan #3050.3.1).
+    serverTools: input.keepFiles ? replyServerTools(input.model) : peopleServerTools(input.model),
     // A change's input needs room a text does not (ACTING_MAX_TOKENS, plan #2999).
     maxTokens: acting ? ACTING_MAX_TOKENS : REPLY_MAX_TOKENS,
     // A reply that reaches a limit gets one more stretch to make the change it was asked for.
@@ -574,10 +606,77 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   }
 
   const bubbles = answer.ok ? splitBubbles(answer.body) : [];
-  for (; queued < bubbles.length; queued++) save(bubbles[queued], 'reply');
+  // What show_chart drew goes on the reply's last bubble (plan #3050.2.2), never in its text.
+  const charts = answer.ok ? turnCharts(answer.toolCalls).slice(0, MAX_BUBBLE_CHARTS) : [];
+  // A saved page or file it attached by reference goes there too, as a card (plan #3050.4).
+  const attached = answer.ok ? turnAttached(answer.toolCalls) : [];
+  const unsaved = bubbles.length - queued;
+  for (; queued < bubbles.length; queued++) {
+    const last = queued === bubbles.length - 1;
+    save(bubbles[queued], 'reply', last ? charts : [], last ? attached : []);
+  }
   closed = true;
   acking.abort();
   await chain;
+  // Every bubble went while the text streamed: the charts go on the last of them now.
+  if ((charts.length > 0 || attached.length > 0) && unsaved <= 0 && lastReplyId && !saveError) {
+    const { error } = await client
+      .from('advisor_messages')
+      .update({ ...(charts.length > 0 ? { charts } : {}), ...(attached.length > 0 ? { attached } : {}) })
+      .eq('user_id', userId)
+      .eq('chat_id', chatId)
+      .eq('id', lastReplyId);
+    if (error) console.error('the charts and cards of a reply were not kept', error);
+  }
+
+  // What the mentor's code made goes under the reply's last bubble (plan #3050.3.1);
+  // what could not be kept is said in a text of its own.
+  const made = answer.ok && !saveError && input.keepFiles ? (answer.madeFiles ?? []) : [];
+  if (made.length > 0 && input.keepFiles) {
+    const { files, unkept } = await fetchMadeFiles(anthropic, made);
+    let notKept: UnkeptFile[] = unkept;
+    if (files.length > 0 && lastReplyId) {
+      try {
+        const outcome = await input.keepFiles(lastReplyId, files);
+        notKept = [...unkept, ...outcome.unkept];
+        if (outcome.kept.length > 0) {
+          // The count is what an open thread hears, to ask for the files.
+          const { error } = await client
+            .from('advisor_messages')
+            .update({ file_count: outcome.kept.length })
+            .eq('user_id', userId)
+            .eq('chat_id', chatId)
+            .eq('id', lastReplyId);
+          if (error) console.error('the file count of a reply was not kept', error);
+        }
+      } catch (error) {
+        console.error('the files a mentor made were not kept', error);
+        notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'it could not be kept with the reply' }))];
+      }
+    } else if (files.length > 0) {
+      notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'the reply it went with was not saved' }))];
+    }
+    const note = madeFilesNote(notKept);
+    if (note) {
+      save(note, 'reply');
+      await chain;
+    }
+  }
+
+  // A reply that says a file is attached when nothing was sent says so after all (plan #3050.1).
+  // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
+  // A file its code made is said for above (plan #3050.3.1).
+  // A saved page or file it attached counts as sent (plan #3050.4).
+  const claim = answer.ok && !saveError ? falseAttachment(bubbles.join('\n\n'), charts.length, made.length + attached.length) : null;
+  if (claim) {
+    save(input.keepFiles ? NOTHING_ATTACHED : NOTHING_ATTACHED_CHART_ONLY, 'reply');
+    await chain;
+    if (input.act?.recordSlip) {
+      await input.act
+        .recordSlip({ ...claimSlip(name, claim), surface: 'people', conversation: `people:${chatId}`, href: threadHref })
+        .catch((error) => console.error('the attachment slip was not kept', error));
+    }
+  }
 
   await Promise.all(
     (Object.keys(spent) as MentorSpendOperation[])
@@ -635,7 +734,8 @@ async function firstText(
     );
     spent.push({ model: MODELS.mentorAck, usage: usageFrom(response.usage) });
     const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
-    return cleanAck(text);
+    // A first text stopped at its token cap ends part-way through; only its whole sentences are kept.
+    return cleanAck(text, response.stop_reason === 'max_tokens');
   } catch (error) {
     if (!signal.aborted) console.error('mentor first text failed', error);
     return null;

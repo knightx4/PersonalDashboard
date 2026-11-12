@@ -16,6 +16,9 @@ import { isOwner } from '@/lib/dev/owner';
 import { botPageStarter } from '@/lib/you/bot-pages-store';
 import { sessionStarter } from '@/lib/talk/session-handoff-store';
 import { botPasser } from '@/lib/talk/hand-to-bot-store';
+import { keepSlip } from '@/lib/dash/slips';
+import { keepMadeFiles } from '@/lib/you/chat-message-files';
+import { directMessenger } from '@/lib/you/group-direct-message-request';
 
 /**
  * Writing in a group from a request (plan #2879.1.2): POST
@@ -110,12 +113,13 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
   const client = await createYouClient();
   try {
     const [core, settings, owner] = await Promise.all([createCoreClient(), loadAccountSettings(userId), isOwner()]);
+    const model = await dashModelFor(core, userId);
     await runGroupBurst({
       client,
       userId,
       chatId,
       timeZone: settings.timezone,
-      model: await dashModelFor(core, userId),
+      model,
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       recordSpend: (operation, reports) => recordSpendReports(core, userId, { module: 'you', operation }, reports),
       // Places near home for any speaker, under the app's daily cap (plan #2987.3).
@@ -126,6 +130,11 @@ async function burstInRequest(userId: string, chatId: string, from: { claimed: b
       handOn: owner ? (sessionStarter(core, userId) ?? undefined) : undefined,
       // A request passed to another bot (plan #3003.2), for the owner alone, as hand_off is.
       passToBot: owner ? botPasser(client, core, userId) : undefined,
+      // A bot messaging the person in its own chat when they ask it to (plan #3083), as its one-on-one replies do.
+      messageDirectly: directMessenger(client, core, userId, { model, timeZone: settings.timezone }),
+      recordSlip: (slip) => keepSlip(core, userId, slip),
+      // What a speaker's code made, kept under its text (plan #3050.3.3), as in a direct chat.
+      keepFiles: (messageId, files) => keepMadeFiles(core, userId, messageId, files),
       claimed: from.claimed,
       round: from.round,
       deadline: Date.now() + BURST_REQUEST_MS,

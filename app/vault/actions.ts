@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '@/lib/auth/server';
-import { fileVaultNote } from '@/lib/capture/vault';
+import { addVaultQuickNote, fileVaultNote } from '@/lib/capture/vault';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteHref } from '@/lib/vault/paths';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -56,8 +56,8 @@ export async function newVaultNote(_prev: NewNoteState, formData: FormData): Pro
 
 /**
  * A quick note added from the Vault page (plan #1730, feature #1726): one
- * piece of text, filed in the Inbox folder through the capture box's write
- * (fileVaultNote) and left there to be sorted in Quick note triage. Unlike
+ * piece of text, added as a section of Quick note triage through the capture
+ * box's write (addVaultQuickNote, plan #3063) and left there to be sorted. Unlike
  * newVaultNote it opens nothing; the list stays where it is and the waiting
  * count goes up.
  */
@@ -66,7 +66,7 @@ export async function addQuickNote(text: string): Promise<{ error: string | null
   const user = await requireUser();
   const trimmed = text.trim();
   if (!trimmed) return { error: 'Write the note first.' };
-  const result = await fileVaultNote(user.id, trimmed);
+  const result = await addVaultQuickNote(user.id, trimmed);
   if (!result.ok) return { error: result.error };
   revalidatePath('/vault');
   return { error: null };

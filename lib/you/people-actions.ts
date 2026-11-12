@@ -11,8 +11,8 @@ import {
   type DashWriteResult,
   type DashWriteTool,
 } from '@/lib/dash/registry';
-import { CHART_TOOL } from '@/lib/talk/chart';
 import { dashWebSearch, WEB_RULES } from '@/lib/dash/web-search';
+import { dashCodeExecution } from '@/lib/talk/made-files';
 import type { DashChange, MadeDashChange, NewDashChange, PeopleCause } from '@/lib/talk/changes';
 import type { DashSlip } from '@/lib/dash/slips';
 
@@ -36,17 +36,15 @@ import type { DashSlip } from '@/lib/dash/slips';
  *
  * Not the hand-off from the registry list: a person on People is handed it
  * only with a session starter (plan #3005.2, lib/talk/session-handoff.ts),
- * whose session replies in their own thread. And not the chart, which only
- * an Ask answer draws.
+ * whose session replies in their own thread. The chart is offered (plan
+ * #3050.2.2): it is drawn under the reply's last bubble.
  *
  * No clients here: lib/talk/ask-request.ts binds a PeopleDash to the request,
  * and the tests hand in stubs.
  */
 
-/** Every tool Ask Dash offers, but the hand-off and the chart. */
-export const PEOPLE_TOOLS: readonly DashTool[] = ASK_DASH_TOOLS.filter(
-  (tool) => tool.kind !== 'handoff' && tool.name !== CHART_TOOL,
-);
+/** Every tool Ask Dash offers, but the hand-off. */
+export const PEOPLE_TOOLS: readonly DashTool[] = ASK_DASH_TOOLS.filter((tool) => tool.kind !== 'handoff');
 
 /**
  * The tools run on Anthropic's side that every person on People has beside
@@ -55,6 +53,16 @@ export const PEOPLE_TOOLS: readonly DashTool[] = ASK_DASH_TOOLS.filter(
  */
 export function peopleServerTools(model: string): Anthropic.ToolUnion[] {
   return [dashWebSearch(model)];
+}
+
+/**
+ * A direct thread's reply has code execution too (plan #3050.3.1), since it
+ * keeps what the code makes: a picture or a PDF goes under the reply
+ * (lib/you/mentor-reply.ts). Elsewhere the files would be lost, so nothing
+ * else is offered it.
+ */
+export function replyServerTools(model: string): Anthropic.ToolUnion[] {
+  return [...peopleServerTools(model), dashCodeExecution()];
 }
 
 /**

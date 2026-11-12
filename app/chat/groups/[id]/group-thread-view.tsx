@@ -19,7 +19,16 @@ import { Tooltip } from '@/components/ui/tooltip';
 import { createClient } from '@/lib/auth/client';
 import { cn } from '@/lib/cn';
 import { MESSAGE_MAX } from '@/lib/you/council-model';
-import { mergeMessages, replyFailedOf, threadBlocks, threadMessageOf, type ThreadMessage } from '@/lib/you/chat-threads-model';
+import {
+  mergeMessages,
+  needsBotFiles,
+  replyFailedOf,
+  threadBlocks,
+  threadMessageOf,
+  type ThreadFile,
+  type ThreadMessage,
+} from '@/lib/you/chat-threads-model';
+import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import { owedGroupReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import {
   firstName,
@@ -33,7 +42,8 @@ import {
 } from '@/lib/you/group-chats-model';
 import { GroupMark, Reactions } from '../../group-parts';
 import { SpeakRun, VoicedBubble } from '../../people/[key]/thread-view';
-import { SpeakingPill, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { SpeakingPill, SpeakingScope, SpeakSwitch, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { BubbleCharts } from '@/components/talk/reply-chart';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 
 /**
@@ -50,6 +60,10 @@ import { unlockSpeechOutput } from '@/lib/talk/speech/output';
  * text, with Try again, and a text of yours left a minute with no burst
  * holding the chat and no bot typing asks the group once more, as Try again
  * would (plan #2988.3).
+ *
+ * A picture or a PDF a bot's code made shows under its text (plan
+ * #3050.3.3). The text arrives first; once the files are kept its
+ * file_count rises, and the thread asks for them (`files`).
  */
 
 export type GroupThreadActions = {
@@ -57,6 +71,8 @@ export type GroupThreadActions = {
   read: (chatId: string) => Promise<void>;
   /** Ask the group to answer your newest text again; `stalled` for the safety net rather than a press. */
   retryReply?: (chatId: string, options?: { stalled?: boolean }) => Promise<{ error: string | null }>;
+  /** The files a bot's code made for one text (plan #3050.3.3), or null when they could not be read. */
+  files?: (messageId: string) => Promise<ThreadFile[] | null>;
 };
 
 const NO_ACTIONS: GroupThreadActions = {
@@ -105,7 +121,19 @@ export type GroupThreadProps = {
   onDraftChange?: (text: string) => void;
 };
 
-export function GroupThreadView({
+/**
+ * A group chat keeps its own voice switch, so turning voice on here plays this
+ * group's replies without turning it on in every chat (plan #3082).
+ */
+export function GroupThreadView(props: GroupThreadProps) {
+  return (
+    <SpeakingScope scope={`group.${props.chatId}`}>
+      <GroupThread {...props} />
+    </SpeakingScope>
+  );
+}
+
+function GroupThread({
   chatId,
   title,
   members: firstMembers,
@@ -165,6 +193,8 @@ export function GroupThreadView({
   // socket dropped, so the page is read again when the channel joins again or
   // the tab comes back (plan #2988).
   const router = useRouter();
+  // The bot texts whose files were asked for, by id and count, so a later update does not ask again.
+  const askedFiles = useRef(new Set<string>());
   useEffect(() => {
     if (!live) return;
     const supabase = createClient();
@@ -176,6 +206,15 @@ export function GroupThreadView({
         if (!row) return;
         setHeard((list) => mergeMessages(list, [row]));
         if (row.role === 'advisor') void act.current.read(chatId);
+        // The bot's code made files for this text (plan #3050.3.3): a Realtime row never carries them.
+        const asking = `${row.id}:${row.fileCount ?? 0}`;
+        if (needsBotFiles(row) && !askedFiles.current.has(asking)) {
+          askedFiles.current.add(asking);
+          void act.current.files?.(row.id).then((files) => {
+            if (!files || files.length === 0) return;
+            setHeard((list) => list.map((m) => (m.id === row.id ? { ...m, files } : m)));
+          });
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'you', table: 'advisor_chat_members', filter: `chat_id=eq.${chatId}` }, (event) => {
         const next = (event.new ?? {}) as Record<string, unknown>;
@@ -381,13 +420,19 @@ export function GroupThreadView({
       name={title}
       // A group with no name of its own is already called by its members, so the line under says how many.
       detail={title === groupDetailOf(members) ? `Group of ${members.length}` : groupDetailOf(members)}
+      // One line, so the voice switch beside Settings does not push the header taller on a phone (plan #3082).
+      detailOneLine
       avatar={<GroupMark members={members} size="sm" />}
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: title, href: groupHref(chatId) }]}
       actions={
-        <Link href={groupSettingsHref(chatId)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          Settings
-        </Link>
+        <>
+          {/* Each bot's new replies read aloud in its own voice while on (plan #3082). */}
+          <SpeakSwitch look="icon" />
+          <Link href={groupSettingsHref(chatId)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Settings
+          </Link>
+        </>
       }
       scrollRef={scroller}
       onScroll={onScroll}
@@ -454,10 +499,24 @@ export function GroupThreadView({
                   bot={block.speakerId ?? null}
                   run={block.messages}
                 >
-                  <MessageBubble from={block.from} last={i === block.messages.length - 1} arriving={m.role === 'advisor' && !openingIds.has(m.id)}>
+                  <MessageBubble
+                    from={block.from}
+                    last={i === block.messages.length - 1 && !m.charts?.length && !m.files?.length}
+                    arriving={m.role === 'advisor' && !openingIds.has(m.id)}
+                  >
                     {m.text}
                   </MessageBubble>
                 </VoicedBubble>
+                {/* What the bot's code made for this text (plan #3050.3.3): a picture opens full size, a PDF as a chip. */}
+                {m.files && m.files.length > 0 && (
+                  <AskTurnFiles
+                    files={m.files}
+                    large
+                    align={block.from === 'you' ? 'end' : 'start'}
+                    label={`Made by ${who?.name ?? 'a bot'} for this text`}
+                  />
+                )}
+                <BubbleCharts charts={m.charts} />
                 {reactions[m.id]?.length ? <Reactions list={reactions[m.id]} members={[...members, ...former]} from={block.from} /> : null}
                 {m.receipts.map((r) => (
                   <MessageLink key={`${r.link}-${r.label}`} href={r.link}>

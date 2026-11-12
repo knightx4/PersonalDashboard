@@ -26,7 +26,7 @@ import { todoCaptureForm } from '@/lib/capture/todo';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadDashAction, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
-import { fileVaultNote, undoVaultCapture, vaultWritable } from '@/lib/capture/vault';
+import { addVaultQuickNote, undoVaultCapture, vaultWritable } from '@/lib/capture/vault';
 import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actions';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
@@ -271,7 +271,7 @@ async function rowWriters(
         ? { ok: true as const, subjectRef: written.subjectRef }
         : { ok: false as const, error: written.error };
     },
-    vault: (text) => fileVaultNote(userId, text),
+    vault: (text) => addVaultQuickNote(userId, text),
     ...NOT_FROM_THE_BOX,
     record: (entry) => recordDashAction(deps, entry),
     role: async (input) => {

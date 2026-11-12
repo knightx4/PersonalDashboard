@@ -91,7 +91,9 @@ with confirmed, not something that only mentions the subject. Read the
 
 - **Jobs** (`job_search.applications` with its role, `application_events`,
   `interviews`). Clear: an application to the role the step names with
-  `submitted_at` set or a status other than `lead` or `drafting`; an
+  `submitted_at` set or a status other than `lead` or `drafting`; a later
+  rejection still counts, since the application was sent (both closes of
+  28 September stood); an
   interview whose time has passed with status `completed`. Not enough: a role saved but not applied to;
   an application with no role when the step names one.
 - **Calendar** (`todo.events`, which they put on their own calendar;
@@ -103,6 +105,9 @@ with confirmed, not something that only mentions the subject. Read the
   you go?".
 - **Todo** (`todo.tasks`). Clear: a task marked done that is the same action
   as the step, by its title or by a link to the same row.
+  Not enough: one task that only loosely covers several steps. On 29 October
+  "Get Sam's desk ready" closed two sub-steps at once and neither was undone,
+  but a task closes at most one step unless its title names each of them.
 - **Gmail.** Clear: a message from the other party confirming the exact
   thing: "Your autopay is now active" for every loan the step covers, a
   receipt for the payment the step asks for with its amount and date, "We

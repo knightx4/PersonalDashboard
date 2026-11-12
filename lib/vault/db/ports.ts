@@ -559,6 +559,19 @@ export function noteCreatePorts(opts: {
   };
 }
 
+/**
+ * The ports a quick note is written with (plan #3063): the save that adds its
+ * section to Quick note triage, and the create that makes that note when
+ * there is none. `userId` names the person on a service-role client.
+ */
+export function quickNotePorts(opts: {
+  supabase: VaultSupabaseClient;
+  userId?: string;
+  afterSave: (noteId: string) => void;
+}): { save: SaveNotePorts; create: CreateNotePorts } {
+  return { save: noteSavePorts(opts), create: noteCreatePorts(opts) };
+}
+
 /** The ports for taking a note capture wrote back out (plan #1582), over the session client. */
 export function noteRemovePorts(supabase: VaultSupabaseClient, userId?: string): RemoveNotePorts {
   return {

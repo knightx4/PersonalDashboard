@@ -356,3 +356,30 @@ export async function workingRefsForPage(userId: string): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * The browser tasks that have waited out the wait for a computer of the
+ * person's (plan #3040.4): session hand-offs marked browser_task, still
+ * pending, claimed by no computer, kept at or before `keptBy`. Oldest first.
+ * Read through the service client by the minute sweep, so the user is named.
+ */
+export async function loadWaitedBrowserHandoffs(
+  core: Pick<CoreSupabaseClient, 'from'>,
+  userId: string,
+  keptBy: string,
+  limit = 20,
+): Promise<SessionHandoff[]> {
+  const { data, error } = await core
+    .from('dash_handoffs')
+    .select(SESSION_SELECT)
+    .eq('user_id', userId)
+    .eq('kind', 'session')
+    .eq('browser_task', true)
+    .eq('status', 'pending')
+    .is('claimed_by', null)
+    .lte('created_at', keptBy)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`Reading the waiting browser tasks failed: ${error.message}`);
+  return ((data ?? []) as SessionHandoffDbRow[]).map(toSessionHandoff);
+}

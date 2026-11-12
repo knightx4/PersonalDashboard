@@ -2,7 +2,7 @@ import { SpeechFixtureProvider } from '@/components/talk/speak-reply';
 import { SPEAK_MESSAGES } from '@/lib/talk/speech/speak';
 import { SPEAK_HELD_BACK, type SpeechState } from '@/lib/talk/speech/player';
 import { AskDashChatsSurface, DashPageSurface } from './ask-surfaces';
-import { ChatThreadSurface } from './chat-surfaces';
+import { ChatGroupSurface, ChatThreadSurface } from './chat-surfaces';
 
 /**
  * Replies read aloud (plan #3006.1), drawn with the player held in one state
@@ -45,6 +45,21 @@ export function ChatThreadSpeakingSurface({ state }: { state: 'playing' | 'block
   return (
     <SpeechFixtureProvider value={{ speaking: true, state: state === 'playing' ? PLAYING_T7 : HELD_BACK_T7 }}>
       <ChatThreadSurface />
+    </SpeechFixtureProvider>
+  );
+}
+
+const PLAYING_G7: SpeechState = { key: 'g7', phase: 'playing', notes: {} };
+
+/**
+ * A group chat with its voice switch on (plan #3082): the switch lit in the
+ * header, every bot's bubble with its speaker, and the newest text being
+ * read in that bot's voice, named in the pill at the top.
+ */
+export function ChatGroupSpeakingSurface() {
+  return (
+    <SpeechFixtureProvider value={{ speaking: true, state: PLAYING_G7 }}>
+      <ChatGroupSurface />
     </SpeechFixtureProvider>
   );
 }

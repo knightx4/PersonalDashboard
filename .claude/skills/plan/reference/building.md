@@ -53,6 +53,12 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # A title line, a blank line, then what the idea
                                                # is, where it came from and why it would be
                                                # useful: a bare title is refused
+npx tsx scripts/plan.ts run-route /api/cron/<name> [--query name=value ...] [--until <field> [--then [name=value ...]]]
+                                               # run one of the app's own cron routes through the app, which
+                                               # holds CRON_SECRET. Use this instead of raising for the secret.
+                                               # Only /api/cron/<name> on the app's own domain; anything else is
+                                               # refused. Fallback if the app is down: the pg_net/Vault pair
+                                               # (`app_origin`, `cron_secret`) of #2172.6.2, docs/SETUP.md
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 npm run friction -- log "<what happened>" --kind <kind> [--lesson <key>] [--cost <min>] [--from <n>]
                                                # something cost you time: say so as it happens
@@ -89,6 +95,20 @@ it. `plan.ts`, the gate and the writing check record their own refusals, so
 log what they cannot see: the wrong turn, the misleading doc, the hour lost.
 One line takes seconds and is how the next builder is spared it
 (`.claude/skills/builder-loop/SKILL.md` is the review that reads them).
+
+**A route that needs CRON_SECRET: run it, do not raise for it.** A step that has
+to call one of the app's cron routes (`/api/cron/broker-wake-test?start=1`, an
+`area-check` pass) runs `plan.ts run-route /api/cron/<name>`, which asks the app
+to make the call with the secret attached on its side and prints the JSON. Add
+`--until <field>` to call again until that field is true (`--then name=value` sets the query
+for the later calls; a bare `--then` makes them empty). Never write a setup step or a raise asking the person for
+CRON_SECRET, and never try to read it. The command needs the same
+`SUPABASE_SERVICE_ROLE_KEY` as the rest of `plan.ts`, and only
+`/api/cron/<name>` paths run; another path or host is refused. When the app
+itself cannot be reached, the database can still fire the route through `pg_net`
+with the Vault's `app_origin` and `cron_secret` (plan #2172.6.2; the pair is
+described in `docs/SETUP.md`, "The overnight tick"), the way
+`supabase/migrations/0078_overnight_tick_cron.sql` posts to its route.
 
 **Write run lines as you go.** The run's page shows what you write with
 `activity <n>`: `--kind action` right after claiming ("Claimed #n"), after each

@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BUBBLE_GAP_MS, bubbleVoice, createSpeechPlayer, SPEAK_HELD_BACK, SPEAK_UNREACHABLE, type SpeechAudio } from './player';
+import {
+  BUBBLE_GAP_MS,
+  bubbleVoice,
+  createSpeechPlayer,
+  pillShows,
+  readSpeaking,
+  rememberSpeaking,
+  SPEAK_HELD_BACK,
+  SPEAKING_KEY,
+  speakingKeyOf,
+  SPEAK_UNREACHABLE,
+  type SpeechAudio,
+  type SpeechFailure,
+} from './player';
 
 function audioResponse() {
   return new Response(new Blob(['mp3'], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
@@ -77,6 +90,21 @@ describe('the speech player', () => {
       { text: 'A sample.', voice: 'v1' },
       { text: 'Dash.' },
     ]);
+  });
+
+  it("names a bot's bubble by its message id, so the route keeps its spoken version on the row (plan #3079)", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const player = createSpeechPlayer({
+      fetch: (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(audioResponse());
+      },
+      audio: () => ({ audio: { play: async () => {}, pause: () => {}, onended: null, onerror: null }, release: () => {} }),
+    });
+    const id = '3f2a1b4c-1d2e-4f5a-8b9c-0d1e2f3a4b5c';
+    player.queue(id, 'From Zena.', { bot: 'zena-id' });
+    await settle();
+    expect(bodies).toEqual([{ text: 'From Zena.', bot: 'zena-id', message: id }]);
   });
 
   it("keeps the route's message under the reply when voice is paused or not set up", async () => {
@@ -190,6 +218,35 @@ describe('the speech player', () => {
     expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
   });
 
+  it('reads eight bots answering in a row one after another, each in its own voice, fetching all at once (plan #3080)', async () => {
+    const bodies: { text: string; bot?: string }[] = [];
+    const audios: SpeechAudio[] = [];
+    const player = createSpeechPlayer({
+      wait: async () => {},
+      fetch: (_url, init) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return Promise.resolve(audioResponse());
+      },
+      audio: () => {
+        const audio: SpeechAudio = { play: vi.fn(async () => {}), pause: vi.fn(), onended: null, onerror: null };
+        audios.push(audio);
+        return { audio, release: () => {} };
+      },
+    });
+    const bots = ['ada', 'ben', 'cy', 'dee', 'eve', 'fay', 'gus', 'hal'];
+    for (const bot of bots) player.speakOnce(`m-${bot}`, `${bot} says one thing.`, { bot });
+    await settle();
+    expect(bodies.map((b) => b.bot)).toEqual(bots);
+    const heard: (string | null)[] = [];
+    for (let i = 0; i < bots.length; i++) {
+      heard.push(player.get().key);
+      audios[i].onended?.();
+      await settle();
+    }
+    expect(heard).toEqual(bots.map((b) => `m-${b}`));
+    expect(player.get()).toMatchObject({ key: null, phase: 'idle' });
+  });
+
   it('pauses briefly between bubbles, and not before the first', async () => {
     const { player, audios, waits } = setup([]);
     player.queue('a', 'One.');
@@ -273,5 +330,122 @@ describe('bubbleVoice (plan #3043)', () => {
     expect(bubbleVoice(player.get(), 'a')).toBe('playing');
     player.stop();
     expect(bubbleVoice(player.get(), 'a')).toBe('rest');
+  });
+});
+
+describe('playing means sounding (plan #3068)', () => {
+  function reporting(responses: (() => Promise<Response>)[], play: () => Promise<void> = async () => {}) {
+    const failures: SpeechFailure[] = [];
+    const audios: SpeechAudio[] = [];
+    const player = createSpeechPlayer({
+      wait: async () => {},
+      fetch: () => (responses.shift() ?? (() => Promise.resolve(audioResponse())))(),
+      audio: () => {
+        const audio: SpeechAudio = { play: vi.fn(play), pause: vi.fn(), onended: null, onerror: null };
+        audios.push(audio);
+        return { audio, release: () => {} };
+      },
+      report: (failure) => failures.push(failure),
+    });
+    return { player, failures, audios };
+  }
+
+  it('keeps the pill down until the audio says it sounds', async () => {
+    let sound: () => void = () => {};
+    const { player } = reporting([], () => new Promise<void>((resolve) => (sound = resolve)));
+    player.play('a', 'Hello.');
+    await settle();
+    expect(player.get().phase).toBe('loading');
+    expect(pillShows(player.get())).toBe(false);
+    sound();
+    await settle();
+    expect(player.get().phase).toBe('playing');
+    expect(pillShows(player.get())).toBe(true);
+  });
+
+  it('keeps the pill up between the bubbles of a run once one has sounded, and down when the run ends', async () => {
+    const { player, audios } = reporting([]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    audios[0].onended?.();
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'loading' });
+    expect(pillShows(player.get())).toBe(true);
+    await settle();
+    audios[1].onended?.();
+    expect(pillShows(player.get())).toBe(false);
+  });
+
+  it('never shows the pill for a reply the browser held back, and logs the error name', async () => {
+    const held = Object.assign(new Error('StalledError: the clock did not move'), { name: 'StalledError' });
+    const { player, failures } = reporting([], () => Promise.reject(held));
+    player.play('a', 'Hello.');
+    await settle();
+    expect(pillShows(player.get())).toBe(false);
+    expect(player.get().notes.a).toBe(SPEAK_HELD_BACK);
+    expect(failures).toEqual([{ stage: 'play', key: 'a', name: 'StalledError', message: 'StalledError: the clock did not move' }]);
+  });
+
+  it("logs the route's status and why when voice is paused or not set up", async () => {
+    const { player, failures } = reporting([() => Promise.resolve(refusal(429, 'paused', 'Voice is paused until next month.'))]);
+    player.play('a', 'Hello.');
+    await settle();
+    await settle();
+    expect(player.get().notes.a).toBe('Voice is paused until next month.');
+    expect(failures).toEqual([{ stage: 'fetch', key: 'a', status: 429, why: 'paused' }]);
+  });
+
+  it('counts an empty body as not read aloud', async () => {
+    const empty = () => Promise.resolve(new Response(new Blob([], { type: 'audio/mpeg' }), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    const { player, failures, audios } = reporting([empty]);
+    player.play('a', 'Hello.');
+    await settle();
+    await settle();
+    expect(audios).toHaveLength(0);
+    expect(player.get().notes.a).toBe(SPEAK_UNREACHABLE);
+    expect(failures[0]).toMatchObject({ stage: 'fetch', why: 'empty body' });
+  });
+
+  it('shows the play press when the sound stops part way, and reads the next bubble', async () => {
+    const { player, failures, audios } = reporting([]);
+    player.queue('a', 'One.');
+    player.queue('b', 'Two.');
+    await settle();
+    audios[0].onerror?.(true);
+    expect(player.get().notes.a).toBe(SPEAK_HELD_BACK);
+    expect(failures).toEqual([{ stage: 'playback', key: 'a', name: 'Interrupted' }]);
+    await settle();
+    expect(player.get()).toMatchObject({ key: 'b', phase: 'playing' });
+  });
+});
+
+describe('a group chat keeps its own voice switch (plan #3082)', () => {
+  it('keeps the shared switch under SPEAKING_KEY and a group under its own key', () => {
+    expect(speakingKeyOf()).toBe(SPEAKING_KEY);
+    expect(speakingKeyOf(null)).toBe(SPEAKING_KEY);
+    expect(speakingKeyOf('group.abc')).toBe(`${SPEAKING_KEY}.group.abc`);
+  });
+
+  it('remembers a group switched on without turning on the shared one, and across a reload', () => {
+    const kept = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (k: string) => kept.get(k) ?? null,
+        setItem: (k: string, v: string) => void kept.set(k, v),
+        removeItem: (k: string) => void kept.delete(k),
+      },
+    });
+    try {
+      const group = speakingKeyOf('group.abc');
+      expect(readSpeaking(group)).toBe(false);
+      rememberSpeaking(true, group);
+      expect(readSpeaking(group)).toBe(true);
+      expect(readSpeaking()).toBe(false);
+      expect(readSpeaking(speakingKeyOf('group.other'))).toBe(false);
+      rememberSpeaking(false, group);
+      expect(readSpeaking(group)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

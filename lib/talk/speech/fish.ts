@@ -1,11 +1,11 @@
 import 'server-only';
 
 import { FISH_MODEL_HEADER } from '@/lib/talk/speech/budget';
-import { LIBRARY_PAGE, voiceOf, voicesOf, type FishVoice, type VoiceList } from '@/lib/talk/speech/voices-model';
+import { VOICE_PAGE, voiceListUrl, voiceOf, voicePageOf, type FishVoice, type VoiceFilters, type VoicePage } from '@/lib/talk/speech/voices-model';
 
 /**
  * Fish Audio's text-to-speech call (plan #3006.3), and the voices a bot's
- * form offers (plan #3006.5).
+ * form offers (plan #3006.5, filtered and sorted since plan #3081).
  *
  * POST https://api.fish.audio/v1/tts with the key as a bearer and the model
  * in a `model` header; the body names the text, the voice and the format, and
@@ -109,27 +109,14 @@ function fishGet(env: FishEnv, url: string, fetchImpl: typeof fetch): Promise<Re
 }
 
 /**
- * The voices a bot's form offers (plan #3006.5): the person's own voices on
- * their Fish account, and the public library searched by title (its most
- * used voices while the search is empty). Throws when Fish cannot be asked.
+ * One page of the voice picker (plan #3081): Fish's GET /model with the
+ * picker's filters, the title, gender and style tags, language, the
+ * person's own voices only, and the order. Throws when Fish cannot be asked.
  */
-export async function fishVoices(env: FishEnv, search: string, fetchImpl: typeof fetch = fetch): Promise<VoiceList> {
-  const title = search.trim().slice(0, 80);
-  const mineUrl = new URL(FISH_MODEL_URL);
-  mineUrl.searchParams.set('self', 'true');
-  mineUrl.searchParams.set('page_size', '50');
-  if (title) mineUrl.searchParams.set('title', title);
-  const libraryUrl = new URL(FISH_MODEL_URL);
-  libraryUrl.searchParams.set('page_size', String(LIBRARY_PAGE));
-  libraryUrl.searchParams.set('sort_by', title ? 'score' : 'task_count');
-  if (title) libraryUrl.searchParams.set('title', title);
-
-  const [mine, library] = await Promise.all([fishGet(env, mineUrl.toString(), fetchImpl), fishGet(env, libraryUrl.toString(), fetchImpl)]);
-  if (!library.ok) throw new Error(`Fish answered ${library.status} to the voice library`);
-  const own = mine.ok ? voicesOf(await mine.json().catch(() => null)) : [];
-  const ownIds = new Set(own.map((v) => v.id));
-  const found = voicesOf(await library.json().catch(() => null)).filter((v) => !ownIds.has(v.id));
-  return { mine: own, library: found };
+export async function fishVoicePage(env: FishEnv, filters: VoiceFilters, page: number, fetchImpl: typeof fetch = fetch): Promise<VoicePage> {
+  const response = await fishGet(env, voiceListUrl(FISH_MODEL_URL, filters, page, VOICE_PAGE), fetchImpl);
+  if (!response.ok) throw new Error(`Fish answered ${response.status} to the voice list`);
+  return voicePageOf(await response.json().catch(() => null), page, VOICE_PAGE);
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   sortPeople,
   threadBlocks,
   threadDetail,
+  needsBotFiles,
   threadMessageOf,
   threadTime,
   recipientsOf,
@@ -237,5 +238,44 @@ describe('files sent with a message (plan #2974)', () => {
     expect(bubbleText({ text, files })).toBeNull();
     expect(bubbleText({ text: 'What does this say?', files })).toBe('What does this say?');
     expect(bubbleText({ text })).toBe(text);
+  });
+});
+
+describe("a bubble's charts (plan #3050.2.2)", () => {
+  const row = (charts: unknown) => ({ id: 'm1', chat_id: 'c1', role: 'advisor', kind: 'reply', text: 'Choppy week.', created_at: '2026-11-07T09:00:00Z', charts });
+
+  it('reads the charts kept on the row through parseChart, and drops one that no longer parses', () => {
+    const line = {
+      kind: 'line',
+      title: 'Markets',
+      unit: '%',
+      series: ['S&P 500', 'Nasdaq'],
+      rows: [
+        { label: 'Mon', values: [0, 0] },
+        { label: 'Fri', values: [1.2, 2] },
+      ],
+    };
+    const m = threadMessageOf(row([line, { kind: 'pie', title: 'x', rows: [] }]));
+    expect(m?.charts).toHaveLength(1);
+    expect(m?.charts?.[0]).toMatchObject({ kind: 'line', series: ['S&P 500', 'Nasdaq'] });
+    expect(m?.text).toBe('Choppy week.');
+  });
+
+  it('has none for an empty array, a missing column or something that is not a list', () => {
+    expect(threadMessageOf(row([]))?.charts).toBeUndefined();
+    expect(threadMessageOf(row(undefined))?.charts).toBeUndefined();
+    expect(threadMessageOf(row({ kind: 'bar' }))?.charts).toBeUndefined();
+  });
+});
+
+describe('a bot message whose code made files (plan #3050.3.1)', () => {
+  it('reads the count off the row, and asks for files only while it has fewer than the count', () => {
+    const row = threadMessageOf({ id: 'x', chat_id: 'c', role: 'advisor', text: 'Here it is.', file_count: 2, created_at: '2026-11-03T08:00:00Z' });
+    expect(row?.fileCount).toBe(2);
+    expect(row && needsBotFiles(row)).toBe(true);
+    const file = { id: 'f', name: 'a.png', contentType: 'image/png', size: 4, href: '/attachments/f' };
+    expect(needsBotFiles({ role: 'advisor', fileCount: 2, files: [file, { ...file, id: 'g' }] })).toBe(false);
+    expect(needsBotFiles({ role: 'person', fileCount: 2 })).toBe(false);
+    expect(threadMessageOf({ id: 'y', text: 'hi', file_count: 0, created_at: '2026-11-03T08:00:00Z' })?.fileCount).toBeUndefined();
   });
 });

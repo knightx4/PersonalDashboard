@@ -1,6 +1,8 @@
 import { filesOnlyText } from '@/lib/attachments/rules';
 import { whenDay, whenTime, zoneDay } from '@/lib/core/when';
 import { receiptsOf, type CouncilReceipt } from '@/lib/you/council-model';
+import { parseChart, type DashChart } from '@/lib/talk/chart';
+import { savedAttachmentsOf, type SavedAttachment } from '@/lib/talk/attached';
 
 /**
  * The People tab's threads (plan #2748.6), kept pure so the tests fix the
@@ -23,7 +25,7 @@ export const SEARCH_TEXT_MAX = 200;
 /** Two messages from one sender further apart than this start a new group. */
 export const GROUP_GAP_MS = 10 * 60 * 1000;
 
-export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, created_at, delivered_at, read_at, speaker_id';
+export const THREAD_MESSAGE_COLUMNS = 'id, chat_id, role, kind, text, receipts, charts, attached, file_count, created_at, delivered_at, read_at, speaker_id';
 
 export type MessageKind = 'reply' | 'ack' | 'text_first';
 
@@ -40,12 +42,45 @@ export type ThreadMessage = {
   /** In a group, the bot that wrote it (plan #2879.1.3); null or absent elsewhere. */
   speakerId?: string | null;
   /**
-   * The pictures and PDFs the person sent with it (plan #2974), kept in
-   * core.attachments under messageFilesRef; absent when there are none. A
-   * Realtime row never carries them, so a merge keeps the copy that does.
+   * The pictures and PDFs the person sent with it (plan #2974), or a bot's
+   * code made for it (plan #3050.3.1), kept in core.attachments under
+   * messageFilesRef; absent when there are none. A Realtime row never
+   * carries them, so a merge keeps the copy that does.
    */
   files?: ThreadFile[];
+  /**
+   * How many files a bot's code made for it (you.advisor_messages.file_count,
+   * plan #3050.3.1); absent when none. An open thread that hears it rise
+   * over Realtime asks for the files (needsBotFiles).
+   */
+  fileCount?: number;
+  /**
+   * The charts a bot drew with this bubble (plan #3050.2.2), from
+   * you.advisor_messages.charts through parseChart; absent when none. Kept
+   * out of `text`, so voice reads the words alone.
+   */
+  charts?: DashChart[];
+  /**
+   * The saved pages and files a bot attached by reference (plan #3050.4),
+   * from you.advisor_messages.attached through parseSavedAttachment; absent
+   * when none. Kept out of `text`, as charts are.
+   */
+  attached?: SavedAttachment[];
 };
+
+/** The most charts one bubble keeps, as you 0052's check allows. */
+export const MAX_BUBBLE_CHARTS = 4;
+
+/** The charts a row keeps, each read again through parseChart; one that no longer parses draws nothing. */
+export function chartsOf(value: unknown): DashChart[] {
+  if (!Array.isArray(value)) return [];
+  const charts: DashChart[] = [];
+  for (const raw of value.slice(0, MAX_BUBBLE_CHARTS)) {
+    const parsed = parseChart(raw);
+    if (parsed.ok) charts.push(parsed.chart);
+  }
+  return charts;
+}
 
 /** A file sent with a message, as the thread draws it: `href` opens it through a short signed link. */
 export type ThreadFile = { id: string; name: string; contentType: string; size: number; href: string };
@@ -74,6 +109,9 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
   const text = str(row.text);
   if (typeof row.id !== 'string' || !text || !str(row.created_at)) return null;
   const kind: MessageKind = row.kind === 'ack' || row.kind === 'text_first' ? row.kind : 'reply';
+  const charts = chartsOf(row.charts);
+  const attached = savedAttachmentsOf(row.attached);
+  const fileCount = typeof row.file_count === 'number' && row.file_count > 0 ? Math.floor(row.file_count) : 0;
   return {
     id: row.id,
     chatId: str(row.chat_id),
@@ -85,7 +123,15 @@ export function threadMessageOf(row: Record<string, unknown>): ThreadMessage | n
     deliveredAt: strOrNull(row.delivered_at),
     readAt: strOrNull(row.read_at),
     speakerId: strOrNull(row.speaker_id),
+    ...(charts.length > 0 ? { charts } : {}),
+    ...(attached.length > 0 ? { attached } : {}),
+    ...(fileCount > 0 ? { fileCount } : {}),
   };
+}
+
+/** A bot's message whose code made files the thread does not have yet, so it asks for them. */
+export function needsBotFiles(m: Pick<ThreadMessage, 'role' | 'fileCount' | 'files'>): boolean {
+  return m.role === 'advisor' && (m.fileCount ?? 0) > (m.files?.length ?? 0);
 }
 
 /** How far a message's receipts have got: read, delivered, neither. */

@@ -292,17 +292,32 @@ function longText(text: string | null | undefined, max = SECTION_CHARS, outlines
   return readable.length <= max ? readable : `${readable.slice(0, max).trimEnd()} …`;
 }
 
+/** Rows per read of the outline view: the API returns at most 1,000 rows a request. */
+export const OUTLINE_PAGE = 1000;
+
 /**
  * Every plan step's outline by its number, from the `plan_item_outlines` view
- * (migration 0197), which places rows the way the plan page's tree does. A
- * read that fails gives an empty index, and steps fall back to their numbers.
+ * (migration 0197), which places rows the way the plan page's tree does. The
+ * plan has more rows than one request returns, so the view is read a page at
+ * a time: a single read stopped at 1,000 of 3,061 rows, and every newer step's
+ * outline ("#2897.6") then named no step. A read that fails keeps the pages
+ * already read, and steps it missed fall back to their numbers.
  */
 export async function planOutlines(client: SchemaClient, ctx: AskContext): Promise<Map<number, string>> {
   const index = new Map<number, string>();
   try {
-    const { data, error } = await client.from('plan_item_outlines').select('number, outline').eq('user_id', ctx.userId);
-    if (error) return index;
-    for (const row of (data ?? []) as { number: number; outline: string }[]) index.set(Number(row.number), row.outline);
+    for (let from = 0; ; from += OUTLINE_PAGE) {
+      const { data, error } = await client
+        .from('plan_item_outlines')
+        .select('number, outline')
+        .eq('user_id', ctx.userId)
+        .order('number', { ascending: true })
+        .range(from, from + OUTLINE_PAGE - 1);
+      if (error) return index;
+      const rows = (data ?? []) as { number: number; outline: string }[];
+      for (const row of rows) index.set(Number(row.number), row.outline);
+      if (rows.length < OUTLINE_PAGE) break;
+    }
   } catch {
     // An index that could not be read names steps by number, which still finds them.
   }

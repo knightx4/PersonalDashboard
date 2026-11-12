@@ -6,6 +6,7 @@ import type { AskContext, AskDb, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
 import { CHART_TOOL } from '@/lib/talk/chart';
+import { ATTACH_SAVED_TOOL } from '@/lib/talk/attached';
 import { CAPTURE_TABLE, CAPTURE_TOOLS } from './capture-tools';
 import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
@@ -16,9 +17,11 @@ import { PAID_TOOLS } from './paid-tools';
 import type { DashWriteRuns } from './runs';
 import type { DashSeen } from './sets';
 import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import type { SaveNotePorts } from '@/lib/vault/notes/save';
 import type { RoutineTarget } from '@/lib/feedback/routine';
 import type { TakeOnOrigin } from '@/lib/goals/take-on';
 import type { SlipWhere } from './slips';
+import type { DashAppRoutePort } from './app-route-writes';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -126,14 +129,14 @@ export type DashWriteContext = AskContext & {
    */
   readPosting?: (url: string) => Promise<FetchOutcome>;
   /**
-   * The note-create ports on the person's vault, embedding each note once
-   * the reply has gone, for add_quick_note (plan #1894.2): sessionInboxPorts
-   * from lib/capture/vault.ts on the person's session, or the connector's
-   * service-role ports for the person its token names. The tool calls
-   * createCapturedNote on them, as the Vault page's quick note does (plan
-   * #2473.5). Absent: the note is refused.
+   * The ports a quick note is written with on the person's vault, for
+   * add_quick_note (plan #1894.2): sessionInboxPorts from
+   * lib/capture/vault.ts on the person's session, or the connector's
+   * service-role ports for the person its token names. The tool adds a
+   * section to Quick note triage with them (addQuickNote, plan #3063), as
+   * the Vault page's quick note does. Absent: the note is refused.
    */
-  quickNotePorts?: () => Promise<CreateNotePorts>;
+  quickNotePorts?: () => Promise<{ save: SaveNotePorts; create: CreateNotePorts }>;
   /**
    * Whether this person may start the goals routine, and the routine it is
    * fired at, for start_goal_run and work_goal_step (lib/dash/goal-run-writes.ts).
@@ -154,6 +157,13 @@ export type DashWriteContext = AskContext & {
    * Absent: a slip names no conversation.
    */
   slipWhere?: SlipWhere;
+  /**
+   * What run_app_route needs (lib/dash/app-route-writes.ts, plan #3070.3):
+   * whether this is the owner, who is asking, the chat its finish is said in,
+   * the runner and the poll's store. Absent where no route can be run, such
+   * as the connector, and then the tool says so.
+   */
+  appRoute?: () => Promise<DashAppRoutePort>;
 };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */
@@ -343,8 +353,9 @@ export const ASK_DASH_TOOLS: readonly DashTool[] = DASH_TOOLS.filter((tool) => o
  * The tools a thread on a row of `table` offers (plan #1465): every lookup,
  * every write, every paid tool (plan #2228.1), and the row's own tools. Not the watch proposal or Ask's
  * hand-off, which keep what they start in an Ask conversation a thread does
- * not have, and not the chart (plan #1655), which is drawn from the tool
- * calls an Ask answer keeps and a thread's reply does not.
+ * not have, and not the chart (plan #1655) or a saved page's card (plan
+ * #3050.4), which are drawn from the tool calls an Ask answer keeps and a
+ * thread's reply does not.
  */
 export function threadDashTools(table: string): DashTool[] {
   return DASH_TOOLS.filter(
@@ -354,6 +365,7 @@ export function threadDashTools(table: string): DashTool[] {
         tool.kind === 'paid' ||
         (tool.kind === 'handoff' && tool.subjects)) &&
       tool.name !== CHART_TOOL &&
+      tool.name !== ATTACH_SAVED_TOOL &&
       offeredOn(tool, table),
   );
 }

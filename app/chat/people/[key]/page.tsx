@@ -8,7 +8,7 @@ import { loadGroupRows } from '@/lib/you/group-chats';
 import { editHref } from '@/lib/you/people-cards-model';
 import { loadReachOutView } from '@/lib/you/reach-out-card';
 import { nextTextLine, type ReachOutView } from '@/lib/you/reach-out-card-model';
-import { decideThreadWatch, olderMessages, readThread, retryReply, threadBuilds, threadChanges } from '../../actions';
+import { decideThreadWatch, olderMessages, readThread, retryReply, threadBuilds, threadChanges, threadMessageFiles } from '../../actions';
 import { confirmDashChange, declineDashChange, reopenDashChange, undoDashChange } from '../../dash/actions';
 import { PeopleView } from '../../people-view';
 import { loadThreadParts } from '../../thread-data';
@@ -66,7 +66,7 @@ export default async function ChatThreadPage({
         typingUntil={person.typingUntil}
         timezone={settings.timezone}
         now={now}
-        actions={{ older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds }}
+        actions={{ older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds, files: threadMessageFiles }}
         changes={changes}
         builds={builds}
         presses={{ confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange, watch: decideThreadWatch }}

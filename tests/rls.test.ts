@@ -351,6 +351,18 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${userId}, true)`;
   ids.dash_finish_notifications = userId;
 
+  const [appRouteRun] = await admin<{ id: string }[]>`
+    insert into app_route_runs (user_id, asked_by, path, status, ended_at, http_status)
+    values (${userId}, ${`${tag} asked`}, '/api/example', 'ok', now(), 200)
+    returning id`;
+  ids.app_route_runs = appRouteRun.id;
+
+  const [appRoutePoll] = await admin<{ id: string }[]>`
+    insert into app_route_polls (user_id, asked_by, path, poll_until, deadline, last_run_id)
+    values (${userId}, ${`${tag} asked`}, '/api/example', 'done', now() + interval '1 hour', ${appRouteRun.id})
+    returning id`;
+  ids.app_route_polls = appRoutePoll.id;
+
   const [xAccount] = await admin<{ id: string }[]>`
     insert into x_accounts (user_id, x_user_id, handle)
     values (${userId}, ${`${tag}-x`}, ${`${tag}handle`})

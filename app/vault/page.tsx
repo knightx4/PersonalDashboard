@@ -13,7 +13,6 @@ import { DailyNoteButton } from '@/components/vault/daily-note';
 import { QuickNoteRow } from '@/components/vault/quick-note';
 import { requireUser } from '@/lib/auth/server';
 import { vaultWritable } from '@/lib/capture/vault';
-import { INBOX_FOLDER } from '@/lib/vault/paths';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -81,8 +80,8 @@ export default async function VaultPage({
     search ? Promise.resolve([]) : loadTriageNotes(supabase, user.id),
   ]);
   const groups = groupByFolder(notes);
-  // Quick notes are the top level of the Inbox folder; the list already holds them.
-  const waiting = notes.filter((note) => note.folder === INBOX_FOLDER).length;
+  // Quick notes are the sections of Quick note triage (plan #3063); the deck already holds them.
+  const waiting = triage.length;
 
   return (
     <PageColumn>

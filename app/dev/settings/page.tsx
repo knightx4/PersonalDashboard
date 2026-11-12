@@ -13,6 +13,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
 import { goalsStatus } from '@/lib/goals/runner-status';
 import { loadGoalsNight } from '@/inngest/goals/overnight';
+import { loadAppRouteRuns } from '@/lib/dev/app-route-runs';
 import { DevSettingsView } from './settings-view';
 
 export const metadata = { title: 'Dev settings' };
@@ -51,7 +52,7 @@ export default async function DevSettingsPage() {
   // the page down.
   const goalsRead = readGoals(user.id);
   const now = readClock();
-  const [plan, overnight, fires, lastRuns, started, openNotes, notesLastRun, vision, autoApprove] =
+  const [plan, overnight, fires, lastRuns, started, openNotes, notesLastRun, vision, autoApprove, routeRuns] =
     await Promise.all([
       loadPlanForRequest(user.id),
       loadOvernightRun(supabase, user.id),
@@ -69,6 +70,11 @@ export default async function DevSettingsPage() {
       loadNotesLastRun(supabase, user.id),
       loadVisionReviewStatus(supabase, user.id),
       loadAutoApprove(supabase, user.id),
+      // A failed read leaves the list empty rather than taking the page down.
+      loadAppRouteRuns(supabase, user.id).catch((error: Error) => {
+        console.error(error.message);
+        return [];
+      }),
     ]);
 
   const card = runnerCard({
@@ -99,6 +105,7 @@ export default async function DevSettingsPage() {
       notesLastRun={notesLastRun}
       vision={vision}
       autoApprove={autoApprove}
+      routeRuns={routeRuns}
       now={now}
     />
   );

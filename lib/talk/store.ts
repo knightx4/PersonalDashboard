@@ -137,6 +137,21 @@ export async function appendTurns(
 }
 
 /**
+ * Rewrites the words of one of Dash's turns, already kept (plan #3050.3.2):
+ * an answer whose code made a file that could not be kept says so after
+ * all. Only an assistant turn of the person's own is touched.
+ */
+export async function amendAnswerBody(core: CoreSupabaseClient, userId: string, turnId: string, body: string): Promise<void> {
+  const { error } = await core
+    .from('conversation_turns')
+    .update({ body })
+    .eq('user_id', userId)
+    .eq('id', turnId)
+    .eq('role', 'assistant');
+  if (error) throw new Error(`Keeping the answer's words failed: ${error.message}`);
+}
+
+/**
  * Starts a conversation for a question asked from anywhere (kind `ask`, plan
  * #1086) and returns its subject, for appendTurns and loadConversation. Every
  * question starts a new one: the id is made here so the ref can be the same

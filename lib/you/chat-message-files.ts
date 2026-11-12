@@ -2,17 +2,19 @@ import 'server-only';
 
 import { listAttachments, recordAttachments, type Attachment } from '@/lib/attachments/store';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import type { MadeFile, UnkeptFile } from '@/lib/talk/made-files';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { DashFile } from '@/lib/dash/files';
-import { readHeldFiles } from '@/lib/talk/turn-files';
+import { keepMadeFilesAt, readHeldFiles } from '@/lib/talk/turn-files';
 import { messageFilesRef, type ThreadFile, type ThreadMessage } from '@/lib/you/chat-threads-model';
 
 /**
- * The pictures and PDFs sent with a message on People (plan #2974), kept in
+ * The pictures and PDFs sent with a message on People (plan #2974), and the
+ * files a bot's code made for its reply (plan #3050.3.1), kept in
  * core.attachments under `you.advisor_messages:<message id>`, the one store
  * Ask's questions use (lib/talk/turn-files.ts). The message row does not hold
  * them: this records them on the way in, joins them on the way out, and reads
- * them for the reply.
+ * the person's for the reply.
  */
 
 function toFile({ id, name, contentType, size, href }: Attachment): ThreadFile {
@@ -30,15 +32,38 @@ export async function recordMessageFiles(
   return (await recordAttachments(core, userId, messageFilesRef(messageId), files)).map(toFile);
 }
 
-/** The messages with the files each of the person's was sent with; the rest are returned as they were. */
+/**
+ * The messages with the files each was sent with: every one of the person's,
+ * and a bot's whose code made some (fileCount). The rest are returned as
+ * they were.
+ */
 export async function withMessageFiles(core: CoreSupabaseClient, messages: readonly ThreadMessage[]): Promise<ThreadMessage[]> {
-  const theirs = messages.filter((m) => m.role === 'person');
-  if (theirs.length === 0) return [...messages];
-  const byRef = await listAttachments(core, theirs.map((m) => messageFilesRef(m.id)));
+  const holding = messages.filter((m) => m.role === 'person' || (m.fileCount ?? 0) > 0);
+  if (holding.length === 0) return [...messages];
+  const byRef = await listAttachments(core, holding.map((m) => messageFilesRef(m.id)));
   return messages.map((m) => {
     const held = byRef.get(messageFilesRef(m.id));
     return held && held.length > 0 ? { ...m, files: held.map(toFile) } : m;
   });
+}
+
+/** The files one message holds, oldest first, as the thread draws them. */
+export async function messageFiles(core: CoreSupabaseClient, messageId: string): Promise<ThreadFile[]> {
+  return ((await listAttachments(core, [messageFilesRef(messageId)])).get(messageFilesRef(messageId)) ?? []).map(toFile);
+}
+
+/**
+ * Keeps the files a bot's code made against its message (plan #3050.3.1),
+ * as Ask keeps its answer's (lib/talk/turn-files.ts keepMadeFilesAt).
+ */
+export async function keepMadeFiles(
+  core: CoreSupabaseClient,
+  userId: string,
+  messageId: string,
+  files: readonly MadeFile[],
+): Promise<{ kept: ThreadFile[]; unkept: UnkeptFile[] }> {
+  const { kept, unkept } = await keepMadeFilesAt(core, userId, messageFilesRef(messageId), files);
+  return { kept: kept.map(toFile), unkept };
 }
 
 /**

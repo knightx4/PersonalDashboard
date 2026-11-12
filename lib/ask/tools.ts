@@ -36,6 +36,8 @@ import { dashModelLookup } from '@/lib/dash/model-lookup';
 import { sessionHandoffsLookup } from './session-handoffs';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
+import { ATTACH_SAVED_DEFINITION } from '@/lib/talk/attached';
+import { attachSavedLookup } from './attach';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -86,13 +88,15 @@ export const ASK_TOOL_NAMES = [
   'read_job_board',
   'find_places',
   'show_chart',
+  'attach_saved',
 ] as const;
 
 /**
  * Tools the connector (lib/connector/mcp.ts) does not offer. Mail is searched
  * and read in Gmail as the person, which a connector token cannot do, and
  * what it holds is not to leave the app for another client. A chart is drawn
- * in the app's own reply (plan #1655), which another client does not have.
+ * in the app's own reply (plan #1655), which another client does not have,
+ * and so is a card for a saved page or file (plan #3050.4).
  * The model Dash answers with is the app's own setting (plan #2458.4), and a
  * connector client is not Dash. A places lookup spends the app's own daily
  * allowance of Google calls (plan #2987.3), which stays with the app's chats.
@@ -103,6 +107,7 @@ export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = [
   'read_job_board',
   'find_places',
   'show_chart',
+  'attach_saved',
   'dash_model',
   'session_handoffs',
 ];
@@ -346,7 +351,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'job_applications',
     description:
-      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched, and how many were sent (not a lead or a draft); lists the newest 50, each linking to its role. For "how many have I applied to" answer from the sent count, never from the rows listed or the ones with a sent day alone. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
+      'The person\'s job applications, with each one\'s role, company, status, the day it was sent, the day they last heard from the company, and for a rejection the stage it came at. Counts by status and by rejection stage over everything matched, and how many were sent (not a lead or a draft); lists 50, each linking to its role: live processes first (offer, final round, in process), then leads and drafts not yet sent, then sent ones waiting on the company, then closed, newest first within each, so one call with no filter answers "where does my search stand". For "how many have I applied to" answer from the sent count, never from the rows listed or the ones with a sent day alone. Filter by the day sent, by status, to open applications with no word from the company for a number of days (for "who have I heard nothing from in a month", quiet_for_days 30), to sent applications that never had a reply (no_reply), or to the ones whose status changed in a period, with what it was before (changed_status).',
     input_schema: {
       type: 'object',
       properties: {
@@ -661,6 +666,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   },
   FIND_PLACES_DEFINITION,
   CHART_TOOL_DEFINITION,
+  ATTACH_SAVED_DEFINITION,
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -710,6 +716,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   find_places: { run: placesLookup, module: null },
   // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
   show_chart: { run: chartLookup, module: null },
+  // Reads the page or file it is given, the person's own, and keeps its card (plan #3050.4).
+  attach_saved: { run: attachSavedLookup, module: null },
 };
 
 /**

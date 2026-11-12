@@ -6,13 +6,18 @@ import type { PlacesLookupInput, PlacesLookupResult } from '@/lib/you/places-loo
 import { PAGE_RULES } from '@/lib/you/bot-pages';
 import { SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { DIRECT_ASKED_RULES, DIRECT_RULES } from '@/lib/you/group-direct-message';
+import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
 import {
-  MAX_BOT_MESSAGES,
-  MAX_OPENERS,
+  groupCaps,
   MAX_PER_BOT,
+  PASS_WORD,
   runGroupBurst,
+  SPEAKER_CODE_MAX_TOKENS,
   SPEAKER_MAX_LOOKUPS,
+  SPEAKER_MAX_TOKENS,
   SPEAKER_PLACES_RULES,
+  speakerText,
   speakWithModel,
   type DirectorInput,
   type DirectorPlan,
@@ -136,9 +141,20 @@ const base = (client: YouSupabaseClient) => ({
 
 const botMessages = (tables: Record<string, Row[]>) => tables.advisor_messages.filter((m) => m.role === 'advisor');
 
+/** The Files API as a speaker's code left it: each id's name and type, and three bytes; an id not here cannot be read. */
+function madeFilesClient(files: Record<string, { filename: string; mime_type: string }>): Anthropic {
+  return {
+    get: async (path: string) => {
+      const file = files[/\/v1\/files\/([^/]+)/.exec(path)?.[1] ?? ''];
+      if (!file) throw new Error('not found');
+      return path.endsWith('/content') ? new Response(new Uint8Array([1, 2, 3])) : { ...file, size_bytes: 3 };
+    },
+  } as unknown as Anthropic;
+}
+
 /** Checks every cap over the bot messages after one message from the person. */
-function expectCapsHold(said: Row[]) {
-  expect(said.length).toBeLessThanOrEqual(MAX_BOT_MESSAGES);
+function expectCapsHold(said: Row[], most = groupCaps(8).messages) {
+  expect(said.length).toBeLessThanOrEqual(most);
   const count = new Map<unknown, number>();
   for (const [i, m] of said.entries()) {
     count.set(m.speaker_id, (count.get(m.speaker_id) ?? 0) + 1);
@@ -149,7 +165,7 @@ function expectCapsHold(said: Row[]) {
 
 describe('runGroupBurst (plan #2879.1.2)', () => {
   it('holds every cap when every bot is prompted to keep talking', async () => {
-    const { client, tables } = group('Everyone, argue about this forever.');
+    const { client, tables } = group('Argue about this forever.');
     const looks: DirectorInput[] = [];
     // A director that always wants every bot to answer, for a reason that would let them.
     const director = async (input: DirectorInput): Promise<DirectorPlan> => {
@@ -164,15 +180,94 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     const outcome = await runGroupBurst({ ...base(client), director, speak });
     const said = botMessages(tables);
     expectCapsHold(said);
-    expect(said).toHaveLength(MAX_BOT_MESSAGES);
-    expect(outcome.messages).toBe(MAX_BOT_MESSAGES);
-    // The opening round is three; the director looked at most once per round, three rounds in all.
+    // Eight bots: four answer the person and eight messages in all (plan #3080).
+    expect(said).toHaveLength(groupCaps(8).messages);
+    expect(outcome.messages).toBe(groupCaps(8).messages);
+    // The director looked at most once per round, three rounds in all.
     expect(looks.length).toBeLessThanOrEqual(3);
     expect(looks[0].state.round).toBe(0);
-    expect(said.slice(0, MAX_OPENERS).every((m) => typeof m.speaker_id === 'string')).toBe(true);
+    expect(said.slice(0, groupCaps(8).openers).every((m) => typeof m.speaker_id === 'string')).toBe(true);
     // The lease is let go at the end, with every bot's typing.
     expect(tables.advisor_chats[0].typing_until).toBeNull();
     expect(tables.advisor_chat_members.every((m) => m.typing_until === null)).toBe(true);
+  });
+
+  it('holds three openers and six messages in a group of three, as before (plan #3080)', async () => {
+    const { client, tables } = group('Argue about this forever.', 3);
+    const director = async (input: DirectorInput): Promise<DirectorPlan> => ({
+      wait: false,
+      picks: input.members.map((m) => ({ key: m.key, why: input.state.round === 0 ? 'answer' : 'question' })),
+      reactions: [],
+    });
+    const speak = async (input: SpeakerInput) => `${input.members.find((m) => m.id !== input.speaker.id)!.name.split(' ')[0]}, what do you say?`;
+    await runGroupBurst({ ...base(client), director, speak });
+    const said = botMessages(tables);
+    expectCapsHold(said, 6);
+    expect(said).toHaveLength(6);
+  });
+
+  it('gives all eight one turn each when the person asks everyone, even when one asks the person something (plan #3080)', async () => {
+    const { client, tables } = group('Everyone say one thing');
+    const turns: SpeakerInput['turn'][] = [];
+    await runGroupBurst({
+      ...base(client),
+      // A director that would pick only two, and then wait.
+      director: async (input) =>
+        input.state.round === 0 ? { wait: false, picks: [{ key: 'eve', why: 'answer' }, { key: 'ben', why: 'answer' }], reactions: [] } : { wait: true, picks: [], reactions: [] },
+      speak: async (input) => {
+        turns.push(input.turn);
+        return input.speaker.key === 'cy' ? 'What would you say yourself?' : `${input.speaker.name} says one thing.`;
+      },
+    });
+    const said = botMessages(tables).map((m) => m.speaker_id);
+    expect(said).toEqual(['id-eve', 'id-ben', 'id-ada', 'id-cy', 'id-dee', 'id-fay', 'id-gus', 'id-hal']);
+    // Each was asked, so none may pass, and each keeps it short.
+    expect(turns.every((t) => t?.mayPass === false && t.brief === true)).toBe(true);
+  });
+
+  it('answers an ordinary message in a group of eight with a few, lets the others pass silently, and stops when nobody has more (plan #3080)', async () => {
+    const { client, tables } = group('I am thinking about moving to Lisbon.');
+    const looks: DirectorInput[] = [];
+    const turns: { key: string; turn: SpeakerInput['turn'] }[] = [];
+    await runGroupBurst({
+      ...base(client),
+      director: async (input) => {
+        looks.push({ ...input, state: { ...input.state, spoken: [...input.state.spoken] } });
+        return { wait: false, picks: input.members.map((m) => ({ key: m.key, why: input.state.round === 0 ? 'answer' : 'disagreement' })), reactions: [] };
+      },
+      speak: async (input) => {
+        turns.push({ key: input.speaker.key, turn: input.turn });
+        // Ada and Cy each have one thing to say; after that, and for everyone else, there is nothing new.
+        const before = turns.filter((t) => t.key === input.speaker.key).length;
+        if ((input.speaker.key === 'ada' || input.speaker.key === 'cy') && before === 1) return `${input.speaker.name} has a view.`;
+        return PASS_WORD;
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-cy']);
+    expect(said.every((m) => m.text !== PASS_WORD)).toBe(true);
+    expectCapsHold(said);
+    // Four were asked in the opening round; the first had to answer, the rest could pass.
+    expect(turns.slice(0, 4).map((t) => t.key)).toEqual(['ada', 'ben', 'cy', 'dee']);
+    expect(turns.slice(0, 4).map((t) => t.turn?.mayPass)).toEqual([false, true, true, true]);
+    // Round 1 picked three; every one passed, so the director did not look a third time.
+    expect(looks.map((l) => l.state.round)).toEqual([0, 1]);
+  });
+
+  it('gives "keep going" another short round from the quietest bots when the director picks nobody (plan #3080)', async () => {
+    const { client, tables } = group('Tell me about Lisbon.');
+    tables.advisor_messages.push(
+      { id: 'b1', user_id: USER, chat_id: CHAT, role: 'advisor', speaker_id: 'id-ada', text: 'Hills.', created_at: '2026-11-04T09:59:10Z' },
+      { id: 'b2', user_id: USER, chat_id: CHAT, role: 'advisor', speaker_id: 'id-ben', text: 'Trams.', created_at: '2026-11-04T09:59:20Z' },
+      { id: 'p2', user_id: USER, chat_id: CHAT, role: 'person', speaker_id: null, text: 'keep going', created_at: '2026-11-04T09:59:30Z' },
+    );
+    await runGroupBurst({
+      ...base(client),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => `${input.speaker.name} adds something.`,
+    });
+    const after = botMessages(tables).slice(2).map((m) => m.speaker_id);
+    expect(after).toEqual(['id-cy', 'id-dee', 'id-eve', 'id-fay']);
   });
 
   it('waits on the person when the director says so, and writes nothing', async () => {
@@ -191,6 +286,109 @@ describe('runGroupBurst (plan #2879.1.2)', () => {
     const { client, tables } = group('@cy what do you think');
     await runGroupBurst({ ...base(client), director: async () => ({ wait: true, picks: [], reactions: [] }), speak: async () => 'I think so.' });
     expect(botMessages(tables).map((m) => m.speaker_id)).toEqual(['id-cy']);
+  });
+
+  it('says nothing came through, and keeps a slip, when a bot claims a file it never sent (plan #3050.1)', async () => {
+    const { client, tables } = group('@cy chart the markets');
+    const recordSlip = vi.fn(async () => undefined);
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async () => "Here's the chart, attached as markets.png.",
+    });
+    expect(botMessages(tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED_CHART_ONLY}`]);
+    expect(recordSlip).toHaveBeenCalledWith(expect.objectContaining({ kind: 'claimed_attachment', surface: 'people' }));
+  });
+
+  it('keeps a chart a bot drew on its text, and lets "here is the chart" through (plan #3050.2.2)', async () => {
+    const { client, tables } = group('@cy chart the markets');
+    const recordSlip = vi.fn(async () => undefined);
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        input.charts?.push({ kind: 'bar', title: 'Week', rows: [{ label: 'S&P', value: 1.2 }], currency: null, unit: '%', columns: null, reference: null });
+        return "Here's the chart: the S&P rose.";
+      },
+    });
+    const [message] = botMessages(tables);
+    expect(message.text).toBe("Here's the chart: the S&P rose.");
+    expect(message.charts).toEqual([expect.objectContaining({ kind: 'bar', title: 'Week' })]);
+    expect(recordSlip).not.toHaveBeenCalled();
+  });
+
+  it("keeps the files a bot's code made under its text, counts them, and says in a text of its own which could not be kept (plan #3050.3.3)", async () => {
+    const { client, tables } = group('@cy send the markets chart as an image');
+    const recordSlip = vi.fn(async () => undefined);
+    const keepFiles = vi.fn(async (_id: string, files: { name: string }[]) => ({ kept: files.map((f) => ({ name: f.name })), unkept: [] }));
+    const offered: (string[] | undefined)[] = [];
+    await runGroupBurst({
+      ...base(client),
+      recordSlip,
+      keepFiles,
+      anthropic: madeFilesClient({
+        png: { filename: '/tmp/outputs/markets.png', mime_type: 'image/png' },
+        svg: { filename: 'markets.svg', mime_type: 'image/svg+xml' },
+      }),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        offered.push(input.made && [...input.made]);
+        input.made?.push('png', 'svg');
+        return "Here's the markets chart as a picture.";
+      },
+    });
+    expect(offered).toEqual([[]]);
+    const [text, note] = botMessages(tables);
+    expect(text).toMatchObject({ text: "Here's the markets chart as a picture.", speaker_id: 'id-cy', file_count: 1 });
+    expect(keepFiles).toHaveBeenCalledTimes(1);
+    const [messageId, files] = keepFiles.mock.calls[0];
+    expect(messageId).toBe(text.id);
+    expect(files.map((f) => f.name)).toEqual(['markets.png']);
+    expect(note).toMatchObject({ speaker_id: 'id-cy', role: 'advisor' });
+    expect(note.text).toMatch(/^Sorry, a file did not come through\. markets\.svg could not be saved/);
+    // A file its code made is not a false claim.
+    expect(recordSlip).not.toHaveBeenCalled();
+  });
+
+  it("says so in the group when not one of the files a bot's code made could be read (plan #3050.3.3)", async () => {
+    const { client, tables } = group('@cy send the markets chart as an image');
+    const keepFiles = vi.fn(async () => ({ kept: [], unkept: [] }));
+    await runGroupBurst({
+      ...base(client),
+      keepFiles,
+      anthropic: madeFilesClient({}),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => {
+        input.made?.push('gone');
+        return 'Here it is as a picture.';
+      },
+    });
+    const [text, note] = botMessages(tables);
+    expect(text.file_count).toBeUndefined();
+    expect(keepFiles).not.toHaveBeenCalled();
+    expect(note.text).toContain('could not be fetched from where the code ran');
+  });
+
+  it('offers a speaker no code where nothing keeps its files, and says a claimed file did not come where something does (plan #3050.3.3)', async () => {
+    const without = group('@cy chart it');
+    const offered: (string[] | undefined)[] = [];
+    await runGroupBurst({
+      ...base(without.client),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async (input) => (offered.push(input.made), 'Sure.'),
+    });
+    expect(offered).toEqual([undefined]);
+
+    const withKeep = group('@cy chart it');
+    await runGroupBurst({
+      ...base(withKeep.client),
+      keepFiles: vi.fn(),
+      director: async () => ({ wait: true, picks: [], reactions: [] }),
+      speak: async () => "Here's the chart, attached as markets.png.",
+    });
+    expect(botMessages(withKeep.tables).map((m) => m.text)).toEqual([`Here's the chart, attached as markets.png.\n\n${NOTHING_ATTACHED}`]);
   });
 
   it('takes texts sent in a row as one message, waiting until they stop (plan #2988)', async () => {
@@ -425,10 +623,62 @@ describe('a speaker looking places up (plan #2987.3)', () => {
     expect(said).toBe('Passed to Maya.');
   });
 
+  it('offers message_person_directly with its rules (plan #3083), and the asked line only to a bot that was asked', async () => {
+    const { anthropic, sent } = scripted([text('Sure.'), text('Sure.')]);
+    const direct = vi.fn(async () => ({ ok: true as const, rows: [] }));
+    await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, direct, turn: { mayPass: false, brief: false, direct: true } }, []);
+    await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, direct }, []);
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['message_person_directly']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(DIRECT_RULES);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(DIRECT_ASKED_RULES);
+    expect(sent[1].system.map((b) => b.text).join('\n')).toContain(DIRECT_RULES);
+    expect(sent[1].system.map((b) => b.text).join('\n')).not.toContain(DIRECT_ASKED_RULES);
+  });
+
   it('sends no tools when there is no way to look places up', async () => {
     const { anthropic, sent } = scripted([text('Try the noodle place.')]);
     expect(await speakWithModel(anthropic, 'claude-sonnet-5-5', speaker, [])).toBe('Try the noodle place.');
     expect(sent[0].tools).toBeUndefined();
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(CHART_ONLY_RULES);
+  });
+
+  it('runs code where its files are kept, carries on past a pause in the same container, and collects what the code wrote (plan #3050.3.3)', async () => {
+    const ran = (fileId: string) => [
+      { type: 'server_tool_use', id: `s-${fileId}`, name: 'bash_code_execution', input: { command: 'python chart.py' } },
+      {
+        type: 'bash_code_execution_tool_result',
+        tool_use_id: `s-${fileId}`,
+        content: { type: 'bash_code_execution_result', stdout: '', stderr: '', return_code: 0, content: [{ type: 'bash_code_execution_output', file_id: fileId }] },
+      },
+    ];
+    const paused = { content: [{ type: 'text', text: 'Let me draw that.' }, ...ran('f-png')], stop_reason: 'pause_turn', container: { id: 'c1' }, usage: USAGE };
+    const done = { content: [...ran('f-pdf'), { type: 'text', text: 'Here is the week as a picture and a PDF.' }], stop_reason: 'end_turn', usage: USAGE };
+    const { anthropic, sent } = scripted([paused, done]);
+    const made: string[] = [];
+    const said = await speakWithModel(anthropic, 'claude-sonnet-5-5', { ...speaker, charts: [], made }, []);
+
+    expect(sent[0].tools?.map((t) => t.name)).toEqual(['code_execution', 'show_chart']);
+    expect(sent[0].system.map((b) => b.text).join('\n')).toContain(ATTACH_RULES);
+    expect((sent[0] as unknown as { max_tokens: number }).max_tokens).toBe(SPEAKER_CODE_MAX_TOKENS);
+    // The paused turn goes back as it was, in the container it ran in.
+    expect(sent).toHaveLength(2);
+    expect((sent[1] as unknown as { container?: string }).container).toBe('c1');
+    expect(sent[1].messages.at(-1)).toMatchObject({ role: 'assistant' });
+    expect(sent[1].tool_choice).toEqual({ type: 'auto' });
+    expect(made).toEqual(['f-png', 'f-pdf']);
+    expect(said).toBe('Here is the week as a picture and a PDF.');
+
+    const plain = scripted([text('Sure.')]);
+    await speakWithModel(plain.anthropic, 'claude-sonnet-5-5', speaker, []);
+    expect((plain.sent[0] as unknown as { max_tokens: number }).max_tokens).toBe(SPEAKER_MAX_TOKENS);
+  });
+
+  it("reads a speaker's words after its code, not what it said it was about to do (plan #3050.3.3)", () => {
+    const result = { type: 'bash_code_execution_tool_result' };
+    expect(speakerText([{ type: 'text', text: 'Drawing it now.' }, { type: 'server_tool_use' }, result, { type: 'text', text: 'Here it is.' }])).toBe('Here it is.');
+    expect(speakerText([{ type: 'text', text: 'Drawing it now.' }, { type: 'server_tool_use' }, result])).toBe('Drawing it now.');
+    expect(speakerText([{ type: 'text', text: 'First.' }, { type: 'text', text: 'Second.' }])).toBe('First.');
+    expect(speakerText([])).toBe('');
   });
 });
 
@@ -456,4 +706,84 @@ describe('what a bot heard in its other chats (plan #2983)', () => {
     expect(system).not.toContain('keep this between us');
     expect(system).not.toContain('what do you think I should cook');
   });
+});
+
+describe('a bot messaging the person in its own chat (plan #3083)', () => {
+  const pickAll = async (input: DirectorInput): Promise<DirectorPlan> =>
+    input.state.round === 0
+      ? { wait: false, picks: input.members.slice(0, 3).map((m) => ({ key: m.key, why: 'answer' as const })), reactions: [] }
+      : { wait: true, picks: [], reactions: [] };
+
+  it('sends the asked bot\'s message to its chat, leaves a short line with a link in the group, and the others still answer', async () => {
+    const { client, tables } = group('Ada can you message me individually to tell me more about your Cornell cafeteria situation. Anyone else, thoughts on what Ada is saying?', 3);
+    const messageDirectly = vi.fn(async () => ({ ok: true as const, directChatId: 'dm-ada' }));
+    const turns: { key: string; turn: SpeakerInput['turn'] }[] = [];
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly,
+      speak: async (input) => {
+        turns.push({ key: input.speaker.key, turn: input.turn });
+        if (input.speaker.key !== 'ada') return `${input.speaker.name} thinks the cafeteria sounds rough.`;
+        expect(input.direct).toBeDefined();
+        const result = await input.direct!({ ask: 'the full Cornell cafeteria story' });
+        expect(result.ok && result.note).toContain('Sent');
+        // A bot that tells the story here anyway is cut back to the pointer.
+        return 'So it started in 2019 when the dining hall closed.\n\nThen the whole floor ate cereal for a month and the dean got involved, which was its own saga.';
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-ben', 'id-cy']);
+    expect(said[0].text).toBe('Sent you the full thing in our chat.');
+    expect(said[0].receipts).toEqual([{ label: 'Open your chat with Ada', link: '/chat/people/ada' }]);
+    expect(said[1].receipts).toBeUndefined();
+    expect(turns.map((t) => [t.key, t.turn?.direct])).toEqual([['ada', true], ['ben', false], ['cy', false]]);
+    expect(messageDirectly).toHaveBeenCalledTimes(1);
+    const [asker] = messageDirectly.mock.calls[0] as unknown as [{ bot: { key: string }; chatId: string; said: string; transcript: string }];
+    expect(asker.bot.key).toBe('ada');
+    expect(asker.chatId).toBe(CHAT);
+    expect(asker.said).toContain('message me individually');
+    expect(asker.transcript).toContain('The person:');
+  });
+
+  it('sends one message per bot when several are asked, and a second call in one turn sends nothing more', async () => {
+    const { client, tables } = group('Ada and Ben, DM me your takes', 3);
+    const messageDirectly = vi.fn(async () => ({ ok: true as const, directChatId: 'dm' }));
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly,
+      speak: async (input) => {
+        await input.direct!({ ask: 'your take' });
+        const again = await input.direct!({ ask: 'your take' });
+        expect(again.ok && again.note).toContain('Already sent');
+        return 'Sent you my take in our chat.';
+      },
+    });
+    const said = botMessages(tables);
+    expect(said.map((m) => m.speaker_id)).toEqual(['id-ada', 'id-ben']);
+    expect(said.map((m) => m.text)).toEqual(['Sent you my take in our chat.', 'Sent you my take in our chat.']);
+    expect(messageDirectly).toHaveBeenCalledTimes(2);
+  });
+
+  it('says in the group that it was not sent when the message fails, with no link', async () => {
+    const { client, tables } = group('Ada, text me privately about it', 3);
+    let told = '';
+    await runGroupBurst({
+      ...base(client),
+      director: pickAll,
+      messageDirectly: async () => ({ ok: false as const, error: 'your chat with them could not be opened.' }),
+      speak: async (input) => {
+        if (input.speaker.key !== 'ada') return PASS_WORD;
+        const result = await input.direct!({ ask: 'it' });
+        told = result.ok ? (result.note ?? '') : '';
+        return 'I could not get it into our chat just now, sorry.';
+      },
+    });
+    expect(told).toContain('It was not sent: your chat with them could not be opened.');
+    const said = botMessages(tables);
+    expect(said.map((m) => m.text)).toEqual(['I could not get it into our chat just now, sorry.']);
+    expect(said[0].receipts).toBeUndefined();
+  });
+
 });

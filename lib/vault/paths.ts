@@ -114,6 +114,15 @@ export function normaliseSubpath(subpath: string | null | undefined): string {
 }
 
 /**
+ * True when a vault folder is an email address. Nobody names a vault folder
+ * that way, but a password manager fills one into the field above the token,
+ * and saving it points the sync at a folder that holds none of the vault.
+ */
+export function subpathIsEmail(subpath: string): boolean {
+  return /^[^\s/@]+@[^\s/@]+\.[^\s/@]+$/.test(normaliseSubpath(subpath));
+}
+
+/**
  * A repository path as it should be stored, or null when it is outside the
  * vault.
  *
@@ -140,9 +149,9 @@ export function toRepoPath(vaultPath: string, subpath: string): string {
 export const INBOX_FOLDER = 'Inbox';
 
 /**
- * The note Dash keeps at the top of the vault listing every waiting quick note
- * (plan #1732). It is outside the Inbox on purpose, so it is never a quick note
- * itself, and no triage suggestion or search offers it as a place to file into.
+ * The note at the top of the vault that holds every waiting quick note, one
+ * section each (plan #1732; sections since plan #3063). No triage suggestion
+ * or search offers it as a place to file into.
  */
 export const TRIAGE_NOTE_PATH = 'Quick note triage.md';
 export const TRIAGE_NOTE_TITLE = 'Quick note triage';

@@ -86,6 +86,7 @@ export function Messaging({
 export function MessagingThread({
   name,
   detail,
+  detailOneLine = false,
   avatar,
   back,
   crumbs = [],
@@ -100,6 +101,8 @@ export function MessagingThread({
   name: React.ReactNode;
   /** One quiet line under the name, such as what they help with. */
   detail?: string;
+  /** Keep the line under the name to one line on a phone too, ending in an ellipsis: a group's members (plan #3082). */
+  detailOneLine?: boolean;
   avatar?: React.ReactNode;
   /** On a phone, the way back to the list of people. */
   back: { href: string; label: string };
@@ -136,7 +139,7 @@ export function MessagingThread({
           {avatar}
           <div className="min-w-0 flex-1">
             {typeof name === 'string' ? <h1 className="truncate text-body font-semibold text-ink">{name}</h1> : name}
-            {detail && <p className="line-clamp-2 text-small text-ink-muted min-[720px]:truncate">{detail}</p>}
+            {detail && <p className={cn('text-small text-ink-muted', detailOneLine ? 'truncate' : 'line-clamp-2 min-[720px]:truncate')}>{detail}</p>}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>
@@ -295,16 +298,17 @@ export function MessageLink({ href, children }: { href: string; children: React.
  * People did or proposes, with its presses, as the last item in their run.
  * Wider than a short bubble so its sentence and buttons have room. The slot is
  * the content's: the change cards and the live card of #2854.3 bring their
- * own surface.
+ * own surface. `wide` is for a chart a bot drew (plan #3050.2.2).
  */
-export function MessageCard({ label, children }: { label?: string; children: React.ReactNode }) {
+export function MessageCard({ label, wide = false, children }: { label?: string; wide?: boolean; children: React.ReactNode }) {
   return (
     <div
       role={label ? 'group' : undefined}
       aria-label={label}
       // In a run of bubbles, so the same 2px gap. On a phone it takes the thread's whole width (the group is three
       // quarters of it), so a proposal's title and buttons are not squeezed; from sm up, a fixed width under the bubble.
-      className="w-[133.333%] max-w-none sm:w-80 sm:max-w-full"
+      // A chart (plan #3050.2.2) is wide: its lines need more room across than a card's sentence does.
+      className={wide ? 'w-[133.333%] max-w-none sm:w-[28rem] sm:max-w-full' : 'w-[133.333%] max-w-none sm:w-80 sm:max-w-full'}
     >
       {children}
     </div>

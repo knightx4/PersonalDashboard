@@ -9,8 +9,7 @@ import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { connectorAccess } from '@/lib/connector/access';
 import { serveMcp } from '@/lib/connector/mcp';
 import type { ConnectorWriteContext } from '@/lib/connector/writes';
-import { noteCreatePorts } from '@/lib/vault/db/ports';
-import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import { quickNotePorts as quickNoteWritePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 
 /**
@@ -69,9 +68,9 @@ function serviceAskDb(): AskDb {
  * opened by user id, since the service role passes no RLS, and the note
  * embedded once the reply has gone.
  */
-function quickNotePorts(userId: string, core: SchemaClient): CreateNotePorts {
+function quickNotePorts(userId: string, core: SchemaClient) {
   const vault = createVaultServiceSupabase();
-  return noteCreatePorts({
+  return quickNoteWritePorts({
     supabase: vault,
     userId,
     afterSave: () => {

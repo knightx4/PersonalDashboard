@@ -11,6 +11,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { askDash } from '@/lib/dash/ask';
+import { keepLookupCap } from '@/lib/dash/lookup-caps';
 import type { DashWriteContext } from '@/lib/dash/registry';
 import { publicEnv } from '@/lib/env';
 import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
@@ -24,8 +25,7 @@ import { allSearchSources } from '@/lib/search/registry';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { insertTask } from '@/lib/todo/tasks/write';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { noteCreatePorts } from '@/lib/vault/db/ports';
-import type { CreateNotePorts } from '@/lib/vault/notes/create';
+import { quickNotePorts as quickNoteWritePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { insertMadeChange } from './changes';
 import { appendTurns, loadConversation, startAsk } from './store';
@@ -59,9 +59,9 @@ function goalsClient(accessToken: string, history: Parameters<typeof historyHead
   }) as unknown as GoalsSupabaseClient;
 }
 
-/** The note-create ports on the session's vault client, each note embedded once the reply has gone. */
-function quickNotePorts(userId: string, vault: VaultSupabaseClient, core: CoreSupabaseClient): CreateNotePorts {
-  return noteCreatePorts({
+/** The quick note ports on the session's vault client, each note embedded once the reply has gone. */
+function quickNotePorts(userId: string, vault: VaultSupabaseClient, core: CoreSupabaseClient) {
+  return quickNoteWritePorts({
     supabase: vault,
     userId,
     afterSave: () => {
@@ -120,6 +120,7 @@ export function voiceAskDeps(): VoiceAskDeps {
             append: (subject, turns) => appendTurns(core, userId, subject, turns),
             recordSpend: (reports) =>
               recordSpendReports(core, userId, { module: 'core', operation: 'ask-dash' }, reports),
+            recordLookupCap: (cap) => keepLookupCap(core, userId, cap),
             saveChange: (conversationId, made) => insertMadeChange(core, userId, conversationId, made),
             // No propose is passed, so the loop refuses every proposal before one is kept.
             saveProposal: () => Promise.reject(new Error('Dash proposes nothing when asked by voice.')),

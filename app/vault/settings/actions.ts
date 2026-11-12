@@ -8,7 +8,7 @@ import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { cleanFolder } from '@/lib/vault/map/rules';
-import { normaliseSubpath } from '@/lib/vault/paths';
+import { normaliseSubpath, subpathIsEmail } from '@/lib/vault/paths';
 import { parseRepoInput } from '@/lib/vault/repo-input';
 
 /**
@@ -49,6 +49,13 @@ export async function connectVault(
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' };
+  }
+
+  if (subpathIsEmail(parsed.data.subpath)) {
+    return {
+      error:
+        'The folder is an email address, most likely filled in by a password manager. Clear the Folder field and save again.',
+    };
   }
 
   const repo = parseRepoInput(parsed.data.repo);

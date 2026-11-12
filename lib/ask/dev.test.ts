@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { AskContext, SchemaClient } from './db';
-import { MAX_DEV_COMMENTS, SECTION_CHARS, excerpt, queryWords, runLine } from './dev';
+import { MAX_DEV_COMMENTS, OUTLINE_PAGE, SECTION_CHARS, excerpt, queryWords, runLine } from './dev';
 import { executeAskTool } from './tools';
 
 /**
@@ -22,6 +22,7 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   private filters: ((row: Row) => boolean)[] = [];
   private sort: { column: string; ascending: boolean } | null = null;
   private cap: number | null = null;
+  private window: { from: number; to: number } | null = null;
 
   constructor(
     private readonly rows: Row[],
@@ -77,6 +78,10 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     this.cap = n;
     return this;
   }
+  range(from: number, to: number) {
+    this.window = { from, to };
+    return this;
+  }
   then<A = { data: Row[]; error: null }, B = never>(
     onFulfilled?: ((value: { data: Row[]; error: null }) => A | PromiseLike<A>) | null,
     onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null,
@@ -89,7 +94,10 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
         return sort.ascending ? order : -order;
       });
     }
+    if (this.window) out = out.slice(this.window.from, this.window.to + 1);
     if (this.cap !== null) out = out.slice(0, this.cap);
+    // The API returns at most 1,000 rows a request, as Supabase's does.
+    out = out.slice(0, OUTLINE_PAGE);
     return Promise.resolve({ data: out, error: null }).then(onFulfilled, onRejected);
   }
 }
@@ -359,6 +367,19 @@ describe('read_dev_row', () => {
     }
     const unknown = await read({ kind: 'step', ref: '#1319.7' }, { tables: outlined });
     expect(unknown.ok).toBe(false);
+  });
+
+  it('reads a step by its outline when the plan has more rows than one request returns', async () => {
+    // On 5 November #2897.6 named no step: the outline index stopped at the
+    // first 1,000 of 3,061 rows. Here the step sorts after 1,200 earlier rows.
+    const earlier = Array.from({ length: OUTLINE_PAGE + 200 }, (_, i) => ({ user_id: ME, number: i + 1, outline: String(i + 1) }));
+    const outlined: Tables = {
+      ...tables,
+      plan_item_outlines: [...earlier, { user_id: ME, number: 1248, outline: '1319.1' }, { user_id: ME, number: 1319, outline: '1319' }],
+    };
+    const result = await read({ kind: 'step', ref: '#1319.1' }, { tables: outlined });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.rows[0].detail).toMatchObject({ step: '#1319.1', number: 1248 });
   });
 
   it('reads the sessions sent at a step, newest first, with why each stopped', async () => {

@@ -85,6 +85,7 @@ import {
   retryReply,
   threadBuilds,
   threadChanges,
+  threadMessageFiles,
   decideThreadWatch,
 } from '@/app/chat/actions';
 import { groupHref } from '@/lib/you/group-chats-model';
@@ -325,8 +326,8 @@ const ACTIONS: AskSource = {
     list: paneThreads,
     open: paneThread,
     live: {
-      thread: { older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds },
-      group: { older: olderGroupMessages, read: readGroup },
+      thread: { older: olderMessages, read: readThread, retryReply, changes: threadChanges, builds: threadBuilds, files: threadMessageFiles },
+      group: { older: olderGroupMessages, read: readGroup, files: threadMessageFiles },
       presses: { confirm: confirmDashChange, decline: declineDashChange, reopen: reopenDashChange, undo: undoDashChange, watch: decideThreadWatch },
     },
   },

@@ -10,7 +10,7 @@ import { APPLICATION_CHILDREN, ROLE_CHILDREN } from '@/lib/dash/jobs-writes';
  * default, merging or with ignoreDuplicates leaving the row alone and
  * returning nothing for it), update and delete, the filters eq, neq, gt,
  * gte, lt, is, ilike (without wildcards), in, not (is null) and or (of eq,
- * neq and is null), order, limit, single and maybeSingle. Every query returns whole
+ * neq, lt and is null), order, limit, single and maybeSingle. Every query returns whole
  * rows whatever columns it selected. An insert without an id gets one, and a
  * created_at, so a writer that asks for its new row's id gets one back; an
  * insert with one is kept exactly as given.
@@ -187,10 +187,20 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           ),
           not: (c: string) => (filters.push((r) => (r[c] ?? null) !== null), query),
           or: (spec: string) => {
-            const parts = spec.split(',').map((part) => part.split('.'));
+            // The value is everything after the operator, so a timestamp's dot stays in it.
+            const parts = spec.split(',').map((part) => {
+              const [c, operator, ...rest] = part.split('.');
+              return [c, operator, rest.join('.')] as const;
+            });
             filters.push((r) =>
               parts.some(([c, operator, v]) =>
-                operator === 'is' ? (r[c] ?? null) === null : operator === 'neq' ? r[c] !== v : r[c] === v,
+                operator === 'is'
+                  ? (r[c] ?? null) === null
+                  : operator === 'neq'
+                    ? r[c] !== v
+                    : operator === 'lt'
+                      ? r[c] != null && String(r[c]) < v
+                      : r[c] === v,
               ),
             );
             return query;

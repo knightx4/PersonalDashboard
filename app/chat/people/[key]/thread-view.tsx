@@ -31,6 +31,7 @@ import {
   bubbleText,
   isTyping,
   mergeMessages,
+  needsBotFiles,
   personInitials,
   receiptOf,
   replyFailedOf,
@@ -47,6 +48,8 @@ import { placeAfterReplies, withItem } from '@/lib/you/thread-cards';
 import { owedReply, STALLED_LIMIT_MS, STALLED_MS } from '@/lib/you/reply-turn';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
 import { LiveWorking } from '@/components/talk/live-card';
+import { BubbleCharts } from '@/components/talk/reply-chart';
+import { AttachedCards } from '@/components/talk/attached-cards';
 import { SpeakBubble, SpeakingPill, SpeakNote, SpeakPress, SpeakSwitch, useSpeakArrivals, useSpeaking } from '@/components/talk/speak-reply';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 import type { DashChange } from '@/lib/talk/changes';
@@ -93,6 +96,8 @@ export type ThreadActions = {
   changes?: (chatId: string) => Promise<DashChange[] | null>;
   /** Where the thread's confirmed builds stand, by run id, or null when they could not be read (plan #2854.3). */
   builds?: (runIds: string[]) => Promise<Record<string, BuildRun> | null>;
+  /** The files a bot's code made for one message (plan #3050.3.1), or null when they could not be read. */
+  files?: (messageId: string) => Promise<ThreadFile[] | null>;
 };
 
 /** What the gallery reads with: nothing further back, and reading and trying again change nothing. */
@@ -288,6 +293,8 @@ export function ThreadView({
   // next send redrew the page (plan #2988).
   const router = useRouter();
   const drawnWithChat = useRef(initialChatId !== null);
+  // The bot messages whose files were asked for, by id and count, so a receipt's update does not ask again.
+  const askedFiles = useRef(new Set<string>());
   useEffect(() => {
     if (!live || !chatId) return;
     const supabase = createClient();
@@ -299,6 +306,15 @@ export function ThreadView({
         if (!row) return;
         setMessages((list) => mergeMessages(list, [row]));
         if (row.role === 'advisor' && !row.readAt && shown()) void act.current.read(chatId, person.id);
+        // The bot's code made files for this text (plan #3050.3.1): a Realtime row never carries them.
+        const asking = `${row.id}:${row.fileCount ?? 0}`;
+        if (needsBotFiles(row) && !askedFiles.current.has(asking)) {
+          askedFiles.current.add(asking);
+          void act.current.files?.(row.id).then((files) => {
+            if (!files || files.length === 0) return;
+            setMessages((list) => list.map((m) => (m.id === row.id ? { ...m, files } : m)));
+          });
+        }
         // A text of theirs may be the reply to something they did: read the cards again.
         if (row.role === 'advisor' && event.eventType === 'INSERT') {
           void act.current.changes?.(chatId).then((next) => next && setChanges(next));
@@ -665,13 +681,26 @@ export function ThreadView({
                   {/* A card under a bubble carries on the run, so the bubble keeps its corner tucked. */}
                   {words !== null && (
                     <VoicedBubble id={m.id} text={m.role === 'advisor' ? words : null} name={person.name} bot={person.id} run={block.messages}>
-                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length} arriving={arrives(m)}>
+                      <MessageBubble from={block.from} last={lastOfRun && !m.files?.length && !m.charts?.length && !m.attached?.length} arriving={arrives(m)}>
                         {words}
                       </MessageBubble>
                     </VoicedBubble>
                   )}
                   {m.files && m.files.length > 0 && (
-                    <AskTurnFiles files={m.files} large align={block.from === 'you' ? 'end' : 'start'} label="Sent with this message" />
+                    <AskTurnFiles
+                      files={m.files}
+                      large
+                      align={block.from === 'you' ? 'end' : 'start'}
+                      label={block.from === 'you' ? 'Sent with this message' : `Made by ${person.name} for this reply`}
+                    />
+                  )}
+                  {/* What the bot drew with show_chart (plan #3050.2.2), kept on the row, so a reopened thread draws it again. */}
+                  <BubbleCharts charts={m.charts} />
+                  {/* A saved page or file the bot attached by reference (plan #3050.4), as a card that opens it. */}
+                  {m.attached && m.attached.length > 0 && (
+                    <MessageCard>
+                      <AttachedCards cards={m.attached} label={`Sent by ${person.name} with this reply`} />
+                    </MessageCard>
                   )}
                   {m.receipts.map((r) => (
                     <MessageLink key={`${r.link}-${r.label}`} href={r.link}>

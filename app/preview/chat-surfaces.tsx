@@ -7,6 +7,7 @@ import { PeopleSkeleton } from '@/app/chat/people-skeleton';
 import { ThreadView } from '@/app/chat/people/[key]/thread-view';
 import { nextTextLine } from '@/lib/you/reach-out-card-model';
 import type { DashChange } from '@/lib/talk/changes';
+import type { DashChart } from '@/lib/talk/chart';
 import type { BuildRun } from '@/lib/you/live-cards';
 import { ChangeThreadDemo, ChatArrivalDemo, ChatTypingDemo } from './chat-moments';
 import { GroupSettings } from '@/app/chat/groups/[id]/group-settings';
@@ -255,7 +256,31 @@ const UNNAMED_GROUP: GroupRow = {
 
 export const MESSAGE_GROUPS: GroupRow[] = [GROUP_ROW, UNNAMED_GROUP];
 
-type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'settings' | 'settings-delete';
+/**
+ * You ask the CFO for the pay as a picture and a PDF, and its code made three
+ * files (plan #3050.3.3): the PNG and the PDF are kept under its text, and
+ * the SVG it also wrote could not be, which a text of its own says.
+ */
+const GROUP_MADE_FILES: ThreadMessage[] = [
+  ...GROUP_THREAD.slice(0, 3),
+  gmsg('g7', null, 'CFO, can you send me that as a picture I can share? And a PDF.', '2026-11-03T08:50:00Z'),
+  {
+    ...gmsg('g8', 'm1', 'Here it is as a picture, and as a one-page PDF with the yearly figures.', '2026-11-03T08:50:30Z'),
+    fileCount: 2,
+    files: [
+      { id: 'gf1', name: 'pay-now-and-northwind.png', contentType: 'image/png', size: 41_984, href: '/gallery/offer-pay-chart.svg' },
+      { id: 'gf2', name: 'Pay now and the Northwind offer, a year before tax.pdf', contentType: 'application/pdf', size: 118_784, href: '#' },
+    ],
+  },
+  gmsg(
+    'g9',
+    'm1',
+    'Sorry, a file did not come through. pay.svg could not be saved: that kind of file cannot be kept here; images, PDFs, Word, text and CSV can.',
+    '2026-11-03T08:50:31Z',
+  ),
+];
+
+type GroupState = 'thread' | 'typing' | 'new' | 'reply-failed' | 'made-files' | 'settings' | 'settings-delete';
 
 /** A group open beside the list, in each of its states, and its settings. */
 export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
@@ -273,11 +298,19 @@ export function ChatGroupSurface({ state = 'thread' }: { state?: GroupState }) {
           members,
           ...(state === 'new' ? { last: null, name: null, title: unnamed } : {}),
           ...(state === 'reply-failed' ? { last: { role: 'person' as const, speaker: null, text: GROUP_THREAD[GROUP_THREAD.length - 1].text, at: '2026-11-03T08:50:00Z' } } : {}),
+          ...(state === 'made-files' ? { last: { role: 'advisor' as const, speaker: 'The CFO', text: GROUP_MADE_FILES[GROUP_MADE_FILES.length - 1].text, at: '2026-11-03T08:50:31Z' } } : {}),
         }
       : g,
   );
   // A burst that failed leaves your last text with no answer (plan #2988.3).
-  const messages = state === 'new' ? [] : typing || state === 'reply-failed' ? GROUP_THREAD : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
+  const messages =
+    state === 'new'
+      ? []
+      : state === 'made-files'
+        ? GROUP_MADE_FILES
+        : typing || state === 'reply-failed'
+          ? GROUP_THREAD
+          : [...GROUP_THREAD, gmsg('g7', 'm3', 'Then that is your answer. Ask Northwind for the start date you want.', '2026-11-03T08:52:00Z')];
   return (
     <ChatShell path={`/chat/groups/${GROUP_ID}`}>
       <PeopleView rows={MESSAGE_ROWS} groups={groups} current={GROUP_ID} timezone={ZONE} now={NOW} live={false}>
@@ -363,7 +396,98 @@ type ThreadState =
   | 'loading'
   | 'next-text'
   | 'files'
-  | 'adding';
+  | 'adding'
+  | 'chart'
+  | 'made-files'
+  | 'attached';
+
+/** The markets over last week, as a bot draws them with show_chart (plan #3050.2.2): each index as the change since Monday. */
+const MARKETS_CHART: DashChart = {
+  kind: 'line',
+  title: 'US markets, 2 to 6 November 2026',
+  rows: [
+    { label: 'Mon 2', value: 0, values: [0, 0, 0] },
+    { label: 'Tue 3', value: 0.4, values: [0.4, 0.9, 0.1] },
+    { label: 'Wed 4', value: -0.3, values: [-0.3, -0.8, 0.2] },
+    { label: 'Thu 5', value: 0.8, values: [0.8, 1.6, 0.5] },
+    { label: 'Fri 6', value: 1.2, values: [1.2, 2.1, 0.7] },
+  ],
+  currency: null,
+  unit: '%',
+  columns: null,
+  reference: null,
+  series: ['S&P 500', 'Nasdaq', 'Dow'],
+};
+
+/** You ask for a chart of the markets, and the reply draws it under its last bubble. */
+const CHART_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('c1', 'person', 'Can you show me a chart of the stock markets past week?', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('c2', 'advisor', 'A choppy week that ended up. Wednesday took back most of Tuesday.', '2026-11-03T08:58:30Z'),
+  msg('c3', 'advisor', 'The Nasdaq led, up 2.1% by Friday; the Dow lagged at 0.7%.', '2026-11-03T08:58:40Z', { charts: [MARKETS_CHART] }),
+];
+
+/**
+ * You ask for the chart as a picture and a PDF, and the reply's code made
+ * three files (plan #3050.3.1): the PNG and the PDF are kept under the last
+ * bubble, and the SVG it also wrote could not be, which a text says.
+ */
+const MADE_FILES_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('c1', 'person', 'Can you send me the stock markets chart for the past week as an image? And a PDF I can forward.', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('c2', 'advisor', 'Here it is as a picture, and the same week as a one-page PDF with the closing figures.', '2026-11-03T08:58:40Z', {
+    fileCount: 2,
+    files: [
+      { id: 'mf1', name: 'us-markets-week-2026-11-06.png', contentType: 'image/png', size: 48_128, href: '/gallery/markets-chart.svg' },
+      { id: 'mf2', name: 'US markets, week to 6 November 2026, closing figures.pdf', contentType: 'application/pdf', size: 212_992, href: '#' },
+    ],
+  }),
+  msg(
+    'c3',
+    'advisor',
+    'Sorry, a file did not come through. markets.svg could not be saved: that kind of file cannot be kept here; images, PDFs, Word, text and CSV can.',
+    '2026-11-03T08:58:41Z',
+  ),
+];
+
+/**
+ * Asked for the interview prep page and the offer letter (plan #3050.4),
+ * Franklin found both and sent them by reference: the page a bot made
+ * earlier and the PDF you sent last week, each a card that opens it.
+ */
+const ATTACHED_THREAD: ThreadMessage[] = [
+  ...THREAD.slice(3, 5),
+  msg('a1', 'person', 'Can you send me that prep page for the Northwind interview again? And the offer letter.', '2026-11-03T08:58:00Z', {
+    deliveredAt: '2026-11-03T08:58:01Z',
+    readAt: '2026-11-03T08:58:02Z',
+  }),
+  msg('a2', 'advisor', 'Here are both. The prep page has the case drill at the end, worth one more pass tonight.', '2026-11-03T08:58:40Z', {
+    attached: [
+      {
+        table: 'core.files',
+        id: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+        title: 'Northwind final round: accounting practice drill and the questions they ask',
+        kind: 'page',
+        href: '/goals/files/7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11',
+      },
+      {
+        table: 'core.attachments',
+        id: '1a9e5c3b-6d2f-4e7a-8b0c-5f3d1e9a7c22',
+        title: 'Northwind offer letter, signed copy.pdf',
+        kind: 'file',
+        href: '#',
+        contentType: 'application/pdf',
+        size: 1_258_291,
+      },
+    ],
+  }),
+];
 
 /** A screenshot of the offer and its letter, sent to Franklin (plan #2974). */
 const OFFER_FILES = [
@@ -721,6 +845,12 @@ export function ChatThreadSurface({ state = 'thread' }: { state?: ThreadState })
           ? THREAD.slice(0, 7)
           : state === 'files'
             ? FILES_THREAD
+            : state === 'chart'
+            ? CHART_THREAD
+            : state === 'made-files'
+            ? MADE_FILES_THREAD
+            : state === 'attached'
+            ? ATTACHED_THREAD
             : state === 'older'
             ? // Read from the top, where the earlier page loads; the to do further down is clipped by the pane.
               THREAD.map((m) => ({ ...m, receipts: [] }))

@@ -55,8 +55,11 @@ fix, re-ask the one case it is about, never all of them.
   reply check:" that names the model and the rule; the fix is the rule, or
   `readReply` in `lib/core/model-call.ts` for a new shape.
 - **One case by hand**: `npx tsx scripts/sql.ts "select core.run_dash_quality('<case id>')"`
-  re-asks one case against whatever is deployed, in under a minute, for a
-  few cents. This is how a fix is proven. `core.run_dash_quality()` with no
+  re-asks one case against whatever is deployed, in under a minute. This is
+  how a fix is proven. It is not a few cents: on 11 November, with the
+  person's model and a 95,000-token prompt, a one-lookup case cost $0.56 and
+  a ten-lookup case $1.10. Re-ask only the case the fix is about, the
+  shortest one that shows it, and never a case whose cause is still open. `core.run_dash_quality()` with no
   id asks every case for about $1: do that only when a change touches every
   answer (the prompt, the loop), and at most once a week.
 - **Code**: `lib/dash/quality/` (grade, health, run), `inngest/core/dash-quality.ts`
@@ -119,7 +122,11 @@ is not one. Work it down:
   scan over embeddings (see migrations 0275 and 0276 for how recall was
   fixed). A bad argument from the model repeated across days means the tool's
   description or input schema misleads it: fix the description, or make the
-  tool accept what the model naturally sends.
+  tool accept what the model naturally sends. A lookup that says a row
+  exists nowhere when it does is often a read cut at the API's 1,000 rows
+  a request: `read_dev_row` named #2897.6 no step for a week because the
+  outline index stopped at 1,000 of 3,061 plan rows (fixed 11 November).
+  Count the rows the read should see before blaming the model.
 - **"I could not finish", a limit, or a refused lookup.** Read the spend
   rows of that minute (`core.model_spend`, operation `ask-dash`): how many
   calls, how many tokens each. Compare with `INPUT_BUDGET`, `MAX_LOOKUPS`
@@ -207,7 +214,11 @@ when you see a cause of failure that one fix will not remove.
 3. **Whole answers, not a page.** Questions about all of something ("roles at
    X", "how much on Y") must reach a filtered query or a count, not the first
    50 rows of a list. Find where the tools return a page and the prompt lets
-   the model answer from it.
+   the model answer from it. Done 12 November: `job_applications` lists
+   live processes and unsent leads first (case e8554e9d). Next: the "full
+   picture" case 71b0bc38 still read interviews, todos and goals through
+   `query_rows`/`list_rows`/`table_info`; a failed case's `lookups` now keep
+   each call's input, so read them there before guessing which page it was.
 4. **Grounding.** Every factual claim about their data must rest on a row a
    lookup returned. On 22 October a thread reply said an answer "calls
    Decagon's pricing on work done a finance question"; the answer says

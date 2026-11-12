@@ -10,7 +10,8 @@ import { PersonForm } from '@/app/chat/people/person-form';
 import { BUILDER_TEXTS, textSwitches } from '@/lib/you/first-texts';
 import type { ReachOutView } from '@/lib/you/reach-out-card-model';
 import type { WatchCard } from '@/lib/you/watch-card-model';
-import type { VoiceList } from '@/lib/talk/speech/voices-model';
+import { DEFAULT_VOICE_FILTERS } from '@/lib/talk/speech/voices-model';
+import type { VoicePickerFixture } from '@/app/chat/people/voice-picker';
 import { BUILDER_ROW, CHAT_PEOPLE, EVERYONE } from './chat-surfaces';
 
 /**
@@ -35,18 +36,38 @@ const ZONE = 'Europe/London';
 /** The Fish voice chosen for Franklin (plan #3006.5). */
 const FRANKLIN_VOICE = { id: 'b1f2c3d4e5f60718293a4b5c6d7e8f90', name: 'Elder statesman, warm and unhurried' };
 
-/** What the voice picker lists: two voices of the person's own, then the library, one with no sample recording and one with the longest name. */
-const VOICE_LIST: VoiceList = {
-  mine: [
-    { id: 'a1', name: 'My voice (cloned)', author: '', sample: 'https://example.invalid/a1.mp3' },
-    { id: 'a2', name: 'Grandad reading', author: '', sample: null },
-  ],
-  library: [
-    { id: FRANKLIN_VOICE.id, name: FRANKLIN_VOICE.name, author: 'Philadelphia Voices', sample: 'https://example.invalid/b1.mp3' },
-    { id: 'c1', name: 'Calm British narrator', author: 'storyteller', sample: 'https://example.invalid/c1.mp3' },
-    { id: 'c2', name: 'Energetic coach with a slight Texan drawl, great for pep talks and morning briefings', author: 'coachvoices_official', sample: null },
-    { id: 'c3', name: 'Soft-spoken librarian', author: 'quietshelf', sample: 'https://example.invalid/c3.mp3' },
-  ],
+/**
+ * What the voice picker shows (plan #3081): Male and calm on, the rest at
+ * their defaults, and the first page of what Fish lists for them. One voice
+ * has no sample recording, one the longest name, one no tags at all.
+ */
+const VOICE_PICKER: VoicePickerFixture = {
+  filters: { ...DEFAULT_VOICE_FILTERS, gender: 'male', tags: ['calm'] },
+  page: {
+    total: 1284,
+    more: true,
+    voices: [
+      { id: FRANKLIN_VOICE.id, name: FRANKLIN_VOICE.name, author: 'Philadelphia Voices', sample: 'https://example.invalid/b1.mp3', tags: ['male', 'calm', 'old', 'narrator'], languages: ['en'], uses: 48210 },
+      { id: 'c1', name: 'Calm British narrator', author: 'storyteller', sample: 'https://example.invalid/c1.mp3', tags: ['male', 'calm', 'british', 'audiobook'], languages: ['en'], uses: 1203400 },
+      {
+        id: 'c2',
+        name: 'Measured late-night radio host with a low, slightly gravelly voice, good for long readings and evening briefings',
+        author: 'nightshift_audio_collective',
+        sample: null,
+        tags: ['male', 'calm', 'deep', 'radio', 'late-night', 'gravelly'],
+        languages: ['en', 'es'],
+        uses: 9870,
+      },
+      { id: 'c3', name: 'Soft-spoken librarian', author: 'quietshelf', sample: 'https://example.invalid/c3.mp3', tags: ['male', 'calm'], languages: ['en'], uses: 312 },
+      { id: 'c4', name: 'Hamburg storyteller', author: 'erzaehler', sample: 'https://example.invalid/c4.mp3', tags: ['male', 'calm', 'storytelling'], languages: ['de'], uses: 1 },
+    ],
+  },
+};
+
+/** The picker with Mine, Female, young and Japanese on, and nothing Fish has for them. */
+const VOICE_PICKER_EMPTY: VoicePickerFixture = {
+  filters: { ...DEFAULT_VOICE_FILTERS, search: 'grandad', gender: 'female', tags: ['young'], language: 'ja', mine: true, sort: 'created_at' },
+  page: { total: 0, more: false, voices: [] },
 };
 
 const FRANKLIN_CARD = `Who you are
@@ -269,6 +290,7 @@ export function ChatPersonEditSurface({
     | 'photo-failed'
     | 'voice'
     | 'voice-picker'
+    | 'voice-picker-empty'
     | 'voice-gone'
     | 'voice-no-key'
     | 'card'
@@ -298,7 +320,7 @@ export function ChatPersonEditSurface({
                 ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_WATCH }
                 : state === 'reach-out-partly'
                   ? { ...FRANKLIN_PERSON, reachOut: FRANKLIN_REACH_OUT_PARTLY }
-                  : state === 'voice' || state === 'voice-picker' || state === 'voice-gone'
+                  : state === 'voice' || state === 'voice-picker' || state === 'voice-picker-empty' || state === 'voice-gone'
                     ? { ...FRANKLIN_PERSON, voice: FRANKLIN_VOICE }
                     : FRANKLIN_PERSON;
   return (
@@ -312,8 +334,8 @@ export function ChatPersonEditSurface({
           photoBusy={state === 'photo-uploading'}
           photoError={state === 'photo-failed' ? 'Choose an image under 5 MB.' : null}
           voiceStatus={state === 'voice-gone' ? 'gone' : state === 'voice-no-key' ? 'not-set' : 'ok'}
-          voiceOpen={state === 'voice-picker'}
-          voiceList={state === 'voice-picker' ? VOICE_LIST : null}
+          voiceOpen={state === 'voice-picker' || state === 'voice-picker-empty'}
+          voiceList={state === 'voice-picker' ? VOICE_PICKER : state === 'voice-picker-empty' ? VOICE_PICKER_EMPTY : null}
           drafting={state === 'redrafting'}
           removing={state === 'memory' ? 'mem2' : null}
           editing={state === 'memory' ? 'mem1' : null}

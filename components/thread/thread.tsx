@@ -21,6 +21,8 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { AttachedCards } from '@/components/talk/attached-cards';
+import { turnAttached } from '@/lib/talk/attached';
 import { ReplyMockups } from '@/components/talk/reply-mockup';
 import { PaidCard } from '@/components/talk/paid-card';
 import { paidCardHosts } from '@/lib/dash/paid-card';
@@ -50,6 +52,16 @@ import { sourceMarks, type SourceMark } from '@/components/talk/source-marks';
 /** A question sent as its files alone, whose words are only their names (plan #2974): the files are drawn, not the names. */
 function onlyFiles(turn: Pick<TalkTurn, 'body' | 'files'>): boolean {
   return Boolean(turn.files?.length) && turn.body === filesOnlyText((turn.files ?? []).map((file) => file.name));
+}
+
+/**
+ * A turn's files: the person's as small thumbnails and chips, and those
+ * Dash's code made for an answer (plan #3050.3.2) drawn large, as a bot's
+ * are on People, since a chart made as a picture is the answer.
+ */
+function TurnFiles({ files, mine, name }: { files: NonNullable<TalkTurn['files']>; mine: boolean; name: string }) {
+  if (mine) return <AskTurnFiles files={files} />;
+  return <AskTurnFiles files={files} large fit label={`Made by ${name} for this answer`} />;
 }
 
 /**
@@ -1696,8 +1708,9 @@ function TalkThread({
                 <Words body={turn.body} refs="outlines" marks={marksFor(turn)} />
               </>
             )}
-            {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+            {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
             {!mine && <ReplyCharts calls={turn.toolCalls} />}
+            {!mine && <AttachedCards cards={turnAttached(turn.toolCalls)} className="mt-2" />}
             {mine && turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added />}
             {isPending(turn.id)
               ? undefined
@@ -1777,9 +1790,11 @@ function TalkThread({
                 ) : (
                   <Words body={turn.body} refs="outlines" />
                 )}
-                {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+                {turn.files && turn.files.length > 0 && <TurnFiles files={turn.files} mine={mine} name={assistant.name} />}
                 {/* A chart Dash drew (plan #1655) sits under the words and above the rows they rest on. */}
                 {!mine && <ReplyCharts calls={turn.toolCalls} />}
+                {/* A saved page or file Dash attached by reference (plan #3050.4), as a card that opens it. */}
+                {!mine && <AttachedCards cards={turnAttached(turn.toolCalls)} className="mt-2" />}
                 {/* A mockup from a thought-through answer (plan #2789.10), in its sandboxed frame. */}
                 {!mine && <ReplyMockups calls={turn.toolCalls} />}
                 {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} added={mine} />}

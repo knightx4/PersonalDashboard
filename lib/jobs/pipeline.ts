@@ -319,6 +319,22 @@ export function deriveApplicationState(
       sentSeenAt = earliest(sentSeenAt, event.occurredAt);
     }
 
+    // A closed pursuit reopened by hand is open from that moment on: later
+    // mail moves it forward, and the mail that arrived while it was closed
+    // has had its answer (job_search 0079).
+    if (
+      event.kind === 'status_override' &&
+      event.payload?.status &&
+      isTerminal(status) &&
+      !isTerminal(event.payload.status)
+    ) {
+      status = event.payload.status;
+      closedAt = null;
+      outcome = null;
+      flaggedEventIndexes.length = 0;
+      continue;
+    }
+
     if (event.kind === 'rejection') {
       if (!isTerminal(status)) {
         rejectionStage = inferRejectionStage(status, lastInterviewKind);

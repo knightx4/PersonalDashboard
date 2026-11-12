@@ -6,6 +6,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, scopedVoice, type AskLookupEvent, type AskStores } from './ask';
 import { DASH_CHOICES, HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { filesEstimate } from './file-cost';
+import type { LookupCap } from './lookup-caps';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
@@ -15,6 +16,7 @@ import {
   madeSummary,
   FALLBACK_ROWS,
   limitNote,
+  ANSWER_AT,
   MAX_LOOKUPS,
   pageLine,
   TIME_BUDGET_MS,
@@ -240,27 +242,71 @@ describe('askDash', () => {
 
   it('answers with what it has when the lookups run out, and says so', async () => {
     const { client, sent } = stubClient([], (call) =>
-      call > MAX_LOOKUPS
+      call > ANSWER_AT
         ? reply([use('a', 'answer', { answer: 'Here is what I found.', cited: [{ table: 'public.orders', ref: 'o-1' }] })])
         : reply([use(`u${call}`, 'search', { query: `try ${call}` })]),
     );
     const { execute, calls } = stubExecute();
     const { stores, written, spend } = memoryStores();
+    const caps: LookupCap[] = [];
+    let clock = 1_000;
 
     const result = await askDash(
-      { question: 'Everything about eBay?', today: '2026-09-27', execute, anthropicApiKey: 'k', client },
-      stores,
+      {
+        question: 'Everything about eBay?',
+        today: '2026-09-27',
+        execute,
+        anthropicApiKey: 'k',
+        client,
+        page: { path: '/shopping/orders', module: 'shopping', page: 'Orders', row: null },
+        now: () => (clock += 500),
+      },
+      { ...stores, recordLookupCap: async (cap) => void caps.push(cap) },
     );
 
-    expect(calls).toHaveLength(MAX_LOOKUPS);
-    expect(sent).toHaveLength(MAX_LOOKUPS + 1);
-    expect(sent[MAX_LOOKUPS].tool_choice).toEqual({ type: 'auto' });
+    expect(calls).toHaveLength(ANSWER_AT);
+    expect(sent).toHaveLength(ANSWER_AT + 1);
+    expect(sent[ANSWER_AT].tool_choice).toEqual({ type: 'auto' });
     expect(result.stop).toBe('lookups');
     const body = written[1].turns[0].body;
     expect(body).toBe(`Here is what I found.\n\n${limitNote('lookups')}`);
-    expect(body).toContain(`${MAX_LOOKUPS} lookups`);
+    expect(body).toContain(`${ANSWER_AT} lookups`);
     expect(written[1].turns[0].citations).toEqual([ORDER]);
-    expect(spend).toHaveLength(MAX_LOOKUPS + 1);
+    expect(spend).toHaveLength(ANSWER_AT + 1);
+
+    // Kept for the list on Dev (plan #3092): the question, where, and the lookups in order.
+    expect(caps).toHaveLength(1);
+    const cap = caps[0];
+    expect(cap).toMatchObject({
+      surface: 'ask',
+      question: 'Everything about eBay?',
+      conversationId: 'conv-new',
+      turnId: result.turns[1].id,
+      pagePath: '/shopping/orders',
+      model: ASK_MODEL,
+    });
+    expect(cap.toolCalls.map((c) => [c.name, c.input])).toEqual(
+      Array.from({ length: ANSWER_AT }, (_, i) => ['search', { query: `try ${i + 1}` }]),
+    );
+    expect(cap.spent).toHaveLength(ANSWER_AT + 1);
+    expect(cap.seconds).toBeGreaterThan(0);
+    expect(cap.answer.cutShort).toBeUndefined();
+  });
+
+  it('keeps no lookup record for an answer that finished inside its lookups', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'search', { query: 'ebay' })]),
+      reply([use('a', 'answer', { answer: 'One order.', cited: [] })]),
+    ]);
+    const { execute } = stubExecute();
+    const { stores } = memoryStores();
+    const caps: LookupCap[] = [];
+    const result = await askDash(
+      { question: 'eBay?', today: '2026-09-27', execute, anthropicApiKey: 'k', client },
+      { ...stores, recordLookupCap: async (cap) => void caps.push(cap) },
+    );
+    expect(result.stop).toBe('answered');
+    expect(caps).toHaveLength(0);
   });
 
   it('refuses lookups past the cap within one round and sends them back as errors', async () => {

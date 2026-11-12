@@ -3,7 +3,7 @@ import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
 import { CasePageView, type CasePage } from '@/components/jobs/case-page';
-import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
+import { ActivityPage } from '@/app/jobs/(app)/_home/today-page';
 import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
 import { WelcomeForm } from '@/app/jobs/(onboarding)/onboarding/forms';
@@ -14,7 +14,7 @@ import type { Activity, ActivityEntry } from '@/lib/jobs/activity/load';
  * Answers, Career goals, the first onboarding step and the shared case page.
  * Analytics was retired in plan #1496.7.1.
  *
- * Activity is a tab of Now since plan #1496.7.2, drawn from Now's own view.
+ * Activity is its own tab again (note eb898bfd), drawn from its page's view.
  * Answers and Career goals are server pages that only read and pass
  * rows to client components, so they are drawn here from those components and
  * the page's own header. Onboarding and the case page write their
@@ -64,12 +64,10 @@ const ACTIVITY: Activity = {
   ],
 };
 
-/** Now's Activity tab (plan #1496.7.2), where the Activity page went. */
+/** Jobs' Activity tab, its own page again (note eb898bfd). */
 export function JobsActivitySurface() {
   return (
-    <TodayPage
-      tab="activity"
-      opensOn="activity"
+    <ActivityPage
       timezone="America/New_York"
       activity={ACTIVITY}
       accounts={[

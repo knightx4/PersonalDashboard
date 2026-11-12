@@ -78,6 +78,10 @@ const PUBLIC_PATHS = [
   // cookie. The route checks the token itself and answers 401 without one,
   // then asks Dash on a session as the token's owner.
   '/api/ask/voice',
+  // A session running one of the app's cron routes (plan #3070.2). It carries
+  // the service-role key, never the cookie. The route checks the key itself
+  // in constant time and answers 401 without it.
+  '/api/dev/run-route',
 ];
 
 /**

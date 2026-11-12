@@ -9,8 +9,11 @@ import { memoryOf, type CouncilMemory } from '@/lib/you/council-model';
 import { loadGroup } from '@/lib/you/group-chats';
 import { loadCarryOver } from '@/lib/you/carry-over';
 import {
+  askOf,
   asksPerson,
+  BRIEF_RULES,
   BURST_REQUEST_MS,
+  burstFull,
   CHAIN_RESERVE_MS,
   cleanSpeech,
   DIRECTOR_MAX_TOKENS,
@@ -18,16 +21,19 @@ import {
   DIRECTOR_TOOL,
   directorPlanOf,
   directorPrompt,
+  isPass,
   MAX_REPLANS,
-  mentionedIn,
+  PASS_RULES,
   planReactions,
   planTurns,
+  quietestFirst,
   SPEAKER_MAX_TOKENS,
   SPEAKER_RULES,
   THREAD_READ,
   transcriptOf,
   turnPauseMs,
   WAIT,
+  type BurstAsk,
   type BurstLine,
   type BurstMember,
   type BurstState,
@@ -43,6 +49,27 @@ import { MAKE_PAGE_TOOL, MAKE_PAGE_TOOL_NAME, PAGE_RULES, type BotPageStarter } 
 import { HAND_OFF_TOOL, HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
 import { SESSION_RULES, type SessionStarter } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, HAND_TO_BOT_TOOL, HAND_TO_BOT_TOOL_NAME, personWords, type BotPasser } from '@/lib/talk/hand-to-bot';
+import { ATTACH_RULES, CHART_ONLY_RULES, claimSlip, falseAttachment, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { dashCodeExecution, fetchMadeFiles, madeFileIds, madeFilesNote, type MadeFile, type UnkeptFile } from '@/lib/talk/made-files';
+import { CHART_DRAWN, CHART_TOOL, CHART_TOOL_DEFINITION, parseChart, type DashChart } from '@/lib/talk/chart';
+import { MAX_BUBBLE_CHARTS } from '@/lib/you/chat-threads-model';
+import type { CouncilReceipt } from '@/lib/you/council-model';
+import {
+  ALREADY_SENT_NOTE,
+  askedDirect,
+  DIRECT_ASKED_RULES,
+  DIRECT_MESSAGE_TOOL,
+  DIRECT_MESSAGE_TOOL_NAME,
+  DIRECT_RULES,
+  DIRECT_TRANSCRIPT_LINES,
+  directReceipt,
+  notSentNote,
+  pointerText,
+  sentNote,
+  type DirectMessenger,
+} from '@/lib/you/group-direct-message';
+import { firstName } from '@/lib/you/group-chats-model';
+import type { DashSlip } from '@/lib/dash/slips';
 
 export * from '@/lib/you/group-burst-model';
 
@@ -68,17 +95,41 @@ export type GroupSpendOperation = 'group-director' | 'group-speaker';
 /** The bot whose turn it is, with what it reads before writing. */
 export type Speaker = BurstMember & { system: string };
 
-export type DirectorInput = { members: (BurstMember & { card: string })[]; lines: BurstLine[]; transcript: string; state: BurstState };
+export type DirectorInput = { members: (BurstMember & { card: string })[]; lines: BurstLine[]; transcript: string; state: BurstState; ask?: BurstAsk };
 export type SpeakerInput = {
   speaker: Speaker;
   members: BurstMember[];
   transcript: string;
+  /**
+   * How this turn may go (plan #3080). `mayPass`: the bot may write only
+   * PASS_WORD, and nothing is posted. `brief`: the person asked several bots
+   * to answer, so it keeps to a sentence or two. Absent: neither.
+   */
+  turn?: { mayPass: boolean; brief: boolean; direct?: boolean };
+  /**
+   * Messages the person in this speaker's own one-on-one chat (plan #3083),
+   * offered as message_person_directly. `turn.direct` says the person asked
+   * this speaker to. Absent: no message_person_directly.
+   */
+  direct?: (input: unknown) => Promise<AskToolResult>;
   /** Starts a page for this speaker, answering the person's newest message (plan #2997). Absent: no make_page. */
   page?: (input: unknown) => Promise<AskToolResult>;
   /** Hands heavy work to a session for this speaker (plan #3005.2). Absent: no hand_off. */
   handOn?: (input: unknown) => Promise<AskToolResult>;
   /** Passes a request to another bot for this speaker (plan #3003.2). Absent: no hand_to_bot. */
   passToBot?: (input: unknown) => Promise<AskToolResult>;
+  /**
+   * Where the charts this speaker draws with show_chart are kept, to go on
+   * its text (plan #3050.2.2). Absent: no show_chart.
+   */
+  charts?: DashChart[];
+  /**
+   * Where the ids of the files this speaker's code writes are collected, to
+   * be kept under its text (plan #3050.3.3). Present, it is offered code
+   * execution and told it can send what its code makes; absent, it can draw
+   * a chart and send nothing else.
+   */
+  made?: string[];
 };
 
 export type GroupBurstInput = {
@@ -113,6 +164,24 @@ export type GroupBurstInput = {
    * it. Absent: no bot in the group can pass things on.
    */
   passToBot?: BotPasser;
+  /**
+   * Messages the person in a speaker's own one-on-one chat when they ask it
+   * to (plan #3083), offered to each speaker as message_person_directly. One
+   * message per bot per message of the person's. Absent: no bot can.
+   */
+  messageDirectly?: DirectMessenger;
+  /**
+   * Keeps a slip when a bot's text says it attached a file that was never
+   * sent (plan #3050.1). Absent: the text still says nothing came through.
+   */
+  recordSlip?: (slip: DashSlip) => Promise<void>;
+  /**
+   * Keeps the files a speaker's code made against its text (plan
+   * #3050.3.3), in core.attachments, and says which could not be kept.
+   * Present, each speaker is offered code execution and told it can send
+   * files; absent, the speakers can draw a chart and send nothing else.
+   */
+  keepFiles?: (messageId: string, files: MadeFile[]) => Promise<{ kept: unknown[]; unkept: UnkeptFile[] }>;
   /** The account's IANA zone, for the times on what a bot carries in from its other chats. Defaults to UTC. */
   timeZone?: string;
   /** True when the send (or the request that chained here) already holds the lease. */
@@ -358,8 +427,50 @@ async function handOffCall(
   }
 }
 
+/** One show_chart call of a speaker's (plan #3050.2.2): the chart is kept for its text, as the tool_result the model reads. */
+function chartCall(charts: DashChart[], block: Anthropic.ToolUseBlock): Anthropic.ToolResultBlockParam {
+  const parsed = parseChart(block.input);
+  if (!parsed.ok) return { type: 'tool_result', tool_use_id: block.id, content: parsed.error, is_error: true };
+  if (charts.length >= MAX_BUBBLE_CHARTS) {
+    return { type: 'tool_result', tool_use_id: block.id, content: `A text holds at most ${MAX_BUBBLE_CHARTS} charts.`, is_error: true };
+  }
+  charts.push(parsed.chart);
+  return { type: 'tool_result', tool_use_id: block.id, content: CHART_DRAWN };
+}
+
+/**
+ * How many times one speaker's turn is sent back after its code paused it
+ * (stop_reason pause_turn, plan #3050.3.3), beyond its lookups. A chart
+ * drawn in Python seldom pauses at all.
+ */
+export const SPEAKER_MAX_PAUSES = 2;
+
+/**
+ * A speaker's longest answer when it can run code (plan #3050.3.3): the code
+ * is written in the same answer as the text, and a matplotlib chart alone is
+ * a few hundred tokens. The text is held short by the texting rules.
+ */
+export const SPEAKER_CODE_MAX_TOKENS = 4000;
+
+/**
+ * The text a speaker wrote in one answer. With code in it, the words after
+ * the code's last result, since the words before are the model saying what
+ * it is about to do; with none, its first text, as before.
+ */
+export function speakerText(content: readonly { type: string; text?: unknown }[]): string {
+  const lastTool = content.findLastIndex((c) => c.type === 'server_tool_use' || c.type.endsWith('_tool_result'));
+  const texts = (from: number) =>
+    content
+      .slice(from)
+      .flatMap((c) => (c.type === 'text' && typeof c.text === 'string' && c.text.trim() ? [c.text.trim()] : []));
+  if (lastTool < 0) return texts(0)[0] ?? '';
+  const after = texts(lastTool + 1);
+  return after.length > 0 ? after.join(' ') : (texts(0).at(-1) ?? '');
+}
+
 /** One call of a speaker's, run by its name. */
 function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, call: Anthropic.ToolUseBlock): Promise<Anthropic.ToolResultBlockParam> {
+  if (call.name === CHART_TOOL && input.charts) return Promise.resolve(chartCall(input.charts, call));
   if (call.name === MAKE_PAGE_TOOL_NAME && input.page) return handOffCall(input.page, call, 'The page could not be started. Say so plainly.');
   if (call.name === HAND_OFF_TOOL_NAME && input.handOn) {
     return handOffCall(input.handOn, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
@@ -367,14 +478,20 @@ function speakerCall(input: SpeakerInput, findPlaces: PlacesFinder | undefined, 
   if (call.name === HAND_TO_BOT_TOOL_NAME && input.passToBot) {
     return handOffCall(input.passToBot, call, 'It was not passed on. Say so plainly, and do not ask them to try again.');
   }
+  if (call.name === DIRECT_MESSAGE_TOOL_NAME && input.direct) {
+    return handOffCall(input.direct, call, notSentNote('something went wrong while it was being written.'));
+  }
   return placesCall(findPlaces, call);
 }
 
 /**
  * One bot's text. With a places finder it is offered find_places, and with
- * a page starter make_page (plan #2997); it may call them up to
- * SPEAKER_MAX_LOOKUPS times before it writes. With neither, it writes
- * straight away, so a turn stays short.
+ * a page starter make_page (plan #2997); with a place for charts,
+ * show_chart (plan #3050.2.2). It may call them up to SPEAKER_MAX_LOOKUPS
+ * times before it writes. With somewhere to collect what its code makes, it
+ * may run code too (plan #3050.3.3), in the container its first run made,
+ * and the ids of the files the code wrote go into `input.made`. With none,
+ * it writes straight away, so a turn stays short.
  */
 export async function speakWithModel(
   anthropic: Anthropic,
@@ -384,28 +501,40 @@ export async function speakWithModel(
   findPlaces?: PlacesFinder,
 ): Promise<string | null> {
   const others = input.members.filter((m) => m.id !== input.speaker.id).map((m) => m.name);
+  const code = Boolean(input.made);
   const rules = [
     SPEAKER_RULES,
+    ...(input.turn?.brief ? [BRIEF_RULES] : []),
+    ...(input.turn?.mayPass ? [PASS_RULES] : []),
+    code ? ATTACH_RULES : CHART_ONLY_RULES,
     ...(findPlaces ? [SPEAKER_PLACES_RULES] : []),
     ...(input.page ? [PAGE_RULES] : []),
     ...(input.handOn ? [SESSION_RULES] : []),
     ...(input.passToBot ? [BOT_HANDOFF_RULES] : []),
+    ...(input.direct ? [DIRECT_RULES] : []),
+    ...(input.direct && input.turn?.direct ? [DIRECT_ASKED_RULES] : []),
     `In this group with the person: ${others.join(', ')}.`,
   ].join('\n\n');
-  const tools: Anthropic.Tool[] = [
+  const tools: Anthropic.ToolUnion[] = [
+    ...(code ? [dashCodeExecution()] : []),
+    ...(input.charts ? [CHART_TOOL_DEFINITION] : []),
     ...(findPlaces ? [FIND_PLACES_DEFINITION] : []),
     ...(input.page ? [MAKE_PAGE_TOOL] : []),
     ...(input.handOn ? [HAND_OFF_TOOL] : []),
     ...(input.passToBot ? [HAND_TO_BOT_TOOL] : []),
+    ...(input.direct ? [DIRECT_MESSAGE_TOOL] : []),
   ];
   const messages: Anthropic.MessageParam[] = [
     { role: 'user', content: `The group text so far, oldest first:\n${input.transcript}\n\nWrite your next text as ${input.speaker.name}.` },
   ];
+  // The container the code first ran in, which later rounds reuse so its files stay at hand.
+  let container: string | null = null;
+  let pauses = 0;
   for (let lookups = 0; ; lookups++) {
     const offer = tools.length > 0 && lookups < SPEAKER_MAX_LOOKUPS;
-    const response = await anthropic.messages.create({
+    const response: Anthropic.Message = await anthropic.messages.create({
       model,
-      max_tokens: SPEAKER_MAX_TOKENS,
+      max_tokens: code ? SPEAKER_CODE_MAX_TOKENS : SPEAKER_MAX_TOKENS,
       system: [
         { type: 'text', text: input.speaker.system },
         { type: 'text', text: rules },
@@ -414,13 +543,25 @@ export async function speakWithModel(
       // read, but the model is told to write.
       ...(tools.length > 0 ? { tools, tool_choice: offer ? { type: 'auto' as const } : { type: 'none' as const } } : {}),
       messages,
+      // Widened: the installed SDK's params predate the container.
+      ...(container ? ({ container } as Record<string, string>) : {}),
     });
     spent.push({ model, usage: usageFrom(response.usage) });
-    const calls = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
-    if (!offer || calls.length === 0) {
-      const text = response.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text ?? '';
-      return cleanSpeech(text, input.speaker.name);
+    if (input.made) {
+      for (const id of madeFileIds(response.content)) if (!input.made.includes(id)) input.made.push(id);
+      const ran = (response as unknown as { container?: { id?: unknown } | null }).container?.id;
+      if (typeof ran === 'string' && ran) container = ran;
     }
+    const calls = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
+    // The code paused the turn: send it back as it is, and the model carries on (plan #3050.3.3).
+    const stopped: string | null = response.stop_reason;
+    if (code && offer && calls.length === 0 && stopped === 'pause_turn' && pauses < SPEAKER_MAX_PAUSES) {
+      pauses += 1;
+      lookups -= 1;
+      messages.push({ role: 'assistant', content: response.content });
+      continue;
+    }
+    if (!offer || calls.length === 0) return cleanSpeech(speakerText(response.content), input.speaker.name);
     messages.push({ role: 'assistant', content: response.content });
     messages.push({ role: 'user', content: await Promise.all(calls.map((call) => speakerCall(input, findPlaces, call))) });
   }
@@ -470,6 +611,8 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
 
     let carriedRound = input.round ?? null;
     let answered: string | null = null;
+    // One message to its own chat per bot per message of the person's (plan #3083).
+    const sentDirect = new Set<string>();
     for (let burst = 0; burst <= MAX_REPLANS; burst++) {
       // Texts sent in a row are one turn: wait, the lease held, until the person stops (plan #2988).
       if (input.round === undefined || burst > 0) {
@@ -485,22 +628,30 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
       const spent: Record<GroupSpendOperation, SpendReport[]> = { 'group-director': [], 'group-speaker': [] };
       const state: BurstState = { round: carriedRound ?? (spoken.length > 0 ? 1 : 0), spoken: [...spoken] };
       carriedRound = null;
-      const mentioned = mentionedIn(said, members);
+      const ask = askOf(said, members);
       const thread = [...lines];
       let interrupted = false;
       let over = false;
 
-      while (!over && !interrupted) {
+      while (!over && !interrupted && !burstFull(state, members.length, ask)) {
         const transcript = transcriptOf(thread, members, formerNames);
-        const plan = await direct({ members: withCards, lines: thread, transcript, state }, spent['group-director']);
+        const plan = await direct({ members: withCards, lines: thread, transcript, state, ask }, spent['group-director']);
         for (const r of planReactions(plan, thread, members)) {
           const { error } = await client
             .from('advisor_message_reactions')
             .upsert({ user_id: userId, message_id: r.messageId, advisor_id: r.advisorId, reaction: r.reaction }, { onConflict: 'message_id,advisor_id' });
           if (!error) outcome.reactions += 1;
         }
-        const turns = planTurns(plan, state, members, state.round === 0 ? mentioned : []);
+        const turns = planTurns(plan, state, members, state.round === 0 ? ask : undefined, ask.keepGoing ? quietestFirst(lines, members) : []);
         if (turns.length === 0) break;
+        // A bot the person spoke to answers and cannot pass; in a round where several were spoken to, a
+        // question to the person waits until the last of them has answered (plan #3080).
+        const asked = new Set(state.round === 0 ? [...ask.named, ...ask.addressed] : []);
+        const addressedRound = state.round === 0 && ask.addressed.length > 0;
+        // The bots the person asked to message them in their own chat (plan #3083).
+        const directAsked = new Set(state.round === 0 ? askedDirect(said, ask, members.map((m) => m.id)) : []);
+        const wroteBefore = state.spoken.length;
+        let askedPerson = false;
 
         for (const advisorId of turns) {
           if (now() > deadline - CHAIN_RESERVE_MS && input.chain) {
@@ -560,6 +711,32 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                     args,
                   )
               : undefined;
+            // A message sent to its own chat puts a link to that chat under this text (plan #3083).
+            const pointers: CouncilReceipt[] = [];
+            const messenger = input.messageDirectly;
+            const direct = messenger
+              ? async (args: unknown): Promise<AskToolResult> => {
+                  const once = `${advisorId}:${anchor.id}`;
+                  if (sentDirect.has(once)) return { ok: true, rows: [], note: ALREADY_SENT_NOTE };
+                  const sent = await messenger(
+                    {
+                      bot: member,
+                      chatId,
+                      groupTitle: group.title,
+                      said: personWords(said.split('\n')) || anchor.text,
+                      transcript: transcriptOf(thread.slice(-DIRECT_TRANSCRIPT_LINES), members, formerNames),
+                    },
+                    args,
+                  );
+                  if (!sent.ok) return { ok: true, rows: [], note: notSentNote(sent.error) };
+                  sentDirect.add(once);
+                  pointers.push(directReceipt(member));
+                  return { ok: true, rows: [], note: sentNote(firstName(member.name) || member.name) };
+                }
+              : undefined;
+            // What show_chart draws goes on this text (plan #3050.2.2), and what its code makes under it (plan #3050.3.3).
+            const charts: DashChart[] = [];
+            const made: string[] = [];
             text = await speak(
               {
                 speaker: { ...member, system: persona.system },
@@ -568,21 +745,69 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
                 ...(page ? { page } : {}),
                 ...(handOn ? { handOn } : {}),
                 ...(passToBot ? { passToBot } : {}),
+                ...(direct ? { direct } : {}),
+                charts,
+                ...(input.keepFiles ? { made } : {}),
+                // Somebody answers the person: the first bot of the opening round does not pass.
+                turn: {
+                  mayPass: !asked.has(advisorId) && !(state.round === 0 && state.spoken.length === 0),
+                  brief: addressedRound,
+                  direct: directAsked.has(advisorId),
+                },
               },
               spent['group-speaker'],
             );
+            // A pass is silent: nothing is posted, and the turn costs only the call (plan #3080).
+            if (text && isPass(text)) text = null;
+            // Sent to its own chat: the group gets one short line pointing there, never the message again (plan #3083).
+            if (pointers.length > 0) text = pointerText(text);
+            // A text that says a file is attached when nothing was sent says so after all (plan #3050.1).
+            // A chart it drew counts as sent; a file it names still does not (plan #3050.2.2).
+            // A file its code made is said for once it is kept (plan #3050.3.3).
+            const claim = text ? falseAttachment(text, charts.length, made.length) : null;
+            if (text && claim) {
+              text = `${text}\n\n${input.keepFiles ? NOTHING_ATTACHED : NOTHING_ATTACHED_CHART_ONLY}`;
+              await input
+                .recordSlip?.({ ...claimSlip(member.name, claim), surface: 'people', conversation: `people:${chatId}`, href: `/chat/groups/${chatId}` })
+                .catch((error) => console.error('the attachment slip was not kept', error));
+            }
             if (text) {
               const wait = turnPauseMs(text) - (now() - turnStarted);
               if (wait > 0) await sleep(wait);
               const saved = await client
                 .from('advisor_messages')
-                .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind: 'reply', speaker_id: advisorId, text })
+                .insert({
+                  user_id: userId,
+                  chat_id: chatId,
+                  role: 'advisor',
+                  kind: 'reply',
+                  speaker_id: advisorId,
+                  text,
+                  ...(charts.length > 0 ? { charts } : {}),
+                  ...(pointers.length > 0 ? { receipts: pointers } : {}),
+                })
                 .select('id, created_at')
                 .single();
               if (saved.error || typeof saved.data?.id !== 'string') throw new Error(`A message was written but not saved: ${saved.error?.message ?? 'no row came back'}`);
               thread.push({ id: saved.data.id, speakerId: advisorId, text, createdAt: str(saved.data.created_at) });
               state.spoken.push(advisorId);
               outcome.messages += 1;
+              // What its code made goes under this text; what could not be kept is said in a text of its own (plan #3050.3.3).
+              const note =
+                made.length > 0 && input.keepFiles
+                  ? await keepSpeakerFiles({ client, userId, chatId, messageId: saved.data.id, made, keep: input.keepFiles, anthropic })
+                  : null;
+              if (note) {
+                const said = await client
+                  .from('advisor_messages')
+                  .insert({ user_id: userId, chat_id: chatId, role: 'advisor', kind: 'reply', speaker_id: advisorId, text: note })
+                  .select('id, created_at')
+                  .single();
+                if (said.error || typeof said.data?.id !== 'string') console.error('the note on a file not kept was not saved', said.error);
+                else thread.push({ id: said.data.id, speakerId: advisorId, text: note, createdAt: str(said.data.created_at) });
+              }
+            } else if (made.length > 0) {
+              console.error(`group speaker ${member.name} made ${made.length} files and wrote no text; they were not kept`);
             }
           } finally {
             await keepTyping.stop();
@@ -593,10 +818,16 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
             break;
           }
           if (text && asksPerson(text, advisorId, members)) {
+            if (addressedRound) {
+              askedPerson = true;
+              continue;
+            }
             over = true;
             break;
           }
         }
+        // A round where everyone picked passed has nothing new, and the group waits for the person.
+        if (askedPerson || (!interrupted && state.spoken.length === wroteBefore)) over = true;
         state.round += 1;
       }
 
@@ -642,6 +873,59 @@ export async function runGroupBurst(input: GroupBurstInput): Promise<BurstOutcom
     };
   }
   return outcome;
+}
+
+/** Every file the code made, as unkept for one reason, when not one of them could be read. */
+const allUnkept = (made: readonly string[], why: string): UnkeptFile[] => made.map(() => ({ name: 'One file', why }));
+
+/**
+ * Keeps the files a speaker's code made under its saved text (plan
+ * #3050.3.3), as a direct reply does (lib/you/mentor-reply.ts): each is read
+ * through the Files API and kept in core.attachments against the message,
+ * whose file_count is then set so an open thread hears it and asks for them.
+ * Returns the text naming what could not be kept, or null when all were.
+ * Never throws.
+ */
+async function keepSpeakerFiles(input: {
+  client: YouSupabaseClient;
+  userId: string;
+  chatId: string;
+  messageId: string;
+  made: readonly string[];
+  keep: NonNullable<GroupBurstInput['keepFiles']>;
+  anthropic: Pick<Anthropic, 'get'> | null;
+}): Promise<string | null> {
+  const { client, userId, chatId, messageId, made, keep, anthropic } = input;
+  const fetchFailed = 'it could not be fetched from where the code ran';
+  if (!anthropic) return madeFilesNote(allUnkept(made, fetchFailed));
+  let notKept: UnkeptFile[];
+  try {
+    const { files, unkept } = await fetchMadeFiles(anthropic, made);
+    notKept = unkept;
+    if (files.length > 0) {
+      try {
+        const outcome = await keep(messageId, files);
+        notKept = [...unkept, ...outcome.unkept];
+        if (outcome.kept.length > 0) {
+          // The count is what an open thread hears, to ask for the files.
+          const { error } = await client
+            .from('advisor_messages')
+            .update({ file_count: outcome.kept.length })
+            .eq('user_id', userId)
+            .eq('chat_id', chatId)
+            .eq('id', messageId);
+          if (error) console.error('the file count of a group text was not kept', error);
+        }
+      } catch (error) {
+        console.error('the files a group speaker made were not kept', error);
+        notKept = [...unkept, ...files.map((file) => ({ name: file.name, why: 'it could not be kept with the text' }))];
+      }
+    }
+  } catch (error) {
+    console.error('the files a group speaker made were not read', error);
+    notKept = allUnkept(made, fetchFailed);
+  }
+  return madeFilesNote(notKept);
 }
 
 /** Whether the person has written since `after` (an ISO time). */

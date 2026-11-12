@@ -10,18 +10,18 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { setBotPhoto } from '@/lib/you/bot-photos';
 import { setBotVoice } from '@/lib/you/bot-voices';
-import { fishEnv, fishVoice, fishVoices } from '@/lib/talk/speech/fish';
-import { VOICE_ID, type VoiceList } from '@/lib/talk/speech/voices-model';
+import { fishEnv, fishVoice, fishVoicePage } from '@/lib/talk/speech/fish';
+import { VOICE_ID, filtersOf, type VoicePage } from '@/lib/talk/speech/voices-model';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadPeople, loadThreadPage, markThreadRead, startChat, threadHref, withChats, type ThreadPage } from '@/lib/you/chat-threads';
-import { withMessageFiles } from '@/lib/you/chat-message-files';
+import { messageFiles, withMessageFiles } from '@/lib/you/chat-message-files';
+import type { ThreadFile } from '@/lib/you/chat-threads-model';
 import {
   createGroup,
   deleteGroup,
   groupHref,
   loadGroup,
   loadGroupRows,
-  loadGroupThreadPage,
   renameGroup,
   setGroupMembers,
   type Reacted,
@@ -62,7 +62,7 @@ import { REACH_OUT_LIMITS } from '@/lib/you/reach-out-rule';
 import type { PanePick, PaneThread, PaneThreads } from '@/lib/you/pane-threads-model';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { todayInTimezone } from '@/lib/money';
-import { loadThreadParts } from './thread-data';
+import { loadGroupThreadParts, loadThreadParts } from './thread-data';
 
 /**
  * The People tab's presses that are not a send (plan #2748.6): reading the
@@ -86,6 +86,24 @@ export async function olderMessages(chatId: string, before: string): Promise<Thr
   } catch (error) {
     console.error('older messages not read', error);
     return { error: 'Earlier messages could not be read.' };
+  }
+}
+
+/**
+ * The files a bot's code made for one of its messages (plan #3050.3.1), read
+ * when the thread hears the message's file count rise, since a Realtime row
+ * never carries them. Null when they could not be read; the thread keeps
+ * what it has.
+ */
+// latency: instant
+export async function threadMessageFiles(messageId: string): Promise<ThreadFile[] | null> {
+  await requireUser();
+  if (!UUID.test(messageId)) return null;
+  try {
+    return await messageFiles(await createCoreClient(), messageId);
+  } catch (error) {
+    console.error('message files not read', error);
+    return null;
   }
 }
 
@@ -186,7 +204,7 @@ export async function paneThread(pick: PanePick): Promise<PaneThread> {
     if (pick.kind === 'group') {
       const group = await loadGroup(client, user.id, pick.id);
       if (!group) return gone;
-      const page = await loadGroupThreadPage(client, user.id, pick.id);
+      const page = await loadGroupThreadParts(client, user.id, pick.id);
       return {
         kind: 'group',
         chatId: pick.id,
@@ -292,7 +310,7 @@ export async function olderGroupMessages(
   const user = await requireUser();
   if (!UUID.test(chatId) || !Number.isFinite(Date.parse(before))) return { error: 'Those messages cannot be read.' };
   try {
-    return await loadGroupThreadPage(await createYouClient(), user.id, chatId, before);
+    return await loadGroupThreadParts(await createYouClient(), user.id, chatId, before);
   } catch (error) {
     console.error('older group messages not read', error);
     return { error: 'Earlier messages could not be read.' };
@@ -449,17 +467,19 @@ export async function saveBotPhoto(advisorId: string, path: string | null): Prom
 }
 
 /**
- * The voices a bot's form offers (plan #3006.5): the person's own Fish
- * voices first, then the public library searched by name. `configured` is
- * false when the deployment has no Fish key, and the form says so.
+ * The voices a bot's form offers (plan #3006.5): one page of Fish's list
+ * with the picker's filters and order (plan #3081). The Fish key stays
+ * here, on the server. `configured` is false when the deployment has no
+ * Fish key, and the form says so.
  */
 // latency: pending
-export async function listBotVoices(search: string): Promise<({ configured: true } & VoiceList) | { configured: false } | { error: string }> {
+export async function listBotVoices(filters: unknown, page: number = 1): Promise<({ configured: true } & VoicePage) | { configured: false } | { error: string }> {
   await requireUser();
   const fish = fishEnv();
   if (!fish) return { configured: false };
+  const pageNumber = Number.isInteger(page) && page >= 1 && page <= 50 ? page : 1;
   try {
-    return { configured: true, ...(await fishVoices(fish, typeof search === 'string' ? search : '')) };
+    return { configured: true, ...(await fishVoicePage(fish, filtersOf(filters), pageNumber)) };
   } catch (error) {
     console.error('voices not listed', error);
     return { error: 'The voices could not be listed. Try again in a moment.' };

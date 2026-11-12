@@ -514,7 +514,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
+import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatGroupSpeakingSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
 import {
   ChatArrivalMomentSurface,
   ChatBuilderTextSurface,
@@ -528,7 +528,15 @@ import {
   ChatTypingMomentSurface,
 } from './chat-surfaces';
 import { ChatBotsSurface, ChatPersonAddSurface, ChatPersonEditSurface, ChatPersonTextsSurface } from './chat-person-surfaces';
-import { TalkThreadFilesSurface, TalkThreadSurface, TalkThreadWaitingSurface } from './talk-thread-surface';
+import {
+  TalkThreadChartFullSurface,
+  TalkThreadMadeFilesSurface,
+  TalkThreadAttachedSurface,
+  TalkThreadChartsSurface,
+  TalkThreadFilesSurface,
+  TalkThreadSurface,
+  TalkThreadWaitingSurface,
+} from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface, RecurringWithChargesSurface } from './recurring-surfaces';
 import {
   FinancesSpendingCategoriesSurface,
@@ -687,6 +695,7 @@ import {
   DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import { DevLookupCapsEmptySurface, DevLookupCapsSurface } from './dev-lookup-caps-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
 import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
@@ -8974,6 +8983,46 @@ export const SURFACES: readonly Surface[] = [
     render: () => <TalkThreadSurface />,
   },
   {
+    /* Charts with several series (plan #3050.2.1): the markets over a week
+     * as three lines, a month's balance as an area, and a table with three
+     * figures a row that sorts by any heading and scrolls sideways on a phone. */
+    id: 'ask-dash-charts',
+    label: 'Ask Dash · Lines, areas and a sortable table',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadChartsSurface />,
+  },
+  {
+    /* The markets chart opened full screen, its tooltip held on Thursday
+     * (plan #3050.2.1): the hidden parts of a line, drawn open. */
+    id: 'ask-dash-charts-full',
+    label: 'Ask Dash · A chart full screen',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadChartFullSurface />,
+  },
+  {
+    /* Files Dash's code made (plan #3050.3.2): asked for the markets chart
+     * as an image and a PDF, the answer has the PNG under it as a picture
+     * that opens full size, the PDF as a chip with its name, and a last
+     * sentence naming the file that could not be kept. */
+    id: 'ask-dash-made-files',
+    label: 'Ask Dash · Files its code made under the answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadMadeFilesSurface />,
+  },
+  {
+    /* A saved page Dash attached by reference (plan #3050.4): asked for the
+     * prep page it made for an interview, the answer has the page under it
+     * as a card with its title that opens it. */
+    id: 'ask-dash-attached',
+    label: 'Ask Dash · A saved page attached under the answer',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadAttachedSurface />,
+  },
+  {
     /* A question with a bill's photo and PDF added (plan #1716): Dash reads
      * them with the question, and the $ beside Send, open, counts reading
      * them. */
@@ -9366,6 +9415,30 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatThreadSurface state="files" />,
   },
   {
+    /* A chart a bot drew (plan #3050.2.2): asked for the markets over last week, the reply's last bubble has a line chart under it, one line an index, with the button that opens it full screen. */
+    id: 'chat-people-thread-chart',
+    label: 'Chat · A thread, a chart under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="chart" />,
+  },
+  {
+    /* Files a bot's code made (plan #3050.3.1): asked for the markets chart as an image and a PDF, the reply's bubble has the PNG under it as a picture that opens full size and the PDF as a chip with its name, then a text saying the file that could not be kept. */
+    id: 'chat-people-thread-made-files',
+    label: 'Chat · A thread, files a bot made under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="made-files" />,
+  },
+  {
+    /* A saved page and a file a bot sent by reference (plan #3050.4): asked for the prep page and the offer letter, the reply's bubble has a card for each under it, its title first, that opens it. */
+    id: 'chat-people-thread-attached',
+    label: 'Chat · A thread, a saved page and file under the reply',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatThreadSurface state="attached" />,
+  },
+  {
     /* The box with two files added and not yet sent, each removable, and one it refused with why (plan #2974). */
     id: 'chat-people-thread-adding',
     label: 'Chat · A thread, files in the box',
@@ -9428,6 +9501,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'chat',
     width: 'screen',
     render: () => <ChatGroupSurface state="reply-failed" />,
+  },
+  {
+    /* Files a bot's code made in a group (plan #3050.3.3): asked for the pay as a picture and a PDF, the CFO's text has the PNG under it as a picture that opens full size and the PDF as a chip with its name, then a text of the CFO's saying the file that could not be kept. */
+    id: 'chat-group-made-files',
+    label: 'Chat · A group chat, files a bot made under its text',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSurface state="made-files" />,
+  },
+  {
+    /* A group with its voice switch on (plan #3082): the switch lit in the
+     * header beside Settings, a speaker on each bot's bubble, and the CFO's
+     * newest text being read in the CFO's voice, named in the pill. */
+    id: 'chat-group-speaking',
+    label: 'Chat · A group chat, voice on and a reply being read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSpeakingSurface />,
   },
   {
     /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
@@ -9526,7 +9617,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="photo-failed" />,
   },
   {
-    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture names it, with a sample to hear, Change voice and Use default. */
+    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture is one Choose voice button naming it, with a sample to hear beside it (plan #3081). */
     id: 'chat-person-edit-voice',
     label: 'Chat · Editing a bot, with their own voice',
     module: 'chat',
@@ -9534,12 +9625,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="voice" />,
   },
   {
-    /* The voice picker open: a search over Fish voices, the person's own voices first, then the library, each with a sample and Use; the voice in use says so; a pasted ID or link at the foot. */
+    /* The voice picker's pop-up (plan #3081): a modal on a laptop, a full-height sheet on a phone. Search, gender chips and Mine, style tag chips with the note on uploaders' tags, language and sort; Male and calm on, so Clear filters shows; each voice with its tags, language, uses, a sample and Use this voice; the voice in use says so; Show more voices; a pasted ID or link and Dash's default at the foot. */
     id: 'chat-person-edit-voice-picker',
     label: 'Chat · Editing a bot, choosing a voice',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="voice-picker" />,
+  },
+  {
+    /* The voice picker's pop-up with nothing for its filters (plan #3081): Mine, Female, young, Japanese and a search on, the empty line, and Clear filters. */
+    id: 'chat-person-edit-voice-picker-empty',
+    label: 'Chat · Editing a bot, no voice for these filters',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-picker-empty" />,
   },
   {
     /* A saved voice Fish no longer offers: the row says Voice unavailable, using default. */
@@ -13200,6 +13299,27 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevUsageEmptySurface />,
   },
   {
+    id: 'dev-lookup-caps',
+    label: "Dev · Ran out of lookups",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface />,
+  },
+  {
+    id: 'dev-lookup-caps-open',
+    label: "Dev · Ran out of lookups, lookups open",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface open />,
+  },
+  {
+    id: 'dev-lookup-caps-empty',
+    label: "Dev · Ran out of lookups, none yet",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsEmptySurface />,
+  },
+  {
     id: 'dev-modules',
     label: "Dev · Modules",
     module: 'dev',
@@ -13258,7 +13378,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'jobs-activity',
-    label: 'Now · the Activity tab',
+    label: 'Jobs · Activity',
     module: 'jobs',
     width: 'wide',
     render: () => <JobsActivitySurface />,

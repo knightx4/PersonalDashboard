@@ -419,6 +419,10 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-paid-declined': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-made-changes': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-thread': ['/chat/dash/[ref]'],
+  'ask-dash-charts': ['/chat/dash/[ref]'],
+  'ask-dash-charts-full': ['/chat/dash/[ref]'],
+  'ask-dash-made-files': ['/chat/dash/[ref]'],
+  'ask-dash-attached': ['/chat/dash/[ref]'],
   'ask-dash-files': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-waiting': ['/chat/dash', '/chat/dash/[ref]'],
   'ask-dash-held': ['/chat/dash', '/chat/dash/[ref]'],
@@ -462,6 +466,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-people-thread-reply-failed': ['/chat/people/[key]'],
   'chat-people-thread-new': ['/chat/people/[key]'],
   'chat-people-thread-files': ['/chat/people/[key]'],
+  'chat-people-thread-chart': ['/chat/people/[key]'],
+  'chat-people-thread-made-files': ['/chat/people/[key]'],
+  'chat-people-thread-attached': ['/chat/people/[key]'],
   'chat-people-thread-adding': ['/chat/people/[key]'],
   'chat-people-thread-not-ready': ['/chat/people/[key]'],
   'chat-people-thread-loading': ['/chat/people/[key]'],
@@ -469,6 +476,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-group-typing': ['/chat/groups/[id]'],
   'chat-group-new': ['/chat/groups/[id]'],
   'chat-group-reply-failed': ['/chat/groups/[id]'],
+  'chat-group-made-files': ['/chat/groups/[id]'],
+  'chat-group-speaking': ['/chat/groups/[id]'],
   'chat-group-settings': ['/chat/groups/[id]'],
   'chat-group-settings-delete': ['/chat/groups/[id]'],
   'chat-bots': ['/chat/bots'],
@@ -483,6 +492,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'chat-person-edit-photo-failed': ['/chat/bots/[key]'],
   'chat-person-edit-voice': ['/chat/bots/[key]'],
   'chat-person-edit-voice-picker': ['/chat/bots/[key]'],
+  'chat-person-edit-voice-picker-empty': ['/chat/bots/[key]'],
   'chat-person-edit-voice-gone': ['/chat/bots/[key]'],
   'chat-person-edit-voice-no-key': ['/chat/bots/[key]'],
   'chat-person-edit-versions': ['/chat/bots/[key]'],
@@ -873,13 +883,16 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
   'dev-usage-empty': ['/dev/usage'],
+  'dev-lookup-caps': ['/dev/usage/lookups'],
+  'dev-lookup-caps-open': ['/dev/usage/lookups'],
+  'dev-lookup-caps-empty': ['/dev/usage/lookups'],
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
   'dev-module-ideas': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
   'dev-plan-run': ['/dev/plan/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
-  'jobs-activity': ['/jobs'],
+  'jobs-activity': ['/jobs/activity'],
   'jobs-answers': ['/jobs/answers'],
   'jobs-thoughts': ['/jobs/settings'],
   'jobs-settings-linkedin': ['/jobs/settings'],
@@ -1124,7 +1137,16 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The one thread (plan #1964.3), with a subject or none: a change to it is
   // looked at here and on the dev-comment-thread surfaces, rather than on
   // every page that draws a thread.
-  'ask-dash-thread': ['components/thread/thread.tsx'],
+  'ask-dash-thread': ['components/thread/thread.tsx', 'components/talk/reply-chart.tsx'],
+  // The charts an answer draws (plan #3050.2.1): lines, areas, a sortable
+  // table, and a chart opened full screen with its tooltip showing.
+  'ask-dash-charts': ['components/talk/reply-chart.tsx'],
+  'ask-dash-charts-full': ['components/talk/reply-chart.tsx'],
+  // The files an answer's code made, under it (plan #3050.3.2).
+  'ask-dash-made-files': ['components/thread/thread.tsx', 'components/attachments/ask-turn-files.tsx'],
+  // A saved page or file attached by reference, as a card under the answer (plan #3050.4).
+  'ask-dash-attached': ['components/thread/thread.tsx', 'components/talk/attached-cards.tsx'],
+  'chat-people-thread-attached': ['components/talk/attached-cards.tsx'],
   // The box open with files added and the $ beside Send (plan #1716).
   'ask-dash-files': ['components/thread/thread.tsx'],
   'ask-dash-waiting': ['components/thread/thread.tsx'],

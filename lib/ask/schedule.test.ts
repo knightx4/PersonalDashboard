@@ -46,7 +46,7 @@ describe('schedule lookup (plan #3027)', () => {
       entry({ key: 'e1', source: 'own_event', from: 'Your calendar', ref: 'todo.events:e1', title: 'Double Chicken Please with Sam', day: '2026-11-08', startsAt: '2026-11-09T00:30:00.000Z' }),
       entry({ key: 'e2', source: 'own_event', from: 'Your calendar', ref: 'todo.events:e2', title: 'Brunch with Priya', day: '2026-11-08', startsAt: '2026-11-08T15:00:00.000Z' }),
     ]);
-    loadSchedule.mockResolvedValue({ range: { from: '2026-11-07', to: '2026-11-08' }, timezone: ctx.timezone, entries, failed: [] });
+    loadSchedule.mockResolvedValue({ range: { from: '2026-11-07', to: '2026-11-08' }, timezone: ctx.timezone, entries, failed: [], stale: [] });
 
     const result = await scheduleLookup(ctx, { from: '2026-11-07', to: '2026-11-08' });
 
@@ -67,7 +67,7 @@ describe('schedule lookup (plan #3027)', () => {
       entry({ key: 'a1', source: 'appointment', from: 'Booking email', ref: 'todo.appointments:a1', title: 'Double Chicken Please', day: '2026-11-07', startsAt: '2026-11-08T01:00:00.000Z' }),
       entry({ key: 'e1', source: 'own_event', from: 'Your calendar', ref: 'todo.events:e1', title: 'Double Chicken Please with Sam', day: '2026-11-07', startsAt: '2026-11-08T00:30:00.000Z' }),
     ]);
-    loadSchedule.mockResolvedValue({ range: { from: '2026-11-07', to: '2026-11-08' }, timezone: ctx.timezone, entries, failed: ['Booking emails'] });
+    loadSchedule.mockResolvedValue({ range: { from: '2026-11-07', to: '2026-11-08' }, timezone: ctx.timezone, entries, failed: ['Booking emails'], stale: [] });
 
     const result = await scheduleLookup(ctx, { from: '2026-11-07', to: '2026-11-08' });
     if (!result.ok) throw new Error(result.error);
@@ -79,8 +79,15 @@ describe('schedule lookup (plan #3027)', () => {
     expect(result.note).toContain('Booking emails');
   });
 
+  it('says which subscribed calendar may be out of date when it could not be re-read (plan #3045)', async () => {
+    loadSchedule.mockResolvedValue({ range: { from: '2026-11-06', to: '2026-11-06' }, timezone: ctx.timezone, entries: [], failed: [], stale: ['Partiful calendar'] });
+    const result = await scheduleLookup(ctx, {});
+    if (!result.ok) throw new Error(result.error);
+    expect(result.note).toContain('may be out of date: Partiful calendar');
+  });
+
   it('defaults to today', async () => {
-    loadSchedule.mockResolvedValue({ range: { from: '2026-11-06', to: '2026-11-06' }, timezone: ctx.timezone, entries: [], failed: [] });
+    loadSchedule.mockResolvedValue({ range: { from: '2026-11-06', to: '2026-11-06' }, timezone: ctx.timezone, entries: [], failed: [], stale: [] });
     await scheduleLookup(ctx, {});
     expect(loadSchedule.mock.calls[0][1]).toEqual({ from: '2026-11-06', to: '2026-11-06', cut: false });
   });

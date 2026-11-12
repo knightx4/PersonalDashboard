@@ -17,6 +17,10 @@ import { PEOPLE_ACTION_RULES, PEOPLE_WEB_RULES } from './people-actions';
 import { PAGE_RULES, PAGE_STARTED } from './bot-pages';
 import { ON_IT, SESSION_RULES } from '@/lib/talk/session-handoff';
 import { BOT_HANDOFF_RULES, passedNote } from '@/lib/talk/hand-to-bot';
+import { SAVED_RULES } from '@/lib/talk/attached';
+import { ATTACH_RULES, CHART_ONLY_RULES, NOTHING_ATTACHED, NOTHING_ATTACHED_CHART_ONLY } from '@/lib/talk/attachment-claim';
+import { CHART_DRAWN, parseChart } from '@/lib/talk/chart';
+import type { DashExecutor } from '@/lib/dash/loop';
 
 /**
  * A stand-in for PostgREST over in-memory tables: select, insert and update,
@@ -164,6 +168,106 @@ function anthropicStub(pieces: string[], options: { delayMs?: number; ack?: stri
   return { stub, streamed, created };
 }
 
+/** A week of two indexes, as Newt would draw it. */
+const MARKETS = {
+  kind: 'line',
+  title: 'Markets, 2 to 6 November',
+  unit: '%',
+  series: ['S&P 500', 'Nasdaq'],
+  rows: [
+    { label: 'Mon', values: [0, 0] },
+    { label: 'Wed', values: [0.6, 1.1] },
+    { label: 'Fri', values: [1.2, 2] },
+  ],
+};
+
+/** A client whose first round calls show_chart with `chart`, and whose second answers with `pieces`. */
+function chartStub(chart: Record<string, unknown>, pieces: string[], tool = 'show_chart') {
+  const streamed: Record<string, unknown>[] = [];
+  const usage = { input_tokens: 3_000, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const stub = {
+    messages: {
+      create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+      stream: (params: Record<string, unknown>) => {
+        streamed.push(params);
+        const round = streamed.length;
+        return {
+          on() {
+            return this;
+          },
+          async finalMessage() {
+            if (round === 1) return { content: [{ type: 'tool_use', id: 'c1', name: tool, input: chart }], stop_reason: 'tool_use', usage };
+            return answerMessage(pieces.join(''));
+          },
+        };
+      },
+    },
+  } as unknown as Anthropic;
+  return { stub, streamed };
+}
+
+/**
+ * A client whose first round runs code that writes `files` (by file id), and
+ * whose second answers with `pieces`; `get` serves the Files API.
+ */
+function codeStub(pieces: string[], files: Record<string, { filename: string; mime_type: string; size_bytes: number; bytes: number[] }>) {
+  const streamed: Record<string, unknown>[] = [];
+  const usage = { input_tokens: 3_000, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  const stub = {
+    messages: {
+      create: async () => ({ content: [{ type: 'text', text: 'Hm.' }], usage: { input_tokens: 9, output_tokens: 2 } }),
+      stream: (params: Record<string, unknown>) => {
+        streamed.push(params);
+        const round = streamed.length;
+        return {
+          on() {
+            return this;
+          },
+          async finalMessage() {
+            if (round === 1) {
+              return {
+                content: [
+                  { type: 'server_tool_use', id: 's1', name: 'bash_code_execution', input: { command: 'python chart.py' } },
+                  {
+                    type: 'bash_code_execution_tool_result',
+                    tool_use_id: 's1',
+                    content: {
+                      type: 'bash_code_execution_result',
+                      stdout: '',
+                      stderr: '',
+                      return_code: 0,
+                      content: Object.keys(files).map((file_id) => ({ type: 'bash_code_execution_output', file_id })),
+                    },
+                  },
+                ],
+                container: { id: 'container_1' },
+                stop_reason: 'pause_turn',
+                usage,
+              };
+            }
+            return answerMessage(pieces.join(''));
+          },
+        };
+      },
+    },
+    get: async (path: string) => {
+      const id = /\/v1\/files\/([^/]+)/.exec(path)?.[1] ?? '';
+      const file = files[id];
+      if (!file) throw new Error('no such file');
+      if (path.endsWith('/content')) return new Response(new Uint8Array(file.bytes));
+      return { filename: file.filename, mime_type: file.mime_type, size_bytes: file.size_bytes };
+    },
+  } as unknown as Anthropic;
+  return { stub, streamed };
+}
+
+/** The chart lookup as Ask runs it (lib/ask/tools.ts chartLookup). */
+const drawChart: DashExecutor = async (name, input) => {
+  const parsed = parseChart(input);
+  if (name !== 'show_chart' || !parsed.ok) return { ok: false as const, error: 'no' };
+  return { ok: true as const, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
+};
+
 function run(tables: Tables, stub: Anthropic, extra: Partial<Parameters<typeof replyToMentor>[0]> = {}) {
   const spent: { op: MentorSpendOperation; reports: SpendReport[] }[] = [];
   const client = fakeClient(tables);
@@ -218,8 +322,115 @@ describe('replyToMentor', () => {
     expect(system[0].cache_control).toEqual({ type: 'ephemeral' });
     const tools = (streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toContain('todos');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     expect(tools.at(-1)).toBe('answer');
+  });
+
+  it('says nothing came through, and keeps a slip, when a reply claims a file it never sent (plan #3050.1)', async () => {
+    const tables = world();
+    const { stub, streamed } = anthropicStub(["Choppy week.", "\n\nHere's your chart, attached as stocks_week.png!"]);
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act, keepFiles: vi.fn() }).promise;
+
+    expect(mentorRows(tables).map((m) => m.text)).toEqual(['Choppy week.', "Here's your chart, attached as stocks_week.png!", NOTHING_ATTACHED]);
+    expect(recordSlip).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'claimed_attachment', surface: 'people', conversation: `people:${CHAT}`, what: expect.stringContaining('stocks_week.png') }),
+    );
+    const system = (streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
+    expect(system).toContain(ATTACH_RULES);
+  });
+
+  it('keeps a chart it drew on the last bubble, out of the text, and does not call it a false attachment (plan #3050.2.2)', async () => {
+    const tables = world();
+    const { stub, streamed } = chartStub(MARKETS, ['Choppy week.', "\n\nHere's the chart: the Nasdaq led."]);
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act, execute: drawChart }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Choppy week.', "Here's the chart: the Nasdaq led."]);
+    expect(rows[0].charts).toBeUndefined();
+    const charts = rows[1].charts as { kind: string; series: string[]; rows: unknown[] }[];
+    expect(charts).toHaveLength(1);
+    expect(charts[0]).toMatchObject({ kind: 'line', series: ['S&P 500', 'Nasdaq'] });
+    expect(charts[0].rows).toHaveLength(3);
+    expect(recordSlip).not.toHaveBeenCalled();
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('show_chart');
+  });
+
+  it('keeps a saved page it attached by reference on the last bubble, and does not call it a false attachment (plan #3050.4)', async () => {
+    const tables = world();
+    const page = { table: 'core.files', id: '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11', title: 'Northwind prep', kind: 'page', href: '/goals/files/7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11' };
+    const attach: DashExecutor = async (name) =>
+      name === 'attach_saved' ? { ok: true as const, rows: [], note: 'Attached.', kept: { attached: page } } : { ok: false as const, error: 'no' };
+    const { stub, streamed } = chartStub({ table: 'core.files', ref: page.id }, ['Found it.', "\n\nHere it is, I've attached the prep page."], 'attach_saved');
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    await run(tables, stub, { act, execute: attach }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Found it.', "Here it is, I've attached the prep page."]);
+    expect(rows[0].attached).toBeUndefined();
+    expect(rows[1].attached).toEqual([page]);
+    expect(recordSlip).not.toHaveBeenCalled();
+    expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('attach_saved');
+    expect((streamed[0].system as { text: string }[]).map((b) => b.text).join('\n')).toContain(SAVED_RULES);
+  });
+
+  it('still says no file came when a reply that drew a chart names a file (plan #3050.2.2)', async () => {
+    const tables = world();
+    const { stub } = chartStub(MARKETS, ['Here is the chart, attached as markets.png.']);
+    await run(tables, stub, { execute: drawChart }).promise;
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual(['Here is the chart, attached as markets.png.', NOTHING_ATTACHED_CHART_ONLY]);
+    expect(rows[0].charts).toHaveLength(1);
+  });
+
+  it('offers code execution and says it can send files only where the files are kept (plan #3050.3.1)', async () => {
+    const without = anthropicStub(['Fine.']);
+    await run(world(), without.stub).promise;
+    const plain = (without.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
+    expect(plain).toContain(CHART_ONLY_RULES);
+    expect((without.streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('code_execution');
+
+    const withFiles = anthropicStub(['Fine.']);
+    await run(world(), withFiles.stub, { keepFiles: vi.fn() }).promise;
+    expect((withFiles.streamed[0].tools as { name: string }[]).map((t) => t.name)).toContain('code_execution');
+  });
+
+  it('keeps the files its code made under the last bubble, counts them, and says which could not be kept (plan #3050.3.1)', async () => {
+    const tables = world();
+    const { stub, streamed } = codeStub(['Choppy week.', "\n\nHere's the chart as a picture."], {
+      file_png: { filename: 'markets.png', mime_type: 'image/png', size_bytes: 4, bytes: [137, 80, 78, 71] },
+      file_svg: { filename: 'markets.svg', mime_type: 'image/svg+xml', size_bytes: 9, bytes: [60] },
+    });
+    const recordSlip = vi.fn(async () => undefined);
+    const act = { apply: vi.fn(), saveChange: vi.fn(), propose: vi.fn(), queue: vi.fn(), saveProposal: vi.fn(), recordSlip };
+    const keepFiles = vi.fn(async (_id: string, files: { name: string }[]) => ({ kept: files.map((f) => ({ name: f.name })), unkept: [] }));
+    await run(tables, stub, { act, keepFiles }).promise;
+
+    const rows = mentorRows(tables);
+    expect(rows.map((m) => m.text)).toEqual([
+      'Choppy week.',
+      "Here's the chart as a picture.",
+      expect.stringContaining('markets.svg could not be saved'),
+    ]);
+    expect(keepFiles).toHaveBeenCalledTimes(1);
+    const [messageId, files] = keepFiles.mock.calls[0];
+    expect(messageId).toBe(rows[1].id);
+    expect(files.map((f) => f.name)).toEqual(['markets.png']);
+    expect(rows[1].file_count).toBe(1);
+    expect(recordSlip).not.toHaveBeenCalled();
+    // The paused round goes on in the container the code ran in.
+    expect(streamed[1].container).toBe('container_1');
+  });
+
+  it('adds nothing to a reply that claims no file', async () => {
+    const tables = world();
+    const { stub } = anthropicStub(['The S&P rose 1.2% on the week.']);
+    await run(tables, stub).promise;
+    expect(mentorRows(tables).map((m) => m.text)).toEqual(['The S&P rose 1.2% on the week.']);
   });
 
   it("acts with Ask Dash's tools and rules when it is given them (plan #2854.2)", async () => {
@@ -234,7 +445,7 @@ describe('replyToMentor', () => {
     const tools = (acting.streamed[0].tools as { name: string }[]).map((t) => t.name);
     expect(tools).toEqual(expect.arrayContaining(['todos', 'add_todo', 'add_plan_step', 'propose_build', 'propose_delete']));
     expect(tools).not.toContain('hand_off');
-    expect(tools).not.toContain('show_chart');
+    expect(tools).toContain('show_chart');
     const system = (acting.streamed[0].system as { text: string }[]).map((b) => b.text).join('\n');
     expect(system).toContain(PEOPLE_ACTION_RULES);
     // Web search is in the core set, acting or not (plan #2861).
@@ -271,6 +482,25 @@ describe('replyToMentor', () => {
     expect(created[0].model).toBe('claude-haiku-5-5');
     expect(outcome.rounds[0].acked).toBe(true);
     expect(spent.map((s) => s.op).sort()).toEqual(['mentor-ack', 'mentor-reply']);
+  });
+
+  it('keeps every bubble of a three-bubble reply whole when its first text runs long (plan #3067)', async () => {
+    const tables = world();
+    const ack =
+      "Better, but it's still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes. The interviewer wants a story.";
+    const { stub } = anthropicStub(['Tell the Ramp story.\n\n', 'Name the process you changed.\n\n', 'Then the number it moved.'], {
+      delayMs: 60,
+      ack,
+    });
+    await run(tables, stub, { ackAfterMs: 5 }).promise;
+    const rows = mentorRows(tables).map((m) => [m.kind, m.text]);
+    expect(rows).toEqual([
+      ['ack', "Better, but it's still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes."],
+      ['reply', 'Tell the Ramp story.'],
+      ['reply', 'Name the process you changed.'],
+      ['reply', 'Then the number it moved.'],
+    ]);
+    for (const [, text] of rows) expect(text).toMatch(/[.!?]$/);
   });
 
   it('marks the chat failed, with the reason, when the reply cannot be written', async () => {
@@ -734,9 +964,9 @@ describe('replyToMentor', () => {
     expect((streamed[0].tools as { name: string }[]).map((t) => t.name)).not.toContain('make_page');
   });
 
-  it('offers every lookup but the chart, and nothing that writes', () => {
+  it('offers every lookup, the chart among them, and nothing that writes (plan #3050.2.2)', () => {
     expect(MENTOR_LOOKUPS.every((t) => t.kind === 'lookup')).toBe(true);
-    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(false);
+    expect(MENTOR_LOOKUPS.some((t) => t.name === 'show_chart')).toBe(true);
   });
 });
 

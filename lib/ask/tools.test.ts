@@ -281,6 +281,42 @@ function expectLinkedRows(result: Awaited<ReturnType<typeof executeAskTool>>) {
   return result.rows;
 }
 
+describe('attach_saved (plan #3050.4)', () => {
+  const PAGE = '7d2c1e4a-3b5f-4c8e-9a1d-2f6b8c0e4a11';
+  const FILE = '1a9e5c3b-6d2f-4e7a-8b0c-5f3d1e9a7c22';
+  const OTHER = '00000000-0000-4000-8000-00000000000b';
+  const tables = {
+    'core.files': [
+      { id: PAGE, user_id: ME, title: 'Northwind prep', format: 'html', archived_at: null },
+      { id: OTHER, user_id: OTHER, title: 'Not theirs', format: 'markdown', archived_at: null },
+    ],
+    'core.attachments': [{ id: FILE, user_id: ME, name: 'offer.pdf', content_type: 'application/pdf', size_bytes: 2048 }],
+  };
+
+  it("keeps a card for the person's own page, from a table and ref or a full ref", async () => {
+    for (const input of [{ table: 'core.files', ref: PAGE }, { ref: `core.files:${PAGE}` }]) {
+      const result = await executeAskTool('attach_saved', input, context(tables));
+      expect(result).toMatchObject({
+        ok: true,
+        kept: { attached: { table: 'core.files', id: PAGE, title: 'Northwind prep', kind: 'page', href: `/goals/files/${PAGE}` } },
+      });
+    }
+  });
+
+  it('keeps a card for a file they added, with its type and size', async () => {
+    const result = await executeAskTool('attach_saved', { table: 'core.attachments', ref: FILE }, context(tables));
+    expect(result).toMatchObject({
+      ok: true,
+      kept: { attached: { kind: 'file', title: 'offer.pdf', href: `/attachments/${FILE}`, contentType: 'application/pdf', size: 2048 } },
+    });
+  });
+
+  it('finds nothing of another account, and refuses a ref that names neither table', async () => {
+    expect((await executeAskTool('attach_saved', { table: 'core.files', ref: OTHER }, context(tables))).ok).toBe(false);
+    expect((await executeAskTool('attach_saved', { table: 'goals.items', ref: PAGE }, context(tables))).ok).toBe(false);
+  });
+});
+
 describe('the tool definitions', () => {
   it('define every tool the dispatcher runs, once each, as objects with no other keys', () => {
     expect(ASK_TOOLS.map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
@@ -653,6 +689,28 @@ describe('job_applications', () => {
       title: 'Analyst at Acme',
       href: '/jobs/roles/r1',
     });
+  });
+
+  it('lists live processes and unsent leads before the sent and the closed, newest first within each', async () => {
+    const many: Tables = {
+      ...tables,
+      'job_search.applications': [
+        ...Array.from({ length: 60 }, (_, i) =>
+          app(`g${i}`, ME, 'r1', 'acknowledged', `2026-10-${String((i % 28) + 1).padStart(2, '0')}`),
+        ),
+        app('old-live', ME, 'r2', 'in_process', '2026-06-01'),
+        app('lead', ME, 'r3', 'lead', '2026-07-01', { submitted_at: null }),
+        app('newer-live', ME, 'r2', 'in_process', '2026-07-15'),
+        app('closed', ME, 'r3', 'rejected', '2026-11-01'),
+      ],
+    };
+    const result = await executeAskTool('job_applications', {}, context(many));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.slice(0, 3).map((r) => r.ref)).toEqual(['newer-live', 'old-live', 'lead']);
+    expect(result.rows).toHaveLength(50);
+    expect(result.rows.map((r) => r.ref)).not.toContain('closed');
+    expect(result.totals).toMatchObject({ count: 64, by_status: { acknowledged: 60, in_process: 2, lead: 1, rejected: 1 } });
   });
 
   it('counts as sent an application added by hand with no sent day, and not a lead', async () => {
