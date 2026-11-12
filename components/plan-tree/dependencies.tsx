@@ -31,7 +31,7 @@ function stepName(ref: { number: number; outline?: string; title: string }): str
   return handle ? `${handle} ${ref.title}` : ref.title;
 }
 
-const STEP_LINK = `min-w-0 truncate rounded-full ${linkVariants({ tone: 'quiet' })}`;
+const STEP_LINK = `press-area min-w-0 rounded-full ${linkVariants({ tone: 'quiet' })}`;
 /**
  * A step named in a chip, opening that step's page (plan #3094). A real
  * anchor, so Enter, middle-click and cmd/ctrl-click work. A step with no
@@ -54,7 +54,7 @@ function StepLabel({
     );
   return (
     <Link href={planRefHref(step.number)} className={STEP_LINK}>
-      {text}
+      <span className="block truncate">{text}</span>
     </Link>
   );
 }
@@ -200,7 +200,10 @@ export function Dependencies<E extends TreeCatalogEntry>({
             <Fragment key={ref.id}>
               {index > 0 && ', '}
               {ref.number > 0 ? (
-                <Link href={planRefHref(ref.number)} className={linkVariants({ tone: 'quiet' })}>
+                <Link
+                  href={planRefHref(ref.number)}
+                  className={`press-area ${linkVariants({ tone: 'quiet' })}`}
+                >
                   {stepName(ref)}
                 </Link>
               ) : (
