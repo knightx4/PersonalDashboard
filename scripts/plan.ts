@@ -133,6 +133,7 @@ import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { ideaDetailShortfall } from '../lib/ideas/body';
 import { isModuleId } from '../lib/modules';
+import { fileStep, flagComment } from '../lib/plan/step-project';
 import {
   PROJECT_COLUMNS,
   isAppScope,
@@ -1504,7 +1505,12 @@ async function main(): Promise<void> {
       const moduleArg = arg('--module');
       // A plan step may belong to a project built elsewhere (lib/plan/projects).
       if (moduleArg && !isPlanScope(moduleArg, projects)) fail(`"${moduleArg}" is not a module or project.`);
-      const scope = parent ? parent.module : planScopeOf(moduleArg, projects);
+      // With no parent and no --module, a repository the step names may file
+      // it under a project (plan #3095).
+      const filing =
+        parent || moduleArg ? null : fileStep({ title, detail: arg('--detail') ?? null, projects });
+      const scope = parent ? parent.module : filing ? filing.scope : planScopeOf(moduleArg, projects);
+      if (filing?.flag) console.log(filing.flag);
       const priority = Number(arg('--priority') ?? 2);
       if (!isPlanPriority(priority)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       const size = arg('--size');
@@ -1577,7 +1583,7 @@ async function main(): Promise<void> {
       // There is no answer to quote then, so the finding is given with
       // --because and shown on the row as the session's words.
       const fromNumber = arg('--from');
-      let comment: string | null = null;
+      let comment: string | null = flagComment(filing?.flag ?? null);
       if (fromNumber) {
         const from = await byNumber(sql, userId, fromNumber);
         if (from.kind === 'decision') {

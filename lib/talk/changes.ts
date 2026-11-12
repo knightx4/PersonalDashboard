@@ -449,6 +449,11 @@ export type PeopleCause = {
   messageId: string;
   /** The thread's page, for a slip kept from it (plan #2999). Not kept on the change. */
   href?: string;
+  /**
+   * On a hand-off, the bot that passed the request on (plan #3095), so a
+   * plan step the reply adds goes under that bot's project. Not kept on the change.
+   */
+  fromBot?: string | null;
 };
 
 function peopleColumns(cause: PeopleCause) {

@@ -146,6 +146,8 @@ export type MentorHandoffTurn = {
   brief: string;
   /** What the bot is told about acting on a hand-off, after its own rules. */
   rules: string;
+  /** The bot that passed it on (you.board_advisors id), null for Ask Dash (plan #3095). */
+  fromBot?: string | null;
 };
 
 /** What a hand-off turn did: the reply's words and every change it made or proposed. */
@@ -481,7 +483,13 @@ async function replyOnce(input: MentorReplyInput, handoff: MentorHandoffTurn | n
   // Whatever the mentor changes is kept under the text being answered, naming them.
   const threadHref = `/chat/people/${ctx.mentor.key}`;
   const acting = input.act
-    ? peopleActing(input.act, { advisorId: ctx.mentor.id, chatId, messageId: answering.id, href: threadHref })
+    ? peopleActing(input.act, {
+        advisorId: ctx.mentor.id,
+        chatId,
+        messageId: answering.id,
+        href: threadHref,
+        ...(handoff?.fromBot ? { fromBot: handoff.fromBot } : {}),
+      })
     : null;
   // A page is made in a session, not in this turn (plan #2997): the tool keeps it and the mentor says it is on it.
   // Heavy work goes to a session the same way (plan #3005.2): hand_off keeps it and the mentor says it is on it.

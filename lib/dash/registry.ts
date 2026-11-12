@@ -158,6 +158,13 @@ export type DashWriteContext = AskContext & {
    */
   slipWhere?: SlipWhere;
   /**
+   * The bots on People behind this write, by you.board_advisors id: the one
+   * replying and, on a hand-off, the one that passed the request on. A plan
+   * step one of them adds goes under the project that bot is tied to (plan
+   * #3095). Absent outside People.
+   */
+  bots?: readonly string[];
+  /**
    * What run_app_route needs (lib/dash/app-route-writes.ts, plan #3070.3):
    * whether this is the owner, who is asking, the chat its finish is said in,
    * the runner and the poll's store. Absent where no route can be run, such
