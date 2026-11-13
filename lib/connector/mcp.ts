@@ -154,7 +154,8 @@ export async function runConnectorTool(
 
 /**
  * One write call, the way runConnectorTool runs a lookup: the cap, the write,
- * then the log. Rows come back with absolute links.
+ * then the log. Rows come back with absolute links. Unlike a lookup, a write
+ * whose log fails still answers with what it changed.
  */
 export async function runConnectorWriteTool(
   session: ConnectorSession,
@@ -176,7 +177,14 @@ export async function runConnectorWriteTool(
   const result = session.write
     ? await runConnectorWrite(tool, { ...session.write(caller.userId), account: { enabledModules, today, timezone }, lookups: session.ctx }, input)
     : ({ ok: false, error: 'Changes cannot be made through this connection.' } as const);
-  await logCall(log, { ...who, result });
+  // The change is made by now, so a failed log must not turn it into an
+  // error: the client would report it failed and may make it again. A lookup
+  // has nothing to repeat, so it keeps the throw.
+  try {
+    await logCall(log, { ...who, result });
+  } catch (error) {
+    console.error(`connector write ${who.tool} was not logged`, error);
+  }
   return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
 }
 

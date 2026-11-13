@@ -243,10 +243,10 @@ when you see a cause of failure that one fix will not remove.
    - The connector cannot add, rename or close a plain todo, move a role to
      another stage, or delete anything (`CONNECTOR_WRITE_TOOLS` in
      `lib/connector/writes.ts` against the Ask registry).
-   - `recordConnectorCall` runs after a write and throws if the log insert
-     fails, so the app sees an error for a change that was made and may make
-     it again (`lib/connector/mcp.ts`). Log first or never fail the call on
-     the log.
+   - ~~A failed log insert after a write turned a made change into an
+     error.~~ Done 13 November: `runConnectorWriteTool` answers with the
+     change and logs `connector write <tool> was not logged` to Vercel.
+     Lookups still throw on a failed log, by design.
    - Partial failures still answer as clean: `agenda` drops the workspaces it
      could not read, `recall` drops rows whose link failed while its totals
      still count them, and `open_row` drops a thread it could not read. Say

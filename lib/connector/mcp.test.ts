@@ -311,6 +311,21 @@ describe('a write call', () => {
     expect(JSON.parse(answer.content[0].text).rows[0].href).toBe(`${HOST}/learn/r/r1`);
   });
 
+  it('still answers with what it changed when the log insert fails, so the client does not make it again', async () => {
+    const result: AskToolResult = { ok: true, rows: [{ table: 'learn.readings', ref: 'r2', title: 'Evals', href: '/learn/r/r2' }] };
+    calls.runConnectorWrite.mockResolvedValue(result);
+    calls.recordConnectorCall.mockRejectedValue(new Error('Could not record the connector call: timeout'));
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const answer = await write('add_to_reading_list', { items: [{ title: 'Evals' }], subjects: ['AI'] });
+
+    expect(calls.runConnectorWrite).toHaveBeenCalledTimes(1);
+    expect(answer.isError).toBeUndefined();
+    expect(JSON.parse(answer.content[0].text).rows[0].href).toBe(`${HOST}/learn/r/r2`);
+    expect(quiet).toHaveBeenCalledWith('connector write add_to_reading_list was not logged', expect.any(Error));
+    quiet.mockRestore();
+  });
+
   it('is refused, and logged, when the route gave no way to write', async () => {
     const answer = await write('mark_read', { title: 'agents' }, false);
 
