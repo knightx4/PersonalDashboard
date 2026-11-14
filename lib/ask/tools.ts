@@ -834,16 +834,72 @@ export async function executeAskTool(
     return { ok: false, error: `The ${MODULE_LABELS[needs]} workspace is switched off, so it cannot be read.` };
   }
 
-  try {
+  const attempt = async (): Promise<AskToolResult> => {
     const result = await run(ctx, args);
     if (!result.ok) return result;
     // The promise to the page: every row a tool gives back opens somewhere,
     // in the app or, for a message, in Gmail (isOpenableHref).
     const rows = result.rows.filter((row) => isOpenableHref(row.href));
     return { ...result, rows: await parentsOf(ctx, rows) };
-  } catch (error) {
-    if (error instanceof AskInputError) return { ok: false, error: error.message };
-    console.error(`ask tool ${name} failed`, error);
-    return { ok: false, error: 'That lookup failed to read the database.' };
+  };
+
+  for (let tries = 1; ; tries++) {
+    try {
+      return await withinLookupTime(attempt());
+    } catch (error) {
+      if (error instanceof AskInputError) return { ok: false, error: error.message };
+      if (error instanceof LookupTimeout) {
+        console.error(`ask tool ${name} failed: timed out after ${LOOKUP_TIME_MS} ms`);
+        return { ok: false, error: LOOKUP_TIMED_OUT };
+      }
+      if (tries === 1 && isTransientDbError(error)) {
+        console.error(`ask tool ${name} failed once, retrying`, error);
+        continue;
+      }
+      console.error(`ask tool ${name} failed`, error);
+      return { ok: false, error: tries > 1 ? LOOKUP_FAILED_TWICE : LOOKUP_FAILED };
+    }
   }
 }
+
+/**
+ * How long one lookup may run before the model is told it was stopped. The
+ * loop has TIME_BUDGET_MS (lib/dash/loop.ts) for all its lookups, so one
+ * lookup must not spend it alone, and a connector call must not hang until
+ * the route is cut off at 300 seconds.
+ */
+export const LOOKUP_TIME_MS = 20_000;
+
+class LookupTimeout extends Error {}
+
+function withinLookupTime<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new LookupTimeout()), LOOKUP_TIME_MS);
+  });
+  return Promise.race([work, limit]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * An error the database or the network caused, which the same read may not
+ * hit a second time: a dropped connection, a 5xx from PostgREST, a pool
+ * that was full. A statement timeout is not one; the same read would take
+ * as long again.
+ */
+export function isTransientDbError(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && (status === 429 || status >= 500)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/statement timeout|canceling statement/i.test(message)) return false;
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ECONNREFUSED|socket hang up|terminating connection|connection (was )?(reset|refused|closed|terminated)|could not connect|too many (connections|clients)|service unavailable|bad gateway|gateway time-?out|upstream connect|PGRST00[0-3]|\b50[234]\b/i.test(
+    message,
+  );
+}
+
+/** What the model is told, each time naming what to try instead. */
+const LOOKUP_TIMED_OUT =
+  'That lookup timed out after 20 seconds and was stopped. Do not repeat it as it was: narrow it with a filter (a name, a status, a date range) or read one row with open_row. If nothing narrower answers, say that part could not be read.';
+const LOOKUP_FAILED =
+  'That lookup failed to read the database. Do not call it again with the same input: reach the same rows another way (search, query_rows on its table, or open_row on a row you already have), or say that part could not be read.';
+const LOOKUP_FAILED_TWICE =
+  'That lookup failed to read the database twice; the database may be briefly unavailable. Reach the same rows another way (search, or query_rows on its table) once, and if that fails too, say that part could not be read right now.';

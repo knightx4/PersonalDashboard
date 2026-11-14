@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { SearchHit, SearchSource } from '@/lib/search/sources';
 import { citationsOf, type AskContext, type AskDb, type AskSchema, type SchemaClient } from './db';
 import { OPENABLE } from './lookups';
-import { ASK_TOOLS, ASK_TOOL_NAMES, executeAskTool } from './tools';
+import { ASK_TOOLS, ASK_TOOL_NAMES, LOOKUP_TIME_MS, executeAskTool, isTransientDbError } from './tools';
 
 /**
  * Dash's read tools (plan #1088) against a stubbed client: an in-memory
@@ -314,6 +314,68 @@ describe('attach_saved (plan #3050.4)', () => {
   it('finds nothing of another account, and refuses a ref that names neither table', async () => {
     expect((await executeAskTool('attach_saved', { table: 'core.files', ref: OTHER }, context(tables))).ok).toBe(false);
     expect((await executeAskTool('attach_saved', { table: 'goals.items', ref: PAGE }, context(tables))).ok).toBe(false);
+  });
+});
+
+describe('a lookup that fails or hangs (dash-quality backlog item 2)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  /** A db whose first `failures` schema reads throw `error`, then answers from `tables`. */
+  function failingDb(error: unknown, failures: number): { db: AskDb; reads: () => number } {
+    let reads = 0;
+    const good = fakeDb({});
+    return {
+      db: async (schema) => {
+        reads++;
+        if (reads <= failures) throw error;
+        return good(schema);
+      },
+      reads: () => reads,
+    };
+  }
+
+  it('retries once after a dropped connection and answers', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, reads } = failingDb(new TypeError('fetch failed'), 1);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(result.ok).toBe(true);
+    expect(reads()).toBeGreaterThan(1);
+  });
+
+  it('says it failed twice, and what to try, when the retry fails too', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db } = failingDb(new Error('todo.tasks: 503 Service Unavailable'), 99);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/failed to read the database twice.*another way/) });
+  });
+
+  it('does not retry an error the same read would hit again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, reads } = failingDb(new Error('todo.tasks: canceling statement due to statement timeout'), 99);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(reads()).toBe(1);
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/failed to read the database\. Do not call it again/) });
+  });
+
+  it('stops a lookup that hangs and tells the model to narrow it', async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hang: AskDb = () => new Promise(() => {});
+    const pending = executeAskTool('todos', {}, context({}, { db: hang }));
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIME_MS + 1);
+    expect(await pending).toEqual({ ok: false, error: expect.stringMatching(/timed out after 20 seconds.*narrow it/) });
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('ask tool todos failed: timed out'));
+  });
+
+  it('tells transient errors from lasting ones', () => {
+    expect(isTransientDbError(new TypeError('fetch failed'))).toBe(true);
+    expect(isTransientDbError({ status: 502, message: 'Bad Gateway' })).toBe(true);
+    expect(isTransientDbError(new Error('jobs: terminating connection due to administrator command'))).toBe(true);
+    expect(isTransientDbError(new Error('jobs: canceling statement due to statement timeout'))).toBe(false);
+    expect(isTransientDbError(new Error('column "foo" does not exist'))).toBe(false);
   });
 });
 

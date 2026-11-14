@@ -207,10 +207,14 @@ when you see a cause of failure that one fix will not remove.
    workspace or by a cheap first pass, rather than all of them. Measure with
    the health's `avgPromptTokens` before and after; the alert is at 85,000
    (`PROMPT_TOKENS_ALERT`) and the aim is under 30,000.
-2. **No lookup may hang or fail opaquely.** Give every lookup a time limit
-   and one retry for a transient database error (`lib/ask/tools.ts`
-   `executeAskTool`), and make every error tell the model what to try
-   instead.
+2. ~~**No lookup may hang or fail opaquely.**~~ Done 14 November:
+   `executeAskTool` (`lib/ask/tools.ts`) stops a lookup at `LOOKUP_TIME_MS`
+   (20 seconds), retries once on a dropped connection or a 5xx
+   (`isTransientDbError`), and each error tells the model what to try
+   instead. The Vercel log says `ask tool <name> failed: timed out` or
+   `failed once, retrying`; count those before raising the limit. Left: the
+   lookups that catch their own errors and answer `ok: false` (search_mail,
+   read_job_board, find_places) still word their own failures.
 3. **Whole answers, not a page.** Questions about all of something ("roles at
    X", "how much on Y") must reach a filtered query or a count, not the first
    50 rows of a list. Find where the tools return a page and the prompt lets
@@ -254,7 +258,7 @@ when you see a cause of failure that one fix will not remove.
      health see it.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
-   - No lookup has a time limit; the route allows 300 seconds.
+   - ~~No lookup has a time limit.~~ Done 14 November with item 2: 20 seconds each.
 7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
    a reply to an `@dash` comment keeps its lookups on its turn
    (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or
