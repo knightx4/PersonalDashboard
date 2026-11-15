@@ -251,6 +251,23 @@ describe('add_role_note', () => {
     expect(tables['core.conversation_turns']).toEqual([]);
   });
 
+  it('takes an application id sent as a role ref, as the connector sends it', async () => {
+    // The connector counts any ref as seen, so the id is first read as a role.
+    seen.add(`job_search.roles:${APPLICATION}`);
+    const result = ok(await apply('add_role_note', { role_ref: APPLICATION, body: 'Needs a Workday sign-in.' }));
+    expect(tables['core.conversation_turns']).toEqual([
+      expect.objectContaining({ ref: `job_search.roles:${ROLE}`, body: 'Needs a Workday sign-in.' }),
+    ]);
+    expect(result).toMatchObject({ input: { roleId: ROLE } });
+  });
+
+  it('refuses an id that is neither their role nor their application', async () => {
+    const STRANGER = '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f';
+    seen.add(`job_search.roles:${STRANGER}`);
+    const result = await apply('add_role_note', { role_ref: STRANGER, body: 'x' });
+    expect(!result.ok && result.error).toContain('That role is not one of theirs');
+  });
+
   it('refuses while Jobs is switched off', async () => {
     seen.add(`job_search.roles:${ROLE}`);
     const result = await apply('add_role_note', { role_ref: ROLE, body: 'x' }, context(['todo']));

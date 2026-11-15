@@ -256,6 +256,11 @@ when you see a cause of failure that one fix will not remove.
      still count them, and `open_row` drops a thread it could not read. Say
      what could not be read in the note, as `search` does, so the log and the
      health see it.
+   - The connector counts every ref as seen (`seen: () => …` in
+     `lib/connector/writes.ts`), so a write that takes two tables reads a
+     bare id as the first. On 15 November `add_role_note` refused 11
+     application ids as roles; it now reads the id as either (fixed). Any
+     other write whose `seenRef` lists two tables needs the same check.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
    - ~~No lookup has a time limit.~~ Done 14 November with item 2: 20 seconds each.
