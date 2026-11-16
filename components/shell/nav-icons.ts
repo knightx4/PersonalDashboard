@@ -1,4 +1,5 @@
 import {
+  Presentation,
   Timer,
   ContactRound,
   MessagesSquare,
@@ -170,6 +171,8 @@ export const NAV_ICONS = {
   know: Network,
   // Idea Space: your ideas as points around what they are about (plan #1857).
   ideaSpace: Orbit,
+  // Courses: a lecture series cut down to its path and lessons (learn 0194).
+  courses: Presentation,
   // Essays: what you write about what you learned (plan #1863).
   essays: PenLine,
   // Goals: the things you want to learn and how well (plan #897).

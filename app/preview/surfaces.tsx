@@ -390,6 +390,13 @@ import {
   TodaysPieceNoneSurface,
   TodaysPieceSurface,
 } from './todays-piece-surfaces';
+import {
+  CourseDigestBuildingPreview,
+  CourseDigestLessonPreview,
+  CourseDigestListPreview,
+  CourseDigestMapPreview,
+  CourseDigestPathPreview,
+} from './course-digest-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import {
@@ -8142,6 +8149,48 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnCourseCheckPreview />,
+  },
+  {
+    /* Learn's Courses tab (learn 0194): a course being built, one built, the
+     * box that takes any playlist, and the open courses Dash can build. */
+    id: 'learn-digest-list',
+    label: 'Courses · Yours and the catalogue',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestListPreview />,
+  },
+  {
+    /* A course part way through its build: each stage named, the one running
+     * with its count. */
+    id: 'learn-digest-building',
+    label: 'Courses · A build under way',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestBuildingPreview />,
+  },
+  {
+    /* A built course on its path: the clips in order, each playing in the page. */
+    id: 'learn-digest-path',
+    label: 'Courses · The path',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestPathPreview />,
+  },
+  {
+    /* A built course's map: what rests on what, and where the lecturers disagree. */
+    id: 'learn-digest-map',
+    label: 'Courses · The map',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestMapPreview />,
+  },
+  {
+    /* One lesson: the point, each idea in the form it was given, a question to try. */
+    id: 'learn-digest-lesson',
+    label: 'Courses · A lesson',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestLessonPreview />,
   },
   {
     /* A Learn-area goal's Learning section: how well you want to know it,

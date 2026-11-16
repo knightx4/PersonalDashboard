@@ -90,6 +90,8 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   learn: [
     { href: '/learn/now', label: 'Now', icon: 'readNow', exact: true },
     { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true },
+    // Courses: long lecture series cut down to what you need (learn 0194).
+    { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },
     {
       href: '/learn/know',
       label: 'Subjects',

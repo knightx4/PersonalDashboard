@@ -5,6 +5,7 @@ const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+const COURSES: Section = { href: '/learn/courses', label: 'Courses' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
 const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
 
@@ -55,6 +56,16 @@ export const learnSources: ModuleSources = {
       title: 'title',
       href: (id) => `/learn/t/${id}`,
       section: READING_LISTS,
+    },
+    {
+      table: 'learn.courses',
+      module: 'Learn',
+      holds: 'Lecture series cut down for them: what they wanted from each, the digest and what they have watched.',
+      weight: 'record',
+      search: ['title', 'about', 'goal'],
+      title: 'title',
+      href: (id) => `/learn/courses/${id}`,
+      section: COURSES,
     },
     {
       table: 'learn.readings',
@@ -404,6 +415,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.subject_sources', reason: 'Join rows naming the catalogue documents added to a subject; the documents are read through the catalogue.' },
     { table: 'learn.subject_preparations', reason: 'Bookkeeping for preparing a subject: which step its run is on and why it stopped.' },
     { table: 'learn.subject_preparation_steps', reason: 'Bookkeeping for preparing a subject: the steps of its run and what each produced.' },
+    { table: 'learn.course_lectures', reason: "Bookkeeping: a course's videos in order with the build's notes on each; the course is in learn.courses." },
     { table: 'learn.topic_draft_requests', reason: 'Bookkeeping: a topic waiting for the routine to draft it; the drafted topic is in learn.topics.' },
     { table: 'learn.theme_fields', reason: 'Model placement of vault themes.' },
     { table: 'learn.track_offers', reason: 'Tracks the feed offered.' },

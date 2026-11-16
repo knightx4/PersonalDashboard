@@ -1,0 +1,351 @@
+{
+ "digest": {
+  "madeFor": "Cut for a CPA and MBA who already knows OLS, Markowitz and accounting, so the review lectures are cards or skims. They want the practitioner view: how a sell-side quant desk measures risk and prices by replication. The practitioner stories and live worked examples get clips, mechanisms get worked numbers, and the math they already hold is cut to a sentence.",
+  "intro": "This condenses all 24 lectures of MIT 18.S096 *Topics in Mathematics with Applications in Finance* (Fall 2013) plus four 2024 18.642 guest lectures. There are 28 videos totaling about 37 hours, all on the MIT OpenCourseWare YouTube channel, and every transcript was read in full. If you have 3 hours, follow the **3-hour path**. If you have 20 minutes, read **Ten ideas**.\n\n- Every timestamp is a link that opens the video at that moment.\n- Lecture codes: **L01–L26** are the 2013 lectures (the playlist has no L04 or L22). **P09, P18, P20, P23** are the 2024 lectures 9, 18, 20 and 23.\n- The 2013 course has two kinds of lectures. Math lectures (Lee, Kempthorne) build the tools. Practitioner lectures (Morgan Stanley, Harvard Management Company) apply them. The practitioner lectures are where most of the value is.\n- Numbers in the lessons come from the lectures. Where a lecturer made an error, it is marked and corrected in **Errors and caveats**. Numbers marked *illustrative* were added to make a mechanism concrete.\n\nThe whole series is one chain of ideas. You measure risk with a covariance matrix, then compress that matrix with factors. You price anything by building it from things that already trade. Whatever can't be hedged gets charged for: counterparty default, funding, crowding. Each idea gives a plain-language explanation, the mechanism with the lecture's own numbers, and the best place to watch it.",
+  "lessons": [
+   {
+    "key": "A",
+    "title": "Measuring risk",
+    "point": "Risk is a covariance matrix read through a loss quantile, and the normal version understates the tail: Abbott's 4.2% one-day 99% VaR was exceeded on 1.5% of days against the 1% predicted.",
+    "ideas": [
+     {
+      "name": "Value at Risk (VaR)",
+      "treatment": "clip",
+      "body": "VaR is the loss you won't exceed on 99% of days, if the future behaves like the past. Abbott's example: daily σ of 1.8% × 2.33 (the one-sided 1% point of a normal) gives a one-day 99% VaR of 4.2%. On a $10M position that is $420K. His backtest expected 1% of days beyond 4.2% and observed 1.5%, so losses beyond VaR came 50% more often than the normal model predicts. [[L07 21:49]] · [[L07 26:29]]",
+      "clips": [
+       {
+        "code": "L07",
+        "start": "21:49",
+        "end": "29:39",
+        "listenFor": "Daily σ of 1.8% × 2.33 gives the 4.2% one-day 99% VaR."
+       },
+       {
+        "code": "L07",
+        "start": "26:29",
+        "listenFor": "The backtest: 1.5% of days beyond VaR against the 1% predicted."
+       }
+      ]
+     },
+     {
+      "name": "Portfolio variance, x'Σx",
+      "treatment": "worked",
+      "body": "The risk of a book is the vector of dollar positions times the covariance matrix times that vector. Signs matter. A long bond position enters with a negative PV01, because price falls when yield rises. A long yen position quoted in yen per dollar also enters negative. *Illustrative:* take two $1M positions, each with $10K daily σ, at ρ = 0.83 (Abbott's measured correlation between 10y Treasuries and 10y AAA). Book σ = √(100 + 100 + 2 × 0.83 × 100) = $19.1K, against $20K at ρ = 1 and $14.1K at ρ = 0. [[L07 46:53]] · [[L07 1:12:33]]",
+      "clips": [
+       {
+        "code": "L07",
+        "start": "46:53",
+        "listenFor": "How the sign of each position enters the vector before the matrix is applied."
+       },
+       {
+        "code": "L07",
+        "start": "1:12:33",
+        "listenFor": "The 0.83 correlation between 10y Treasuries and 10y AAA."
+       }
+      ]
+     },
+     {
+      "name": "PV01 and duration",
+      "treatment": "card",
+      "body": "The same rate sensitivity in two units: a duration of 7.9 years is a PV01 of about $790 per $1M per basis point (7.9 × $1M × 0.0001). Bond traders think in PV01, insurers think in duration, and duration is also the PV-weighted average time of the cash flows. [[L07 34:28]] · [[L10 11:13]]",
+      "clips": []
+     },
+     {
+      "name": "EWMA weighting",
+      "treatment": "clip",
+      "body": "EWMA weights an observation from k days ago by ω^k. At ω = 0.94, 99% of the weight sits in the last 76 days (0.94^76 ≈ 0.009). Abbott's warning: the weight you choose moves measured volatility enough that \"you tell me the outcome you want and I'll tell you what statistics to use.\" [[L07 56:13]]",
+      "clips": [
+       {
+        "code": "L07",
+        "start": "56:13",
+        "end": "1:00:53",
+        "listenFor": "\"You tell me the outcome you want and I'll tell you what statistics to use.\""
+       }
+      ]
+     }
+    ],
+    "check": {
+     "question": "Take the lesson's two-position book: $1M in each of two positions, each with a $10K daily σ, at ρ = 0.83 (*illustrative*). What is the book's one-day 99% VaR, how much less is that than the two standalone VaRs added together, and on how many of 252 trading days should losses exceed it under the normal model and at the rate Abbott's backtest found?",
+     "answer": "Book σ = √(100 + 100 + 2 × 0.83 × 100) = √366 = $19.1K. VaR = 2.33 × $19.13K = $44.6K. Each position alone has a VaR of 2.33 × $10K = $23.3K, so the sum is $46.6K and diversification at ρ = 0.83 saves only about $2.0K. The normal model expects 1% × 252 ≈ 2.5 days a year beyond VaR. At Abbott's observed 1.5% it is about 3.8 days, 50% more, which is the fat tail the normal leaves out."
+    },
+    "tension": "Abbott treats the normal as a usable heuristic [[L07 24:55]], while Kempthorne's fitted t(10) puts a 6σ day at 1 in 10,000 [[L11 19:32]] and hourly power prices show kurtosis of 76 [[L13 50:42]]; Abbott's own backtest concedes the point [[L07 26:29]], and the course keeps using normal-based tools anyway. On old data, Abbott prefers equal weights because weighting lets you pick the answer [[L07 57:48]] and Kempthorne calls EWMA \"very, very effective\" [[L09 26:00]], and no lecture tests one against the other out of sample."
+   },
+   {
+    "key": "B",
+    "title": "Time series and volatility",
+    "point": "Volatility is estimated, clustered and slow to fade, so the answer depends on the clock, the data and the model: the same EUR/USD history measures 10.25% or 12.2%.",
+    "ideas": [
+     {
+      "name": "Mean reversion, AR(1)",
+      "treatment": "worked",
+      "body": "The model is X_t = φX_(t-1) + ε. With |φ| < 1 the series reverts, with a half-life of ln 0.5 / ln φ: φ = 0.9 gives 6.6 periods. At φ = 1 it becomes a random walk whose variance grows as tσ². The continuous-time version is Ornstein-Uhlenbeck, which is the Vasicek rate model, and it is also used for spreads. Kempthorne's caveat: over long periods, the level the series reverts to drifts too. [[L08 56:20]] · [[L21 12:52]]",
+      "clips": [
+       {
+        "code": "L08",
+        "start": "56:20",
+        "end": "1:01:08",
+        "listenFor": "The AR(1) setup, and note the slide's variance formula is wrong (see Errors)."
+       },
+       {
+        "code": "L21",
+        "start": "12:52",
+        "end": "15:10",
+        "listenFor": "Ornstein-Uhlenbeck as the continuous-time version."
+       }
+      ]
+     }
+    ],
+    "check": {
+     "question": "A spread follows an AR(1) with φ = 0.9 on daily data and sits 2 units above its mean. Where do you expect it after one half-life, and how many days is that? Then take the lesson's GARCH numbers (α0 = 0.000002, α1 = 0.08, β1 = 0.90, *illustrative*): what volatility does it settle at, how long does half of a vol shock last, and why does RiskMetrics EWMA have no answer to that question?",
+     "answer": "Half-life = ln 0.5 / ln 0.9 = 6.6 days, so the expected gap is 1 unit after 6.6 days and 0.5 after about 13. For the GARCH: long-run variance = 0.000002 / (1 − 0.08 − 0.90) = 0.0001, a daily σ of 1%, or 1% × √252 = 15.9% a year. Persistence is 0.98, so the half-life of a shock is ln 0.5 / ln 0.98 ≈ 34 days. EWMA sets α0 = 0 and α1 + β1 = 1, so there is no long-run level and a shock never decays toward one."
+    },
+    "tension": "Kempthorne proposes a model, fits it, checks residuals and revises [[L06 7:46]], while Hull collects the data first and lets validation choose the model [[P23 10:18]]. Both guard against overfitting, one with AIC/BIC penalties [[L09 2:22]] and the other with a held-out validation set [[P23 16:41]]."
+   }
+  ],
+  "dependencies": {
+   "intro": "Read each track top to bottom. Each box needs the ones above it. Linear algebra feeds both tracks, through covariance square roots on one side and PCA on the other. The 2024 ML lecture joins the tracks: it borrows overfitting control from regularization and uses replication as its benchmark. One link is not drawn. Crowding (L16) and CVA hedging (L26) are the same feedback loop seen from each track, which is why both tracks end in risks no model in the course captures.",
+   "tracks": [
+    {
+     "title": "Measuring risk",
+     "steps": [
+      "Linear algebra and probability",
+      "Covariance and portfolio variance",
+      "Value at Risk",
+      "Volatility and time series",
+      "Factor models and PCA",
+      "Regularization",
+      "Portfolio construction",
+      "Machine learning (2024)",
+      "Crowding"
+     ]
+    },
+    {
+     "title": "Pricing by replication",
+     "steps": [
+      "Linear algebra and probability",
+      "Random walks and martingales",
+      "Itô calculus",
+      "No-arbitrage and Black-Scholes",
+      "Option prices as probabilities",
+      "Credit, commodities and real options",
+      "Machine learning (2024)",
+      "CVA and counterparty risk"
+     ]
+    }
+   ]
+  },
+  "tensions": {
+   "intro": "The biggest unresolved conflict is about tails and stationarity. The tools the course teaches (normal VaR, Markowitz, Black-Scholes) assume well-behaved, stable inputs. Its practitioners keep showing fat tails, regime breaks, and markets that react to the models being used. Nobody reconciles the two. The table pairs the conflicting positions with the best timestamp for each.",
+   "rows": [
+    {
+     "tension": "How fat are the tails?",
+     "oneSide": "Abbott treats the normal as a usable heuristic: \"eight standard deviation moves don't happen\" [[L07 24:55]]",
+     "otherSide": "Kempthorne's fitted t(10) puts a 6σ day at 1 in 10,000 [[L11 19:32]]; hourly power prices show kurtosis of 76 [[L13 50:42]]",
+     "lands": "Abbott's own backtest concedes the point (1.5% of days vs 1% beyond VaR) [[L07 26:29]]. The course keeps using normal-based tools anyway."
+    },
+    {
+     "tension": "How should old data be weighted?",
+     "oneSide": "Abbott prefers equal weights, because weighting lets you pick the answer [[L07 57:48]]",
+     "otherSide": "Kempthorne calls EWMA \"very, very effective\" [[L09 26:00]]. RiskMetrics drops the long-run level entirely [[L11 28:03]]",
+     "lands": "Unresolved. No lecture tests one weighting against the other out of sample."
+    }
+   ],
+   "outro": "Two framing changes between 2013 and 2024 are worth noticing. In 2013 PCA is a way to compress and hedge risk (Masyukov, Kempthorne). In 2024 Andreev treats the hedged residuals, PC2 and PC3, as \"the most interesting\" source of trades [[P09 59:58]]. And the risk objective moves from VaR (2013 regulation) toward CVaR, which Hull optimizes directly with reinforcement learning [[L14 1:23:24]] · [[P23 1:08:49]]."
+  },
+  "ratings": {
+   "intro": "Five lectures are worth watching whole: L07, L13, L16, L19 and L20. Eight more have must-watch stretches, fourteen are worth skimming at the timestamps below, and only L02 is a full skip. The practitioner lectures rate higher than the math lectures throughout, because they show where the math breaks.",
+   "rows": [
+    {
+     "code": "L02",
+     "rating": "skip",
+     "watch": "[[L02 1:02:30]] Perron-Frobenius, only if you watch L25",
+     "why": "Linear algebra review, and a 3Blue1Brown video teaches it better."
+    },
+    {
+     "code": "L07",
+     "rating": "watch",
+     "watch": "Whole lecture",
+     "why": "Practitioner risk management with an accounting tie-in at [[L07 14:00]] and honest limits. Closest to an audit-and-controls mindset."
+    },
+    {
+     "code": "L09",
+     "rating": "parts",
+     "watch": "[[L09 20:31]] to end · [[L09 6:18]] AIC vs t-stat",
+     "why": "The volatility half: clocks, range estimators, fat tails, GARCH."
+    },
+    {
+     "code": "L11",
+     "rating": "skim",
+     "watch": "[[L11 16:23-28:03]] t tails, persistence, RiskMetrics · [[L11 1:17:54]] to end macro VAR (optional)",
+     "why": "The VAR estimation half is derivations."
+    }
+   ]
+  },
+  "ideas": [
+   {
+    "title": "The price of a bet doesn't depend on who you think will win.",
+    "body": "A bookie who sets odds from the money bet ($10K vs $50K, so 5:1) pays $60K whatever happens and has no risk. A bookie who sets odds from the true 20/80 probabilities can lose. Black-Scholes is the same move: hedge, and the stock's expected return drops out of the price. [[L19 0:22]] · [[L19 27:47]]"
+   },
+   {
+    "title": "Option prices are probabilities you can trade.",
+    "body": "Three calls at neighboring strikes form a butterfly whose price is the market's probability of ending in that band. Rates desks trade 10bp-wide butterflies when they think that probability is wrong. [[L20 30:10]]"
+   },
+   {
+    "title": "Physical assets hide options.",
+    "body": "A storage tank looks like it is worth the $3 calendar spread. As an option on the spread it is worth $4.47, so the quant outbids the trader and still keeps $0.27. Power plants, pipelines and tankers work the same way. [[L13 13:27]] · [[L13 42:06]]"
+   }
+  ],
+  "path": {
+   "intro": "Seventeen clips totaling 177 minutes. They run in dependency order: measure risk, compress it, price by replication, read prices as probabilities, then the risks replication can't remove. Watch at 1x. The practitioners talk fast and the numbers matter.\n\nWith an extra 30 minutes, add [[L24 1:14:05-1:31:21]] (callable bond and structured note, 17 min) and [[L18 25:17-27:52]] plus [[L18 36:38-42:11]] (the ½σ² term and the no-peeking rule, 8 min).",
+   "budgetMinutes": 180,
+   "clips": [
+    {
+     "code": "L07",
+     "start": "21:49",
+     "end": "29:39",
+     "get": "The VaR calculation and the backtest showing 1.5% vs 1%"
+    },
+    {
+     "code": "L07",
+     "start": "56:13",
+     "end": "1:00:53",
+     "get": "EWMA weighting, and how a weight choice can produce any answer you want"
+    },
+    {
+     "code": "L11",
+     "start": "19:32",
+     "end": "22:36",
+     "get": "Normal vs t tails: where they part ways, and the 6σ odds"
+    }
+   ]
+  },
+  "errors": {
+   "intro": "Most of the lectures' numbers check out. These are the ones that don't, plus the claims you shouldn't reuse without checking.\n\n**Speaker naming.** L13's speaker is not named on the tape. MIT OCW lists Alexander Eydeland (Morgan Stanley).\n\n**Time-sensitive facts.** Market figures are as of each lecture and are now stale. That covers Fall 2013 for the 2013 course (a 10y Treasury yield of 1.7% at the end of 2012, S&P near 1,800) and Fall 2024 for the 2024 lectures (Kalshi's volume, BridgeBio's ~$4.6B market cap, the Fed's 50bp cut).",
+   "rows": [
+    {
+     "where": "[[L07 24:55]]",
+     "said": "Abbott: a 3σ move happens \"about once per 10,000\" observations",
+     "correction": "For a normal, a one-sided 3σ loss has probability 0.135%, about 1 in 740 days (1 in 370 counting both tails). His broader point, that normal tails are too thin, still stands."
+    },
+    {
+     "where": "[[L08 56:20]]",
+     "said": "Slide gives AR(1) variance as σ²/(1 − φ)",
+     "correction": "It is σ²/(1 − φ²). At φ = 0.9 the slide gives 10σ² and the correct value is 5.3σ²."
+    }
+   ]
+  }
+ },
+ "lectures": [
+  {
+   "code": "L02",
+   "title": "2. Linear Algebra",
+   "videoId": "9YtmGy-wfE4",
+   "durationSeconds": "1:12:37",
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L06",
+   "title": "6. Regression Analysis",
+   "videoId": "l1kLCrxL9Hk",
+   "durationSeconds": "1:22:13",
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L07",
+   "title": "7. Value At Risk (VaR) Models",
+   "videoId": "92WaNz9mPeY",
+   "durationSeconds": "1:21:15",
+   "speaker": "Ken Abbott (Morgan Stanley)"
+  },
+  {
+   "code": "L08",
+   "title": "8. Time Series Analysis I",
+   "videoId": "uBeM1FUk4Ps",
+   "durationSeconds": "1:16:19",
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L09",
+   "title": "9. Volatility Modeling",
+   "videoId": "cDlbEQz1PQk",
+   "durationSeconds": "1:21:16",
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L10",
+   "title": "10. Regularized Pricing and Risk Models",
+   "videoId": "aga-Tak3c3M",
+   "durationSeconds": "1:29:57",
+   "speaker": "Ivan Masyukov (Morgan Stanley)"
+  },
+  {
+   "code": "L11",
+   "title": "11. Time Series Analysis II",
+   "videoId": "_IFUfFuyQlU",
+   "durationSeconds": "1:23:48",
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L13",
+   "title": "13. Commodity Models",
+   "videoId": "nmehlS-8b3Y",
+   "durationSeconds": "1:20:45",
+   "speaker": "Alexander Eydeland (Morgan Stanley; named on OCW, not on tape)"
+  },
+  {
+   "code": "L14",
+   "title": "14. Portfolio Theory",
+   "videoId": "ywl3pq6yc54",
+   "durationSeconds": "1:24:55",
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L18",
+   "title": "18. Itō Calculus",
+   "videoId": "Z5yRMMVUC5w",
+   "durationSeconds": "1:18:03",
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L19",
+   "title": "19. Black-Scholes Formula, Risk-neutral Valuation",
+   "videoId": "TnS8kI_KuJc",
+   "durationSeconds": "0:49:52",
+   "speaker": "Vasily Strela (Morgan Stanley)"
+  },
+  {
+   "code": "L20",
+   "title": "20. Option Price and Probability Duality",
+   "videoId": "eG_aRPy1KVE",
+   "durationSeconds": "1:20:29",
+   "speaker": "Stephen Blythe (Harvard Management Co.)"
+  },
+  {
+   "code": "L21",
+   "title": "21. Stochastic Differential Equations",
+   "videoId": "qdbkvD4N-us",
+   "durationSeconds": "0:56:05",
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L24",
+   "title": "24. HJM Model for Interest Rates and Credit",
+   "videoId": "D2Jn1VrqjWI",
+   "durationSeconds": "1:47:16",
+   "speaker": "Denis Gorokhov (Morgan Stanley)"
+  },
+  {
+   "code": "P09",
+   "title": "Principal Component Analysis in Finance",
+   "videoId": "CechARGinR4",
+   "durationSeconds": "1:23:14",
+   "speaker": "Stefan Andreev (Two Sigma)"
+  },
+  {
+   "code": "P23",
+   "title": "Introduction to Machine Learning",
+   "videoId": "kTsieIl_YBA",
+   "durationSeconds": "1:16:21",
+   "speaker": "John Hull (Toronto)"
+  }
+ ]
+}

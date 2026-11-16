@@ -31,6 +31,7 @@
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
     "learn:prepare": "tsx --conditions=react-server scripts/learn-prepare-subject.ts",
     "learn:drafts": "tsx --conditions=react-server scripts/learn-drafts.ts",
+    "learn:course": "tsx --conditions=react-server scripts/learn-course.ts",
     "broker": "tsx --conditions=react-server scripts/session-broker.ts",
     "browser-runner": "tsx --conditions=react-server scripts/browser-runner.ts",
     "session-sync": "tsx --conditions=react-server scripts/session-sync.ts",
