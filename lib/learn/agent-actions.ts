@@ -391,6 +391,16 @@ export const learnActions: ModuleActions = {
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },
+  'app/learn/read/actions.ts': {
+    finishSection: none('own', 'Finishing a section records the person\'s own reading.'),
+    unreadSection: none('own', 'Taking back a section marked read is the person correcting their own record.'),
+    judgeSource: none('theirs', 'Keeping a source or saying it is not for them is the person\'s verdict on what Dash chose.'),
+    askFor: none('spends', 'Starts a routine to find and prepare a source, a few minutes of the subscription; what is worth preparing is the person\'s to ask for.'),
+    goDeeper: none('spends', 'Starts a routine for more on one section; the person asks for it while reading.'),
+    addYourCopy: none('own', 'The person pastes their own copy of a text; nobody else has it to give.'),
+    findMore: none('spends', 'Starts a routine to find more to read; it runs only when the person asks, so a week away costs nothing.'),
+    startPreparing: none('spends', 'Starts the routine again on a source that stopped or has been waiting; the person decides whether to spend the run.'),
+  },
   'app/learn/courses/actions.ts': {
     buildCatalogueCourse: none(
       'spends',

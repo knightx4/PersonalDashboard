@@ -5,6 +5,7 @@ const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
+const READ: Section = { href: '/learn/read', label: 'Read' };
 const COURSES: Section = { href: '/learn/courses', label: 'Courses' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
 const GOALS_HOME: Section = { href: '/goals', label: 'Now' };
@@ -56,6 +57,16 @@ export const learnSources: ModuleSources = {
       title: 'title',
       href: (id) => `/learn/t/${id}`,
       section: READING_LISTS,
+    },
+    {
+      table: 'learn.reader_sources',
+      module: 'Learn',
+      holds: 'Things prepared for them to read: why each was chosen, what they asked for, what they have read of it and whether they kept it.',
+      weight: 'record',
+      search: ['title', 'author', 'why', 'asked'],
+      title: 'title',
+      href: (id) => `/learn/read/${id}`,
+      section: READ,
     },
     {
       table: 'learn.courses',

@@ -88,7 +88,9 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   // /goals. Idea Space and Essays became tabs at the person's ask in October
   // 2026 (docs/CUT-BACK-SPEC.md, R1).
   learn: [
-    { href: '/learn/now', label: 'Now', icon: 'readNow', exact: true },
+    // Read: the reader, Learn's front page (learn 0195). It took the place of
+    // Now, the card feed and lessons, which is kept at /learn/now.
+    { href: '/learn/read', label: 'Read', icon: 'readNow', alsoMatches: ['/learn/read/'] },
     { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true },
     // Courses: long lecture series cut down to what you need (learn 0194).
     { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },

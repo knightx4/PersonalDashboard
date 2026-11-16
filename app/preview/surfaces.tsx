@@ -391,6 +391,15 @@ import {
   TodaysPieceSurface,
 } from './todays-piece-surfaces';
 import {
+  ReaderCopyrightPreview,
+  ReaderHomePreview,
+  ReaderIdeasPreview,
+  ReaderPreparingPreview,
+  ReaderSectionPreview,
+  ReaderSourcePreview,
+  ReaderSummaryPreview,
+} from './reader-surfaces';
+import {
   CourseDigestBuildingPreview,
   CourseDigestLessonPreview,
   CourseDigestListPreview,
@@ -8149,6 +8158,62 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnCourseCheckPreview />,
+  },
+  {
+    /* Learn's front page (learn 0195): one press picks up where you left off, then what you started, what was chosen against your notes, what is new and what you asked for. */
+    id: 'learn-read-home',
+    label: 'Read · What there is to read',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderHomePreview />,
+  },
+  {
+    /* A source in layers: its context, the work in brief, the one idea, then each section opening to its summary. */
+    id: 'learn-read-source',
+    label: 'Read · A source in layers',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSourcePreview />,
+  },
+  {
+    /* A source whose text may not be shown: summaries, and where to paste your own copy. */
+    id: 'learn-read-copyright',
+    label: 'Read · A source in copyright',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderCopyrightPreview />,
+  },
+  {
+    /* Something asked for while reading, still being prepared. */
+    id: 'learn-read-preparing',
+    label: 'Read · Being prepared',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderPreparingPreview />,
+  },
+  {
+    /* One section: where you are in the argument, the author's text with a note behind each dotted phrase, the one idea. */
+    id: 'learn-read-section',
+    label: 'Read · A section of text',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSectionPreview />,
+  },
+  {
+    /* A section of a work in copyright, read as its summary. */
+    id: 'learn-read-summary',
+    label: 'Read · A section as its summary',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSummaryPreview />,
+  },
+  {
+    /* The one idea of every section read, each a way back to its passage. */
+    id: 'learn-read-ideas',
+    label: 'Read · Ideas you have met',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderIdeasPreview />,
   },
   {
     /* Learn's Courses tab (learn 0194): a course being built, one built, the

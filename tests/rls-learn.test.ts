@@ -178,6 +178,7 @@ describe('RLS coverage', () => {
       'quiz_questions',
       'quiz_sources',
       'quizzes',
+      'reader_sources',
       'reading_subjects',
       'readings',
       'review_questions',
@@ -272,6 +273,35 @@ describe('what a chat adds (plan #1807)', () => {
 
 describe('a topic waiting for the routine to draft it (learn 0193)', () => {
   // A press queues its own; the routine's script works them with the service role.
+  it('keeps what is prepared to read to the person it is for (learn 0195)', async () => {
+    const [source] = await asUser(
+      userA,
+      (tx) =>
+        tx<
+          { id: string }[]
+        >`insert into reader_sources (user_id, title, origin) values (${userA}, 'What Is Money?', 'asked') returning id`,
+    );
+    expect(await asUser(userA, (tx) => tx`select id from reader_sources`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from reader_sources`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into reader_sources (user_id, title) values (${userA}, 'Not mine')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(
+      userB,
+      (tx) => tx`update reader_sources set verdict = 'dropped' where id = ${source.id}`,
+    );
+    expect(
+      await admin`select id from reader_sources where id = ${source.id} and verdict is null`,
+    ).toHaveLength(1);
+    // A source cannot be marked ready with nothing prepared.
+    await expect(
+      asUser(userA, (tx) => tx`update reader_sources set status = 'ready' where id = ${source.id}`),
+    ).rejects.toThrow();
+  });
+
   it('keeps a course and its lectures to the person who asked for it (learn 0194)', async () => {
     const [course] = await asUser(
       userA,
