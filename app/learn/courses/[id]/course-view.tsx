@@ -369,7 +369,7 @@ function LecturesTab({
             {digest.errors.rows.map((row, index) => (
               <li key={index} className="space-y-1">
                 <Markdown
-                  markdown={text(row.where)}
+                  markdown={text(`At ${row.where}`)}
                   className="vault-prose prose-compact prose-aside"
                 />
                 <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">Said: {row.said}</p>
@@ -414,7 +414,8 @@ function LectureRow({
         <div className="space-y-1 pl-11">
           {row.watch && (
             <Markdown
-              markdown={text(row.watch)}
+              // Led by a word so a verdict that is only a timestamp still reads as a line of prose.
+              markdown={text(`Watch ${row.watch}`)}
               className="vault-prose prose-compact prose-aside"
             />
           )}
