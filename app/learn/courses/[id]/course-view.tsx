@@ -3,7 +3,6 @@ import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { Card, CardSection } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
-import { Markdown } from '@/components/ui/markdown';
 import { Tabs } from '@/components/ui/tabs';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
@@ -27,6 +26,7 @@ import {
 } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { hours } from '../format';
+import { CourseMarkdown } from './course-markdown';
 import { PlanMap, type MapStage } from './plan-map';
 
 /**
@@ -71,6 +71,7 @@ export function CourseView({
   const { runtimeMinutes = 0, videos = course.lectures.length } = course.totals;
   const text = (source: string) => linkMoments(source, course.lectures, momentHref(course.id));
   const plan = hasPlan(digest) ? digest.plan : null;
+  const maths = digest.maths === true;
   const planMinutes = plan
     ? placedSteps(plan).reduce((sum, placed) => sum + placed.step.minutes, 0)
     : 0;
@@ -93,7 +94,7 @@ export function CourseView({
 
       {open === 'plan' &&
         (plan ? (
-          <PlanTab course={course} plan={plan} text={text} />
+          <PlanTab course={course} plan={plan} text={text} maths={maths} />
         ) : (
           <Card padding="dense">
             <p className="text-ui text-ink [overflow-wrap:anywhere]">
@@ -111,20 +112,25 @@ export function CourseView({
                   <span className="tabular text-ink-muted">{index + 1}. </span>
                   {idea.title}
                 </p>
-                <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
+                <CourseMarkdown
+                  maths={maths}
+                  markdown={text(idea.body)}
+                  className="vault-prose prose-compact"
+                />
               </li>
             ))}
           </ol>
         </Card>
       )}
       {open === 'lectures' && (
-        <LecturesTab course={course} digest={digest} text={text} play={play} />
+        <LecturesTab course={course} digest={digest} text={text} play={play} maths={maths} />
       )}
 
       <CardSection title="About this digest" fold="learn.course.about" defaultOpen={false}>
         <div className="space-y-3">
           <p className="text-ui text-ink [overflow-wrap:anywhere]">{digest.madeFor}</p>
-          <Markdown
+          <CourseMarkdown
+            maths={maths}
             markdown={text(digest.intro)}
             className="vault-prose prose-compact prose-aside"
           />
@@ -141,7 +147,17 @@ type Text = (source: string) => string;
  * (plan-map.tsx). The map is given only what it draws, a stage's steps by
  * title and what is in them, so the steps' own text stays on the server.
  */
-function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Text }) {
+function PlanTab({
+  course,
+  plan,
+  text,
+  maths,
+}: {
+  course: Course;
+  plan: Plan;
+  text: Text;
+  maths: boolean;
+}) {
   const done = new Set(course.progress.lessons);
   const steps = placedSteps(plan);
   const taken = steps.filter((placed) => done.has(placed.step.key)).length;
@@ -171,7 +187,11 @@ function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Tex
   return (
     <section className="space-y-4">
       {plan.intro && (
-        <Markdown markdown={text(plan.intro)} className="vault-prose prose-compact max-w-prose" />
+        <CourseMarkdown
+          maths={maths}
+          markdown={text(plan.intro)}
+          className="vault-prose prose-compact max-w-prose"
+        />
       )}
       {taken > 0 && (
         <p className="tabular text-small text-ink-muted">
@@ -202,17 +222,20 @@ function LecturesTab({
   digest,
   text,
   play,
+  maths,
 }: {
   course: Course;
   digest: Digest;
   text: Text;
+  maths: boolean;
   play: { code: string; start: number } | null;
 }) {
   const rated = new Map(digest.ratings.rows.map((row) => [row.code, row]));
   return (
     <section className="space-y-3">
       {digest.ratings.intro && (
-        <Markdown
+        <CourseMarkdown
+          maths={maths}
           markdown={text(digest.ratings.intro)}
           className="vault-prose prose-compact prose-aside"
         />
@@ -226,6 +249,7 @@ function LecturesTab({
               row={rated.get(lecture.code)}
               text={text}
               playFrom={play?.code === lecture.code ? play.start : null}
+              maths={maths}
             />
           ))}
         </ul>
@@ -240,12 +264,17 @@ function LecturesTab({
           <ul className="space-y-4">
             {digest.errors.rows.map((row, index) => (
               <li key={index} className="space-y-1">
-                <Markdown
+                <CourseMarkdown
+                  maths={maths}
                   markdown={text(`At ${row.where}`)}
                   className="vault-prose prose-compact prose-aside"
                 />
                 <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">Said: {row.said}</p>
-                <Markdown markdown={text(row.correction)} className="vault-prose prose-compact" />
+                <CourseMarkdown
+                  maths={maths}
+                  markdown={text(row.correction)}
+                  className="vault-prose prose-compact"
+                />
               </li>
             ))}
           </ul>
@@ -260,10 +289,12 @@ function LectureRow({
   row,
   text,
   playFrom,
+  maths,
 }: {
   lecture: Lecture;
   row: Digest['ratings']['rows'][number] | undefined;
   text: Text;
+  maths: boolean;
   /** Set when a moment's link opened this lecture: the player is up, at that second. */
   playFrom: number | null;
 }) {
@@ -285,13 +316,18 @@ function LectureRow({
       {row && (
         <div className="space-y-1 pl-11">
           {row.watch && (
-            <Markdown
+            <CourseMarkdown
+              maths={maths}
               // Led by a word so a verdict that is only a timestamp still reads as a line of prose.
               markdown={text(`Watch ${row.watch}`)}
               className="vault-prose prose-compact prose-aside"
             />
           )}
-          <Markdown markdown={text(row.why)} className="vault-prose prose-compact prose-aside" />
+          <CourseMarkdown
+            maths={maths}
+            markdown={text(row.why)}
+            className="vault-prose prose-compact prose-aside"
+          />
         </div>
       )}
       <ClipPlayer

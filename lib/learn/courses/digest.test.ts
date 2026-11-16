@@ -316,6 +316,13 @@ describe('checkDigest', () => {
     if (!checked.ok) expect(checked.problems.join('\n')).toMatch(problem);
   });
 
+  it('sets formulas as maths only in a course written with them', () => {
+    const plain = checkDigest(digest(), LECTURES);
+    const written = checkDigest(digest({ maths: true }), LECTURES);
+    expect(plain.ok && plain.digest.maths).toBe(false);
+    expect(written.ok && written.digest.maths).toBe(true);
+  });
+
   it('refuses a lecture left without a rating (D4)', () => {
     const base = digest();
     const checked = checkDigest({ ...base, ratings: { rows: [base.ratings.rows[0]] } }, LECTURES);

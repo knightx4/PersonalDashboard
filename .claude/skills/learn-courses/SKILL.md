@@ -228,4 +228,11 @@ step. So the centre of a digest is its **plan**.
   the correction. Flag market figures as of the lecture's date.
 - The script works out each clip's and each step's minutes from the times
   and the words, so give start and end only.
+- **A course in mathematics sets `"maths": true`** at the top of the file.
+  Then `$x$` in a line and `$$ … $$` on a line of its own are set as
+  formulas in text, check and reading bodies, and a matrix is written
+  `\\begin{bmatrix} 2 & 1 \\\\ 1 & 3 \\end{bmatrix}`. Titles, `gain`, `short`,
+  captions and drawings stay plain text. With it on, never write a dollar
+  amount with a dollar sign. Leave it off for any other course, where a
+  dollar sign is a dollar sign.
 - No em dashes anywhere; the check refuses them.

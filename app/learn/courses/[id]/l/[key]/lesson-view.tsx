@@ -5,7 +5,6 @@ import { PageColumn } from '@/components/shell/page-width';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
-import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
@@ -19,6 +18,7 @@ import {
 import { shortName, type Placed } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { ReaderFigure } from '../../../../read/figure';
+import { CourseMarkdown } from '../../course-markdown';
 import { momentHref } from '../../course-view';
 import { StepFoot, type Onward } from './step-foot';
 
@@ -44,6 +44,7 @@ export function LessonView({
   const byCode = new Map(course.lectures.map((lecture) => [lecture.code, lecture]));
   const stepHref = (key: string) => `/learn/courses/${course.id}/l/${encodeURIComponent(key)}`;
   const mapHref = `/learn/courses/${course.id}`;
+  const maths = course.digest?.maths === true;
   const done = new Set(course.progress.lessons);
   // The first clip is ready to play; the rest load when pressed, so a step with several stays light.
   const firstClip = step.blocks.findIndex((block) => block.type === 'clip');
@@ -105,6 +106,7 @@ export function LessonView({
             block={block}
             lectures={byCode}
             text={text}
+            maths={maths}
             deferred={index !== firstClip}
             fold={`learn.course.check.${course.id}.${step.key}.${index}`}
           />
@@ -128,12 +130,14 @@ function BlockView({
   block,
   lectures,
   text,
+  maths,
   deferred,
   fold,
 }: {
   block: Block;
   lectures: ReadonlyMap<string, Lecture>;
   text: (source: string) => string;
+  maths: boolean;
   deferred: boolean;
   fold: string;
 }) {
@@ -143,7 +147,11 @@ function BlockView({
         {block.title && (
           <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{block.title}</h2>
         )}
-        <Markdown markdown={text(block.body)} className="vault-prose max-w-none" />
+        <CourseMarkdown
+          maths={maths}
+          markdown={text(block.body)}
+          className="vault-prose max-w-none"
+        />
       </section>
     );
   }
@@ -183,7 +191,11 @@ function BlockView({
             </p>
           )}
         </div>
-        <Markdown markdown={text(block.body)} className="vault-prose prose-compact" />
+        <CourseMarkdown
+          maths={maths}
+          markdown={text(block.body)}
+          className="vault-prose prose-compact"
+        />
         {block.excerpt.length > 0 && (
           <div className="space-y-3 border-l-2 border-border-strong pl-4">
             <div className="vault-prose">
@@ -215,9 +227,17 @@ function BlockView({
   return (
     <CardSection title="Try it" fold={fold}>
       <div className="space-y-3">
-        <Markdown markdown={text(block.question)} className="vault-prose prose-compact" />
+        <CourseMarkdown
+          maths={maths}
+          markdown={text(block.question)}
+          className="vault-prose prose-compact"
+        />
         <Disclosure title="The answer">
-          <Markdown markdown={text(block.answer)} className="vault-prose prose-compact" />
+          <CourseMarkdown
+            maths={maths}
+            markdown={text(block.answer)}
+            className="vault-prose prose-compact"
+          />
         </Disclosure>
       </div>
     </CardSection>
