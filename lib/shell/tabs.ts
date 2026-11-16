@@ -95,16 +95,12 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
     { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true },
     // Courses: long lecture series cut down to what you need (learn 0194).
     { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },
-    {
-      href: '/learn/know',
-      label: 'Subjects',
-      icon: 'know',
-      exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
-    },
-    // Idea Space left the nav when Courses came in (learn 0194): it had not
-    // been opened in a month and the count of Learn's tabs is held where it
-    // is. Its page is kept at /learn/space.
+    // Idea Space left the nav when Courses came in (learn 0194) and came back
+    // at the person's ask the same day. The count of Learn's tabs is held
+    // where it is, so Subjects gave up its place: the generated subjects are
+    // what the reader replaced (docs/LEARN-READER-SPEC.md). Its pages are kept
+    // at /learn/know.
+    { href: '/learn/space', label: 'Idea Space', icon: 'ideaSpace', exact: true },
     {
       href: '/learn/essays',
       label: 'Essays',

@@ -104,6 +104,10 @@ Not built yet:
 - A fixed share of new ground among what Find me more to read returns. The
   skill asks for two near the notes and two new each time, which is a ratio
   written in prose and not one the code holds.
-- The old Learn. Now, Subjects, Essays, Reading lists and Videos are still
-  there, and the hourly jobs behind them still run. Retiring them is its own
-  step.
+- The old Learn. Its pages are still there: the card feed at `/learn/now`,
+  Subjects at `/learn/know` (out of the tab bar since Idea Space came back),
+  Essays, Reading lists and Videos. Three of its clocks were paused on 16
+  November 2026 (learn 0196): the hourly card top-up, the hourly theme
+  placement and the topic import. The daily run still does Learn's
+  embeddings, literature pulls, preparations and figures. Removing the pages
+  and the daily work is its own step.
