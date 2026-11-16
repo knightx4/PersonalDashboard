@@ -396,7 +396,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'duplicate_answers',
     description:
-      'The application answers that repeat a question already answered on another role, grouped by question ("1. Why are you interested in Hooli?" and "Why are you interested in Hooli?" are one question). Each row is a copy that could go: its answer ref, the question, the role, its status and the first words, with remove true when it is an identical copy of the one kept (and keeps naming that one) and remove false when the copies are worded differently and the person has to say which to keep. Submitted answers are never rows. Use it for "remove my duplicate answers" or "which answers are repeated", then propose_delete for the rows with remove true.',
+      'The application answers that repeat a question already answered on another role, grouped by question ("1. Why are you interested in Hooli?" and "Why are you interested in Hooli?" are one question). Each row is a copy that could go: its answer ref, the question, the role, its status and the first words, with remove true when it is an identical copy of the one kept (and keeps naming that one) and remove false when the copies are worded differently and the person has to say which to keep. Submitted answers are never rows. Use it for "remove my duplicate answers" or "which answers are repeated", then propose deleting the rows with remove true where a delete tool is offered, or else name them so they can remove them on the role pages.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {

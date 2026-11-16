@@ -1592,7 +1592,7 @@ async function namedEmail(env: JobsWriteEnv, ref: string): Promise<Row> {
   if (isUuid(ref)) query = query.eq('id', ref);
   else {
     const at = ref.indexOf(':');
-    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('email_ref must be the ref search_mail or a lookup returned for the email.');
+    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('email_ref must be the ref a mail search or a lookup returned for the email.');
     query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
   }
   const { data, error } = await query.maybeSingle();
@@ -1781,7 +1781,7 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   const application = await namedApplication(env, args);
   const applicationId = application.id as string;
   const emailRef = text(args, 'email_ref');
-  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref a mail search or a lookup returned.');
   // Through the inbox view, which carries the person's user id.
   const email = await namedEmail(env, emailRef);
   const messageId = email.id as string;
@@ -2154,7 +2154,7 @@ const pickMessage = (row: Row): Row => Object.fromEntries(MESSAGE_COLUMNS.map((c
 /** The emails a call names, read through the inbox view by the person's user id; refused unless every one is theirs. */
 async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
   const list = Array.isArray(refs) ? refs : [];
-  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as search_mail or a lookup returned them.');
+  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as a mail search or a lookup returned them.');
   if (list.length > EMAILS_MAX) throw new JobsRefused(`Up to ${EMAILS_MAX} emails at a time.`);
   const byId = new Map<string, Row>();
   for (const raw of list) {
@@ -2164,7 +2164,7 @@ async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
     if (isUuid(ref)) query = query.eq('id', ref);
     else {
       const at = ref.indexOf(':');
-      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref search_mail or a lookup returned for the email.');
+      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref a mail search or a lookup returned for the email.');
       query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
     }
     const { data, error } = await query.maybeSingle();
@@ -2266,7 +2266,7 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
   if (companyGiven.length > COMPANY_MAX) throw new JobsRefused(`Keep company under ${COMPANY_MAX} characters.`);
   let emailRef = text(args, 'email_ref');
   if (emailRef.startsWith('job_search.inbox_messages:')) emailRef = emailRef.slice('job_search.inbox_messages:'.length);
-  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref a mail search or a lookup returned.');
   const email = await namedEmail(env, emailRef);
   const messageId = email.id as string;
   const { data: stored, error: storedError } = await env.jobs.from('ingested_messages').select('resulting_application_id').eq('id', messageId).maybeSingle();
@@ -3053,7 +3053,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
           description:
             'Where the location, work mode, seniority, posting status and pay given came from: posting when quoted from the posting, email when quoted from an email (give email_ref), person when they told you the value, guess when you worked it out. Left out, they are recorded as your guess, except pay with pay_source posted or recruiter. A guess does not replace a value that came from the posting or an email.',
         },
-        email_ref: { type: 'string', description: 'With fact_source email: the ref search_mail or a lookup returned for the email the values came from.' },
+        email_ref: { type: 'string', description: 'With fact_source email: the ref a mail search or a lookup returned for the email the values came from.' },
       },
       additionalProperties: false,
     },
@@ -3245,7 +3245,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         due: { type: 'string', description: 'The new due day, YYYY-MM-DD.' },
         email_ref: {
           type: 'string',
-          description: 'The email to link it to: the ref search_mail returned, or a job_search.inbox_messages ref. An empty string unlinks it.',
+          description: 'The email to link it to: a job_search.inbox_messages ref, or the ref a mail search returned. An empty string unlinks it.',
         },
       },
       required: ['reminder_ref'],
@@ -3290,7 +3290,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         role_ref: { type: 'string', description: "Instead of application_ref: the job_search.roles ref, for the role's latest application." },
         email_ref: {
           type: 'string',
-          description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.',
+          description: 'The email: a job_search.inbox_messages ref, or the ref a mail search returned.',
         },
       },
       required: ['action', 'email_ref'],
@@ -3345,11 +3345,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/review/actions.ts#dismissMessages', 'lib/jobs/review/verdicts.ts#dismissMessageRows'],
       ['app/jobs/(app)/review/actions.ts#restoreDismissedMessages', 'lib/jobs/review/verdicts.ts#restoreMessageRow'],
     ),
-    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
+    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by their job_search.inbox_messages refs or the refs a mail search returned. Linking an email to a role is change_role_email.`,
     input_schema: {
       type: 'object',
       properties: {
-        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: refs from search_mail, or job_search.inbox_messages refs.' },
+        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: job_search.inbox_messages refs, or refs a mail search returned.' },
         verb: { type: 'string', enum: ['dismiss', 'restore'], description: 'dismiss to take them out of the queue; restore to bring dismissed ones back.' },
         classification: {
           type: 'string',
@@ -3446,7 +3446,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     input_schema: {
       type: 'object',
       properties: {
-        email_ref: { type: 'string', description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.' },
+        email_ref: { type: 'string', description: 'The email: a job_search.inbox_messages ref, or the ref a mail search returned.' },
         company: { type: 'string', description: 'The company the role is at, by name.' },
         title: { type: 'string', description: 'What the role is called.' },
       },
