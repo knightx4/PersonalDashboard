@@ -110,7 +110,7 @@ function StepMark({ step, live }: { step: BuildStep; live: boolean }) {
   return (
     <Circle
       className="mt-0.5 size-4 shrink-0 text-ink-ghost"
-      strokeWidth={1.5}
+      strokeWidth={1.75}
       aria-label="Waiting"
     />
   );

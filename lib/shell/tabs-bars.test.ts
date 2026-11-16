@@ -78,7 +78,6 @@ const LEARN_SHARED: NavSection[] = [
     exact: true,
     alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
   },
-  { href: '/learn/space', label: 'Idea Space', icon: 'ideaSpace', exact: true },
   {
     href: '/learn/essays',
     label: 'Essays',

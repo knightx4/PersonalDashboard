@@ -23,7 +23,7 @@ export function AddCourse() {
             aria-label="A playlist link or a course name"
             placeholder="A playlist link or a course name"
             aria-describedby={state.error ? 'course-what-error' : undefined}
-            className="min-w-0 flex-1"
+            className="min-h-11 min-w-0 flex-1"
             required
           />
           <Button type="submit" pending={pending} className="shrink-0">
@@ -35,6 +35,7 @@ export function AddCourse() {
           name="goal"
           aria-label="What you want from it"
           placeholder="What you want from it (optional)"
+          className="min-h-11"
         />
         {state.error && <FieldError id="course-what-error">{state.error}</FieldError>}
         <p className="text-small text-ink-muted">

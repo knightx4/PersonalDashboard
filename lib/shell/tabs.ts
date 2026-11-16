@@ -99,7 +99,9 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
       exact: true,
       alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
     },
-    { href: '/learn/space', label: 'Idea Space', icon: 'ideaSpace', exact: true },
+    // Idea Space left the nav when Courses came in (learn 0194): it had not
+    // been opened in a month and the count of Learn's tabs is held where it
+    // is. Its page is kept at /learn/space.
     {
       href: '/learn/essays',
       label: 'Essays',
