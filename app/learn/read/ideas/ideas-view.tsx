@@ -17,7 +17,7 @@ export function IdeasView({ ideas }: { ideas: MetIdea[] }) {
   return (
     <PageColumn className="space-y-5">
       <PageHeader
-        subject={sectionSubject('/learn/read', 'Read', {
+        subject={sectionSubject('/learn/read', 'Now', {
           label: 'Ideas you have met',
           href: '/learn/read/ideas',
         })}

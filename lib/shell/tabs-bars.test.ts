@@ -68,7 +68,7 @@ const BEFORE: Record<
 };
 
 const LEARN_SHARED: NavSection[] = [
-  { href: '/learn/read', label: 'Read', icon: 'readNow', alsoMatches: ['/learn/read/'] },
+  { href: '/learn/read', label: 'Now', icon: 'readNow', alsoMatches: ['/learn/read/'] },
   { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true, badge: 7 },
   { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },
   {

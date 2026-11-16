@@ -27,8 +27,8 @@ describe('rememberedPath', () => {
   it('lands Learn on Now whatever page you left it on', () => {
     rememberLastPaths({ learn: '/learn/lists' });
     const home = moduleById('learn')?.home;
-    expect(home).toBe('/learn/now');
-    expect(rememberedPath('learn', home!)).toBe('/learn/now');
+    expect(home).toBe('/learn/read');
+    expect(rememberedPath('learn', home!)).toBe('/learn/read');
   });
 
   it('lands on the home when nothing is remembered', () => {

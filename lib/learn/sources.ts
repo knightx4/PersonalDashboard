@@ -5,7 +5,7 @@ const SUBJECTS: Section = { href: '/learn/know', label: 'Subjects' };
 const ESSAYS: Section = { href: '/learn/essays', label: 'Essays' };
 const READING_LISTS: Section = { href: '/learn/lists', label: 'Reading lists' };
 const VIDEOS: Section = { href: '/learn/videos', label: 'Videos' };
-const READ: Section = { href: '/learn/read', label: 'Read' };
+const READ: Section = { href: '/learn/read', label: 'Now' };
 const COURSES: Section = { href: '/learn/courses', label: 'Courses' };
 /** A learning aim is a goal in Goals now (plan #1491), so it sits under Goals' home. */
 const GOALS_HOME: Section = { href: '/goals', label: 'Now' };

@@ -32,7 +32,7 @@ export function ReadView({ shelves }: { shelves: Shelves }) {
 
   return (
     <PageColumn className="space-y-6">
-      <PageHeader subject={sectionSubject('/learn/read', 'Read')} title="Read" />
+      <PageHeader subject={sectionSubject('/learn/read', 'Now')} title="Read" />
 
       {first && <PickUp row={first} />}
 

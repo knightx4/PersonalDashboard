@@ -23,7 +23,7 @@ import { Preparing, Verdict, YourCopy } from './source-actions';
 export function SourceView({ source }: { source: ReaderSource }) {
   const header = (title: string, description?: string) => (
     <PageHeader
-      subject={sectionSubject('/learn/read', 'Read', {
+      subject={sectionSubject('/learn/read', 'Now', {
         label: title,
         href: `/learn/read/${source.id}`,
       })}
@@ -87,8 +87,10 @@ export function SourceView({ source }: { source: ReaderSource }) {
             className: 'h-auto w-full py-3 whitespace-normal',
           })}
         >
-          {source.read.length > 0 ? 'Go on' : 'Start'}: {prepared.sections[next - 1].title} ·{' '}
-          {prepared.sections[next - 1].minutes} min
+          <span className="min-w-0 text-center whitespace-normal [overflow-wrap:anywhere]">
+            {source.read.length > 0 ? 'Go on' : 'Start'}: {prepared.sections[next - 1].title} ·{' '}
+            {prepared.sections[next - 1].minutes} min
+          </span>
         </Link>
       )}
 

@@ -37,7 +37,7 @@ export function SectionView({
       <PageHeader
         subject={sectionSubject(
           '/learn/read',
-          'Read',
+          'Now',
           { label: source.title, href: `/learn/read/${source.id}` },
           { label: section.title, href: `/learn/read/${source.id}/${n}` },
         )}
