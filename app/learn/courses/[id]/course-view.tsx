@@ -195,7 +195,7 @@ function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Tex
         {planTree(plan).map((line, index) => (
           <div key={line.stages[0].key} className="space-y-3">
             {index > 0 && <Leads>After {afterTitles(plan, line.stages[0]).join(' and ')}</Leads>}
-            <LineView course={course} plan={plan} line={line} done={done} top />
+            <LineView course={course} plan={plan} line={line} done={done} />
           </div>
         ))}
       </div>
@@ -218,22 +218,20 @@ function Leads({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * A line of stages, then the branches that open when it ends. The first fork
- * of the course is set side by side on a wide screen; a fork inside a branch
- * is stacked under it behind a rule, so a phone never has columns in columns.
+ * A line of stages, then the branches that open when it ends, stacked behind
+ * a rule and set in from it. A fork inside a branch is set in again, so how
+ * far in a stage sits says what it follows, at any width.
  */
 function LineView({
   course,
   plan,
   line,
   done,
-  top = false,
 }: {
   course: Course;
   plan: Plan;
   line: Line;
   done: ReadonlySet<string>;
-  top?: boolean;
 }) {
   return (
     <div className="space-y-3">
@@ -245,13 +243,7 @@ function LineView({
           <Leads>
             From here it branches {line.branches.length} ways. Take whichever you want first.
           </Leads>
-          <div
-            className={
-              top
-                ? 'grid items-start gap-3 lg:grid-cols-2'
-                : 'space-y-3 border-l border-border-strong pl-3'
-            }
-          >
+          <div className="space-y-3 border-l border-border-strong pl-3">
             {line.branches.map((branch) => (
               <LineView
                 key={branch.stages[0].key}
