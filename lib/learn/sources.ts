@@ -67,6 +67,7 @@ export const learnSources: ModuleSources = {
       title: 'title',
       href: (id) => `/learn/read/${id}`,
       section: READ,
+      parent: parentBy('reading_id', 'learn.readings'),
     },
     {
       table: 'learn.courses',
