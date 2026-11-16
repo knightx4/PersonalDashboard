@@ -44,7 +44,7 @@ export function SectionText({
                       aria-expanded={open.includes(part.gloss)}
                       onClick={() => toggle(part.gloss)}
                       // ui-ok: a phrase that opens its note under the paragraph, not a link to anywhere
-                      className="cursor-pointer rounded-control underline decoration-accent decoration-dotted decoration-2 underline-offset-4 aria-expanded:bg-accent-tint"
+                      className="inline cursor-pointer rounded-control text-left underline decoration-accent decoration-dotted decoration-2 underline-offset-4 aria-expanded:bg-accent-tint"
                     >
                       {part.text}
                     </button>

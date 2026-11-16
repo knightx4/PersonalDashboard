@@ -113,10 +113,10 @@ function PickUp({ row }: { row: ReaderRow }) {
         className: 'h-auto w-full flex-col items-start gap-0.5 py-3 text-left whitespace-normal',
       })}
     >
-      <span className="text-body font-medium">
+      <span className="max-w-full text-body font-medium whitespace-normal">
         {started ? 'Pick up where you left off' : `Start ${row.title}`}
       </span>
-      <span className="text-small opacity-80 [overflow-wrap:anywhere]">
+      <span className="max-w-full text-small whitespace-normal opacity-80 [overflow-wrap:anywhere]">
         {started
           ? `${row.title} · ${section.title} · ${section.minutes} min`
           : `${row.outline?.sections.length} sections · ${row.outline?.minutes} min in all`}
