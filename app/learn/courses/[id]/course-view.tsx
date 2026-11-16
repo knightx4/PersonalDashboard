@@ -186,18 +186,34 @@ function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Tex
 
       <div className="space-y-2">
         {stageRows(plan).map((row, index) => (
-          <div key={row[0].key} className="space-y-2">
+          <div key={row[0][0].key} className="space-y-2">
             {index > 0 && (
-              <div className="flex items-center gap-2 pl-3 text-small text-ink-muted">
-                <ArrowDown className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
-                {row.length > 1
-                  ? `After ${afterTitles(plan, row[0]).join(' and ')}, ${row.length} branches. Take whichever you want first.`
-                  : `After ${afterTitles(plan, row[0]).join(' and ')}`}
+              <div className="flex items-start gap-2 pl-3 text-small text-ink-muted">
+                <ArrowDown
+                  className="mt-0.5 size-3.5 shrink-0 text-ink-ghost"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <span className="min-w-0 [overflow-wrap:anywhere]">
+                  {row.length > 1
+                    ? `After ${afterTitles(plan, row[0][0]).join(' and ')}, ${row.length} branches. Take whichever you want first.`
+                    : `After ${afterTitles(plan, row[0][0]).join(' and ')}`}
+                </span>
               </div>
             )}
             <div className={row.length > 1 ? 'grid items-start gap-3 lg:grid-cols-2' : undefined}>
-              {row.map((stage) => (
-                <StageCard key={stage.key} course={course} plan={plan} stage={stage} done={done} />
+              {row.map((line) => (
+                <div key={line[0].key} className="space-y-3">
+                  {line.map((stage) => (
+                    <StageCard
+                      key={stage.key}
+                      course={course}
+                      plan={plan}
+                      stage={stage}
+                      done={done}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
           </div>

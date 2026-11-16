@@ -281,11 +281,33 @@ describe('walking the plan', () => {
   const done = (...keys: string[]) => new Set(keys);
 
   it('puts branches of one fork on one row', () => {
-    expect(stageRows(plan).map((row) => row.map((item) => item.key))).toEqual([
-      ['A'],
-      ['B', 'C'],
-      ['D'],
-    ]);
+    const keys = (rows: ReturnType<typeof stageRows>) =>
+      rows.map((row) => row.map((line) => line.map((item) => item.key)));
+    expect(keys(stageRows(plan))).toEqual([[['A']], [['B'], ['C']], [['D']]]);
+  });
+
+  it('keeps a branch two stages long in one column', () => {
+    const bare = (key: string, after: string[]) => ({
+      key,
+      title: key,
+      about: 'x',
+      after,
+      steps: [step('s')],
+    });
+    const long = checkDigest(
+      digest({}, [
+        bare('A', []),
+        bare('B1', ['A']),
+        bare('B2', ['B1']),
+        bare('C', ['A']),
+        bare('G', ['B2', 'C']),
+      ]),
+      LECTURES,
+    );
+    if (!long.ok) throw new Error(long.problems.join(' '));
+    expect(
+      stageRows(long.digest.plan).map((row) => row.map((line) => line.map((item) => item.key))),
+    ).toEqual([[['A']], [['B1', 'B2'], ['C']], [['G']]]);
   });
 
   it('starts at the first stage and follows a branch once it is begun', () => {

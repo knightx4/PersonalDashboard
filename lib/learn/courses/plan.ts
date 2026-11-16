@@ -61,20 +61,41 @@ export function afterStep(plan: Plan, key: string): { step: Step | null; stages:
 }
 
 /**
- * The stages as rows down the page. Stages listed one after another that come
- * after the same stages are branches of one fork and share a row.
+ * The stages as rows down the page. A row holds one line of stages, or
+ * several side by side where the course branches. A line is a stage with the
+ * stages that can only follow it stacked beneath, so a branch two stages long
+ * stays in its own column. Lines listed one after another that come after
+ * the same stages are the branches of one fork and share a row.
  */
-export function stageRows(plan: Plan): Stage[][] {
-  const rows: Stage[][] = [];
+export function stageRows(plan: Plan): Stage[][][] {
+  const followers = (stage: Stage) => plan.stages.filter((item) => item.after.includes(stage.key));
+  const placed = new Set<string>();
+  const lines: Stage[][] = [];
   for (const stage of plan.stages) {
+    if (placed.has(stage.key)) continue;
+    const line = [stage];
+    placed.add(stage.key);
+    for (;;) {
+      const next = followers(line[line.length - 1]);
+      // The line goes on only while one stage follows and it follows nothing else.
+      if (next.length !== 1 || next[0].after.length !== 1 || placed.has(next[0].key)) break;
+      line.push(next[0]);
+      placed.add(next[0].key);
+    }
+    lines.push(line);
+  }
+
+  const rows: Stage[][][] = [];
+  for (const line of lines) {
     const row = rows[rows.length - 1];
+    const head = line[0];
     const same =
       row !== undefined &&
-      stage.after.length > 0 &&
-      row[0].after.length === stage.after.length &&
-      row[0].after.every((key) => stage.after.includes(key));
-    if (same) row.push(stage);
-    else rows.push([stage]);
+      head.after.length > 0 &&
+      row[0][0].after.length === head.after.length &&
+      row[0][0].after.every((key) => head.after.includes(key));
+    if (same) row.push(line);
+    else rows.push([line]);
   }
   return rows;
 }

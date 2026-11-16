@@ -14,60 +14,41 @@ import fixture from './course-digest-fixture.json';
 /**
  * Gallery fixtures for Learn's Courses tab (learn 0194): the list with one
  * course built and one building, a build part way through, a built course on
- * its plan and on its lectures, and one step. The digest is a cut of the
- * first one built, MIT 18.S096, so the surfaces carry real lecture numbers
- * and timestamps: its opening stage and the two branches that follow it.
+ * its plan and on its lectures, and one step. The digest is a cut of a real
+ * one, the Berkeley Agentic AI series, so the surfaces carry real lecture
+ * numbers and timestamps: its opening stage and the branches that follow.
  */
 
 // The fixture is the file a session saves, so it goes through the same check
 // the save does: times become seconds and each step's minutes are worked out.
 const listed = checkLectures(fixture.lectures);
 const lectures: Lecture[] = listed.ok ? listed.lectures : [];
-const checked = checkDigest(
-  {
-    ...fixture.digest,
-    ratings: {
-      ...fixture.digest.ratings,
-      rows: lectures.map(
-        (lecture) =>
-          fixture.digest.ratings.rows.find((row) => row.code === lecture.code) ?? {
-            code: lecture.code,
-            rating: 'skim',
-            watch: '',
-            why: 'Standard review.',
-          },
-      ),
-    },
-    ideas: [...fixture.digest.ideas, ...fixture.digest.ideas],
-  },
-  lectures,
-);
+const checked = checkDigest(fixture.digest, lectures);
 if (!checked.ok)
   throw new Error(`The course fixture does not check: ${checked.problems.join(' ')}`);
 const digest: Digest = checked.digest;
 
 const READY: Course = {
   id: '00000000-0000-4000-8000-0000000c0001',
-  title: 'MIT Quantitative Finance, Condensed',
-  provider: 'MIT OpenCourseWare',
+  title: 'Agentic AI',
+  provider: 'UC Berkeley',
   sourceUrl: null,
-  about:
-    '18.S096 Topics in Mathematics with Applications in Finance (Fall 2013), plus four 2024 guest lectures.',
-  goal: 'See how a sell-side quant desk measures risk and prices by replication.',
-  budgetMinutes: 180,
-  catalogueKey: 'mit-18s096-2013',
+  about: 'The Berkeley Agentic AI MOOC, Fall 2025: eleven guest lectures.',
+  goal: 'Know how agents are built, scored and attacked well enough to judge one.',
+  budgetMinutes: 240,
+  catalogueKey: 'berkeley-agentic-ai-f25',
   status: 'ready',
   steps: [],
   totals: {
-    videos: 28,
-    runtimeMinutes: 2202,
-    pathMinutes: 262,
-    watchMinutes: 177,
-    share: 0.08,
-    watch: 5,
-    parts: 8,
-    skim: 14,
-    skip: 1,
+    videos: 11,
+    runtimeMinutes: 777,
+    pathMinutes: 420,
+    watchMinutes: 240,
+    share: 0.31,
+    watch: 2,
+    parts: 7,
+    skim: 2,
+    skip: 0,
   },
   progress: { clips: [], lessons: [digest.plan.stages[0].steps[0].key] },
   error: null,
