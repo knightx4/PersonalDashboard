@@ -401,10 +401,10 @@ import {
 } from './reader-surfaces';
 import {
   CourseDigestBuildingPreview,
+  CourseDigestLecturesPreview,
   CourseDigestLessonPreview,
   CourseDigestListPreview,
-  CourseDigestMapPreview,
-  CourseDigestPathPreview,
+  CourseDigestPlanPreview,
 } from './course-digest-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
@@ -8234,25 +8234,27 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CourseDigestBuildingPreview />,
   },
   {
-    /* A built course on its path: the clips in order, each playing in the page. */
-    id: 'learn-digest-path',
-    label: 'Courses · The path',
+    /* A built course on its plan: the stages down the page, side by side where
+     * the course branches, each a list of steps. */
+    id: 'learn-digest-plan',
+    label: 'Courses · The lesson plan',
     module: 'learn',
     width: 'page',
-    render: () => <CourseDigestPathPreview />,
+    render: () => <CourseDigestPlanPreview />,
   },
   {
-    /* A built course's map: what rests on what, and where the lecturers disagree. */
-    id: 'learn-digest-map',
-    label: 'Courses · The map',
+    /* A built course's lectures: a verdict on each, and each playing in the page. */
+    id: 'learn-digest-lectures',
+    label: 'Courses · The lectures',
     module: 'learn',
     width: 'page',
-    render: () => <CourseDigestMapPreview />,
+    render: () => <CourseDigestLecturesPreview />,
   },
   {
-    /* One lesson: the point, each idea in the form it was given, a question to try. */
+    /* One step of the plan: commentary, a clip in the page, a drawing, a
+     * reading, a question, and the branches to choose between at the foot. */
     id: 'learn-digest-lesson',
-    label: 'Courses · A lesson',
+    label: 'Courses · A step of the plan',
     module: 'learn',
     width: 'page',
     render: () => <CourseDigestLessonPreview />,

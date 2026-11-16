@@ -420,7 +420,7 @@ export const learnActions: ModuleActions = {
     ),
     markCourseProgress: none(
       'own',
-      "Ticking a clip watched or a lesson done records the person's own study.",
+      "Ticking a step of a course's plan done records the person's own study.",
     ),
   },
   'app/learn/settings/external/actions.ts': {

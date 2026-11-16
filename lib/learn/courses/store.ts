@@ -407,7 +407,7 @@ export async function requeueCourse(
   if (error) throw new Error(`Queuing the course again failed: ${error.message}`);
 }
 
-/** Tick or untick a path clip or a lesson. */
+/** Tick or untick a step of the plan (`lessons`); `clips` is from the first shape and unused. */
 export async function setProgress(
   client: LearnSupabaseClient,
   userId: string,

@@ -20,12 +20,25 @@ export default async function CoursePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; play?: string; t?: string }>;
 }) {
-  const [{ id }, { tab }] = await Promise.all([params, searchParams]);
+  const [{ id }, { tab, play, t }] = await Promise.all([params, searchParams]);
   const user = await requireUser();
   const course = await loadCourse(await createLearnClient(), user.id, id);
   if (!course) notFound();
   if (course.status !== 'ready' || !course.digest) return <BuildView course={course} />;
-  return <CourseView course={course} digest={course.digest} tab={tab ?? null} />;
+  // A moment's link (linkMoments) names the lecture to open and the second to play from.
+  const start = Number(t);
+  return (
+    <CourseView
+      course={course}
+      digest={course.digest}
+      tab={tab ?? null}
+      play={
+        play
+          ? { code: play, start: Number.isFinite(start) && start > 0 ? Math.floor(start) : 0 }
+          : null
+      }
+    />
+  );
 }

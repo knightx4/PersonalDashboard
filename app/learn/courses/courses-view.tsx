@@ -16,9 +16,9 @@ import { hours, runningStep } from './format';
 
 /**
  * The Courses tab (docs/LEARN-DIGEST-SPEC.md). A course here is a long
- * lecture series cut down to what this person needs: a timed path of the
- * clips worth watching, lessons that give every idea its cheapest form, and
- * what the lecturers got wrong.
+ * lecture series cut down to what this person needs: one plan of lessons to
+ * take in order, branching where the course forks, with the clips worth
+ * watching inside it, and what the lecturers got wrong.
  *
  * Yours first, with a course that is being built showing the stage it is on.
  * Then the box that takes any playlist, then the open courses Dash can build,
@@ -114,11 +114,11 @@ function courseLine(course: CourseSummary): string {
   const by = course.provider ? `${course.provider} · ` : '';
   if (course.status === 'ready') {
     const { runtimeMinutes, pathMinutes, videos } = course.totals;
-    const watched = course.progress.clips.length;
+    const taken = course.progress.lessons.length;
     const parts = [
       videos ? `${videos} videos` : null,
-      runtimeMinutes ? `${hours(runtimeMinutes)} cut to a ${hours(pathMinutes ?? 0)} path` : null,
-      watched > 0 ? `${watched} ${watched === 1 ? 'clip' : 'clips'} watched` : null,
+      runtimeMinutes ? `${hours(runtimeMinutes)} as about ${hours(pathMinutes ?? 0)} of lessons` : null,
+      taken > 0 ? `${taken} ${taken === 1 ? 'step' : 'steps'} done` : null,
     ].filter(Boolean);
     return by + parts.join(' · ');
   }

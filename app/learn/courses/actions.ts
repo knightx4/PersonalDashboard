@@ -81,7 +81,7 @@ export async function startWaitingCourse(courseId: string): Promise<void> {
   revalidatePath(`/learn/courses/${courseId}`);
 }
 
-/** Tick a path clip watched or a lesson done. */
+/** Tick a step of a course's plan done. */
 // latency: optimistic
 export async function markCourseProgress(
   courseId: string,

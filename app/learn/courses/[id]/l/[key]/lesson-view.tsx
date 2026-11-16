@@ -4,49 +4,47 @@ import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
-import { Chip } from '@/components/ui/chip';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Markdown } from '@/components/ui/markdown';
-import { SectionHeading } from '@/components/ui/section-heading';
+import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
   clock,
   linkMoments,
-  TREATMENT_LABEL,
-  type Idea,
+  type Block,
   type Lecture,
-  type Lesson,
+  type Stage,
+  type Step,
 } from '@/lib/learn/courses/digest';
+import type { Placed } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
+import { ReaderFigure } from '../../../../read/figure';
+import { momentHref } from '../../course-view';
 import { Tick } from '../../tick';
 
 /**
- * One lesson of a course: a cluster of ideas (docs/LEARN-DIGEST-SPEC.md,
- * "Lesson shape"). The point first, in one sentence. Then each idea in the
- * form it was given: the ones to watch with their clip in the page, the
- * worked ones written out with numbers, the rest in a line each, and what was
- * skipped with the reason, folded, so the person can overrule it. Then a
- * question to try, and who in the series disagrees.
+ * One step of a course's plan (docs/LEARN-DIGEST-SPEC.md, "The plan"). Its
+ * blocks are drawn in the order they were written, because that is the order
+ * to take them in: words that set a clip up, the clip playing in the page,
+ * what to make of it, a drawing, a piece of a reading, a question to try.
+ * At the foot, the next step, or the branches to choose between when this
+ * step ends a stage.
  */
 export function LessonView({
   course,
-  lesson,
-  at,
-  total,
+  placed,
   next,
 }: {
   course: Course;
-  lesson: Lesson;
-  at: number;
-  total: number;
-  next: Lesson | null;
+  placed: Placed;
+  next: { step: Step | null; stages: Stage[] };
 }) {
-  const text = (source: string) => linkMoments(source, course.lectures);
-  const full = lesson.ideas.filter(
-    (idea) => idea.treatment === 'clip' || idea.treatment === 'worked',
-  );
-  const cards = lesson.ideas.filter((idea) => idea.treatment === 'card');
-  const skipped = lesson.ideas.filter((idea) => idea.treatment === 'skip');
+  const { stage, step, at } = placed;
+  const text = (source: string) => linkMoments(source, course.lectures, momentHref(course.id));
+  const byCode = new Map(course.lectures.map((lecture) => [lecture.code, lecture]));
+  const stepHref = (key: string) => `/learn/courses/${course.id}/l/${encodeURIComponent(key)}`;
+  // The first clip is ready to play; the rest load when pressed, so a step with several stays light.
+  const firstClip = step.blocks.findIndex((block) => block.type === 'clip');
 
   return (
     <PageColumn className="space-y-5">
@@ -54,155 +52,191 @@ export function LessonView({
         subject={sectionSubject(
           '/learn/courses',
           'Courses',
-          { label: course.title, href: `/learn/courses/${course.id}?tab=lessons` },
-          {
-            label: lesson.title,
-            href: `/learn/courses/${course.id}/l/${encodeURIComponent(lesson.key)}`,
-          },
+          { label: course.title, href: `/learn/courses/${course.id}` },
+          { label: step.title, href: stepHref(step.key) },
         )}
-        title={lesson.title}
-        description={`Lesson ${at + 1} of ${total}`}
+        title={step.title}
+        description={`${stage.title} · step ${at + 1} of ${stage.steps.length} · ${step.minutes} min`}
       />
 
-      <Card padding="dense" className="bg-accent-tint">
-        <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">{lesson.point}</p>
-      </Card>
-
-      {full.map((idea) => (
-        <IdeaCard key={idea.name} idea={idea} lectures={course.lectures} text={text} />
+      {step.blocks.map((block, index) => (
+        <BlockView
+          key={index}
+          block={block}
+          lectures={byCode}
+          text={text}
+          deferred={index !== firstClip}
+          fold={`learn.course.check.${course.id}.${step.key}.${index}`}
+        />
       ))}
 
-      {cards.length > 0 && (
-        <section className="space-y-2">
-          <SectionHeading title="In a line each" count={cards.length} />
-          <Card padding="none">
-            <ul className="divide-y divide-border">
-              {cards.map((idea) => (
-                <li key={idea.name} className="card-pad-x row-pad space-y-0.5">
-                  <p className="text-ui font-medium text-ink [overflow-wrap:anywhere]">
-                    {idea.name}
-                  </p>
-                  <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
-      )}
-
-      {lesson.check && (
-        <CardSection title="Try it" fold={`learn.course.check.${course.id}.${lesson.key}`}>
-          <div className="space-y-3">
-            <Markdown
-              markdown={text(lesson.check.question)}
-              className="vault-prose prose-compact"
-            />
-            <Disclosure title="The answer">
-              <Markdown
-                markdown={text(lesson.check.answer)}
-                className="vault-prose prose-compact"
-              />
-            </Disclosure>
-          </div>
-        </CardSection>
-      )}
-
-      {lesson.tension && (
-        <CardSection title="Where the series disagrees">
-          <Markdown markdown={text(lesson.tension)} className="vault-prose prose-compact" />
-        </CardSection>
-      )}
-
-      {skipped.length > 0 && (
-        <CardSection
-          title="Skipped, and why"
-          fold={`learn.course.skipped.${course.id}`}
-          defaultOpen={false}
-          meta={skipped.length}
-        >
-          <ul className="space-y-2">
-            {skipped.map((idea) => (
-              <li key={idea.name}>
-                <p className="text-ui font-medium text-ink [overflow-wrap:anywhere]">{idea.name}</p>
-                <Markdown
-                  markdown={text(idea.body)}
-                  className="vault-prose prose-compact prose-aside"
-                />
-              </li>
-            ))}
-          </ul>
-        </CardSection>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="space-y-3">
         <Tick
           courseId={course.id}
           kind="lessons"
-          itemKey={lesson.key}
-          done={course.progress.lessons.includes(lesson.key)}
+          itemKey={step.key}
+          done={course.progress.lessons.includes(step.key)}
           label="Done"
         />
-        {next ? (
-          <Link
-            href={`/learn/courses/${course.id}/l/${encodeURIComponent(next.key)}`}
-            className={buttonVariants({ variant: 'primary' })}
-          >
-            Next: {next.title}
-          </Link>
-        ) : (
-          <Link
-            href={`/learn/courses/${course.id}?tab=ideas`}
-            className={buttonVariants({ variant: 'primary' })}
-          >
-            The big ideas
-          </Link>
+        {next.step && (
+          <NextLink href={stepHref(next.step.key)} lead="Next" title={next.step.title} primary />
+        )}
+        {!next.step && next.stages.length > 1 && (
+          <p className="text-ui text-ink [overflow-wrap:anywhere]">
+            That ends {stage.title}. The course branches here. Take whichever you want first.
+          </p>
+        )}
+        {!next.step &&
+          next.stages.map((item, index) => (
+            <NextLink
+              key={item.key}
+              href={stepHref(item.steps[0].key)}
+              lead={next.stages.length > 1 ? 'Branch' : 'Next'}
+              title={item.title}
+              about={item.about}
+              primary={index === 0 && next.stages.length === 1}
+            />
+          ))}
+        {!next.step && next.stages.length === 0 && (
+          <NextLink
+            href={`/learn/courses/${course.id}`}
+            lead="End of this line"
+            title="Back to the plan"
+            primary
+          />
         )}
       </div>
     </PageColumn>
   );
 }
 
-function IdeaCard({
-  idea,
+function NextLink({
+  href,
+  lead,
+  title,
+  about,
+  primary = false,
+}: {
+  href: string;
+  lead: string;
+  title: string;
+  about?: string;
+  primary?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <Link
+        href={href}
+        className={cn(
+          buttonVariants({ variant: primary ? 'primary' : 'secondary' }),
+          'h-auto min-h-11 max-w-full py-2',
+        )}
+      >
+        <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
+          {lead}: {title}
+        </span>
+      </Link>
+      {about && <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{about}</p>}
+    </div>
+  );
+}
+
+function BlockView({
+  block,
   lectures,
   text,
+  deferred,
+  fold,
 }: {
-  idea: Idea;
-  lectures: Lecture[];
+  block: Block;
+  lectures: ReadonlyMap<string, Lecture>;
   text: (source: string) => string;
+  deferred: boolean;
+  fold: string;
 }) {
-  const byCode = new Map(lectures.map((lecture) => [lecture.code, lecture]));
-  return (
-    <Card padding="dense" className="space-y-3">
-      <div className="flex items-start gap-3">
-        <h2 className="min-w-0 flex-1 text-body font-medium text-ink [overflow-wrap:anywhere]">
-          {idea.name}
-        </h2>
-        <Chip tone={idea.treatment === 'clip' ? 'accent' : 'neutral'}>
-          {TREATMENT_LABEL[idea.treatment]}
-        </Chip>
-      </div>
-      <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
-      {idea.clips.map((clip, index) => {
-        const lecture = byCode.get(clip.code);
-        if (!lecture) return null;
-        return (
-          <div key={index} className="space-y-1.5">
-            {clip.listenFor && (
+  if (block.type === 'text') {
+    return (
+      <section className="space-y-1.5">
+        {block.title && (
+          <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{block.title}</h2>
+        )}
+        <Markdown markdown={text(block.body)} className="vault-prose" />
+      </section>
+    );
+  }
+
+  if (block.type === 'clip') {
+    const lecture = lectures.get(block.code);
+    if (!lecture) return null;
+    return (
+      <Card padding="dense" className="space-y-2">
+        <p className="tabular text-small text-ink-muted [overflow-wrap:anywhere]">
+          Watch · {block.minutes} min · {lecture.speaker ?? lecture.title} · {block.code}{' '}
+          {clock(block.start)} to {clock(block.end)}
+        </p>
+        <p className="text-ui text-ink [overflow-wrap:anywhere]">Listen for: {block.listenFor}</p>
+        <ClipPlayer
+          videoId={lecture.videoId}
+          title={lecture.title}
+          start={block.start}
+          end={block.end}
+          deferred={deferred}
+        />
+      </Card>
+    );
+  }
+
+  if (block.type === 'figure') return <ReaderFigure figure={block} />;
+
+  if (block.type === 'reading') {
+    return (
+      <Card padding="dense" className="space-y-3">
+        <div className="space-y-0.5">
+          <p className="text-small text-ink-muted">Reading</p>
+          <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{block.title}</h2>
+          {(block.author || block.source) && (
+            <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
+              {[block.author, block.source].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+        <Markdown markdown={text(block.body)} className="vault-prose prose-compact" />
+        {block.excerpt.length > 0 && (
+          <div className="space-y-3 border-l-2 border-border-strong pl-4">
+            <div className="vault-prose">
+              {block.excerpt.map((paragraph, index) => (
+                <p key={index}>{paragraph}</p>
+              ))}
+            </div>
+            {block.licence && (
               <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
-                Listen for: {clip.listenFor}
+                The author&rsquo;s text, shown under {block.licence}.
               </p>
             )}
-            <ClipPlayer
-              videoId={lecture.videoId}
-              title={`${clip.code} ${clock(clip.start)}${clip.end ? ` to ${clock(clip.end)}` : ''} · ${lecture.speaker ?? lecture.title}`}
-              start={clip.start}
-              end={clip.end}
-              deferred
-            />
           </div>
-        );
-      })}
-    </Card>
+        )}
+        {block.url && (
+          <Link
+            href={block.url}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'max-w-full')}
+          >
+            Open the whole text
+          </Link>
+        )}
+      </Card>
+    );
+  }
+
+  return (
+    <CardSection title="Try it" fold={fold}>
+      <div className="space-y-3">
+        <Markdown markdown={text(block.question)} className="vault-prose prose-compact" />
+        <Disclosure title="The answer">
+          <Markdown markdown={text(block.answer)} className="vault-prose prose-compact" />
+        </Disclosure>
+      </div>
+    </CardSection>
   );
 }

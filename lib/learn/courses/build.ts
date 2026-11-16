@@ -26,9 +26,9 @@ export type BuildStep = {
 };
 
 export type CourseProgress = {
-  /** Path clips watched, by their position in the path. */
+  /** From the first shape, when a path of clips was ticked; nothing writes it now. */
   clips: string[];
-  /** Lessons finished, by key. */
+  /** Steps of the plan finished, by key (`A.2`). */
   lessons: string[];
 };
 

@@ -136,6 +136,42 @@ Before showing anything:
 
 ---
 
+## The plan
+
+Decided by the owner on 16 November 2026, after using the first three
+digests. They had a path of clips, a list of lessons and a dependency map as
+three tabs, and the owner found three views of one course confusing. What
+they asked for: "linear structured lessons" that follow the map "one by one",
+branching where the course forks, with "everything necessary" in each step:
+"some clips, some explanatory commentary and text lessons, diagrams, guest
+lecture snippets, and even chunks of readings where applicable".
+
+So a digest has one plan, and it replaces the path, the lessons and the map.
+
+- A **stage** is a run of steps. It names the stages it comes after. The
+  first stage is the ground everything else rests on. Stages that come after
+  the same stage are branches: the page sets them side by side and the
+  learner takes whichever they want first. The 18.S096 plan opens on linear
+  algebra and probability and then forks.
+- A **step** is one sitting on one idea. It is a list of blocks in the order
+  to take them: `text` (commentary or a worked mechanism), `clip` (played in
+  the page), `figure` (a drawing in the page's colours), `reading` (a text
+  that belongs here, with the author's paragraphs only where it is openly
+  licensed) and `check` (a question with its full answer).
+- What the old lesson carried is still there. The point and the mechanism
+  are text blocks, the tension is commentary in the step it bears on, and a
+  lower-priority idea is a short text block in the step it belongs to.
+- The course keeps two more tabs: the big ideas, and every lecture with its
+  verdict, each playing in the page. A timestamp anywhere opens its lecture
+  there at that moment. The lecturers' errors sit folded under the lectures.
+
+The shape and its checks are `Plan`, `Stage`, `Step` and `Block` in
+`lib/learn/courses/digest.ts`; which step comes next and what a finished
+stage opens are in `lib/learn/courses/plan.ts`.
+
+The two sections below describe the first shape and are kept for the
+reasoning. Where they disagree with this one, this one holds.
+
 ## Lesson shape
 
 A lesson is one concept cluster, rendered in this order:

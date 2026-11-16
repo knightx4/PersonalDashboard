@@ -1,44 +1,132 @@
 import { describe, expect, it } from 'vitest';
-import { checkDigest, checkLectures, clock, digestTotals, linkMoments, momentsIn, secondsOf, type Lecture } from './digest';
+import {
+  checkDigest,
+  checkLectures,
+  clock,
+  digestTotals,
+  linkMoments,
+  momentsIn,
+  secondsOf,
+  type Lecture,
+} from './digest';
+import { afterStep, isOpen, nextStep, stageRows } from './plan';
 
 const LECTURES: Lecture[] = [
-  { code: 'L07', title: 'Value At Risk', videoId: '92WaNz9mPeY', durationSeconds: 4875, speaker: 'Ken Abbott' },
-  { code: 'L11', title: 'Time Series', videoId: '_IFUfFuyQlU', durationSeconds: 4800, speaker: null },
+  {
+    code: 'L07',
+    title: 'Value At Risk',
+    videoId: '92WaNz9mPeY',
+    durationSeconds: 4875,
+    speaker: 'Ken Abbott',
+  },
+  {
+    code: 'L11',
+    title: 'Time Series',
+    videoId: '_IFUfFuyQlU',
+    durationSeconds: 4800,
+    speaker: null,
+  },
 ];
 
-function digest(overrides: Record<string, unknown> = {}) {
+const SVG =
+  '<svg viewBox="0 0 360 80" role="img" aria-label="Loss against sigma"><line x1="10" y1="60" x2="350" y2="60" stroke="currentColor"/><text x="10" y="20" font-size="12" class="accent">2.33 sigma</text></svg>';
+
+const step = (title: string, blocks: unknown[] = []) => ({
+  title,
+  blocks: [{ type: 'text', body: 'Why this comes next.' }, ...blocks],
+});
+
+function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
   return {
     madeFor: 'A CPA who knows regression.',
     intro: 'Two lectures, read in full. See [[L07 21:49]].',
-    lessons: [
-      {
-        key: 'A',
-        title: 'Measuring risk',
-        point: 'VaR is the loss you will not exceed on 99% of days.',
-        ideas: [
-          {
-            name: 'Value at Risk',
-            treatment: 'clip',
-            body: 'Daily sigma of 1.8% times 2.33 gives 4.2% [[L07 21:49-29:39]].',
-            clips: [{ code: 'L07', start: '21:49', end: '29:39', listenFor: 'The backtest.' }],
-          },
-          { name: 'Fat tails', treatment: 'card', body: 'A t(10) fit puts a 6 sigma day at 1 in 10,000 [[L11 19:32]].', clips: [] },
-        ],
-        check: { question: 'Work the VaR on $10M.', answer: '$420K.' },
-      },
-    ],
-    dependencies: { intro: '', tracks: [{ title: 'Risk', steps: ['Covariance', 'VaR'] }] },
-    tensions: { intro: '', rows: [{ tension: 'How fat are the tails?', oneSide: 'Normal [[L07 24:55]]', otherSide: 't [[L11 19:32]]', lands: 'The backtest concedes it.' }] },
+    plan: {
+      intro: 'Shared ground, then two branches.',
+      budgetMinutes: 30,
+      stages: stages ?? [
+        {
+          key: 'A',
+          title: 'Shared ground',
+          about: 'What both branches rest on.',
+          after: [],
+          steps: [
+            step('Value at Risk', [
+              {
+                type: 'clip',
+                code: 'L07',
+                start: '21:49',
+                end: '29:39',
+                listenFor: 'The backtest.',
+              },
+              {
+                type: 'text',
+                title: 'Worked',
+                body: 'Daily sigma of 1.8% times 2.33 gives 4.2% [[L07 21:49-29:39]].',
+              },
+              { type: 'figure', caption: 'Where the 99% line falls.', svg: SVG },
+              { type: 'check', question: 'Work the VaR on $10M.', answer: '$420K.' },
+            ]),
+            step('Fat tails'),
+          ],
+        },
+        {
+          key: 'B',
+          title: 'Risk',
+          about: 'Measuring it.',
+          after: ['A'],
+          steps: [step('Backtesting')],
+        },
+        {
+          key: 'C',
+          title: 'Time series',
+          about: 'Modelling it.',
+          after: ['A'],
+          steps: [
+            step('Volatility clusters', [
+              {
+                type: 'reading',
+                title: 'Lecture 9 notes',
+                author: 'Peter Kempthorne',
+                source: 'MIT OpenCourseWare',
+                url: 'https://ocw.mit.edu/courses/18-s096/',
+                body: 'The derivation the lecture skips.',
+                excerpt: ['Volatility is not observed directly.'],
+                licence: 'CC BY-NC-SA 4.0',
+              },
+            ]),
+          ],
+        },
+        {
+          key: 'D',
+          title: 'Putting it together',
+          about: 'Needs both.',
+          after: ['B', 'C'],
+          steps: [step('A desk')],
+        },
+      ],
+    },
     ratings: {
       intro: '',
       rows: [
-        { code: 'L07', rating: 'watch', watch: '[[L07 21:49-29:39]]', why: 'The practitioner view.' },
+        {
+          code: 'L07',
+          rating: 'watch',
+          watch: '[[L07 21:49-29:39]]',
+          why: 'The practitioner view.',
+        },
         { code: 'L11', rating: 'skim', watch: '', why: 'Known material.' },
       ],
     },
-    ideas: Array.from({ length: 5 }, (_, index) => ({ title: `Idea ${index + 1}`, body: 'With its example.' })),
-    path: { intro: '', budgetMinutes: 30, clips: [{ code: 'L07', start: '21:49', end: '29:39', get: 'The VaR calculation.' }] },
-    errors: { intro: '', rows: [{ where: '[[L07 24:55]]', said: '3 sigma once per 10,000.', correction: 'About 1 in 740.' }] },
+    ideas: Array.from({ length: 5 }, (_, index) => ({
+      title: `Idea ${index + 1}`,
+      body: 'With its example.',
+    })),
+    errors: {
+      intro: '',
+      rows: [
+        { where: '[[L07 24:55]]', said: '3 sigma once per 10,000.', correction: 'About 1 in 740.' },
+      ],
+    },
     ...overrides,
   };
 }
@@ -60,31 +148,120 @@ describe('moments', () => {
   });
 
   it('builds each link from the stored video id', () => {
-    expect(linkMoments('See [[L07 21:49]].', LECTURES)).toBe('See [L07 21:49](https://www.youtube.com/watch?v=92WaNz9mPeY&t=1309).');
+    expect(linkMoments('See [[L07 21:49]].', LECTURES)).toBe(
+      'See [L07 21:49](https://www.youtube.com/watch?v=92WaNz9mPeY&t=1309).',
+    );
     expect(linkMoments('[[L07 21:49-29:39]]', LECTURES)).toContain('[L07 21:49 to 29:39]');
     expect(linkMoments('See [[X01 1:00]].', LECTURES)).toBe('See X01 1:00.');
+    // The pages pass their own player in place of YouTube.
+    expect(
+      linkMoments(
+        '[[L07 21:49]]',
+        LECTURES,
+        (lecture, start) => `/c?play=${lecture.code}&t=${start}`,
+      ),
+    ).toBe('[L07 21:49](/c?play=L07&t=1309)');
   });
 });
 
 describe('checkDigest', () => {
-  it('keeps a digest that checks, and works out the path minutes itself', () => {
+  it('keeps a plan that checks, and works out each step\u2019s minutes itself', () => {
     const checked = checkDigest(digest(), LECTURES);
     expect(checked.ok).toBe(true);
     if (!checked.ok) return;
-    expect(checked.digest.path.clips[0]).toMatchObject({ start: 1309, end: 1779, minutes: 8 });
-    expect(digestTotals(checked.digest, LECTURES)).toMatchObject({ pathMinutes: 8, watch: 1, skim: 1 });
+    const [first] = checked.digest.plan.stages[0].steps;
+    expect(first).toMatchObject({ key: 'A.1', minutes: 8 });
+    expect(first.blocks[1]).toMatchObject({ type: 'clip', start: 1309, end: 1779, minutes: 8 });
+    expect(digestTotals(checked.digest, LECTURES)).toMatchObject({
+      watchMinutes: 8,
+      stages: 4,
+      steps: 5,
+      watch: 1,
+      skim: 1,
+    });
   });
 
   const failing: [string, Record<string, unknown>, RegExp][] = [
-    ['a time past the end of the lecture', { intro: 'See [[L07 1:30:00]].' }, /past the end of L07/],
-    ['a lecture the course lacks', { intro: 'See [[L99 1:00]].' }, /L99, which the course does not have/],
-    ['a typed link', { intro: 'See https://www.youtube.com/watch?v=92WaNz9mPeY.' }, /typed YouTube link/],
-    ['an em dash', { madeFor: 'A CPA — and an MBA.' }, /em dash/],
+    [
+      'a time past the end of the lecture',
+      { intro: 'See [[L07 1:30:00]].' },
+      /past the end of L07/,
+    ],
+    [
+      'a lecture the course lacks',
+      { intro: 'See [[L99 1:00]].' },
+      /L99, which the course does not have/,
+    ],
+    [
+      'a typed link',
+      { intro: 'See https://www.youtube.com/watch?v=92WaNz9mPeY.' },
+      /typed YouTube link/,
+    ],
+    ['an em dash', { madeFor: 'A CPA \u2014 and an MBA.' }, /em dash/],
     ['too few big ideas', { ideas: [] }, /big ideas/],
-    ['a path over its budget', { path: { budgetMinutes: 5, clips: [{ code: 'L07', start: '21:49', end: '29:39', get: 'x' }] } }, /against a budget of 5/],
+    ['a plan with nothing in it', { plan: { stages: [] } }, /no stages/],
   ];
   it.each(failing)('refuses %s', (_name, overrides, problem) => {
     const checked = checkDigest(digest(overrides), LECTURES);
+    expect(checked.ok).toBe(false);
+    if (!checked.ok) expect(checked.problems.join('\n')).toMatch(problem);
+  });
+
+  const stage = (over: Record<string, unknown>, blocks: unknown[] = []) => [
+    { key: 'A', title: 'Start', about: 'x', after: [], steps: [step('One', blocks)], ...over },
+  ];
+  const badPlans: [string, unknown[], RegExp][] = [
+    [
+      'a stage that comes after one below it',
+      [...stage({}), { key: 'B', title: 'b', about: 'x', after: ['C'], steps: [step('s')] }],
+      /not a stage above it/,
+    ],
+    [
+      'a second stage that comes after nothing',
+      [...stage({}), { key: 'B', title: 'b', about: 'x', after: [], steps: [step('s')] }],
+      /only the first stage starts/,
+    ],
+    [
+      'a step with no commentary',
+      stage({
+        steps: [{ title: 'Bare', blocks: [{ type: 'check', question: 'q', answer: 'a' }] }],
+      }),
+      /no commentary/,
+    ],
+    [
+      'a clip with no end',
+      stage({}, [{ type: 'clip', code: 'L07', start: '21:49', listenFor: 'x' }]),
+      /clip with no end/,
+    ],
+    [
+      'clips over the budget',
+      stage({}, [{ type: 'clip', code: 'L07', start: '0:10', end: '1:10:00', listenFor: 'x' }]),
+      /against a budget of 30/,
+    ],
+    [
+      'a drawing with a colour of its own',
+      stage({}, [
+        {
+          type: 'figure',
+          caption: 'c',
+          svg: '<svg viewBox="0 0 10 10"><rect fill="#ff0000" width="1" height="1"/></svg>',
+        },
+      ]),
+      /colour of its own/,
+    ],
+    [
+      'an excerpt with no licence named',
+      stage({}, [{ type: 'reading', title: 't', body: 'b', excerpt: ['The text.'] }]),
+      /without naming its open licence/,
+    ],
+    [
+      'a reading that links a video',
+      stage({}, [{ type: 'reading', title: 't', body: 'b', url: 'https://youtu.be/92WaNz9mPeY' }]),
+      /links a video/,
+    ],
+  ];
+  it.each(badPlans)('refuses %s', (_name, stages, problem) => {
+    const checked = checkDigest(digest({}, stages), LECTURES);
     expect(checked.ok).toBe(false);
     if (!checked.ok) expect(checked.problems.join('\n')).toMatch(problem);
   });
@@ -95,20 +272,56 @@ describe('checkDigest', () => {
     expect(checked.ok).toBe(false);
     if (!checked.ok) expect(checked.problems.join('\n')).toMatch(/L11 has no rating/);
   });
+});
 
-  it('refuses a clip idea with no clip', () => {
-    const base = digest();
-    const lesson = { ...base.lessons[0], ideas: [{ name: 'VaR', treatment: 'clip', body: 'x', clips: [] }] };
-    const checked = checkDigest({ ...base, lessons: [lesson] }, LECTURES);
-    expect(checked.ok).toBe(false);
-    if (!checked.ok) expect(checked.problems.join('\n')).toMatch(/clip with no clip/);
+describe('walking the plan', () => {
+  const checked = checkDigest(digest(), LECTURES);
+  if (!checked.ok) throw new Error(checked.problems.join(' '));
+  const plan = checked.digest.plan;
+  const done = (...keys: string[]) => new Set(keys);
+
+  it('puts branches of one fork on one row', () => {
+    expect(stageRows(plan).map((row) => row.map((item) => item.key))).toEqual([
+      ['A'],
+      ['B', 'C'],
+      ['D'],
+    ]);
+  });
+
+  it('starts at the first stage and follows a branch once it is begun', () => {
+    expect(nextStep(plan, done())?.step.key).toBe('A.1');
+    expect(nextStep(plan, done('A.1'))?.step.key).toBe('A.2');
+    // Both branches are open after A; the first is offered until the other is begun.
+    expect(nextStep(plan, done('A.1', 'A.2'))?.step.key).toBe('B.1');
+    expect(nextStep(plan, done('A.1', 'A.2', 'B.1'))?.step.key).toBe('C.1');
+    expect(nextStep(plan, done('A.1', 'A.2', 'B.1', 'C.1'))?.step.key).toBe('D.1');
+    expect(nextStep(plan, done('A.1', 'A.2', 'B.1', 'C.1', 'D.1'))).toBeNull();
+  });
+
+  it('opens a stage only when every stage before it is finished', () => {
+    const last = plan.stages[3];
+    expect(isOpen(plan, last, done('A.1', 'A.2', 'B.1'))).toBe(false);
+    expect(isOpen(plan, last, done('A.1', 'A.2', 'B.1', 'C.1'))).toBe(true);
+  });
+
+  it('offers the branches at the end of a stage', () => {
+    expect(afterStep(plan, 'A.1')).toMatchObject({ step: { key: 'A.2' }, stages: [] });
+    expect(afterStep(plan, 'A.2').stages.map((item) => item.key)).toEqual(['B', 'C']);
+    expect(afterStep(plan, 'D.1')).toEqual({ step: null, stages: [] });
   });
 });
 
 describe('checkLectures', () => {
   it('reads lengths given as clock times', () => {
-    const checked = checkLectures([{ code: 'L07', title: 'VaR', videoId: '92WaNz9mPeY', durationSeconds: '1:21:15' }]);
-    expect(checked).toEqual({ ok: true, lectures: [{ code: 'L07', title: 'VaR', videoId: '92WaNz9mPeY', durationSeconds: 4875, speaker: null }] });
+    const checked = checkLectures([
+      { code: 'L07', title: 'VaR', videoId: '92WaNz9mPeY', durationSeconds: '1:21:15' },
+    ]);
+    expect(checked).toEqual({
+      ok: true,
+      lectures: [
+        { code: 'L07', title: 'VaR', videoId: '92WaNz9mPeY', durationSeconds: 4875, speaker: null },
+      ],
+    });
   });
 
   it('refuses a repeated code or a missing video id', () => {

@@ -5,14 +5,18 @@
  * that draw it: the shape, and the checks a digest must pass before it is
  * kept.
  *
+ * The centre of a digest is its plan: stages in the order the ideas rest on
+ * each other, each a run of steps taken one after another. A stage names the
+ * stages it comes after, so a course can open on shared ground and then
+ * branch. A step is made of blocks in reading order: commentary, a clip, a
+ * drawing, a piece of a reading, a question to try.
+ *
  * Text fields are markdown. A moment in a lecture is written as a token,
  * `[[L07 21:49]]` or `[[L07 21:49-29:39]]`, never as a URL: the link is built
  * from the lecture's stored video id (rule D2), and a token naming a lecture
  * the course lacks, or a time past its end, fails the check.
  */
-
-export const TREATMENTS = ['clip', 'worked', 'card', 'skip'] as const;
-export type Treatment = (typeof TREATMENTS)[number];
+import { svgProblems } from '@/lib/learn/reader/source';
 
 export const RATINGS = ['watch', 'parts', 'skim', 'skip'] as const;
 export type Rating = (typeof RATINGS)[number];
@@ -24,13 +28,6 @@ export const RATING_LABEL: Record<Rating, string> = {
   skip: 'Skip',
 };
 
-export const TREATMENT_LABEL: Record<Treatment, string> = {
-  clip: 'Clip',
-  worked: 'Worked example',
-  card: 'Card',
-  skip: 'Skipped',
-};
-
 export type Lecture = {
   /** Short and unique in the course: L07, P09, K03. */
   code: string;
@@ -40,41 +37,64 @@ export type Lecture = {
   speaker: string | null;
 };
 
-export type Clip = {
-  code: string;
-  /** Seconds from the start of the lecture. */
-  start: number;
-  end: number | null;
-  /** What to listen for, in one sentence. */
-  listenFor: string;
-};
+export type Block =
+  /** Commentary or a text lesson: what to know before or after what sits beside it. */
+  | { type: 'text'; title: string | null; body: string }
+  /** A stretch of a lecture, played in the page. */
+  | {
+      type: 'clip';
+      code: string;
+      /** Seconds from the start of the lecture. */
+      start: number;
+      end: number;
+      minutes: number;
+      /** What to listen for, in one sentence. */
+      listenFor: string;
+    }
+  /** A drawing, in the page's own colours (svgProblems). */
+  | { type: 'figure'; caption: string; svg: string }
+  /**
+   * A reading that belongs at this point. `body` says what it is and why it is
+   * here. `excerpt` holds the author's own paragraphs, and only where
+   * `licence` names the open licence the text was published under.
+   */
+  | {
+      type: 'reading';
+      title: string;
+      author: string | null;
+      source: string | null;
+      url: string | null;
+      body: string;
+      excerpt: string[];
+      licence: string | null;
+    }
+  /** A case to work or a thing to explain, with a full answer. */
+  | { type: 'check'; question: string; answer: string };
 
-export type Idea = {
-  name: string;
-  treatment: Treatment;
-  /** The explanation: a mechanism with numbers, one sentence for a card, the reason for a skip. */
-  body: string;
-  clips: Clip[];
-};
-
-export type Lesson = {
+export type Step = {
+  /** The stage's key and the step's place in it: `B.2`. */
   key: string;
   title: string;
-  /** The point of the cluster, in one sentence with its number. */
-  point: string;
-  ideas: Idea[];
-  check: { question: string; answer: string } | null;
-  /** Who disagrees inside the series about this cluster, and where it lands. */
-  tension: string | null;
+  /** Watching and reading time, worked out from the blocks. */
+  minutes: number;
+  blocks: Block[];
 };
 
-export type PathClip = {
-  code: string;
-  start: number;
-  end: number;
-  minutes: number;
-  /** What the learner gets from it. */
-  get: string;
+export type Stage = {
+  key: string;
+  title: string;
+  /** What this stage gets you, in a sentence or two. */
+  about: string;
+  /** The stages to finish first. Empty for where the course starts. */
+  after: string[];
+  steps: Step[];
+};
+
+export type Plan = {
+  intro: string;
+  /** The watching time the plan was cut to fit. */
+  budgetMinutes: number;
+  stages: Stage[];
 };
 
 export type Digest = {
@@ -82,18 +102,16 @@ export type Digest = {
   madeFor: string;
   /** How to use it: what was read, what the codes mean. */
   intro: string;
-  lessons: Lesson[];
-  dependencies: { intro: string; tracks: { title: string; steps: string[] }[] };
-  tensions: {
-    intro: string;
-    rows: { tension: string; oneSide: string; otherSide: string; lands: string }[];
-    outro: string | null;
-  };
+  plan: Plan;
   ratings: { intro: string; rows: { code: string; rating: Rating; watch: string; why: string }[] };
   ideas: { title: string; body: string }[];
-  path: { intro: string; budgetMinutes: number; clips: PathClip[] };
   errors: { intro: string; rows: { where: string; said: string; correction: string }[] };
 };
+
+/** A digest kept before plans (learn 0194's first shape) has none; the pages say so. */
+export function hasPlan(digest: Digest | null): digest is Digest {
+  return Array.isArray((digest as { plan?: { stages?: unknown } } | null)?.plan?.stages);
+}
 
 /** `1:21:15` or `21:49` as seconds; null when it is not a time. */
 export function secondsOf(text: string): number | null {
@@ -144,14 +162,20 @@ export function momentsIn(text: string): Moment[] {
  * token whose lecture is unknown is left as its plain text, so a digest that
  * somehow got past the check still reads.
  */
-export function linkMoments(text: string, lectures: readonly Lecture[]): string {
+export function linkMoments(
+  text: string,
+  lectures: readonly Lecture[],
+  /** Where a moment opens. The pages pass their own player; the default is YouTube. */
+  href: (lecture: Lecture, start: number) => string = (lecture, start) =>
+    watchUrl(lecture.videoId, start),
+): string {
   const byCode = new Map(lectures.map((lecture) => [lecture.code, lecture]));
   return text.replace(TOKEN, (raw, code: string, from: string, to: string | undefined) => {
     const lecture = byCode.get(code);
     const start = secondsOf(from);
     if (!lecture || start === null) return `${code} ${from}`;
     const label = to ? `${code} ${from} to ${to}` : `${code} ${from}`;
-    return `[${label}](${watchUrl(lecture.videoId, start)})`;
+    return `[${label}](${href(lecture, start)})`;
   });
 }
 
@@ -224,85 +248,129 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
     return true;
   }
 
-  const lessons: Lesson[] = [];
-  const keys = new Set<string>();
-  list(input.lessons).forEach((raw, index) => {
-    const where = `Lesson ${index + 1}`;
+  const words = (body: string) => body.split(/\s+/).filter(Boolean).length;
+  const planIn = isObject(input.plan) ? input.plan : {};
+  const budgetMinutes =
+    typeof planIn.budgetMinutes === 'number' && planIn.budgetMinutes > 0
+      ? Math.round(planIn.budgetMinutes)
+      : 180;
+  const stages: Stage[] = [];
+  const stageKeys = new Set<string>();
+  let watchSeconds = 0;
+  list(planIn.stages).forEach((raw, index) => {
+    const where = `Stage ${index + 1}`;
     if (!isObject(raw)) return void problems.push(`${where} is not an object.`);
     const key = text(raw.key) || String.fromCharCode(65 + index);
-    if (keys.has(key)) problems.push(`${where} repeats the key ${key}.`);
-    keys.add(key);
-    const ideas: Idea[] = [];
-    list(raw.ideas).forEach((item, at) => {
-      const spot = `${where}, idea ${at + 1}`;
+    if (!/^[A-Za-z0-9]{1,4}$/.test(key)) problems.push(`${where} needs a short key like A or B2.`);
+    if (stageKeys.has(key)) problems.push(`${where} repeats the key ${key}.`);
+    // A stage comes after stages already listed, so the plan reads top to bottom and cannot loop.
+    const after = list(raw.after).map((item) => text(item));
+    for (const earlier of after) {
+      if (!stageKeys.has(earlier))
+        problems.push(
+          `${where} comes after ${earlier || 'nothing'}, which is not a stage above it.`,
+        );
+    }
+    if (index === 0 && after.length > 0) problems.push('The first stage comes after nothing.');
+    if (index > 0 && after.length === 0)
+      problems.push(
+        `${where} names no stage it comes after; only the first stage starts the course.`,
+      );
+    stageKeys.add(key);
+
+    const steps: Step[] = [];
+    list(raw.steps).forEach((item, at) => {
+      const spot = `${where}, step ${at + 1}`;
       if (!isObject(item)) return void problems.push(`${spot} is not an object.`);
-      const treatment = text(item.treatment) as Treatment;
-      if (!TREATMENTS.includes(treatment))
-        problems.push(`${spot} has no treatment (clip, worked, card or skip).`);
-      const clips: Clip[] = [];
-      list(item.clips).forEach((clip, n) => {
-        const here = `${spot}, clip ${n + 1}`;
-        if (!isObject(clip)) return void problems.push(`${here} is not an object.`);
-        const start = time(clip.start);
-        const end = clip.end === undefined || clip.end === null ? null : time(clip.end);
-        if (inside(text(clip.code), start, end, here) && start !== null) {
-          clips.push({
-            code: text(clip.code),
+      const blocks: Block[] = [];
+      let seconds = 0;
+      let read = 0;
+      list(item.blocks).forEach((block, n) => {
+        const here = `${spot}, block ${n + 1}`;
+        if (!isObject(block)) return void problems.push(`${here} is not an object.`);
+        const type = text(block.type);
+        if (type === 'text') {
+          const body = prose(block.body, `${here} body`);
+          read += words(body);
+          blocks.push({ type, title: prose(block.title, `${here} title`, false) || null, body });
+        } else if (type === 'clip') {
+          const start = time(block.start);
+          const end = time(block.end);
+          if (end === null) return void problems.push(`${here} is a clip with no end.`);
+          if (!inside(text(block.code), start, end, here) || start === null) return;
+          seconds += end - start;
+          blocks.push({
+            type,
+            code: text(block.code),
             start,
             end,
-            listenFor: prose(clip.listenFor, `${here} listenFor`, false),
+            // Worked out here, so a step's minutes cannot disagree with its clips.
+            minutes: Math.max(1, Math.round((end - start) / 60)),
+            listenFor: prose(block.listenFor, `${here} listenFor`),
           });
+        } else if (type === 'figure') {
+          const svg = typeof block.svg === 'string' ? block.svg.trim() : '';
+          for (const problem of svgProblems(svg)) problems.push(`${here}: ${problem}`);
+          blocks.push({ type, caption: prose(block.caption, `${here} caption`), svg });
+        } else if (type === 'reading') {
+          const excerpt = list(block.excerpt)
+            .map((paragraph) => text(paragraph))
+            .filter(Boolean);
+          const licence = text(block.licence) || null;
+          if (excerpt.length > 0 && !licence)
+            problems.push(`${here} shows the author's text without naming its open licence.`);
+          const url = text(block.url) || null;
+          if (url && !/^https:\/\/[^\s]+$/.test(url))
+            problems.push(`${here} has a link that is not https.`);
+          if (url && /(youtube\.com|youtu\.be)/.test(url))
+            problems.push(`${here} links a video; a video is a clip block.`);
+          const body = prose(block.body, `${here} body`);
+          read += words(body) + words(excerpt.join(' '));
+          blocks.push({
+            type,
+            title: prose(block.title, `${here} title`),
+            author: text(block.author) || null,
+            source: text(block.source) || null,
+            url,
+            body,
+            excerpt,
+            licence,
+          });
+        } else if (type === 'check') {
+          blocks.push({
+            type,
+            question: prose(block.question, `${here} question`),
+            answer: prose(block.answer, `${here} answer`),
+          });
+        } else {
+          problems.push(`${here} has no type (text, clip, figure, reading or check).`);
         }
       });
-      if (treatment === 'clip' && clips.length === 0)
-        problems.push(`${spot} is a clip with no clip.`);
-      ideas.push({
-        name: prose(item.name, `${spot} name`),
-        treatment,
-        body: prose(item.body, `${spot} body`),
-        clips,
+      if (!blocks.some((block) => block.type === 'text'))
+        problems.push(`${spot} has no commentary; every step says in words what it is for.`);
+      watchSeconds += seconds;
+      steps.push({
+        key: `${key}.${at + 1}`,
+        title: prose(item.title, `${spot} title`),
+        minutes: Math.max(1, Math.round(seconds / 60 + read / 230)),
+        blocks,
       });
     });
-    if (ideas.length === 0) problems.push(`${where} has no ideas.`);
-    const check = isObject(raw.check)
-      ? {
-          question: prose(raw.check.question, `${where} check question`),
-          answer: prose(raw.check.answer, `${where} check answer`),
-        }
-      : null;
-    lessons.push({
+    if (steps.length === 0) problems.push(`${where} has no steps.`);
+    stages.push({
       key,
       title: prose(raw.title, `${where} title`),
-      point: prose(raw.point, `${where} point`),
-      ideas,
-      check,
-      tension: prose(raw.tension, `${where} tension`, false) || null,
+      about: prose(raw.about, `${where} about`),
+      after,
+      steps,
     });
   });
-  if (lessons.length === 0) problems.push('The digest has no lessons.');
-
-  const dependencies = isObject(input.dependencies) ? input.dependencies : {};
-  const tracks = list(dependencies.tracks).flatMap((raw, index) => {
-    if (!isObject(raw)) return [];
-    const steps = list(raw.steps).map((step, at) =>
-      prose(step, `Dependency track ${index + 1}, step ${at + 1}`),
+  if (stages.length === 0) problems.push('The plan has no stages.');
+  const watchMinutes = Math.round(watchSeconds / 60);
+  if (watchMinutes > budgetMinutes * 1.1)
+    problems.push(
+      `The plan's clips run ${watchMinutes} minutes against a budget of ${budgetMinutes}.`,
     );
-    return [{ title: prose(raw.title, `Dependency track ${index + 1} title`), steps }];
-  });
-
-  const tensions = isObject(input.tensions) ? input.tensions : {};
-  const tensionRows = list(tensions.rows).flatMap((raw, index) => {
-    if (!isObject(raw)) return [];
-    const where = `Tension ${index + 1}`;
-    return [
-      {
-        tension: prose(raw.tension, `${where}`),
-        oneSide: prose(raw.oneSide, `${where} one side`),
-        otherSide: prose(raw.otherSide, `${where} other side`),
-        lands: prose(raw.lands, `${where} where it lands`),
-      },
-    ];
-  });
 
   const ratings = isObject(input.ratings) ? input.ratings : {};
   const rated = new Set<string>();
@@ -342,33 +410,6 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
   });
   if (ideas.length < 5) problems.push(`The digest has ${ideas.length} big ideas; write about ten.`);
 
-  const path = isObject(input.path) ? input.path : {};
-  const budgetMinutes =
-    typeof path.budgetMinutes === 'number' && path.budgetMinutes > 0
-      ? Math.round(path.budgetMinutes)
-      : 180;
-  const pathClips: PathClip[] = [];
-  list(path.clips).forEach((raw, index) => {
-    const where = `Path clip ${index + 1}`;
-    if (!isObject(raw)) return void problems.push(`${where} is not an object.`);
-    const start = time(raw.start);
-    const end = time(raw.end);
-    if (end === null) return void problems.push(`${where} has no end.`);
-    if (!inside(text(raw.code), start, end, where) || start === null) return;
-    // The minutes are worked out here, so the column and its total cannot disagree with the clips.
-    pathClips.push({
-      code: text(raw.code),
-      start,
-      end,
-      minutes: Math.max(1, Math.round((end - start) / 60)),
-      get: prose(raw.get, `${where} what you get`),
-    });
-  });
-  if (pathClips.length === 0) problems.push('The path has no clips.');
-  const total = pathClips.reduce((sum, clip) => sum + clip.minutes, 0);
-  if (total > budgetMinutes * 1.1)
-    problems.push(`The path runs ${total} minutes against a budget of ${budgetMinutes}.`);
-
   const errors = isObject(input.errors) ? input.errors : {};
   const errorRows = list(errors.rows).flatMap((raw, index) => {
     if (!isObject(raw)) return [];
@@ -381,20 +422,12 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
       },
     ];
   });
-
   const digest: Digest = {
     madeFor: prose(input.madeFor, 'madeFor'),
     intro: prose(input.intro, 'intro'),
-    lessons,
-    dependencies: { intro: prose(dependencies.intro, 'Dependencies intro', false), tracks },
-    tensions: {
-      intro: prose(tensions.intro, 'Tensions intro', false),
-      rows: tensionRows,
-      outro: prose(tensions.outro, 'Tensions outro', false) || null,
-    },
+    plan: { intro: prose(planIn.intro, 'Plan intro', false), budgetMinutes, stages },
     ratings: { intro: prose(ratings.intro, 'Ratings intro', false), rows: ratingRows },
     ideas,
-    path: { intro: prose(path.intro, 'Path intro', false), budgetMinutes, clips: pathClips },
     errors: { intro: prose(errors.intro, 'Errors intro', false), rows: errorRows },
   };
   return problems.length > 0 ? { ok: false, problems } : { ok: true, digest };
@@ -440,13 +473,21 @@ export function digestTotals(digest: Digest, lectures: readonly Lecture[]) {
   const runtimeMinutes = Math.round(
     lectures.reduce((sum, lecture) => sum + lecture.durationSeconds, 0) / 60,
   );
-  const pathMinutes = digest.path.clips.reduce((sum, clip) => sum + clip.minutes, 0);
+  const steps = digest.plan.stages.flatMap((stage) => stage.steps);
+  // Every step of every branch: the whole plan, watched and read.
+  const pathMinutes = steps.reduce((sum, step) => sum + step.minutes, 0);
+  const watchMinutes = steps
+    .flatMap((step) => step.blocks)
+    .reduce((sum, block) => sum + (block.type === 'clip' ? block.minutes : 0), 0);
   const count = (rating: Rating) =>
     digest.ratings.rows.filter((row) => row.rating === rating).length;
   return {
     runtimeMinutes,
     pathMinutes,
-    share: runtimeMinutes > 0 ? pathMinutes / runtimeMinutes : 0,
+    watchMinutes,
+    stages: digest.plan.stages.length,
+    steps: steps.length,
+    share: runtimeMinutes > 0 ? watchMinutes / runtimeMinutes : 0,
     watch: count('watch'),
     parts: count('parts'),
     skim: count('skim'),

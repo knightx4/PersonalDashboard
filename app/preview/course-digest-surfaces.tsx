@@ -7,18 +7,20 @@ import { CoursesView } from '@/app/learn/courses/courses-view';
 import { freshSteps } from '@/lib/learn/courses/build';
 import { COURSE_CATALOGUE } from '@/lib/learn/courses/catalogue';
 import { checkDigest, checkLectures, type Digest, type Lecture } from '@/lib/learn/courses/digest';
+import { afterStep, findStep } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import fixture from './course-digest-fixture.json';
 
 /**
  * Gallery fixtures for Learn's Courses tab (learn 0194): the list with one
  * course built and one building, a build part way through, a built course on
- * its path, and one lesson. The digest is a cut of the first one built, MIT
- * 18.S096, so the surfaces carry real lecture numbers and timestamps.
+ * its plan and on its lectures, and one step. The digest is a cut of the
+ * first one built, MIT 18.S096, so the surfaces carry real lecture numbers
+ * and timestamps: its opening stage and the two branches that follow it.
  */
 
 // The fixture is the file a session saves, so it goes through the same check
-// the save does: times become seconds and the path's minutes are worked out.
+// the save does: times become seconds and each step's minutes are worked out.
 const listed = checkLectures(fixture.lectures);
 const lectures: Lecture[] = listed.ok ? listed.lectures : [];
 const checked = checkDigest(
@@ -59,14 +61,15 @@ const READY: Course = {
   totals: {
     videos: 28,
     runtimeMinutes: 2202,
-    pathMinutes: 177,
+    pathMinutes: 262,
+    watchMinutes: 177,
     share: 0.08,
     watch: 5,
     parts: 8,
     skim: 14,
     skip: 1,
   },
-  progress: { clips: ['0'], lessons: [] },
+  progress: { clips: [], lessons: [digest.plan.stages[0].steps[0].key] },
   error: null,
   runUrl: null,
   requestedAt: '2026-11-16T06:00:00Z',
@@ -116,22 +119,23 @@ export function CourseDigestBuildingPreview() {
   return <BuildView course={BUILDING} />;
 }
 
-export function CourseDigestPathPreview() {
-  return <CourseView course={READY} digest={digest} tab="path" />;
+export function CourseDigestPlanPreview() {
+  return <CourseView course={READY} digest={digest} tab="plan" />;
 }
 
-export function CourseDigestMapPreview() {
-  return <CourseView course={READY} digest={digest} tab="map" />;
+export function CourseDigestLecturesPreview() {
+  return <CourseView course={READY} digest={digest} tab="lectures" />;
 }
+
+// The last step of the opening stage, so the foot shows the branches to choose between.
+const LAST = digest.plan.stages[0].steps[digest.plan.stages[0].steps.length - 1].key;
 
 export function CourseDigestLessonPreview() {
   return (
     <LessonView
       course={READY}
-      lesson={digest.lessons[0]}
-      at={0}
-      total={9}
-      next={digest.lessons[1]}
+      placed={findStep(digest.plan, LAST)!}
+      next={afterStep(digest.plan, LAST)}
     />
   );
 }

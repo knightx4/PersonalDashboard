@@ -3,60 +3,75 @@ import { ArrowDown, Check } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { Markdown } from '@/components/ui/markdown';
-import { SectionHeading } from '@/components/ui/section-heading';
 import { Tabs } from '@/components/ui/tabs';
+import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
   clock,
+  hasPlan,
   linkMoments,
   RATING_LABEL,
   type Digest,
   type Lecture,
+  type Plan,
   type Rating,
+  type Stage,
+  type Step,
 } from '@/lib/learn/courses/digest';
+import { afterTitles, isOpen, nextStep, placedSteps, stageRows } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { hours } from '../format';
-import { Tick } from './tick';
 
 /**
  * A built course (docs/LEARN-DIGEST-SPEC.md). The header says what the series
- * was cut from and to. Six tabs, the path first because it is the thing to
- * do: the clips in order, each playing in the page from its start to its end.
- * Lessons are the same material by idea. The rest is the course-level
- * reading: the big ideas, a verdict on every lecture, how the ideas rest on
- * each other and where the lecturers disagree, and what they got wrong.
+ * was cut from and to. Three tabs. Lessons is the plan, and the thing to do:
+ * the stages down the page in the order the ideas rest on each other, side by
+ * side where the course branches, each a list of steps to take one after
+ * another. Big ideas is what to keep from the whole series. Lectures is every
+ * video with a verdict, each playing in the page.
  *
  * Every timestamp is a link built from the lecture's stored video id
- * (linkMoments), never one a model typed.
+ * (linkMoments), never one a model typed, and it opens the lecture in the
+ * Lectures tab at that moment.
  */
 
 const TABS = [
-  { id: 'path', label: 'Path' },
-  { id: 'lessons', label: 'Lessons' },
+  { id: 'plan', label: 'Lessons' },
   { id: 'ideas', label: 'Big ideas' },
   { id: 'lectures', label: 'Lectures' },
-  { id: 'map', label: 'Map' },
-  { id: 'errors', label: 'Errors' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
+
+/** Where a moment opens: the lecture's own row on the Lectures tab, playing from there. */
+export function momentHref(courseId: string) {
+  return (lecture: Lecture, start: number) =>
+    `/learn/courses/${courseId}?tab=lectures&play=${lecture.code}&t=${start}#lecture-${lecture.code}`;
+}
 
 export function CourseView({
   course,
   digest,
   tab,
+  play = null,
 }: {
   course: Course;
   digest: Digest;
   tab: string | null;
+  /** A lecture to open playing on the Lectures tab, and from which second. */
+  play?: { code: string; start: number } | null;
 }) {
-  const open: TabId = TABS.some((item) => item.id === tab) ? (tab as TabId) : 'path';
-  const { runtimeMinutes = 0, pathMinutes = 0, videos = course.lectures.length } = course.totals;
-  const share = runtimeMinutes > 0 ? Math.round((pathMinutes / runtimeMinutes) * 100) : 0;
-  const text = (source: string) => linkMoments(source, course.lectures);
+  const open: TabId = TABS.some((item) => item.id === tab) ? (tab as TabId) : 'plan';
+  const { runtimeMinutes = 0, videos = course.lectures.length } = course.totals;
+  const text = (source: string) => linkMoments(source, course.lectures, momentHref(course.id));
+  const plan = hasPlan(digest) ? digest.plan : null;
+  const planMinutes = plan
+    ? placedSteps(plan).reduce((sum, placed) => sum + placed.step.minutes, 0)
+    : 0;
 
   return (
     <PageColumn className="space-y-5">
@@ -66,12 +81,25 @@ export function CourseView({
           href: `/learn/courses/${course.id}`,
         })}
         title={course.title}
-        description={`${videos} videos, ${hours(runtimeMinutes)}, cut to a ${hours(pathMinutes)} path (${share}% of the runtime)`}
+        description={
+          plan
+            ? `${videos} videos, ${hours(runtimeMinutes)}, as ${plan.stages.length} stages of lessons, about ${hours(planMinutes)}`
+            : `${videos} videos, ${hours(runtimeMinutes)}`
+        }
       />
       <Tabs tabs={TABS} label="Course" compact />
 
-      {open === 'path' && <PathTab course={course} digest={digest} text={text} />}
-      {open === 'lessons' && <LessonsTab course={course} digest={digest} />}
+      {open === 'plan' &&
+        (plan ? (
+          <PlanTab course={course} plan={plan} text={text} />
+        ) : (
+          <Card padding="dense">
+            <p className="text-ui text-ink [overflow-wrap:anywhere]">
+              This course was built before courses had a lesson plan. Its big ideas and its lectures
+              are in the other two tabs.
+            </p>
+          </Card>
+        ))}
       {open === 'ideas' && (
         <Card padding="none">
           <ol className="divide-y divide-border">
@@ -87,33 +115,8 @@ export function CourseView({
           </ol>
         </Card>
       )}
-      {open === 'lectures' && <LecturesTab course={course} digest={digest} text={text} />}
-      {open === 'map' && <MapTab digest={digest} text={text} />}
-      {open === 'errors' && (
-        <section className="space-y-3">
-          {digest.errors.intro && (
-            <Markdown
-              markdown={text(digest.errors.intro)}
-              className="vault-prose prose-compact prose-aside"
-            />
-          )}
-          <Card padding="none">
-            <ul className="divide-y divide-border">
-              {digest.errors.rows.map((row, index) => (
-                <li key={index} className="card-pad-x row-pad space-y-1.5">
-                  <Markdown
-                    markdown={text(row.where)}
-                    className="vault-prose prose-compact prose-aside"
-                  />
-                  <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">
-                    Said: {row.said}
-                  </p>
-                  <Markdown markdown={text(row.correction)} className="vault-prose prose-compact" />
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </section>
+      {open === 'lectures' && (
+        <LecturesTab course={course} digest={digest} text={text} play={play} />
       )}
 
       <CardSection title="About this digest" fold="learn.course.about" defaultOpen={false}>
@@ -131,117 +134,133 @@ export function CourseView({
 
 type Text = (source: string) => string;
 
-function PathTab({ course, digest, text }: { course: Course; digest: Digest; text: Text }) {
-  const byCode = new Map(course.lectures.map((lecture) => [lecture.code, lecture]));
-  const watched = new Set(course.progress.clips);
-  const total = digest.path.clips.reduce((sum, clip) => sum + clip.minutes, 0);
-  const done = digest.path.clips.reduce(
-    (sum, clip, index) => sum + (watched.has(String(index)) ? clip.minutes : 0),
+/** What a step is made of, for the line under its title: "14 min · 2 clips · drawing · reading". */
+function stepLine(step: Step): string {
+  const count = (type: string) => step.blocks.filter((block) => block.type === type).length;
+  const clips = count('clip');
+  return [
+    `${step.minutes} min`,
+    clips > 0 ? `${clips} ${clips === 1 ? 'clip' : 'clips'}` : null,
+    count('figure') > 0 ? 'drawing' : null,
+    count('reading') > 0 ? 'reading' : null,
+    count('check') > 0 ? 'a question' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Text }) {
+  const done = new Set(course.progress.lessons);
+  const steps = placedSteps(plan);
+  const taken = steps.filter((placed) => done.has(placed.step.key));
+  const next = nextStep(plan, done);
+  const left = steps.reduce(
+    (sum, placed) => sum + (done.has(placed.step.key) ? 0 : placed.step.minutes),
     0,
   );
-  const next = digest.path.clips.findIndex((_, index) => !watched.has(String(index)));
 
   return (
-    <section className="space-y-3">
-      {digest.path.intro && (
-        <Markdown markdown={text(digest.path.intro)} className="vault-prose prose-compact" />
+    <section className="space-y-4">
+      {plan.intro && <Markdown markdown={text(plan.intro)} className="vault-prose prose-compact" />}
+      {next ? (
+        <div className="space-y-1.5">
+          <Link
+            href={`/learn/courses/${course.id}/l/${encodeURIComponent(next.step.key)}`}
+            className={cn(
+              buttonVariants({ variant: 'primary' }),
+              'h-auto min-h-11 max-w-full py-2',
+            )}
+          >
+            <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
+              {taken.length === 0 ? 'Start' : 'Continue'}: {next.step.title}
+            </span>
+          </Link>
+          <p className="tabular text-small text-ink-muted">
+            {taken.length} of {steps.length} steps done · about {hours(left)} left across every
+            branch
+          </p>
+        </div>
+      ) : (
+        <p className="text-ui text-ink">Every step is done.</p>
       )}
-      <SectionHeading
-        title="The path"
-        count={`${watched.size} of ${digest.path.clips.length} watched · ${done} of ${total} min`}
-      />
-      <Card padding="none">
-        <ol className="divide-y divide-border">
-          {digest.path.clips.map((clip, index) => {
-            const lecture = byCode.get(clip.code);
-            if (!lecture) return null;
-            const seen = watched.has(String(index));
-            return (
-              <li key={index} className="card-pad-x row-pad space-y-2">
-                <div className="flex items-start gap-3">
-                  <span className="tabular w-5 shrink-0 text-ui text-ink-muted">{index + 1}</span>
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={
-                        seen ? 'block text-ui text-ink-muted' : 'block text-ui font-medium text-ink'
-                      }
-                    >
-                      {clip.get}
-                    </span>
-                    <span className="tabular block text-small text-ink-muted [overflow-wrap:anywhere]">
-                      {clip.minutes} min · {clip.code} {clock(clip.start)} to {clock(clip.end)} ·{' '}
-                      {lecture.title}
-                    </span>
-                  </span>
-                  <Tick
-                    courseId={course.id}
-                    kind="clips"
-                    itemKey={String(index)}
-                    done={seen}
-                    label="Watched"
-                  />
-                </div>
-                <ClipPlayer
-                  videoId={lecture.videoId}
-                  title={lecture.speaker ?? lecture.title}
-                  start={clip.start}
-                  end={clip.end}
-                  deferred={index !== next}
-                  className="pl-8"
-                />
-              </li>
-            );
-          })}
-        </ol>
-      </Card>
+
+      <div className="space-y-2">
+        {stageRows(plan).map((row, index) => (
+          <div key={row[0].key} className="space-y-2">
+            {index > 0 && (
+              <div className="flex items-center gap-2 pl-3 text-small text-ink-muted">
+                <ArrowDown className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
+                {row.length > 1
+                  ? `Then it branches ${row.length} ways. Take whichever you want first.`
+                  : `After ${afterTitles(plan, row[0]).join(' and ')}`}
+              </div>
+            )}
+            <div className={row.length > 1 ? 'grid items-start gap-3 lg:grid-cols-2' : undefined}>
+              {row.map((stage) => (
+                <StageCard key={stage.key} course={course} plan={plan} stage={stage} done={done} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
-function LessonsTab({ course, digest }: { course: Course; digest: Digest }) {
-  const finished = new Set(course.progress.lessons);
+function StageCard({
+  course,
+  plan,
+  stage,
+  done,
+}: {
+  course: Course;
+  plan: Plan;
+  stage: Stage;
+  done: ReadonlySet<string>;
+}) {
+  const taken = stage.steps.filter((step) => done.has(step.key)).length;
+  const minutes = stage.steps.reduce((sum, step) => sum + step.minutes, 0);
+  const open = isOpen(plan, stage, done);
   return (
     <Card padding="none">
-      <ul className="divide-y divide-border">
-        {digest.lessons.map((lesson) => {
-          const count = (treatment: string) =>
-            lesson.ideas.filter((idea) => idea.treatment === treatment).length;
-          const parts = [
-            count('clip') ? `${count('clip')} to watch` : null,
-            count('worked') ? `${count('worked')} worked` : null,
-            count('card') ? `${count('card')} in a line` : null,
-            count('skip') ? `${count('skip')} skipped` : null,
-          ].filter(Boolean);
-          return (
-            <li key={lesson.key}>
-              <Link
-                href={`/learn/courses/${course.id}/l/${encodeURIComponent(lesson.key)}`}
-                className="card-pad-x row-pad flex min-h-11 items-start gap-3 transition-colors duration-quick hover:bg-sunken"
-              >
-                <span className="tabular w-5 shrink-0 text-ui text-ink-muted">{lesson.key}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-ui font-medium text-ink [overflow-wrap:anywhere]">
-                    {lesson.title}
-                  </span>
-                  <span className="block text-small text-ink-muted [overflow-wrap:anywhere]">
-                    {lesson.point}
-                  </span>
-                  <span className="tabular block text-small text-ink-muted">
-                    {parts.join(' · ')}
-                  </span>
+      <div className="card-pad-x row-pad space-y-1 border-b border-border">
+        <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{stage.title}</h2>
+        <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{stage.about}</p>
+        <p className="tabular text-small text-ink-muted [overflow-wrap:anywhere]">
+          {taken} of {stage.steps.length} steps · {hours(minutes)}
+          {!open && ` · builds on ${afterTitles(plan, stage).join(' and ')}`}
+        </p>
+      </div>
+      <ol className="divide-y divide-border">
+        {stage.steps.map((step, index) => (
+          <li key={step.key}>
+            <Link
+              href={`/learn/courses/${course.id}/l/${encodeURIComponent(step.key)}`}
+              className="card-pad-x row-pad flex min-h-11 items-start gap-3 transition-colors duration-quick hover:bg-sunken"
+            >
+              <span className="tabular w-5 shrink-0 text-ui text-ink-muted">{index + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    'block text-ui [overflow-wrap:anywhere]',
+                    done.has(step.key) ? 'text-ink-muted' : 'font-medium text-ink',
+                  )}
+                >
+                  {step.title}
                 </span>
-                {finished.has(lesson.key) && (
-                  <Check
-                    className="mt-0.5 size-4 shrink-0 text-positive"
-                    strokeWidth={1.75}
-                    aria-label="Done"
-                  />
-                )}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+                <span className="tabular block text-small text-ink-muted">{stepLine(step)}</span>
+              </span>
+              {done.has(step.key) && (
+                <Check
+                  className="mt-0.5 size-4 shrink-0 text-positive"
+                  strokeWidth={1.75}
+                  aria-label="Done"
+                />
+              )}
+            </Link>
+          </li>
+        ))}
+      </ol>
     </Card>
   );
 }
@@ -253,7 +272,17 @@ const RATING_TONE: Record<Rating, ChipTone> = {
   skip: 'neutral',
 };
 
-function LecturesTab({ course, digest, text }: { course: Course; digest: Digest; text: Text }) {
+function LecturesTab({
+  course,
+  digest,
+  text,
+  play,
+}: {
+  course: Course;
+  digest: Digest;
+  text: Text;
+  play: { code: string; start: number } | null;
+}) {
   const rated = new Map(digest.ratings.rows.map((row) => [row.code, row]));
   return (
     <section className="space-y-3">
@@ -271,10 +300,32 @@ function LecturesTab({ course, digest, text }: { course: Course; digest: Digest;
               lecture={lecture}
               row={rated.get(lecture.code)}
               text={text}
+              playFrom={play?.code === lecture.code ? play.start : null}
             />
           ))}
         </ul>
       </Card>
+      {digest.errors.rows.length > 0 && (
+        <CardSection
+          title="What the lecturers got wrong"
+          fold="learn.course.errors"
+          defaultOpen={false}
+          meta={digest.errors.rows.length}
+        >
+          <ul className="space-y-4">
+            {digest.errors.rows.map((row, index) => (
+              <li key={index} className="space-y-1">
+                <Markdown
+                  markdown={text(row.where)}
+                  className="vault-prose prose-compact prose-aside"
+                />
+                <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">Said: {row.said}</p>
+                <Markdown markdown={text(row.correction)} className="vault-prose prose-compact" />
+              </li>
+            ))}
+          </ul>
+        </CardSection>
+      )}
     </section>
   );
 }
@@ -283,13 +334,16 @@ function LectureRow({
   lecture,
   row,
   text,
+  playFrom,
 }: {
   lecture: Lecture;
   row: Digest['ratings']['rows'][number] | undefined;
   text: Text;
+  /** Set when a moment's link opened this lecture: the player is up, at that second. */
+  playFrom: number | null;
 }) {
   return (
-    <li className="card-pad-x row-pad space-y-1">
+    <li id={`lecture-${lecture.code}`} className="card-pad-x row-pad scroll-mt-24 space-y-2">
       <div className="flex items-start gap-3">
         <span className="tabular w-8 shrink-0 text-small text-ink-muted">{lecture.code}</span>
         <span className="min-w-0 flex-1">
@@ -314,78 +368,16 @@ function LectureRow({
           <Markdown markdown={text(row.why)} className="vault-prose prose-compact prose-aside" />
         </div>
       )}
+      <ClipPlayer
+        key={playFrom ?? 'whole'}
+        videoId={lecture.videoId}
+        title={
+          playFrom === null ? 'The whole lecture, here in the page' : `From ${clock(playFrom)}`
+        }
+        start={playFrom}
+        deferred={playFrom === null}
+        className="pl-11"
+      />
     </li>
-  );
-}
-
-function MapTab({ digest, text }: { digest: Digest; text: Text }) {
-  return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <SectionHeading title="What rests on what" />
-        {digest.dependencies.intro && (
-          <Markdown
-            markdown={text(digest.dependencies.intro)}
-            className="vault-prose prose-compact prose-aside"
-          />
-        )}
-        <Card padding="dense" className="grid gap-6 sm:grid-cols-2">
-          {digest.dependencies.tracks.map((track) => (
-            <div key={track.title} className="space-y-2">
-              <p className="text-ui font-medium text-ink">{track.title}</p>
-              <ol className="flex flex-col items-start gap-1">
-                {track.steps.map((step, index) => (
-                  <li key={`${step}-${index}`} className="flex flex-col items-start gap-1">
-                    {index > 0 && (
-                      <ArrowDown
-                        className="ml-2 size-3.5 text-ink-ghost"
-                        strokeWidth={1.75}
-                        aria-hidden
-                      />
-                    )}
-                    <Chip className="h-auto whitespace-normal py-1 text-left">{step}</Chip>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ))}
-        </Card>
-      </section>
-
-      <section className="space-y-3">
-        <SectionHeading
-          title="Where the series disagrees with itself"
-          count={digest.tensions.rows.length}
-        />
-        {digest.tensions.intro && (
-          <Markdown
-            markdown={text(digest.tensions.intro)}
-            className="vault-prose prose-compact prose-aside"
-          />
-        )}
-        <Card padding="none">
-          <ul className="divide-y divide-border">
-            {digest.tensions.rows.map((row) => (
-              <li key={row.tension} className="card-pad-x row-pad space-y-2">
-                <p className="text-body font-medium text-ink [overflow-wrap:anywhere]">
-                  {row.tension}
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Markdown markdown={text(row.oneSide)} className="vault-prose prose-compact" />
-                  <Markdown markdown={text(row.otherSide)} className="vault-prose prose-compact" />
-                </div>
-                <Markdown
-                  markdown={text(row.lands)}
-                  className="vault-prose prose-compact prose-aside"
-                />
-              </li>
-            ))}
-          </ul>
-        </Card>
-        {digest.tensions.outro && (
-          <Markdown markdown={text(digest.tensions.outro)} className="vault-prose prose-compact" />
-        )}
-      </section>
-    </div>
   );
 }

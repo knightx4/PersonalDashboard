@@ -75,6 +75,23 @@ export const maxDuration = 300;
  */
 type Stage = { name: string; run: () => Promise<unknown> };
 
+
+/**
+ * Stages the run passes over. The person asked on 16 November 2026 for the
+ * Learn work that spends on the API to stop while the reader and Courses,
+ * which prepare on the subscription, take over (docs/LEARN-READER-SPEC.md):
+ * the watch on research briefs, the structure pulls for topics that lit, the
+ * subject preparations and the figure backfill each call a model. The
+ * embeddings stay, since Idea Space is drawn from them. Take a name out to
+ * set its stage going again.
+ */
+const PAUSED: ReadonlySet<string> = new Set([
+  'learn-brief-watch',
+  'learn-lit-topic-pulls',
+  'learn-preparations',
+  'learn-figure-backfill',
+]);
+
 export async function GET(request: NextRequest) {
   if (!authorizeCron(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
@@ -157,6 +174,10 @@ export async function GET(request: NextRequest) {
   const failed: string[] = [];
 
   for (const stage of stages) {
+    if (PAUSED.has(stage.name)) {
+      results[stage.name] = { paused: true };
+      continue;
+    }
     try {
       results[stage.name] = await stage.run();
     } catch (err) {

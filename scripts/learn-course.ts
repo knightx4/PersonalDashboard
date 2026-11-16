@@ -69,7 +69,7 @@ async function main() {
     print({
       ok: true,
       totals: digestTotals(checked.digest, lectures.lectures),
-      lessons: checked.digest.lessons.length,
+      stages: checked.digest.plan.stages.map((stage) => `${stage.key} (${stage.steps.length} steps, after ${stage.after.join(" and ") || "nothing"})`),
     });
     return;
   }

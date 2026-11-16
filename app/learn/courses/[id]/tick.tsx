@@ -5,7 +5,7 @@ import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { markCourseProgress } from '../actions';
 
-/** Mark a path clip watched or a lesson done. Shown pressed at once; the row is saved behind it. */
+/** Mark a step of the plan done. Shown pressed at once; the row is saved behind it. */
 export function Tick({
   courseId,
   kind,
