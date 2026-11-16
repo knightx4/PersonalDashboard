@@ -118,7 +118,7 @@ function courseLine(course: CourseSummary): string {
     const parts = [
       videos ? `${videos} videos` : null,
       runtimeMinutes ? `${hours(runtimeMinutes)} cut to a ${hours(pathMinutes ?? 0)} path` : null,
-      watched > 0 ? `${watched} clips watched` : null,
+      watched > 0 ? `${watched} ${watched === 1 ? 'clip' : 'clips'} watched` : null,
     ].filter(Boolean);
     return by + parts.join(' · ');
   }

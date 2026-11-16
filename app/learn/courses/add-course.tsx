@@ -21,7 +21,7 @@ export function AddCourse() {
             id="course-what"
             name="what"
             aria-label="A playlist link or a course name"
-            placeholder="Paste a YouTube playlist link, or name a course"
+            placeholder="A playlist link or a course name"
             aria-describedby={state.error ? 'course-what-error' : undefined}
             className="min-w-0 flex-1"
             required
@@ -34,7 +34,7 @@ export function AddCourse() {
           id="course-goal"
           name="goal"
           aria-label="What you want from it"
-          placeholder="What do you want from it? (optional)"
+          placeholder="What you want from it (optional)"
         />
         {state.error && <FieldError id="course-what-error">{state.error}</FieldError>}
         <p className="text-small text-ink-muted">

@@ -6,7 +6,7 @@ import { LessonView } from '@/app/learn/courses/[id]/l/[key]/lesson-view';
 import { CoursesView } from '@/app/learn/courses/courses-view';
 import { freshSteps } from '@/lib/learn/courses/build';
 import { COURSE_CATALOGUE } from '@/lib/learn/courses/catalogue';
-import type { Digest, Lecture } from '@/lib/learn/courses/digest';
+import { checkDigest, checkLectures, type Digest, type Lecture } from '@/lib/learn/courses/digest';
 import type { Course } from '@/lib/learn/courses/store';
 import fixture from './course-digest-fixture.json';
 
@@ -17,21 +17,55 @@ import fixture from './course-digest-fixture.json';
  * 18.S096, so the surfaces carry real lecture numbers and timestamps.
  */
 
-const digest = fixture.digest as Digest;
-const lectures = fixture.lectures as Lecture[];
+// The fixture is the file a session saves, so it goes through the same check
+// the save does: times become seconds and the path's minutes are worked out.
+const listed = checkLectures(fixture.lectures);
+const lectures: Lecture[] = listed.ok ? listed.lectures : [];
+const checked = checkDigest(
+  {
+    ...fixture.digest,
+    ratings: {
+      ...fixture.digest.ratings,
+      rows: lectures.map(
+        (lecture) =>
+          fixture.digest.ratings.rows.find((row) => row.code === lecture.code) ?? {
+            code: lecture.code,
+            rating: 'skim',
+            watch: '',
+            why: 'Standard review.',
+          },
+      ),
+    },
+    ideas: [...fixture.digest.ideas, ...fixture.digest.ideas],
+  },
+  lectures,
+);
+if (!checked.ok)
+  throw new Error(`The course fixture does not check: ${checked.problems.join(' ')}`);
+const digest: Digest = checked.digest;
 
 const READY: Course = {
   id: '00000000-0000-4000-8000-0000000c0001',
   title: 'MIT Quantitative Finance, Condensed',
   provider: 'MIT OpenCourseWare',
   sourceUrl: null,
-  about: '18.S096 Topics in Mathematics with Applications in Finance (Fall 2013), plus four 2024 guest lectures.',
+  about:
+    '18.S096 Topics in Mathematics with Applications in Finance (Fall 2013), plus four 2024 guest lectures.',
   goal: 'See how a sell-side quant desk measures risk and prices by replication.',
   budgetMinutes: 180,
   catalogueKey: 'mit-18s096-2013',
   status: 'ready',
   steps: [],
-  totals: { videos: 28, runtimeMinutes: 2202, pathMinutes: 177, share: 0.08, watch: 5, parts: 8, skim: 14, skip: 1 },
+  totals: {
+    videos: 28,
+    runtimeMinutes: 2202,
+    pathMinutes: 177,
+    share: 0.08,
+    watch: 5,
+    parts: 8,
+    skim: 14,
+    skip: 1,
+  },
   progress: { clips: ['0'], lessons: [] },
   error: null,
   runUrl: null,
@@ -57,7 +91,11 @@ const BUILDING: Course = {
   lectures: [],
   steps: freshSteps().map((step, index) =>
     index < 2
-      ? { ...step, state: 'done' as const, detail: index === 0 ? '10 videos, 19:21:02' : '10 of 10' }
+      ? {
+          ...step,
+          state: 'done' as const,
+          detail: index === 0 ? '10 videos, 19:21:02' : '10 of 10',
+        }
       : index === 2
         ? { ...step, state: 'running' as const, detail: '6 of 10' }
         : step,
@@ -66,7 +104,12 @@ const BUILDING: Course = {
 
 export function CourseDigestListPreview() {
   const have = new Set([READY.catalogueKey, BUILDING.catalogueKey]);
-  return <CoursesView courses={[BUILDING, READY]} catalogue={COURSE_CATALOGUE.filter((course) => !have.has(course.key))} />;
+  return (
+    <CoursesView
+      courses={[BUILDING, READY]}
+      catalogue={COURSE_CATALOGUE.filter((course) => !have.has(course.key))}
+    />
+  );
 }
 
 export function CourseDigestBuildingPreview() {
@@ -82,5 +125,13 @@ export function CourseDigestMapPreview() {
 }
 
 export function CourseDigestLessonPreview() {
-  return <LessonView course={READY} lesson={digest.lessons[0]} at={0} total={9} next={digest.lessons[1]} />;
+  return (
+    <LessonView
+      course={READY}
+      lesson={digest.lessons[0]}
+      at={0}
+      total={9}
+      next={digest.lessons[1]}
+    />
+  );
 }

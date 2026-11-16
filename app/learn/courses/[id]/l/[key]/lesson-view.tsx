@@ -9,7 +9,14 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { Markdown } from '@/components/ui/markdown';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { sectionSubject } from '@/lib/core/section-path';
-import { clock, linkMoments, TREATMENT_LABEL, type Idea, type Lecture, type Lesson } from '@/lib/learn/courses/digest';
+import {
+  clock,
+  linkMoments,
+  TREATMENT_LABEL,
+  type Idea,
+  type Lecture,
+  type Lesson,
+} from '@/lib/learn/courses/digest';
 import type { Course } from '@/lib/learn/courses/store';
 import { Tick } from '../../tick';
 
@@ -21,7 +28,19 @@ import { Tick } from '../../tick';
  * skipped with the reason, folded, so the person can overrule it. Then a
  * question to try, and who in the series disagrees.
  */
-export function LessonView({ course, lesson, at, total, next }: { course: Course; lesson: Lesson; at: number; total: number; next: Lesson | null }) {
+export function LessonView({
+  course,
+  lesson,
+  at,
+  total,
+  next,
+}: {
+  course: Course;
+  lesson: Lesson;
+  at: number;
+  total: number;
+  next: Lesson | null;
+}) {
   const text = (source: string) => linkMoments(source, course.lectures);
   const full = lesson.ideas.filter(
     (idea) => idea.treatment === 'clip' || idea.treatment === 'worked',
@@ -63,7 +82,7 @@ export function LessonView({ course, lesson, at, total, next }: { course: Course
                   <p className="text-ui font-medium text-ink [overflow-wrap:anywhere]">
                     {idea.name}
                   </p>
-                  <Markdown markdown={text(idea.body)} className="text-ui text-ink" />
+                  <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
                 </li>
               ))}
             </ul>
@@ -74,9 +93,15 @@ export function LessonView({ course, lesson, at, total, next }: { course: Course
       {lesson.check && (
         <CardSection title="Try it" fold={`learn.course.check.${course.id}.${lesson.key}`}>
           <div className="space-y-3">
-            <Markdown markdown={text(lesson.check.question)} className="text-body text-ink" />
+            <Markdown
+              markdown={text(lesson.check.question)}
+              className="vault-prose prose-compact"
+            />
             <Disclosure title="The answer">
-              <Markdown markdown={text(lesson.check.answer)} className="text-ui text-ink" />
+              <Markdown
+                markdown={text(lesson.check.answer)}
+                className="vault-prose prose-compact"
+              />
             </Disclosure>
           </div>
         </CardSection>
@@ -84,7 +109,7 @@ export function LessonView({ course, lesson, at, total, next }: { course: Course
 
       {lesson.tension && (
         <CardSection title="Where the series disagrees">
-          <Markdown markdown={text(lesson.tension)} className="text-ui text-ink" />
+          <Markdown markdown={text(lesson.tension)} className="vault-prose prose-compact" />
         </CardSection>
       )}
 
@@ -99,7 +124,10 @@ export function LessonView({ course, lesson, at, total, next }: { course: Course
             {skipped.map((idea) => (
               <li key={idea.name}>
                 <p className="text-ui font-medium text-ink [overflow-wrap:anywhere]">{idea.name}</p>
-                <Markdown markdown={text(idea.body)} className="text-small text-ink-muted" />
+                <Markdown
+                  markdown={text(idea.body)}
+                  className="vault-prose prose-compact prose-aside"
+                />
               </li>
             ))}
           </ul>
@@ -154,7 +182,7 @@ function IdeaCard({
           {TREATMENT_LABEL[idea.treatment]}
         </Chip>
       </div>
-      <Markdown markdown={text(idea.body)} className="text-ui text-ink" />
+      <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
       {idea.clips.map((clip, index) => {
         const lecture = byCode.get(clip.code);
         if (!lecture) return null;

@@ -3,7 +3,7 @@ import { ArrowDown, Check } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
-import { Card } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { Markdown } from '@/components/ui/markdown';
 import { SectionHeading } from '@/components/ui/section-heading';
@@ -81,7 +81,7 @@ export function CourseView({
                   <span className="tabular text-ink-muted">{index + 1}. </span>
                   {idea.title}
                 </p>
-                <Markdown markdown={text(idea.body)} className="text-ui text-ink" />
+                <Markdown markdown={text(idea.body)} className="vault-prose prose-compact" />
               </li>
             ))}
           </ol>
@@ -92,17 +92,23 @@ export function CourseView({
       {open === 'errors' && (
         <section className="space-y-3">
           {digest.errors.intro && (
-            <Markdown markdown={text(digest.errors.intro)} className="text-ui text-ink-muted" />
+            <Markdown
+              markdown={text(digest.errors.intro)}
+              className="vault-prose prose-compact prose-aside"
+            />
           )}
           <Card padding="none">
             <ul className="divide-y divide-border">
               {digest.errors.rows.map((row, index) => (
                 <li key={index} className="card-pad-x row-pad space-y-1.5">
-                  <Markdown markdown={text(row.where)} className="text-small text-ink-muted" />
+                  <Markdown
+                    markdown={text(row.where)}
+                    className="vault-prose prose-compact prose-aside"
+                  />
                   <p className="text-ui text-ink-muted [overflow-wrap:anywhere]">
                     Said: {row.said}
                   </p>
-                  <Markdown markdown={text(row.correction)} className="text-ui text-ink" />
+                  <Markdown markdown={text(row.correction)} className="vault-prose prose-compact" />
                 </li>
               ))}
             </ul>
@@ -110,9 +116,15 @@ export function CourseView({
         </section>
       )}
 
-      <p className="text-small text-ink-muted [overflow-wrap:anywhere]">
-        Cut for: {digest.madeFor}
-      </p>
+      <CardSection title="About this digest" fold="learn.course.about" defaultOpen={false}>
+        <div className="space-y-3">
+          <p className="text-ui text-ink [overflow-wrap:anywhere]">{digest.madeFor}</p>
+          <Markdown
+            markdown={text(digest.intro)}
+            className="vault-prose prose-compact prose-aside"
+          />
+        </div>
+      </CardSection>
     </PageColumn>
   );
 }
@@ -131,9 +143,8 @@ function PathTab({ course, digest, text }: { course: Course; digest: Digest; tex
 
   return (
     <section className="space-y-3">
-      <Markdown markdown={text(digest.intro)} className="text-ui text-ink-muted" />
       {digest.path.intro && (
-        <Markdown markdown={text(digest.path.intro)} className="text-ui text-ink" />
+        <Markdown markdown={text(digest.path.intro)} className="vault-prose prose-compact" />
       )}
       <SectionHeading
         title="The path"
@@ -247,7 +258,10 @@ function LecturesTab({ course, digest, text }: { course: Course; digest: Digest;
   return (
     <section className="space-y-3">
       {digest.ratings.intro && (
-        <Markdown markdown={text(digest.ratings.intro)} className="text-ui text-ink-muted" />
+        <Markdown
+          markdown={text(digest.ratings.intro)}
+          className="vault-prose prose-compact prose-aside"
+        />
       )}
       <Card padding="none">
         <ul className="divide-y divide-border">
@@ -291,8 +305,13 @@ function LectureRow({
       </div>
       {row && (
         <div className="space-y-1 pl-11">
-          {row.watch && <Markdown markdown={text(row.watch)} className="text-small text-ink" />}
-          <Markdown markdown={text(row.why)} className="text-small text-ink-muted" />
+          {row.watch && (
+            <Markdown
+              markdown={text(row.watch)}
+              className="vault-prose prose-compact prose-aside"
+            />
+          )}
+          <Markdown markdown={text(row.why)} className="vault-prose prose-compact prose-aside" />
         </div>
       )}
     </li>
@@ -305,7 +324,10 @@ function MapTab({ digest, text }: { digest: Digest; text: Text }) {
       <section className="space-y-3">
         <SectionHeading title="What rests on what" />
         {digest.dependencies.intro && (
-          <Markdown markdown={text(digest.dependencies.intro)} className="text-ui text-ink-muted" />
+          <Markdown
+            markdown={text(digest.dependencies.intro)}
+            className="vault-prose prose-compact prose-aside"
+          />
         )}
         <Card padding="dense" className="grid gap-6 sm:grid-cols-2">
           {digest.dependencies.tracks.map((track) => (
@@ -336,7 +358,10 @@ function MapTab({ digest, text }: { digest: Digest; text: Text }) {
           count={digest.tensions.rows.length}
         />
         {digest.tensions.intro && (
-          <Markdown markdown={text(digest.tensions.intro)} className="text-ui text-ink-muted" />
+          <Markdown
+            markdown={text(digest.tensions.intro)}
+            className="vault-prose prose-compact prose-aside"
+          />
         )}
         <Card padding="none">
           <ul className="divide-y divide-border">
@@ -346,16 +371,19 @@ function MapTab({ digest, text }: { digest: Digest; text: Text }) {
                   {row.tension}
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Markdown markdown={text(row.oneSide)} className="text-ui text-ink" />
-                  <Markdown markdown={text(row.otherSide)} className="text-ui text-ink" />
+                  <Markdown markdown={text(row.oneSide)} className="vault-prose prose-compact" />
+                  <Markdown markdown={text(row.otherSide)} className="vault-prose prose-compact" />
                 </div>
-                <Markdown markdown={text(row.lands)} className="text-small text-ink-muted" />
+                <Markdown
+                  markdown={text(row.lands)}
+                  className="vault-prose prose-compact prose-aside"
+                />
               </li>
             ))}
           </ul>
         </Card>
         {digest.tensions.outro && (
-          <Markdown markdown={text(digest.tensions.outro)} className="text-ui text-ink" />
+          <Markdown markdown={text(digest.tensions.outro)} className="vault-prose prose-compact" />
         )}
       </section>
     </div>
