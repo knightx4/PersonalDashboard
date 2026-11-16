@@ -60,33 +60,81 @@ export function afterStep(plan: Plan, key: string): { step: Step | null; stages:
   };
 }
 
-/** A run of stages taken one after another, and the branches that open when it ends. */
-export type Line = { stages: Stage[]; branches: Line[] };
-
-/**
- * The plan as a tree, for drawing. A line is a stage with the stages that
- * can only follow it; where more than one stage follows, each starts a
- * branch of that line. A stage that comes after two stages belongs under
- * neither, so it starts a line of its own at the top, in the plan's order.
- */
-export function planTree(plan: Plan): Line[] {
-  const followers = (stage: Stage) =>
-    plan.stages.filter((item) => item.after.length === 1 && item.after[0] === stage.key);
-  const lineFrom = (head: Stage): Line => {
-    const stages = [head];
-    for (;;) {
-      const next = followers(stages[stages.length - 1]);
-      if (next.length !== 1) return { stages, branches: next.map(lineFrom) };
-      stages.push(next[0]);
-    }
-  };
-  return plan.stages.filter((stage) => stage.after.length !== 1).map(lineFrom);
-}
-
-/** The names of the stages a stage comes after, for a line under its title. */
-export function afterTitles(plan: Plan, stage: Stage): string[] {
+/** The map names of the stages a stage comes after, for the line over its title. */
+export function afterNames(plan: Plan, stage: Stage): string[] {
   return stage.after.flatMap((key) => {
     const earlier = plan.stages.find((item) => item.key === key);
-    return earlier ? [earlier.title] : [];
+    return earlier ? [shortName(earlier)] : [];
   });
+}
+
+/** A stage's place on the map: `x` in columns from the left (a branch's leaf is one column), `row` from the top. */
+export type MapNode = { key: string; x: number; row: number };
+export type MapLayout = {
+  nodes: MapNode[];
+  /** Every "comes after" as a line from the earlier stage to the later. */
+  edges: { from: string; to: string }[];
+  columns: number;
+  rows: number;
+};
+
+/**
+ * Where each stage sits on the map. A stage's row is how many stages deep
+ * the longest way to it is, so everything it rests on is above it. Its column
+ * comes from the tree under the first stage: a stage hangs under the deepest
+ * stage it comes after, each stage with nothing under it takes the next
+ * column, and a stage with stages under it sits centred over them. A stage
+ * that comes after two stages hangs under one and has a line from the other.
+ */
+export function mapLayout(plan: Plan): MapLayout {
+  const byKey = new Map(plan.stages.map((stage) => [stage.key, stage]));
+  const row = new Map<string, number>();
+  // Stages are listed after the stages they come after (checkDigest), so one pass is enough.
+  for (const stage of plan.stages) {
+    const above = stage.after.flatMap((key) => (row.has(key) ? [row.get(key)!] : []));
+    row.set(stage.key, above.length > 0 ? Math.max(...above) + 1 : 0);
+  }
+  const under = new Map<string, string[]>();
+  const tops: string[] = [];
+  for (const stage of plan.stages) {
+    const parents = stage.after.filter((key) => byKey.has(key));
+    if (parents.length === 0) {
+      tops.push(stage.key);
+      continue;
+    }
+    const parent = parents.reduce((deepest, key) =>
+      row.get(key)! > row.get(deepest)! ? key : deepest,
+    );
+    under.set(parent, [...(under.get(parent) ?? []), stage.key]);
+  }
+
+  const x = new Map<string, number>();
+  let columns = 0;
+  const place = (key: string): number => {
+    const below = (under.get(key) ?? []).map(place);
+    const at = below.length > 0 ? (below[0] + below[below.length - 1]) / 2 : columns++;
+    x.set(key, at);
+    return at;
+  };
+  tops.forEach(place);
+
+  return {
+    nodes: plan.stages.map((stage) => ({
+      key: stage.key,
+      x: x.get(stage.key) ?? 0,
+      row: row.get(stage.key) ?? 0,
+    })),
+    edges: plan.stages.flatMap((stage) =>
+      stage.after.filter((key) => byKey.has(key)).map((from) => ({ from, to: stage.key })),
+    ),
+    columns: Math.max(1, columns),
+    rows: Math.max(0, ...row.values()) + 1,
+  };
+}
+
+/** A stage's name on the map. A plan kept before stages carried one falls back to the start of its title. */
+export function shortName(stage: Stage): string {
+  if (stage.short) return stage.short;
+  const head = stage.title.split(':').pop()!.trim();
+  return head.length > 24 ? `${head.slice(0, 23).trimEnd()}…` : head;
 }

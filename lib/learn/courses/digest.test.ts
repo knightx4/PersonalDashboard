@@ -9,7 +9,7 @@ import {
   secondsOf,
   type Lecture,
 } from './digest';
-import { afterStep, isOpen, nextStep, planTree } from './plan';
+import { afterStep, isOpen, mapLayout, nextStep } from './plan';
 
 const LECTURES: Lecture[] = [
   {
@@ -31,9 +31,12 @@ const LECTURES: Lecture[] = [
 const SVG =
   '<svg viewBox="0 0 360 80" role="img" aria-label="Loss against sigma"><line x1="10" y1="60" x2="350" y2="60" stroke="currentColor"/><text x="10" y="20" font-size="12" class="accent">2.33 sigma</text></svg>';
 
+// Commentary long enough to make a step a sitting on its own: about five minutes of reading.
+const WORDS = Array.from({ length: 1150 }, () => 'word').join(' ');
 const step = (title: string, blocks: unknown[] = []) => ({
   title,
-  blocks: [{ type: 'text', body: 'Why this comes next.' }, ...blocks],
+  gain: 'Work the number out and say what it leaves out.',
+  blocks: [{ type: 'text', body: WORDS }, ...blocks],
 });
 
 function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
@@ -46,6 +49,7 @@ function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
       stages: stages ?? [
         {
           key: 'A',
+          short: 'Shared ground',
           title: 'Shared ground',
           about: 'What both branches rest on.',
           after: [],
@@ -71,6 +75,7 @@ function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
         },
         {
           key: 'B',
+          short: 'Risk',
           title: 'Risk',
           about: 'Measuring it.',
           after: ['A'],
@@ -78,6 +83,7 @@ function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
         },
         {
           key: 'C',
+          short: 'Time series',
           title: 'Time series',
           about: 'Modelling it.',
           after: ['A'],
@@ -98,6 +104,7 @@ function digest(overrides: Record<string, unknown> = {}, stages?: unknown[]) {
         },
         {
           key: 'D',
+          short: 'Putting it together',
           title: 'Putting it together',
           about: 'Needs both.',
           after: ['B', 'C'],
@@ -170,7 +177,9 @@ describe('checkDigest', () => {
     expect(checked.ok).toBe(true);
     if (!checked.ok) return;
     const [first] = checked.digest.plan.stages[0].steps;
-    expect(first).toMatchObject({ key: 'A.1', minutes: 8 });
+    expect(first).toMatchObject({ key: 'A.1', minutes: 13 });
+    expect(first.gain).toBe('Work the number out and say what it leaves out.');
+    expect(checked.digest.plan.stages[0].short).toBe('Shared ground');
     expect(first.blocks[1]).toMatchObject({ type: 'clip', start: 1309, end: 1779, minutes: 8 });
     expect(digestTotals(checked.digest, LECTURES)).toMatchObject({
       watchMinutes: 8,
@@ -208,17 +217,31 @@ describe('checkDigest', () => {
   });
 
   const stage = (over: Record<string, unknown>, blocks: unknown[] = []) => [
-    { key: 'A', title: 'Start', about: 'x', after: [], steps: [step('One', blocks)], ...over },
+    {
+      key: 'A',
+      short: 'Start',
+      title: 'Start',
+      about: 'x',
+      after: [],
+      steps: [step('One', blocks)],
+      ...over,
+    },
   ];
   const badPlans: [string, unknown[], RegExp][] = [
     [
       'a stage that comes after one below it',
-      [...stage({}), { key: 'B', title: 'b', about: 'x', after: ['C'], steps: [step('s')] }],
+      [
+        ...stage({}),
+        { key: 'B', short: 'b', title: 'b', about: 'x', after: ['C'], steps: [step('s')] },
+      ],
       /not a stage above it/,
     ],
     [
       'a second stage that comes after nothing',
-      [...stage({}), { key: 'B', title: 'b', about: 'x', after: [], steps: [step('s')] }],
+      [
+        ...stage({}),
+        { key: 'B', short: 'b', title: 'b', about: 'x', after: [], steps: [step('s')] },
+      ],
       /only the first stage starts/,
     ],
     [
@@ -227,6 +250,33 @@ describe('checkDigest', () => {
         steps: [{ title: 'Bare', blocks: [{ type: 'check', question: 'q', answer: 'a' }] }],
       }),
       /no commentary/,
+    ],
+    [
+      'a step too short to be a sitting',
+      stage({
+        steps: [{ title: 'A note', gain: 'g', blocks: [{ type: 'text', body: 'One line.' }] }],
+      }),
+      /too short to be a sitting/,
+    ],
+    [
+      'a step that does not say what you get',
+      stage({ steps: [{ title: 'One', blocks: [{ type: 'text', body: WORDS }] }] }),
+      /gain is empty/,
+    ],
+    [
+      'a stage with no name for the map',
+      [{ key: 'A', title: 'Start', about: 'x', after: [], steps: [step('One')] }],
+      /short name is empty/,
+    ],
+    [
+      'prose that points at a stage by its key',
+      stage({ about: 'Take this before stage A.' }),
+      /call a stage or a step by its title/,
+    ],
+    [
+      'prose that points at a step by its key',
+      stage({}, [{ type: 'text', body: 'As A.2 showed.' }]),
+      /names "A\.2"/,
     ],
     [
       'a clip with no end',
@@ -280,24 +330,20 @@ describe('walking the plan', () => {
   const plan = checked.digest.plan;
   const done = (...keys: string[]) => new Set(keys);
 
-  type Keys = { stages: string[]; branches: Keys[] };
-  const keys = (lines: ReturnType<typeof planTree>): Keys[] =>
-    lines.map((line) => ({
-      stages: line.stages.map((item) => item.key),
-      branches: keys(line.branches),
-    }));
-  const leaf = (...stages: string[]): Keys => ({ stages, branches: [] });
+  const places = (layout: ReturnType<typeof mapLayout>) =>
+    Object.fromEntries(layout.nodes.map((node) => [node.key, [node.x, node.row]]));
 
-  it('draws a fork as branches, and a stage that needs both as a line of its own', () => {
-    expect(keys(planTree(plan))).toEqual([
-      { stages: ['A'], branches: [leaf('B'), leaf('C')] },
-      leaf('D'),
-    ]);
+  it('sets branches side by side under the stage they follow, and what needs both below them', () => {
+    const layout = mapLayout(plan);
+    expect(places(layout)).toEqual({ A: [0.5, 0], B: [0, 1], C: [1, 1], D: [0, 2] });
+    expect(layout).toMatchObject({ columns: 2, rows: 3 });
+    expect(layout.edges).toContainEqual({ from: 'C', to: 'D' });
   });
 
-  it('keeps a branch two stages long together, and nests a fork inside a branch', () => {
+  it('keeps a branch in its own column and centres a stage over its fork', () => {
     const bare = (key: string, after: string[]) => ({
       key,
+      short: key,
       title: key,
       about: 'x',
       after,
@@ -311,18 +357,18 @@ describe('walking the plan', () => {
         bare('B3', ['B1']),
         bare('C1', ['A']),
         bare('C2', ['C1']),
-        bare('G', ['B2', 'C2']),
       ]),
       LECTURES,
     );
     if (!long.ok) throw new Error(long.problems.join(' '));
-    expect(keys(planTree(long.digest.plan))).toEqual([
-      {
-        stages: ['A'],
-        branches: [{ stages: ['B1'], branches: [leaf('B2'), leaf('B3')] }, leaf('C1', 'C2')],
-      },
-      leaf('G'),
-    ]);
+    expect(places(mapLayout(long.digest.plan))).toEqual({
+      A: [1.25, 0],
+      B1: [0.5, 1],
+      B2: [0, 2],
+      B3: [1, 2],
+      C1: [2, 1],
+      C2: [2, 2],
+    });
   });
 
   it('starts at the first stage and follows a branch once it is begun', () => {

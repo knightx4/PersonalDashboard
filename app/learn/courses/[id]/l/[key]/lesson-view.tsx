@@ -16,19 +16,19 @@ import {
   type Stage,
   type Step,
 } from '@/lib/learn/courses/digest';
-import type { Placed } from '@/lib/learn/courses/plan';
+import { shortName, type Placed } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { ReaderFigure } from '../../../../read/figure';
 import { momentHref } from '../../course-view';
-import { Tick } from '../../tick';
+import { StepFoot, type Onward } from './step-foot';
 
 /**
- * One step of a course's plan (docs/LEARN-DIGEST-SPEC.md, "The plan"). Its
- * blocks are drawn in the order they were written, because that is the order
- * to take them in: words that set a clip up, the clip playing in the page,
- * what to make of it, a drawing, a piece of a reading, a question to try.
- * At the foot, the next step, or the branches to choose between when this
- * step ends a stage.
+ * One step of a course's plan (docs/LEARN-DIGEST-SPEC.md, "The plan"). At the
+ * top, where it sits in its stage, and what it gets you. Its blocks are drawn
+ * in the order they were written, because that is the order to take them in:
+ * words that set a clip up, the clip playing in the page, what to make of it,
+ * a drawing, a piece of a reading, a question to try. At the foot, one press
+ * that marks it done and goes on (step-foot.tsx).
  */
 export function LessonView({
   course,
@@ -43,101 +43,84 @@ export function LessonView({
   const text = (source: string) => linkMoments(source, course.lectures, momentHref(course.id));
   const byCode = new Map(course.lectures.map((lecture) => [lecture.code, lecture]));
   const stepHref = (key: string) => `/learn/courses/${course.id}/l/${encodeURIComponent(key)}`;
+  const mapHref = `/learn/courses/${course.id}`;
+  const done = new Set(course.progress.lessons);
   // The first clip is ready to play; the rest load when pressed, so a step with several stays light.
   const firstClip = step.blocks.findIndex((block) => block.type === 'clip');
+  const minutes = (item: Stage) => item.steps.reduce((sum, each) => sum + each.minutes, 0);
+
+  const onward: { kind: 'step' | 'stages'; to: Onward[] } = next.step
+    ? {
+        kind: 'step',
+        to: [{ href: stepHref(next.step.key), title: next.step.title, minutes: next.step.minutes }],
+      }
+    : {
+        kind: 'stages',
+        to: next.stages.map((item) => ({
+          href: stepHref(item.steps[0].key),
+          title: item.title,
+          about: item.about,
+          minutes: minutes(item),
+        })),
+      };
 
   return (
-    <PageColumn className="space-y-5">
-      <PageHeader
-        subject={sectionSubject(
-          '/learn/courses',
-          'Courses',
-          { label: course.title, href: `/learn/courses/${course.id}` },
-          { label: step.title, href: stepHref(step.key) },
-        )}
-        title={step.title}
-        description={`${stage.title} · step ${at + 1} of ${stage.steps.length} · ${step.minutes} min`}
-      />
-
-      {step.blocks.map((block, index) => (
-        <BlockView
-          key={index}
-          block={block}
-          lectures={byCode}
-          text={text}
-          deferred={index !== firstClip}
-          fold={`learn.course.check.${course.id}.${step.key}.${index}`}
+    <PageColumn>
+      {/* One reading column, so the words, the players and the drawings share their edges. */}
+      <div className="mx-auto w-full max-w-2xl space-y-5">
+        <PageHeader
+          subject={sectionSubject(
+            '/learn/courses',
+            'Courses',
+            { label: course.title, href: mapHref },
+            { label: step.title, href: stepHref(step.key) },
+          )}
+          title={step.title}
+          description={step.gain ?? undefined}
         />
-      ))}
 
-      <div className="space-y-3">
-        <Tick
-          courseId={course.id}
-          kind="lessons"
-          itemKey={step.key}
-          done={course.progress.lessons.includes(step.key)}
-          label="Done"
-        />
-        {next.step && (
-          <NextLink href={stepHref(next.step.key)} lead="Next" title={next.step.title} primary />
-        )}
-        {!next.step && next.stages.length > 1 && (
-          <p className="text-ui text-ink [overflow-wrap:anywhere]">
-            That ends {stage.title}. The course branches here. Take whichever you want first.
+        <div className="space-y-1.5">
+          <ol
+            className="flex gap-1"
+            aria-label={`Step ${at + 1} of ${stage.steps.length} in ${shortName(stage)}`}
+          >
+            {stage.steps.map((item, index) => (
+              <li
+                key={item.key}
+                className={cn(
+                  'h-1 flex-1 rounded-full',
+                  index === at ? 'bg-ink' : done.has(item.key) ? 'bg-accent' : 'bg-border-strong',
+                )}
+              />
+            ))}
+          </ol>
+          <p className="tabular text-small text-ink-muted [overflow-wrap:anywhere]">
+            {shortName(stage)} · step {at + 1} of {stage.steps.length} · {step.minutes} min
           </p>
-        )}
-        {!next.step &&
-          next.stages.map((item, index) => (
-            <NextLink
-              key={item.key}
-              href={stepHref(item.steps[0].key)}
-              lead={next.stages.length > 1 ? 'Branch' : 'Next'}
-              title={item.title}
-              about={item.about}
-              primary={index === 0 && next.stages.length === 1}
-            />
-          ))}
-        {!next.step && next.stages.length === 0 && (
-          <NextLink
-            href={`/learn/courses/${course.id}`}
-            lead="End of this line"
-            title="Back to the plan"
-            primary
+        </div>
+
+        {step.blocks.map((block, index) => (
+          <BlockView
+            key={index}
+            block={block}
+            lectures={byCode}
+            text={text}
+            deferred={index !== firstClip}
+            fold={`learn.course.check.${course.id}.${step.key}.${index}`}
           />
-        )}
+        ))}
+
+        <StepFoot
+          key={step.key}
+          courseId={course.id}
+          stepKey={step.key}
+          done={done.has(step.key)}
+          stageTitle={shortName(stage)}
+          onward={onward}
+          mapHref={mapHref}
+        />
       </div>
     </PageColumn>
-  );
-}
-
-function NextLink({
-  href,
-  lead,
-  title,
-  about,
-  primary = false,
-}: {
-  href: string;
-  lead: string;
-  title: string;
-  about?: string;
-  primary?: boolean;
-}) {
-  return (
-    <div className="space-y-1">
-      <Link
-        href={href}
-        className={cn(
-          buttonVariants({ variant: primary ? 'primary' : 'secondary' }),
-          'h-auto min-h-11 max-w-full py-2',
-        )}
-      >
-        <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
-          {lead}: {title}
-        </span>
-      </Link>
-      {about && <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{about}</p>}
-    </div>
   );
 }
 
@@ -160,7 +143,7 @@ function BlockView({
         {block.title && (
           <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{block.title}</h2>
         )}
-        <Markdown markdown={text(block.body)} className="vault-prose" />
+        <Markdown markdown={text(block.body)} className="vault-prose max-w-none" />
       </section>
     );
   }

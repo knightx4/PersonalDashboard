@@ -6,7 +6,7 @@ import { LessonView } from '@/app/learn/courses/[id]/l/[key]/lesson-view';
 import { CoursesView } from '@/app/learn/courses/courses-view';
 import { freshSteps } from '@/lib/learn/courses/build';
 import { COURSE_CATALOGUE } from '@/lib/learn/courses/catalogue';
-import { checkDigest, checkLectures, type Digest, type Lecture } from '@/lib/learn/courses/digest';
+import type { Digest, Lecture } from '@/lib/learn/courses/digest';
 import { afterStep, findStep } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import fixture from './course-digest-fixture.json';
@@ -14,20 +14,16 @@ import fixture from './course-digest-fixture.json';
 /**
  * Gallery fixtures for Learn's Courses tab (learn 0194): the list with one
  * course built and one building, a build part way through, a built course on
- * its plan and on its lectures, and one step. The digest is a cut of a real
- * one, MIT 18.S096, so the surfaces carry real lecture numbers and
- * timestamps: its opening stage, the three branches that follow it, and the
- * fork inside the first of them.
+ * its map before a step is taken and with a branch under way, its lectures,
+ * and a step in the middle of a stage and at the end of one. The digest is a
+ * real one, MIT 18.S096, as the save keeps it: every stage and step, with
+ * the steps' own text kept for the first stage alone, since that is the only
+ * stage a step surface opens.
  */
 
-// The fixture is the file a session saves, so it goes through the same check
-// the save does: times become seconds and each step's minutes are worked out.
-const listed = checkLectures(fixture.lectures);
-const lectures: Lecture[] = listed.ok ? listed.lectures : [];
-const checked = checkDigest(fixture.digest, lectures);
-if (!checked.ok)
-  throw new Error(`The course fixture does not check: ${checked.problems.join(' ')}`);
-const digest: Digest = checked.digest;
+const lectures = fixture.lectures as Lecture[];
+const digest = fixture.digest as Digest;
+const [OPENING, RISK] = digest.plan.stages;
 
 const READY: Course = {
   id: '00000000-0000-4000-8000-0000000c0001',
@@ -44,15 +40,17 @@ const READY: Course = {
   totals: {
     videos: 28,
     runtimeMinutes: 2202,
-    pathMinutes: 520,
-    watchMinutes: 240,
+    pathMinutes: 301,
+    watchMinutes: 239,
+    stages: 9,
+    steps: 39,
     share: 0.11,
     watch: 5,
     parts: 8,
     skim: 14,
     skip: 1,
   },
-  progress: { clips: [], lessons: [digest.plan.stages[0].steps[0].key] },
+  progress: { clips: [], lessons: [] },
   error: null,
   runUrl: null,
   requestedAt: '2026-11-16T06:00:00Z',
@@ -106,19 +104,40 @@ export function CourseDigestPlanPreview() {
   return <CourseView course={READY} digest={digest} tab="plan" />;
 }
 
+// The opening stage finished and the first branch begun: the map shows the
+// line walked, and opens on the branch under way.
+const UNDER_WAY: Course = {
+  ...READY,
+  progress: {
+    clips: [],
+    lessons: [...OPENING.steps.map((step) => step.key), RISK.steps[0].key],
+  },
+};
+
+export function CourseDigestPlanUnderWayPreview() {
+  return <CourseView course={UNDER_WAY} digest={digest} tab="plan" />;
+}
+
 export function CourseDigestLecturesPreview() {
   return <CourseView course={READY} digest={digest} tab="lectures" />;
 }
 
-// The last step of the opening stage, so the foot shows the branches to choose between.
-const LAST = digest.plan.stages[0].steps[digest.plan.stages[0].steps.length - 1].key;
+const stepProps = (course: Course, key: string) => ({
+  course,
+  placed: findStep(digest.plan, key)!,
+  next: afterStep(digest.plan, key),
+});
 
 export function CourseDigestLessonPreview() {
-  return (
-    <LessonView
-      course={READY}
-      placed={findStep(digest.plan, LAST)!}
-      next={afterStep(digest.plan, LAST)}
-    />
-  );
+  return <LessonView {...stepProps(READY, OPENING.steps[0].key)} />;
+}
+
+// The last step of the opening stage, so the foot offers the branches.
+export function CourseDigestLessonBranchPreview() {
+  const last = OPENING.steps[OPENING.steps.length - 1].key;
+  const course: Course = {
+    ...READY,
+    progress: { clips: [], lessons: OPENING.steps.slice(0, -1).map((step) => step.key) },
+  };
+  return <LessonView {...stepProps(course, last)} />;
 }

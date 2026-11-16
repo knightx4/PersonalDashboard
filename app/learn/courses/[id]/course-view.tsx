@@ -1,14 +1,10 @@
-import Link from '@/components/ui/link';
-import { ArrowDown, Check } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageColumn } from '@/components/shell/page-width';
-import { buttonVariants } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Chip, type ChipTone } from '@/components/ui/chip';
 import { Markdown } from '@/components/ui/markdown';
 import { Tabs } from '@/components/ui/tabs';
-import { cn } from '@/lib/cn';
 import { sectionSubject } from '@/lib/core/section-path';
 import {
   clock,
@@ -19,26 +15,25 @@ import {
   type Lecture,
   type Plan,
   type Rating,
-  type Stage,
   type Step,
 } from '@/lib/learn/courses/digest';
 import {
-  afterTitles,
+  afterNames,
   isOpen,
+  mapLayout,
   nextStep,
   placedSteps,
-  planTree,
-  type Line,
+  shortName,
 } from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { hours } from '../format';
+import { PlanMap, type MapStage } from './plan-map';
 
 /**
  * A built course (docs/LEARN-DIGEST-SPEC.md). The header says what the series
  * was cut from and to. Three tabs. Lessons is the plan, and the thing to do:
- * the stages down the page in the order the ideas rest on each other, drawn
- * as a tree where the course branches, each a list of steps to take one after
- * another. Big ideas is what to keep from the whole series. Lectures is every
+ * a map of the stages, each under the stages it rests on, and beside it the
+ * stage you pressed with its steps to take one after another. Big ideas is what to keep from the whole series. Lectures is every
  * video with a verdict, each playing in the page.
  *
  * Every timestamp is a link built from the lecture's stored video id
@@ -90,7 +85,7 @@ export function CourseView({
         title={course.title}
         description={
           plan
-            ? `${videos} videos, ${hours(runtimeMinutes)}, as ${plan.stages.length} stages of lessons, about ${hours(planMinutes)}`
+            ? `${hours(runtimeMinutes)} of lectures across ${videos} videos, cut to about ${hours(planMinutes)} of lessons`
             : `${videos} videos, ${hours(runtimeMinutes)}`
         }
       />
@@ -141,180 +136,57 @@ export function CourseView({
 
 type Text = (source: string) => string;
 
-/** What a step is made of, for the line under its title: "14 min · 2 clips · drawing · reading". */
-function stepLine(step: Step): string {
-  const count = (type: string) => step.blocks.filter((block) => block.type === type).length;
-  const clips = count('clip');
-  return [
-    `${step.minutes} min`,
-    clips > 0 ? `${clips} ${clips === 1 ? 'clip' : 'clips'}` : null,
-    count('figure') > 0 ? 'drawing' : null,
-    count('reading') > 0 ? 'reading' : null,
-    count('check') > 0 ? 'a question' : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
+/**
+ * The plan: a line on how the course is laid out, then the map
+ * (plan-map.tsx). The map is given only what it draws, a stage's steps by
+ * title and what is in them, so the steps' own text stays on the server.
+ */
 function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Text }) {
   const done = new Set(course.progress.lessons);
   const steps = placedSteps(plan);
-  const taken = steps.filter((placed) => done.has(placed.step.key));
+  const taken = steps.filter((placed) => done.has(placed.step.key)).length;
   const next = nextStep(plan, done);
-  const left = steps.reduce(
-    (sum, placed) => sum + (done.has(placed.step.key) ? 0 : placed.step.minutes),
-    0,
-  );
+  const has = (step: Step, type: string) => step.blocks.some((block) => block.type === type);
+
+  const stages: MapStage[] = plan.stages.map((stage) => ({
+    key: stage.key,
+    short: shortName(stage),
+    title: stage.title,
+    about: stage.about,
+    after: afterNames(plan, stage),
+    open: isOpen(plan, stage, done),
+    steps: stage.steps.map((step) => ({
+      key: step.key,
+      title: step.title,
+      gain: step.gain ?? null,
+      minutes: step.minutes,
+      clips: step.blocks.filter((block) => block.type === 'clip').length,
+      figure: has(step, 'figure'),
+      reading: has(step, 'reading'),
+      check: has(step, 'check'),
+      done: done.has(step.key),
+    })),
+  }));
 
   return (
     <section className="space-y-4">
-      {plan.intro && <Markdown markdown={text(plan.intro)} className="vault-prose prose-compact" />}
-      {next ? (
-        <div className="space-y-1.5">
-          <Link
-            href={`/learn/courses/${course.id}/l/${encodeURIComponent(next.step.key)}`}
-            className={cn(
-              buttonVariants({ variant: 'primary' }),
-              'h-auto min-h-11 max-w-full py-2',
-            )}
-          >
-            <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
-              {taken.length === 0 ? 'Start' : 'Continue'}: {next.step.title}
-            </span>
-          </Link>
-          <p className="tabular text-small text-ink-muted">
-            {taken.length} of {steps.length} steps done · about {hours(left)} left across every
-            branch
-          </p>
-        </div>
-      ) : (
-        <p className="text-ui text-ink">Every step is done.</p>
+      {plan.intro && (
+        <Markdown markdown={text(plan.intro)} className="vault-prose prose-compact max-w-prose" />
       )}
-
-      <div className="space-y-3">
-        {planTree(plan).map((line, index) => (
-          <div key={line.stages[0].key} className="space-y-3">
-            {index > 0 && <Leads>After {afterTitles(plan, line.stages[0]).join(' and ')}</Leads>}
-            <LineView course={course} plan={plan} line={line} done={done} />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** The line between two parts of the plan that says how the second follows the first. */
-function Leads({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-2 pl-3 text-small text-ink-muted">
-      <ArrowDown
-        className="mt-0.5 size-3.5 shrink-0 text-ink-ghost"
-        strokeWidth={1.75}
-        aria-hidden
-      />
-      <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
-    </div>
-  );
-}
-
-/**
- * A line of stages, then the branches that open when it ends, stacked behind
- * a rule and set in from it. A fork inside a branch is set in again, so how
- * far in a stage sits says what it follows, at any width.
- */
-function LineView({
-  course,
-  plan,
-  line,
-  done,
-}: {
-  course: Course;
-  plan: Plan;
-  line: Line;
-  done: ReadonlySet<string>;
-}) {
-  return (
-    <div className="space-y-3">
-      {line.stages.map((stage) => (
-        <StageCard key={stage.key} course={course} plan={plan} stage={stage} done={done} />
-      ))}
-      {line.branches.length > 0 && (
-        <>
-          <Leads>
-            From here it branches {line.branches.length} ways. Take whichever you want first.
-          </Leads>
-          <div className="space-y-3 border-l border-border-strong pl-3">
-            {line.branches.map((branch) => (
-              <LineView
-                key={branch.stages[0].key}
-                course={course}
-                plan={plan}
-                line={branch}
-                done={done}
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function StageCard({
-  course,
-  plan,
-  stage,
-  done,
-}: {
-  course: Course;
-  plan: Plan;
-  stage: Stage;
-  done: ReadonlySet<string>;
-}) {
-  const taken = stage.steps.filter((step) => done.has(step.key)).length;
-  const minutes = stage.steps.reduce((sum, step) => sum + step.minutes, 0);
-  const open = isOpen(plan, stage, done);
-  return (
-    <Card padding="none">
-      <div className="card-pad-x row-pad space-y-1 border-b border-border">
-        <h2 className="text-body font-medium text-ink [overflow-wrap:anywhere]">{stage.title}</h2>
-        <p className="text-small text-ink-muted [overflow-wrap:anywhere]">{stage.about}</p>
-        <p className="tabular text-small text-ink-muted [overflow-wrap:anywhere]">
-          {taken} of {stage.steps.length} steps · {hours(minutes)}
-          {!open && ` · builds on ${afterTitles(plan, stage).join(' and ')}`}
+      {taken > 0 && (
+        <p className="tabular text-small text-ink-muted">
+          {next
+            ? `${taken} of ${steps.length} steps done across the whole course`
+            : 'Every step of the course is done.'}
         </p>
-      </div>
-      <ol className="divide-y divide-border">
-        {stage.steps.map((step, index) => (
-          <li key={step.key}>
-            <Link
-              href={`/learn/courses/${course.id}/l/${encodeURIComponent(step.key)}`}
-              className="card-pad-x row-pad flex min-h-11 items-start gap-3 transition-colors duration-quick hover:bg-sunken"
-            >
-              <span className="tabular w-5 shrink-0 text-ui text-ink-muted">{index + 1}</span>
-              <span className="min-w-0 flex-1">
-                <span
-                  className={cn(
-                    'block text-ui [overflow-wrap:anywhere]',
-                    done.has(step.key) ? 'text-ink-muted' : 'font-medium text-ink',
-                  )}
-                >
-                  {step.title}
-                </span>
-                <span className="tabular block text-small text-ink-muted">{stepLine(step)}</span>
-              </span>
-              {done.has(step.key) && (
-                <Check
-                  className="mt-0.5 size-4 shrink-0 text-positive"
-                  strokeWidth={1.75}
-                  aria-label="Done"
-                />
-              )}
-            </Link>
-          </li>
-        ))}
-      </ol>
-    </Card>
+      )}
+      <PlanMap
+        courseId={course.id}
+        stages={stages}
+        layout={mapLayout(plan)}
+        nextStage={next?.stage.key ?? null}
+      />
+    </section>
   );
 }
 

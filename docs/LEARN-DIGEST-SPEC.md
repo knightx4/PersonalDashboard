@@ -165,6 +165,35 @@ So a digest has one plan, and it replaces the path, the lessons and the map.
   verdict, each playing in the page. A timestamp anywhere opens its lecture
   there at that moment. The lecturers' errors sit folded under the lectures.
 
+### The map
+
+The owner opened the first plan on a tablet the same day and said it read
+like an internal tool: an opening paragraph of stage codes, a weak start
+button, a list where they had asked for a map, and a count of every step in
+every branch. They asked for "a real map which is interactive and works
+intuitively". What changed:
+
+- The Lessons tab is a map of the course. Each stage is a place on it, set
+  under the stages it comes after with a line from each, so a fork reads as
+  a fork. A ring round a place fills as its steps are done, and a finished
+  place is filled in. The place that holds the next step says "Start here"
+  or "Continue".
+- Pressing a place opens that stage beside the map, or under it where the
+  page is narrow: what it gets you, how far through it you are, one button
+  for its next step, and its steps. The map opens on the stage that holds
+  the next step, so the button to press is on screen without choosing.
+- A stage carries `short`, its name on the map. A step carries `gain`, one
+  sentence on what you can do after it, shown under its title on the map
+  and at the head of its own page.
+- Nothing the reader sees names a stage or a step by its key, and no step is
+  shorter than four minutes; `checkDigest` refuses both.
+- A step's page ends in one press that marks it done and goes on. At the end
+  of a stage that press is a choice between the stages that follow, each
+  with what it gets you.
+
+Where each stage sits is `mapLayout` in `lib/learn/courses/plan.ts`; the map
+is `app/learn/courses/[id]/plan-map.tsx`.
+
 The shape and its checks are `Plan`, `Stage`, `Step` and `Block` in
 `lib/learn/courses/digest.ts`; which step comes next and what a finished
 stage opens are in `lib/learn/courses/plan.ts`.

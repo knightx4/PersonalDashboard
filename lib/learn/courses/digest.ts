@@ -18,6 +18,9 @@
  */
 import { svgProblems } from '@/lib/learn/reader/source';
 
+/** A step shorter than this is a note, and belongs inside the step beside it. */
+export const MIN_STEP_MINUTES = 4;
+
 export const RATINGS = ['watch', 'parts', 'skim', 'skip'] as const;
 export type Rating = (typeof RATINGS)[number];
 
@@ -75,6 +78,11 @@ export type Step = {
   /** The stage's key and the step's place in it: `B.2`. */
   key: string;
   title: string;
+  /**
+   * What the learner can do or explain after it, in one sentence. Null on a
+   * plan kept before steps carried one.
+   */
+  gain: string | null;
   /** Watching and reading time, worked out from the blocks. */
   minutes: number;
   blocks: Block[];
@@ -83,6 +91,8 @@ export type Step = {
 export type Stage = {
   key: string;
   title: string;
+  /** A few words for the stage's place on the map: "Measuring risk". */
+  short: string;
   /** What this stage gets you, in a sentence or two. */
   about: string;
   /** The stages to finish first. Empty for where the course starts. */
@@ -203,8 +213,11 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
   const byCode = new Map(lectures.map((lecture) => [lecture.code, lecture]));
   if (!isObject(input)) return { ok: false, problems: ['The digest is not an object.'] };
 
+  /** Everything written for the reader, kept to check it for the plan's own codes. */
+  const written: [string, string][] = [];
   const prose = (value: unknown, where: string, required = true): string => {
     const body = text(value);
+    if (body) written.push([where, body]);
     if (!body && required) problems.push(`${where} is empty.`);
     if (body.includes('—')) problems.push(`${where} has an em dash.`);
     if (/https?:\/\/(www\.)?(youtube\.com|youtu\.be)/.test(body)) {
@@ -349,23 +362,51 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
       if (!blocks.some((block) => block.type === 'text'))
         problems.push(`${spot} has no commentary; every step says in words what it is for.`);
       watchSeconds += seconds;
+      const minutes = Math.max(1, Math.round(seconds / 60 + read / 230));
+      if (minutes < MIN_STEP_MINUTES)
+        problems.push(
+          `${spot} is ${minutes} min, too short to be a sitting; fold it into the step beside it.`,
+        );
+      const gain = prose(item.gain, `${spot} gain`);
+      if (gain.length > 140)
+        problems.push(`${spot} gain runs ${gain.length} characters; keep it to 140.`);
       steps.push({
         key: `${key}.${at + 1}`,
         title: prose(item.title, `${spot} title`),
-        minutes: Math.max(1, Math.round(seconds / 60 + read / 230)),
+        gain: gain || null,
+        minutes,
         blocks,
       });
     });
     if (steps.length === 0) problems.push(`${where} has no steps.`);
+    const short = prose(raw.short, `${where} short name`);
+    if (short.length > 24)
+      problems.push(
+        `${where} short name runs ${short.length} characters; the map has room for 24.`,
+      );
     stages.push({
       key,
       title: prose(raw.title, `${where} title`),
+      short,
       about: prose(raw.about, `${where} about`),
       after,
       steps,
     });
   });
   if (stages.length === 0) problems.push('The plan has no stages.');
+  // The keys are the plan's own bookkeeping. The reader sees names, so prose
+  // that points at "stage B2" or "step C.3" points at nothing on the page.
+  const codes = [...stageKeys].map((key) => key.replace(/[^A-Za-z0-9]/g, '')).filter(Boolean);
+  if (codes.length > 0) {
+    const named = new RegExp(
+      `\\b(?:stages?|steps?)\\s+(?:${codes.join('|')})(?:\\.\\d+)?\\b|\\b(?:${codes.join('|')})\\.\\d+\\b`,
+    );
+    for (const [where, body] of written) {
+      const found = body.replace(/\[\[[^\]]*\]\]/g, '').match(named);
+      if (found)
+        problems.push(`${where} names "${found[0]}"; call a stage or a step by its title.`);
+    }
+  }
   const watchMinutes = Math.round(watchSeconds / 60);
   if (watchMinutes > budgetMinutes * 1.1)
     problems.push(

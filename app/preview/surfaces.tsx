@@ -402,9 +402,11 @@ import {
 import {
   CourseDigestBuildingPreview,
   CourseDigestLecturesPreview,
+  CourseDigestLessonBranchPreview,
   CourseDigestLessonPreview,
   CourseDigestListPreview,
   CourseDigestPlanPreview,
+  CourseDigestPlanUnderWayPreview,
 } from './course-digest-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
@@ -8234,13 +8236,21 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CourseDigestBuildingPreview />,
   },
   {
-    /* A built course on its plan: the stages down the page, side by side where
-     * the course branches, each a list of steps. */
+    /* A built course on its map before a step is taken: each stage a place
+     * under the stages it rests on, and the opening stage open beside it. */
     id: 'learn-digest-plan',
-    label: 'Courses · The lesson plan',
+    label: 'Courses · The map',
     module: 'learn',
     width: 'page',
     render: () => <CourseDigestPlanPreview />,
+  },
+  {
+    /* The same map with the opening stage done and a branch begun. */
+    id: 'learn-digest-plan-under-way',
+    label: 'Courses · The map, a branch under way',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestPlanUnderWayPreview />,
   },
   {
     /* A built course's lectures: a verdict on each, and each playing in the page. */
@@ -8251,13 +8261,21 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CourseDigestLecturesPreview />,
   },
   {
-    /* One step of the plan: commentary, a clip in the page, a drawing, a
-     * reading, a question, and the branches to choose between at the foot. */
+    /* One step of the plan: where it sits in its stage, commentary, a clip in
+     * the page, a drawing, a reading, a question, and one press to go on. */
     id: 'learn-digest-lesson',
     label: 'Courses · A step of the plan',
     module: 'learn',
     width: 'page',
     render: () => <CourseDigestLessonPreview />,
+  },
+  {
+    /* The last step of a stage: the foot offers the branches that follow. */
+    id: 'learn-digest-lesson-branch',
+    label: 'Courses · A step where the course branches',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestLessonBranchPreview />,
   },
   {
     /* A Learn-area goal's Learning section: how well you want to know it,

@@ -137,12 +137,14 @@ step. So the centre of a digest is its **plan**.
     "stages": [
       {
         "key": "A",
-        "title": "Shared ground: covariance and the normal",
+        "short": "Shared ground",
+        "title": "Covariance and the normal",
         "about": "What this stage gets you, in a sentence or two.",
         "after": [],
         "steps": [
           {
             "title": "Named for the idea, never for the lecture",
+            "gain": "Work out a one-day 99% VaR from a volatility, and say why the backtest overshoots it.",
             "blocks": [
               { "type": "text", "title": null, "body": "What is coming and why it matters." },
               { "type": "clip", "code": "L07", "start": "21:49", "end": "29:39", "listenFor": "The backtest: 1.5% of days against the 1% predicted." },
@@ -154,7 +156,7 @@ step. So the centre of a digest is its **plan**.
           }
         ]
       },
-      { "key": "B", "title": "Measuring risk", "about": "...", "after": ["A"], "steps": [] }
+      { "key": "B", "short": "Measuring risk", "title": "Measuring risk with Value at Risk", "about": "...", "after": ["A"], "steps": [] }
     ]
   },
   "ratings": { "intro": "The profile in a sentence.", "rows": [{ "code": "L07", "rating": "watch", "watch": "[[L07 21:49-29:39]] the VaR calculation", "why": "One sentence." }] },
@@ -171,7 +173,24 @@ step. So the centre of a digest is its **plan**.
   Branch only where it really forks; a course that is one line stays one
   line. A late stage may come after two branches. Four to nine stages of two
   to six steps. Every stage after the first names an earlier one.
-- **A step is one sitting on one idea**, about 8 to 25 minutes, with
+- **The page draws the plan as a map** the person presses: each stage is a
+  place named by its `short` (two or three plain words, at most 24
+  characters, no "track" or "branch"), set under the stages it comes after.
+  `title` names what the stage is about and `about` says in a sentence or
+  two what it gets you, with no minute counts or lecturer rosters.
+  `plan.intro` is two or three short sentences: the shared start, the
+  choices after it by name, and that they pick one.
+- **The keys are yours alone.** The page never shows `A` or `B2.3`, so
+  nothing the person reads may point at a stage or a step by its key: name
+  it ("the Value at Risk lessons", "the step on fat tails"). The check
+  refuses "stage B2", "step C.3" and "B1.3"; a bare "(B1, then B2)" it
+  cannot see, so read for those yourself.
+- **Every step says what you get**: `gain` is one sentence of at most 140
+  characters on what the person can do or explain after it, specific to the
+  step and starting with the verb.
+- **A step is one sitting on one idea**, about 8 to 25 minutes and never
+  under 5 (the check refuses under 4: fold a short one into the step beside
+  it), with
   everything it needs in the order to take it: words that set up what is
   coming, the clip, what to make of it (the mechanism worked with numbers,
   where another lecturer disagrees and where that lands, a correction of
