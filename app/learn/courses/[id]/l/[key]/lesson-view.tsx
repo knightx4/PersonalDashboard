@@ -66,8 +66,8 @@ export function LessonView({
 
   return (
     <PageColumn>
-      {/* One reading column, so the words, the players and the drawings share their edges. */}
-      <div className="mx-auto w-full max-w-2xl space-y-5">
+      {/* One readable measure, so the words, the players and the drawings share their edges. */}
+      <div className="max-w-prose space-y-5">
         <PageHeader
           subject={sectionSubject(
             '/learn/courses',

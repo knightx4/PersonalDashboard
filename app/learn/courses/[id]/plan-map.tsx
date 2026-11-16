@@ -246,7 +246,7 @@ function Place({
         className={cn(
           // The name may run a little past its column, which on a phone is 68px, so
           // that a long word stays whole; names beside each other are short enough to clear.
-          'line-clamp-3 w-max max-w-[5.25rem] shrink-0 text-small leading-tight [overflow-wrap:break-word]',
+          'line-clamp-3 w-max max-w-20 shrink-0 text-small leading-tight [overflow-wrap:break-word]',
           chosen ? 'font-medium text-ink' : 'text-ink',
         )}
       >
