@@ -68,6 +68,13 @@ export function afterNames(plan: Plan, stage: Stage): string[] {
   });
 }
 
+/**
+ * A course has a main line when its longest run of stages is this share of
+ * all of them. Then the map keeps that run in one column and hangs the rest
+ * off it; below it, the stages are drawn as a fork of equals.
+ */
+const MAIN_LINE_SHARE = 0.6;
+
 /** A stage's place on the map: `x` in columns from the left (a branch's leaf is one column), `row` from the top. */
 export type MapNode = { key: string; x: number; row: number };
 export type MapLayout = {
@@ -81,7 +88,8 @@ export type MapLayout = {
 /**
  * Where each stage sits on the map. A stage's row is how many stages deep
  * the longest way to it is, so everything it rests on is above it. Its column
- * comes from the tree under the first stage: a stage hangs under the deepest
+ * comes from the tree under the first stage, drawn one of two ways (see
+ * MAIN_LINE_SHARE). In either, a stage hangs under the deepest
  * stage it comes after, each stage with nothing under it takes the next
  * column, and a stage with stages under it sits centred over them. A stage
  * that comes after two stages hangs under one and has a line from the other.
@@ -110,13 +118,55 @@ export function mapLayout(plan: Plan): MapLayout {
 
   const x = new Map<string, number>();
   let columns = 0;
-  const place = (key: string): number => {
-    const below = (under.get(key) ?? []).map(place);
-    const at = below.length > 0 ? (below[0] + below[below.length - 1]) / 2 : columns++;
-    x.set(key, at);
-    return at;
+
+  // How many stages the longest way down from a stage passes through.
+  const reach = new Map<string, number>();
+  const depthOf = (key: string): number => {
+    if (!reach.has(key)) reach.set(key, 1 + Math.max(0, ...(under.get(key) ?? []).map(depthOf)));
+    return reach.get(key)!;
   };
-  tops.forEach(place);
+  const longest = Math.max(0, ...tops.map(depthOf));
+
+  if (longest >= plan.stages.length * MAIN_LINE_SHARE) {
+    // A course with a main line: it runs straight down the first column, and
+    // what branches off it hangs to the right. A branch takes the nearest
+    // column that is empty from its row down to where it ends.
+    const taken: [number, number][][] = [];
+    const free = (column: number, from: number, to: number) =>
+      (taken[column] ?? []).every(([top, foot]) => to < top || from > foot);
+    const hold = (column: number, from: number, to: number) => {
+      (taken[column] ??= []).push([from, to]);
+    };
+    const mainFirst = (key: string) =>
+      [...(under.get(key) ?? [])].sort((p, q) => depthOf(q) - depthOf(p));
+    const run = (key: string, column: number) => {
+      x.set(key, column);
+      mainFirst(key).forEach((child, index) => {
+        if (index === 0) return run(child, column);
+        const from = row.get(child)!;
+        const to = from + depthOf(child) - 1;
+        let beside = column + 1;
+        while (!free(beside, from, to)) beside++;
+        // Held to the foot of the branch before it is drawn, so nothing else lands in it.
+        hold(beside, from, to);
+        run(child, beside);
+      });
+    };
+    // The main line holds the whole first column.
+    hold(0, 0, Number.POSITIVE_INFINITY);
+    tops.forEach((key) => run(key, 0));
+    columns = Math.max(...x.values()) + 1;
+  } else {
+    // A course that forks into lines of equal standing: each stage with nothing
+    // under it takes the next column, and a stage sits centred over its fork.
+    const place = (key: string): number => {
+      const below = (under.get(key) ?? []).map(place);
+      const at = below.length > 0 ? (below[0] + below[below.length - 1]) / 2 : columns++;
+      x.set(key, at);
+      return at;
+    };
+    tops.forEach(place);
+  }
 
   return {
     nodes: plan.stages.map((stage) => ({
