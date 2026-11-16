@@ -60,44 +60,27 @@ export function afterStep(plan: Plan, key: string): { step: Step | null; stages:
   };
 }
 
-/**
- * The stages as rows down the page. A row holds one line of stages, or
- * several side by side where the course branches. A line is a stage with the
- * stages that can only follow it stacked beneath, so a branch two stages long
- * stays in its own column. Lines listed one after another that come after
- * the same stages are the branches of one fork and share a row.
- */
-export function stageRows(plan: Plan): Stage[][][] {
-  const followers = (stage: Stage) => plan.stages.filter((item) => item.after.includes(stage.key));
-  const placed = new Set<string>();
-  const lines: Stage[][] = [];
-  for (const stage of plan.stages) {
-    if (placed.has(stage.key)) continue;
-    const line = [stage];
-    placed.add(stage.key);
-    for (;;) {
-      const next = followers(line[line.length - 1]);
-      // The line goes on only while one stage follows and it follows nothing else.
-      if (next.length !== 1 || next[0].after.length !== 1 || placed.has(next[0].key)) break;
-      line.push(next[0]);
-      placed.add(next[0].key);
-    }
-    lines.push(line);
-  }
+/** A run of stages taken one after another, and the branches that open when it ends. */
+export type Line = { stages: Stage[]; branches: Line[] };
 
-  const rows: Stage[][][] = [];
-  for (const line of lines) {
-    const row = rows[rows.length - 1];
-    const head = line[0];
-    const same =
-      row !== undefined &&
-      head.after.length > 0 &&
-      row[0][0].after.length === head.after.length &&
-      row[0][0].after.every((key) => head.after.includes(key));
-    if (same) row.push(line);
-    else rows.push([line]);
-  }
-  return rows;
+/**
+ * The plan as a tree, for drawing. A line is a stage with the stages that
+ * can only follow it; where more than one stage follows, each starts a
+ * branch of that line. A stage that comes after two stages belongs under
+ * neither, so it starts a line of its own at the top, in the plan's order.
+ */
+export function planTree(plan: Plan): Line[] {
+  const followers = (stage: Stage) =>
+    plan.stages.filter((item) => item.after.length === 1 && item.after[0] === stage.key);
+  const lineFrom = (head: Stage): Line => {
+    const stages = [head];
+    for (;;) {
+      const next = followers(stages[stages.length - 1]);
+      if (next.length !== 1) return { stages, branches: next.map(lineFrom) };
+      stages.push(next[0]);
+    }
+  };
+  return plan.stages.filter((stage) => stage.after.length !== 1).map(lineFrom);
 }
 
 /** The names of the stages a stage comes after, for a line under its title. */

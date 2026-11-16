@@ -22,15 +22,22 @@ import {
   type Stage,
   type Step,
 } from '@/lib/learn/courses/digest';
-import { afterTitles, isOpen, nextStep, placedSteps, stageRows } from '@/lib/learn/courses/plan';
+import {
+  afterTitles,
+  isOpen,
+  nextStep,
+  placedSteps,
+  planTree,
+  type Line,
+} from '@/lib/learn/courses/plan';
 import type { Course } from '@/lib/learn/courses/store';
 import { hours } from '../format';
 
 /**
  * A built course (docs/LEARN-DIGEST-SPEC.md). The header says what the series
  * was cut from and to. Three tabs. Lessons is the plan, and the thing to do:
- * the stages down the page in the order the ideas rest on each other, side by
- * side where the course branches, each a list of steps to take one after
+ * the stages down the page in the order the ideas rest on each other, drawn
+ * as a tree where the course branches, each a list of steps to take one after
  * another. Big ideas is what to keep from the whole series. Lectures is every
  * video with a verdict, each playing in the page.
  *
@@ -184,42 +191,80 @@ function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Tex
         <p className="text-ui text-ink">Every step is done.</p>
       )}
 
-      <div className="space-y-2">
-        {stageRows(plan).map((row, index) => (
-          <div key={row[0][0].key} className="space-y-2">
-            {index > 0 && (
-              <div className="flex items-start gap-2 pl-3 text-small text-ink-muted">
-                <ArrowDown
-                  className="mt-0.5 size-3.5 shrink-0 text-ink-ghost"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                <span className="min-w-0 [overflow-wrap:anywhere]">
-                  {row.length > 1
-                    ? `After ${afterTitles(plan, row[0][0]).join(' and ')}, ${row.length} branches. Take whichever you want first.`
-                    : `After ${afterTitles(plan, row[0][0]).join(' and ')}`}
-                </span>
-              </div>
-            )}
-            <div className={row.length > 1 ? 'grid items-start gap-3 lg:grid-cols-2' : undefined}>
-              {row.map((line) => (
-                <div key={line[0].key} className="space-y-3">
-                  {line.map((stage) => (
-                    <StageCard
-                      key={stage.key}
-                      course={course}
-                      plan={plan}
-                      stage={stage}
-                      done={done}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
+      <div className="space-y-3">
+        {planTree(plan).map((line, index) => (
+          <div key={line.stages[0].key} className="space-y-3">
+            {index > 0 && <Leads>After {afterTitles(plan, line.stages[0]).join(' and ')}</Leads>}
+            <LineView course={course} plan={plan} line={line} done={done} top />
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+/** The line between two parts of the plan that says how the second follows the first. */
+function Leads({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 pl-3 text-small text-ink-muted">
+      <ArrowDown
+        className="mt-0.5 size-3.5 shrink-0 text-ink-ghost"
+        strokeWidth={1.75}
+        aria-hidden
+      />
+      <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * A line of stages, then the branches that open when it ends. The first fork
+ * of the course is set side by side on a wide screen; a fork inside a branch
+ * is stacked under it behind a rule, so a phone never has columns in columns.
+ */
+function LineView({
+  course,
+  plan,
+  line,
+  done,
+  top = false,
+}: {
+  course: Course;
+  plan: Plan;
+  line: Line;
+  done: ReadonlySet<string>;
+  top?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      {line.stages.map((stage) => (
+        <StageCard key={stage.key} course={course} plan={plan} stage={stage} done={done} />
+      ))}
+      {line.branches.length > 0 && (
+        <>
+          <Leads>
+            From here it branches {line.branches.length} ways. Take whichever you want first.
+          </Leads>
+          <div
+            className={
+              top
+                ? 'grid items-start gap-3 lg:grid-cols-2'
+                : 'space-y-3 border-l border-border-strong pl-3'
+            }
+          >
+            {line.branches.map((branch) => (
+              <LineView
+                key={branch.stages[0].key}
+                course={course}
+                plan={plan}
+                line={branch}
+                done={done}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

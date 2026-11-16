@@ -9,7 +9,7 @@ import {
   secondsOf,
   type Lecture,
 } from './digest';
-import { afterStep, isOpen, nextStep, stageRows } from './plan';
+import { afterStep, isOpen, nextStep, planTree } from './plan';
 
 const LECTURES: Lecture[] = [
   {
@@ -280,13 +280,22 @@ describe('walking the plan', () => {
   const plan = checked.digest.plan;
   const done = (...keys: string[]) => new Set(keys);
 
-  it('puts branches of one fork on one row', () => {
-    const keys = (rows: ReturnType<typeof stageRows>) =>
-      rows.map((row) => row.map((line) => line.map((item) => item.key)));
-    expect(keys(stageRows(plan))).toEqual([[['A']], [['B'], ['C']], [['D']]]);
+  type Keys = { stages: string[]; branches: Keys[] };
+  const keys = (lines: ReturnType<typeof planTree>): Keys[] =>
+    lines.map((line) => ({
+      stages: line.stages.map((item) => item.key),
+      branches: keys(line.branches),
+    }));
+  const leaf = (...stages: string[]): Keys => ({ stages, branches: [] });
+
+  it('draws a fork as branches, and a stage that needs both as a line of its own', () => {
+    expect(keys(planTree(plan))).toEqual([
+      { stages: ['A'], branches: [leaf('B'), leaf('C')] },
+      leaf('D'),
+    ]);
   });
 
-  it('keeps a branch two stages long in one column', () => {
+  it('keeps a branch two stages long together, and nests a fork inside a branch', () => {
     const bare = (key: string, after: string[]) => ({
       key,
       title: key,
@@ -299,15 +308,21 @@ describe('walking the plan', () => {
         bare('A', []),
         bare('B1', ['A']),
         bare('B2', ['B1']),
-        bare('C', ['A']),
-        bare('G', ['B2', 'C']),
+        bare('B3', ['B1']),
+        bare('C1', ['A']),
+        bare('C2', ['C1']),
+        bare('G', ['B2', 'C2']),
       ]),
       LECTURES,
     );
     if (!long.ok) throw new Error(long.problems.join(' '));
-    expect(
-      stageRows(long.digest.plan).map((row) => row.map((line) => line.map((item) => item.key))),
-    ).toEqual([[['A']], [['B1', 'B2'], ['C']], [['G']]]);
+    expect(keys(planTree(long.digest.plan))).toEqual([
+      {
+        stages: ['A'],
+        branches: [{ stages: ['B1'], branches: [leaf('B2'), leaf('B3')] }, leaf('C1', 'C2')],
+      },
+      leaf('G'),
+    ]);
   });
 
   it('starts at the first stage and follows a branch once it is begun', () => {
