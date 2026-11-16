@@ -191,7 +191,7 @@ function PlanTab({ course, plan, text }: { course: Course; plan: Plan; text: Tex
               <div className="flex items-center gap-2 pl-3 text-small text-ink-muted">
                 <ArrowDown className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
                 {row.length > 1
-                  ? `Then it branches ${row.length} ways. Take whichever you want first.`
+                  ? `After ${afterTitles(plan, row[0]).join(' and ')}, ${row.length} branches. Take whichever you want first.`
                   : `After ${afterTitles(plan, row[0]).join(' and ')}`}
               </div>
             )}
