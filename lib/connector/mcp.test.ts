@@ -24,6 +24,7 @@ vi.mock('./writes', async (importActual) => ({
 }));
 
 import { ASK_TOOLS, ASK_TOOL_NAMES } from '@/lib/ask/tools';
+import { dashToolsOf } from '@/lib/dash/registry';
 import { CONNECTOR_WRITE_TOOLS } from './writes';
 import type { ConnectorAccess } from './access';
 import { protectedResourceResponse, serveMcp } from './mcp';
@@ -143,6 +144,23 @@ describe('the tool list', () => {
     for (const tool of tools.filter((t) => WRITE_NAMES.includes(t.name))) {
       expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
+  });
+
+  it('never tells a connected app to call a tool the connector does not offer', async () => {
+    const { tools } = (await call('tools/list')) as {
+      tools: { name: string; description: string; inputSchema: Record<string, unknown> }[];
+    };
+    const offered = new Set(tools.map((t) => t.name));
+    // Names with an underscore only: "search", "schedule" and "reword" are tools and also words.
+    const absent = (['lookup', 'proposal', 'handoff', 'write', 'paid'] as const)
+      .flatMap((kind) => dashToolsOf(kind).map((tool) => tool.definition.name))
+      .filter((name) => name.includes('_') && !offered.has(name));
+    expect(absent.length).toBeGreaterThan(0);
+    const named = tools.flatMap((tool) => {
+      const text = `${tool.description} ${JSON.stringify(tool.inputSchema)}`;
+      return absent.filter((name) => new RegExp(`\\b${name}\\b`).test(text)).map((name) => `${tool.name} names ${name}`);
+    });
+    expect(named).toEqual([]);
   });
 });
 

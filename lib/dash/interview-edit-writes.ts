@@ -595,14 +595,14 @@ async function roundEmail(env: JobsWriteEnv, round: Round, ref: string, where: s
   const links = await rows(env.jobs.from('interview_group_messages').select('*').eq('group_id', round.id).eq('user_id', env.userId), 'the round\'s emails');
   if (links.length === 0) throw new JobsRefused(`${where} has no email attached.`);
   if (!ref) {
-    if (links.length > 1) throw new JobsRefused(`${where} has ${links.length} emails attached. Say which with message_ref, the ref search_mail returned.`);
+    if (links.length > 1) throw new JobsRefused(`${where} has ${links.length} emails attached. Say which with message_ref, the email's job_search.inbox_messages ref or the ref a mail search returned.`);
     return links[0];
   }
   let query = env.jobs.from('inbox_messages').select('id').eq('user_id', env.userId);
   if (isUuid(ref)) query = query.eq('id', ref);
   else {
     const at = ref.indexOf(':');
-    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('message_ref must be the ref search_mail returned for the email.');
+    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('message_ref must be the email\'s job_search.inbox_messages ref, or the ref a mail search returned for it.');
     query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
   }
   const { data, error } = await query.maybeSingle();
@@ -836,7 +836,7 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/roles/[id]/interview-actions.ts#ungroupInterview', 'lib/jobs/interview/edit.ts#moveInterviewToRound'],
     ),
     description:
-      "Change the interview rounds on one of their roles in Jobs when they ask, as the role page does. action edit renames a round (label), writes how the round went as a whole (notes) or renumbers it (new_round_number). action group gathers rounds into one (round_numbers, at least two): the interviews and emails of the later rounds move into the first, each keeping its own notes, and the emptied rounds go; a round with notes of its own is refused. action split moves one interview out of a round it shares into a round of its own, numbered after the others. action detach_email takes an email off a round (message_ref from search_mail, needed when it has several); the email stays on the role. Name the role by role_ref, and the round by round_number; split names the interview as change_interview does.",
+      "Change the interview rounds on one of their roles in Jobs when they ask, as the role page does. action edit renames a round (label), writes how the round went as a whole (notes) or renumbers it (new_round_number). action group gathers rounds into one (round_numbers, at least two): the interviews and emails of the later rounds move into the first, each keeping its own notes, and the emptied rounds go; a round with notes of its own is refused. action split moves one interview out of a round it shares into a round of its own, numbered after the others. action detach_email takes an email off a round (message_ref, the email's job_search.inbox_messages ref or the ref a mail search returned, needed when it has several); the email stays on the role. Name the role by role_ref, and the round by round_number; split names the interview as change_interview does.",
     input_schema: {
       type: 'object',
       properties: {
@@ -850,7 +850,7 @@ export const INTERVIEW_EDIT_WRITES: readonly JobsWrite[] = [
         label: { type: 'string', description: "For edit or group: the round's name. An empty string clears it on edit." },
         notes: { type: 'string', description: 'For edit: how the round went as a whole, in full. An empty string clears it.' },
         new_round_number: { type: 'integer', minimum: 1, description: 'For edit: the number the round should have.' },
-        message_ref: { type: 'string', description: 'For detach_email: the ref search_mail returned for the email.' },
+        message_ref: { type: 'string', description: 'For detach_email: the email\'s job_search.inbox_messages ref, or the ref a mail search returned.' },
       },
       required: ['action'],
       additionalProperties: false,

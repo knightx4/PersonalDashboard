@@ -239,11 +239,12 @@ when you see a cause of failure that one fix will not remove.
    - The tool list a client loads is 109 tools, about 40,000 tokens: the
      catalogue of tables is repeated in list_rows, open_row, query_rows and
      table_info (`lib/ask/tools.ts`). Name it once.
-   - Descriptions name tools the connector does not have: `propose_delete`,
-     `change_todo`, `close_todo`, `move_roles`, `search_mail`,
-     `propose_watch` (`lib/ask/tools.ts`, `lib/dash/todo-writes.ts`,
-     `lib/dash/jobs-writes.ts`, `lib/dash/news-writes.ts`). Make each
-     description true for the surface it is sent to.
+   - ~~Descriptions name tools the connector does not have.~~ Done 16
+     November: the connector now has `change_todo`, `close_todo` and
+     `move_roles`, and the last mentions of `search_mail` and
+     `propose_delete` were reworded. `lib/connector/mcp.test.ts` fails when
+     a connector tool's description or input schema names a Dash tool the
+     connector does not offer (names with an underscore only).
    - The connector cannot add, rename or close a plain todo, move a role to
      another stage, or delete anything (`CONNECTOR_WRITE_TOOLS` in
      `lib/connector/writes.ts` against the Ask registry).
