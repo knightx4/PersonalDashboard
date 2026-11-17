@@ -10,6 +10,8 @@ import {
 } from './application-scores';
 import { scoreApplicationsFor } from './score-run';
 import type { ScoringContext } from './scores';
+import { APPLICATION_QUESTIONS as QUESTIONS } from './application-scores';
+import { rubricAnswers } from './fixtures/rubric-answers';
 
 const APP: ApplicationText = {
   id: 'a1',
@@ -102,24 +104,41 @@ describe('applicationState', () => {
   });
 });
 
-function jev() {
+function jev(answers: Record<string, unknown> = rubricAnswers(2)) {
   return vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
-    expect(Object.keys(body.questions).sort()).toEqual(['chance', 'fit_score']);
+    expect(Object.keys(body.questions).sort()).toEqual(Object.keys(QUESTIONS).sort());
     return new Response(
-      JSON.stringify({
-        model: 'jev-1.13.0',
-        answers: { fit_score: { score: 3, confidence: 0.8 }, chance: { score: 9, confidence: 0.5 } },
-        usage: { input_tokens: 2500, output_tokens: 0 },
-      }),
+      JSON.stringify({ model: 'jev-1.13.0', answers, usage: { input_tokens: 2500, output_tokens: 0 } }),
     );
   }) as unknown as typeof fetch;
 }
 
 describe('scoreApplication', () => {
-  it('asks fit and chance and keeps each readable answer', async () => {
+  it('builds fit and chance from the factors, the match verdicts standing in for requirements', async () => {
     const result = await scoreApplication({ application: APP, context: CONTEXT, apiKey: 'k', fetch: jev() });
-    expect(result).toEqual({ ok: true, scores: { fit_score: { value: 75, confidence: 0.8 } } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.scores.fit_score).toEqual({ value: 50, confidence: 1 });
+    // The one must-have is met, so requirements read as the top level, not Jev's 2.
+    expect(result.scores.rubric?.chance.chance_requirements).toEqual({ score: 4, sd: 0 });
+    expect(result.scores.rubric?.chance.from_matches).toBe(true);
+    expect(result.scores.rubric?.chance.referral).toBe(false);
+  });
+
+  it('scores a referral higher than the same application without one', async () => {
+    const plain = await scoreApplication({ application: APP, context: CONTEXT, apiKey: 'k', fetch: jev() });
+    const referred = await scoreApplication({ application: { ...APP, referral: true }, context: CONTEXT, apiKey: 'k', fetch: jev() });
+    expect(plain.ok && referred.ok).toBe(true);
+    if (!plain.ok || !referred.ok) return;
+    expect(referred.scores.chance!.value).toBeGreaterThan(plain.scores.chance!.value);
+  });
+
+  it('keeps fit out when no wanting factor was readable', async () => {
+    const answers = rubricAnswers(2);
+    for (const key of Object.keys(answers)) if (key.startsWith('fit_') && key !== 'fit_pay') answers[key] = { score: 99, confidence: 0.5 };
+    const result = await scoreApplication({ application: APP, context: CONTEXT, apiKey: 'k', fetch: jev(answers) });
+    expect(result.ok && result.scores.fit_score).toBeUndefined();
   });
 });
 
@@ -169,6 +188,6 @@ describe('scoreApplicationsFor', () => {
     });
     expect(calls).toContainEqual({ table: 'applications', method: 'is', args: ['scored_at', null] });
     const write = calls.find((call) => call.method === 'update');
-    expect(write?.args[0]).toMatchObject({ scores: { fit_score: { value: 75, confidence: 0.8 } }, score_model: 'jev-1.13.0' });
+    expect(write?.args[0]).toMatchObject({ scores: { fit_score: { value: 50, confidence: 1 } }, score_model: 'jev-1.13.0' });
   });
 });
