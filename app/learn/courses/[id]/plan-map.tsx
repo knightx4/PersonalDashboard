@@ -46,8 +46,8 @@ export type MapStage = {
 
 // A place is a 44px ring, up to three lines of name and a line under it; rows sit a gap apart.
 const RING = 44;
-const PLACE = 112;
-const GAP = 30;
+const PLACE = 106;
+const GAP = 26;
 const ROW = PLACE + GAP;
 /** The widest a column gets, so a course of one line is not stretched across the card. */
 const COLUMN = 136;
@@ -73,6 +73,9 @@ export function PlanMap({
   const byKey = new Map(stages.map((stage) => [stage.key, stage]));
   const at = new Map(layout.nodes.map((node) => [node.key, node]));
   const stage = byKey.get(chosen) ?? stages[0];
+  // The step to take next, for the button above the map.
+  const upNext = byKey.get(nextStage ?? '')?.steps.find((step) => !step.done) ?? null;
+  const started = stages.some((item) => item.steps.some((step) => step.done));
   if (!stage) return null;
 
   const choose = (key: string) => {
@@ -91,7 +94,24 @@ export function PlanMap({
   const middle = (x: number) => (x + 0.5) * 100;
 
   return (
-    <div className="@container">
+    <div className="@container space-y-4">
+      {/* Where the stage opens under the map, a long course's map pushes its
+          button far down the page, so the next step is offered above it too. */}
+      {upNext && (
+        <Link
+          href={`/learn/courses/${courseId}/l/${encodeURIComponent(upNext.key)}`}
+          className={cn(
+            buttonVariants({ variant: 'primary', size: 'lg' }),
+            'h-auto min-h-11 w-full justify-start py-2.5 sm:w-auto @4xl:hidden',
+          )}
+        >
+          <Play className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+          <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
+            {started ? 'Continue' : 'Start'}: {upNext.title}
+            <span className="tabular font-normal opacity-80"> · {upNext.minutes} min</span>
+          </span>
+        </Link>
+      )}
       <div className="grid gap-5 @4xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] @4xl:items-start">
         <div ref={map} className="@4xl:sticky @4xl:top-4">
           <Card padding="dense" className="space-y-3">

@@ -108,6 +108,12 @@ export type Plan = {
 };
 
 export type Digest = {
+  /**
+   * The text is written with formulas, `$x$` in a line and `$$…$$` on a line
+   * of their own, and the pages set them as maths. Left off, a dollar sign is
+   * a dollar sign.
+   */
+  maths: boolean;
   /** Who this was cut for and to what end, in a sentence or two. */
   madeFor: string;
   /** How to use it: what was read, what the codes mean. */
@@ -464,6 +470,7 @@ export function checkDigest(input: unknown, lectures: readonly Lecture[]): Diges
     ];
   });
   const digest: Digest = {
+    maths: input.maths === true,
     madeFor: prose(input.madeFor, 'madeFor'),
     intro: prose(input.intro, 'intro'),
     plan: { intro: prose(planIn.intro, 'Plan intro', false), budgetMinutes, stages },

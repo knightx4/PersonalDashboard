@@ -316,6 +316,13 @@ describe('checkDigest', () => {
     if (!checked.ok) expect(checked.problems.join('\n')).toMatch(problem);
   });
 
+  it('sets formulas as maths only in a course written with them', () => {
+    const plain = checkDigest(digest(), LECTURES);
+    const written = checkDigest(digest({ maths: true }), LECTURES);
+    expect(plain.ok && plain.digest.maths).toBe(false);
+    expect(written.ok && written.digest.maths).toBe(true);
+  });
+
   it('refuses a lecture left without a rating (D4)', () => {
     const base = digest();
     const checked = checkDigest({ ...base, ratings: { rows: [base.ratings.rows[0]] } }, LECTURES);
@@ -333,41 +340,69 @@ describe('walking the plan', () => {
   const places = (layout: ReturnType<typeof mapLayout>) =>
     Object.fromEntries(layout.nodes.map((node) => [node.key, [node.x, node.row]]));
 
-  it('sets branches side by side under the stage they follow, and what needs both below them', () => {
-    const layout = mapLayout(plan);
-    expect(places(layout)).toEqual({ A: [0.5, 0], B: [0, 1], C: [1, 1], D: [0, 2] });
-    expect(layout).toMatchObject({ columns: 2, rows: 3 });
-    expect(layout.edges).toContainEqual({ from: 'C', to: 'D' });
+  const bare = (key: string, after: string[]) => ({
+    key,
+    short: key,
+    title: key,
+    about: 'x',
+    after,
+    steps: [step('s')],
+  });
+  const laid = (stages: unknown[]) => {
+    const built = checkDigest(digest({}, stages), LECTURES);
+    if (!built.ok) throw new Error(built.problems.join(' '));
+    return mapLayout(built.digest.plan);
+  };
+
+  it('keeps a main line in one column and hangs what branches off it beside it', () => {
+    // Most of the course is one run of stages: A, B, C, D, F, with two side trips.
+    const layout = laid([
+      bare('A', []),
+      bare('B', ['A']),
+      bare('G', ['B']),
+      bare('C', ['B']),
+      bare('D', ['C']),
+      bare('H', ['D']),
+      bare('J', ['D']),
+      bare('F', ['D']),
+    ]);
+    expect(places(layout)).toEqual({
+      A: [0, 0],
+      B: [0, 1],
+      G: [1, 2],
+      C: [0, 2],
+      D: [0, 3],
+      // Three stages end the course on equal terms: the first listed stays on the line.
+      H: [0, 4],
+      J: [1, 4],
+      F: [2, 4],
+    });
+    expect(layout.columns).toBe(3);
+    // The plan of the fixture is short enough to count as a main line too.
+    expect(places(mapLayout(plan))).toEqual({ A: [0, 0], B: [0, 1], C: [1, 1], D: [0, 2] });
+    expect(mapLayout(plan).edges).toContainEqual({ from: 'C', to: 'D' });
   });
 
-  it('keeps a branch in its own column and centres a stage over its fork', () => {
-    const bare = (key: string, after: string[]) => ({
-      key,
-      short: key,
-      title: key,
-      about: 'x',
-      after,
-      steps: [step('s')],
-    });
-    const long = checkDigest(
-      digest({}, [
-        bare('A', []),
-        bare('B1', ['A']),
-        bare('B2', ['B1']),
-        bare('B3', ['B1']),
-        bare('C1', ['A']),
-        bare('C2', ['C1']),
-      ]),
-      LECTURES,
-    );
-    if (!long.ok) throw new Error(long.problems.join(' '));
-    expect(places(mapLayout(long.digest.plan))).toEqual({
-      A: [1.25, 0],
+  it('draws a fork of equals as a tree, each stage centred over what follows it', () => {
+    const layout = laid([
+      bare('A', []),
+      bare('B1', ['A']),
+      bare('B2', ['B1']),
+      bare('B3', ['B1']),
+      bare('C1', ['A']),
+      bare('C2', ['C1']),
+      bare('D1', ['A']),
+      bare('D2', ['D1']),
+    ]);
+    expect(places(layout)).toEqual({
+      A: [1.75, 0],
       B1: [0.5, 1],
       B2: [0, 2],
       B3: [1, 2],
       C1: [2, 1],
       C2: [2, 2],
+      D1: [3, 1],
+      D2: [3, 2],
     });
   });
 

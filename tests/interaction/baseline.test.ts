@@ -47,6 +47,6 @@ describe('touched surfaces', () => {
 describe('the gate', () => {
   it('runs the phone checks after the build they serve', () => {
     const gate = readFileSync(join(process.cwd(), 'scripts/gate.sh'), 'utf8');
-    expect(gate).toMatch(/"Build" npm run -s build -- "Phone checks" npm run -s check:phone &/);
+    expect(gate).toMatch(/"Build" (env [^-]+ )?npm run -s build -- "Phone checks" npm run -s check:phone &/);
   });
 });
