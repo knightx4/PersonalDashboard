@@ -139,6 +139,16 @@ describe('the Jobs writes', () => {
     expect(t['job_search.fact_origins'][0]).toMatchObject({ origin: 'dash', certainty: 'firsthand' });
   });
 
+  it('sets and clears the recruiting platform, and refuses one not on the list', async () => {
+    const t = tables();
+    const change = await made('change_role', t, { role_ref: ROLE, posting_platform: 'ashby' });
+    expect(change.after).toMatchObject({ posting_platform: 'ashby' });
+    expect(change.summary).toBe('Dash changed the recruiting platform on the role Role from email at Acme.');
+    await made('change_role', t, { role_ref: ROLE, posting_platform: '' });
+    expect(t['job_search.roles'][0].posting_platform).toBeNull();
+    expect(await refused('change_role', tables(), { role_ref: ROLE, posting_platform: 'myspace' })).toMatch(/posting_platform must be one of/);
+  });
+
   it('sets, clears and refuses an AI score', async () => {
     const t = tables();
     const change = await made('change_role', t, { role_ref: ROLE, ai_score: 80 });

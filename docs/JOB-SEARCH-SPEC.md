@@ -190,6 +190,7 @@ One employer is one row. Every path that creates a company goes through `ensureC
 | seniority | text | free text, from the posting |
 | location, work_mode | text, enum | `onsite`, `hybrid`, `remote` |
 | comp_min_cents, comp_max_cents, comp_source | int, enum | `posted`, `recruiter`, `estimate` |
+| posting_platform | text | The recruiting platform the posting is on, typed by the person or given to `change_role`: one of `lib/jobs/roles/platform.ts`, `in_house` for the company's own site. Null when not typed, and the role page then shows what the posting link says. Kept apart from `companies.ats_type`, which drives the board readers |
 | ai_score | smallint | How much the role involves AI work, 0 to 100, typed by the person on the role page or given to Dash's `change_role`. Nothing computes it. A column on the Pipeline table beside fit and chance, sortable |
 | posting_status | enum | `open`, `closed`, `unknown`. A closed posting with a live application is normal |
 | source | enum | `portal`, `linkedin`, `referral`, `recruiter_inbound`, `job_board`, `direct_outreach`, `other` |

@@ -920,6 +920,7 @@ const rolePanels: PanelProps = {
   experienceMinYears: null,
   experienceMaxYears: null,
   aiScore: 70,
+  postingPlatform: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',

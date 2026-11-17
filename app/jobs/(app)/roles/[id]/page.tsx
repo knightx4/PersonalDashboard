@@ -106,7 +106,7 @@ export default async function RoleDetailPage({
     .from('roles')
     .select(
       `id, title, jd_url, jd_text, jd_hash, jd_lookup_note, jd_lookup_at, ats_job_id, seniority, location, work_mode, kind,
-       comp_min_cents, comp_max_cents, comp_source, experience_min_years, experience_max_years, ai_score, posting_status, source, first_seen_at,
+       comp_min_cents, comp_max_cents, comp_source, experience_min_years, experience_max_years, ai_score, posting_platform, posting_status, source, first_seen_at,
        requirements, requirement_matches, requirement_matches_at, requirement_matches_key,
        companies!inner ( id, name, slug, stage, ats_type, priority, logo_url, domains, website, careers_url )`,
     )
@@ -629,6 +629,7 @@ export default async function RoleDetailPage({
           experienceMinYears={(role.experience_min_years as number) ?? null}
           experienceMaxYears={(role.experience_max_years as number) ?? null}
           aiScore={(role.ai_score as number) ?? null}
+          postingPlatform={(role.posting_platform as string) ?? null}
           requirements={requirements}
           requirementMatches={requirementMatches}
           requirementMatchesAt={(role.requirement_matches_at as string) ?? null}

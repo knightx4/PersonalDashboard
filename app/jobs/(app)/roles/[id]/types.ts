@@ -34,6 +34,8 @@ export interface PanelProps {
   experienceMaxYears: number | null;
   /** The person's own AI score, 0 to 100; null when not typed. */
   aiScore: number | null;
+  /** The recruiting platform the person typed; null when not typed (the link may say). */
+  postingPlatform: string | null;
   /** The gallery only: open the details card already in edit mode. */
   detailsEditing?: boolean;
   requirements: Requirement[];

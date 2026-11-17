@@ -17,6 +17,7 @@ import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { experienceAsk, experienceShown } from '@/lib/jobs/jd/experience';
 import { AI_SCORE_LABEL } from '@/lib/jobs/roles-display';
+import { POSTING_PLATFORMS, POSTING_PLATFORM_LABELS, platformFromLink, shownPlatform } from '@/lib/jobs/roles/platform';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -38,6 +39,7 @@ export function Posting({
   experienceMinYears,
   experienceMaxYears,
   aiScore,
+  postingPlatform,
   detailsEditing,
   requirements,
   requirementMatches,
@@ -110,6 +112,7 @@ export function Posting({
         experienceMinYears={experienceMinYears}
         experienceMaxYears={experienceMaxYears}
         aiScore={aiScore}
+        postingPlatform={postingPlatform}
         startEditing={detailsEditing}
         jdText={jdText}
       />
@@ -266,6 +269,7 @@ function RoleDetailsCard({
   experienceMinYears,
   experienceMaxYears,
   aiScore,
+  postingPlatform,
   startEditing,
   jdText,
 }: {
@@ -280,6 +284,7 @@ function RoleDetailsCard({
   experienceMinYears: number | null;
   experienceMaxYears: number | null;
   aiScore: number | null;
+  postingPlatform: string | null;
   startEditing?: boolean;
   /** Only to know whether the lookup is offered: it never overwrites one. */
   jdText: string;
@@ -303,12 +308,15 @@ function RoleDetailsCard({
     experienceMaxYears !== null ? String(experienceMaxYears) : '',
   );
   const [aiDraft, setAiDraft] = useState(aiScore !== null ? String(aiScore) : '');
+  const [platformDraft, setPlatformDraft] = useState(postingPlatform ?? '');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [lookup, setLookup] = useState<JdLookupResult | null>(null);
   const [looking, startLooking] = useTransition();
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
+  const platform = shownPlatform(postingPlatform, jdUrl);
+  const linkPlatform = platformFromLink(jdUrlDraft);
   const experience = experienceAsk(jdText);
   const shownExperience = experienceShown(
     { min: experienceMinYears, max: experienceMaxYears },
@@ -364,6 +372,7 @@ function RoleDetailsCard({
         experienceMinYears: expMin,
         experienceMaxYears: expMax,
         aiScore: ai,
+        postingPlatform: platformDraft || null,
         compSource:
           min !== null || max !== null
             ? ((compSource ?? 'recruiter') as 'posted' | 'recruiter' | 'estimate')
@@ -421,6 +430,17 @@ function RoleDetailsCard({
             }
           />
           <ValueRow label="Kind" value={ROLE_KIND_LABELS[kind]} />
+          <ValueRow
+            label="Platform"
+            value={
+              platform ? (
+                <>
+                  {platform.label}
+                  {platform.fromLink && <span className="ml-1.5 text-small text-ink-muted">from the link</span>}
+                </>
+              ) : null
+            }
+          />
           <ValueRow label="Location" value={location} />
           <ValueRow label="ATS job id" value={atsJobId} />
           <ValueRow
@@ -515,6 +535,22 @@ function RoleDetailsCard({
             {ROLE_KINDS.map((option) => (
               <option key={option} value={option}>
                 {ROLE_KIND_LABELS[option]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field id={`platform-${roleId}`} label="Platform">
+          <Select
+            className="max-sm:min-h-11"
+            value={platformDraft}
+            onChange={(event) => setPlatformDraft(event.target.value)}
+          >
+            <option value="">
+              {linkPlatform ? `Not set (the link says ${POSTING_PLATFORM_LABELS[linkPlatform]})` : 'Not set'}
+            </option>
+            {POSTING_PLATFORMS.map((option) => (
+              <option key={option} value={option}>
+                {POSTING_PLATFORM_LABELS[option]}
               </option>
             ))}
           </Select>
