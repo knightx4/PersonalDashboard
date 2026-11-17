@@ -229,9 +229,13 @@ when you see a cause of failure that one fix will not remove.
    nothing of the kind, and Dash had read only its first 160 characters. Add a check (cheap model or rules) that flags an answer
    naming rows, amounts or dates its lookups did not return, and record it
    in the run's grading.
-5. **Cover every workspace.** At least one case per workspace that is on
-   (jobs, shopping, todo, goals, learn, vault, news, you), and one for
-   recall. Write them from real questions in their chats.
+5. ~~**Cover every workspace.**~~ Done 17 November: every workspace that is
+   on (jobs, shopping, todo, goals, learn, vault, news, you, money) and
+   recall has at least one case. The last three added were vault
+   (b5037dcc, the MGT 847 note), you (80d00677, places lived) and news
+   (8c1bb116, saved stories); none has been asked yet, so the 1 December
+   run is their first. Retire the news case if those stories are unsaved.
+   A new workspace gets its case when it is turned on.
 6. **The connector (MCP) is Dash too.** Connected apps (claude.ai, Claude
    Desktop) call the same lookups through `app/api/mcp` and `lib/connector/`;
    the daily health reads `core.connector_calls` and alerts on `error` and
