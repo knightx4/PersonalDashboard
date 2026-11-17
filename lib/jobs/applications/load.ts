@@ -44,6 +44,8 @@ export interface PipelineRow {
   source: ApplicationSource;
   attempt: number;
   excitement: number | null;
+  /** How much the role involves AI work, 0 to 100, typed by the person (roles.ai_score). */
+  aiScore: number | null;
   needsReview: boolean;
   /** Marked ready to apply on the role's Application tab. */
   readyToApply: boolean;
@@ -100,7 +102,7 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
+    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, ai_score, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
   interviews ( kind, scheduled_at, time_known ),
@@ -136,6 +138,7 @@ type RawRow = {
     work_mode: string | null;
     comp_min_cents: number | null;
     comp_max_cents: number | null;
+    ai_score: number | null;
     requirement_matches: CoverageEntry[] | null;
     companies: {
       id: string;
@@ -198,6 +201,7 @@ export async function loadPipeline(
     source: row.source,
     attempt: row.attempt,
     excitement: row.excitement,
+    aiScore: row.roles.ai_score ?? null,
     needsReview: row.needs_review,
     readyToApply: row.ready_to_apply === true,
     allQuestionsAdded: row.all_questions_added === true,

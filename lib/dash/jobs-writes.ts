@@ -43,7 +43,7 @@ import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } fr
 import { CLASSIFICATIONS, type MessageClassification } from '@/lib/jobs/email/classify';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { fileJobNote } from '@/lib/jobs/notes';
-import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { aiScoreError, descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { channelEdit, excitementError, saveApplicationEdit, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import {
   changedRoleFacts,
@@ -395,6 +395,15 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (given(args, 'posting_status')) {
     update.posting_status = oneOf(args, 'posting_status', POSTING_STATUSES, false);
     changed.push('whether the posting is open');
+  }
+  if (given(args, 'ai_score')) {
+    // The person's own score; nothing computes it. Empty or null clears it.
+    const raw = args.ai_score;
+    const score = raw === null || raw === '' ? null : Number(raw);
+    const bad = aiScoreError(score);
+    if (bad) throw new JobsRefused(bad);
+    update.ai_score = score;
+    changed.push('the AI score');
   }
   if (given(args, 'posting_url')) {
     const url = clearable(args, 'posting_url', 2000);
@@ -3024,7 +3033,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
     ),
     description:
-      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
+      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, its AI score (their own 0 to 100 rating of how much the role involves AI work, set only when they give it), or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
       type: 'object',
       properties: {
@@ -3041,6 +3050,10 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         pay_min: { type: 'number', description: 'The bottom of the yearly pay band, a whole amount such as 150000. 0 clears it.' },
         pay_max: { type: 'number', description: 'The top of the yearly pay band. 0 clears it.' },
         pay_source: { type: 'string', description: `Where the pay came from: ${PAY_SOURCES.join(', ')}. ${CLEARABLE}` },
+        ai_score: {
+          type: ['number', 'string'],
+          description: `Their AI score for the role: a whole number from 0 to 100, as they gave it. ${CLEARABLE}`,
+        },
         company: { type: 'string', description: 'The company the role belongs to, by name.' },
         company_priority: {
           type: 'string',

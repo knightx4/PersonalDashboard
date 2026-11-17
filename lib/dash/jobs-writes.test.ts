@@ -139,6 +139,17 @@ describe('the Jobs writes', () => {
     expect(t['job_search.fact_origins'][0]).toMatchObject({ origin: 'dash', certainty: 'firsthand' });
   });
 
+  it('sets, clears and refuses an AI score', async () => {
+    const t = tables();
+    const change = await made('change_role', t, { role_ref: ROLE, ai_score: 80 });
+    expect(change.after).toMatchObject({ ai_score: 80 });
+    expect(change.summary).toBe('Dash changed the AI score on the role Role from email at Acme.');
+    await made('change_role', t, { role_ref: ROLE, ai_score: '' });
+    expect(t['job_search.roles'][0].ai_score).toBeNull();
+    expect(await refused('change_role', tables(), { role_ref: ROLE, ai_score: 140 })).toMatch(/0 to 100/);
+    expect(await refused('change_role', tables(), { role_ref: ROLE, ai_score: 'high' })).toMatch(/0 to 100/);
+  });
+
   it('refuses fact_source email without the email', async () => {
     expect(await refused('change_role', tables(), { role_ref: ROLE, location: 'Paris', fact_source: 'email' })).toMatch(/needs email_ref/);
     expect(await refused('change_role', tables(), { role_ref: ROLE, location: 'Paris', email_ref: EMAIL })).toMatch(/goes with fact_source/);

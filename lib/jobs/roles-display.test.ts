@@ -38,7 +38,7 @@ const spec = rolesDisplay();
 const arranged = (params: Record<string, string>) => parseListDisplay(spec, params);
 
 describe('the roles table', () => {
-  it('keeps the sort ids the column headers link to, with fit, chance, ready and questions after them', () => {
+  it('keeps the sort ids the column headers link to, with fit, chance, AI score, ready and questions after them', () => {
     expect(spec.sorts.map((sort) => sort.id)).toEqual([
       'title',
       'company',
@@ -48,9 +48,15 @@ describe('the roles table', () => {
       'excitement',
       'fit',
       'chance',
+      'ai',
       'ready',
       'questions',
     ]);
+  });
+
+  it('sorts by AI score, highest first, a role without one last', () => {
+    const rows = [role({ applicationId: 'none', aiScore: null }), role({ applicationId: 'low', aiScore: 20 }), role({ applicationId: 'high', aiScore: 90 })];
+    expect(sortRows(rows, arranged({ sort: 'ai' })).map((row) => row.applicationId)).toEqual(['high', 'low', 'none']);
   });
 
   it('still opens on last activity', () => {

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { applyBoardToRole, resolveBoard, type CompanyForLookup, type RoleForLookup } from '@/lib/jobs/jd/lookup';
-import { descriptionUpdate, experienceYearsError, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { aiScoreError, descriptionUpdate, experienceYearsError, saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { countEvidenceUse, saveAnswerEdit, setCanonicalAnswer } from '@/lib/jobs/answers/edit';
 import { recordHandEditOrigins } from '@/lib/jobs/fact-origins';
 import { isRoleKind } from '@/lib/jobs/role-kind';
@@ -35,6 +35,7 @@ export async function updateRole(
     compSource?: 'posted' | 'recruiter' | 'estimate' | null;
     experienceMinYears?: number | null;
     experienceMaxYears?: number | null;
+    aiScore?: number | null;
     kind?: string;
   },
 ): Promise<{ error: string | null }> {
@@ -71,6 +72,11 @@ export async function updateRole(
     if (bad) return { error: bad };
     if (patch.experienceMinYears !== undefined) update.experience_min_years = patch.experienceMinYears;
     if (patch.experienceMaxYears !== undefined) update.experience_max_years = patch.experienceMaxYears;
+  }
+  if (patch.aiScore !== undefined) {
+    const bad = aiScoreError(patch.aiScore);
+    if (bad) return { error: bad };
+    update.ai_score = patch.aiScore;
   }
   if (patch.kind !== undefined) {
     if (!isRoleKind(patch.kind)) return { error: 'That is not a kind of role.' };
