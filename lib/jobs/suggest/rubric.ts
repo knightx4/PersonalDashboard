@@ -128,12 +128,16 @@ export const FIT_QUESTIONS = {
   fit_pay: {
     type: 'choice',
     question:
-      'How does the pay given in the text compare with the lowest pay in your_preferences, or where none is set, ' +
-      'with pay for this level and place?',
+      'How does the pay given in the text compare with the pay the person names in your_career_goals? Where the ' +
+      'goals name none, use the lowest pay in your_preferences, and where that is not set either, pay for this ' +
+      'level and place. Count bonus and equity where the text gives them, and weigh total pay above base when the ' +
+      'goals say to.',
     options: {
-      strong: 'Clearly above it.',
-      fair: 'About at it.',
-      low: 'Below it.',
+      reach: 'At or above the most they hope for.',
+      target: 'At their target.',
+      realistic: 'Around the realistic floor they would accept.',
+      minimum: 'Below that floor, but at or above their absolute minimum.',
+      below: 'Below their absolute minimum.',
       not_given: 'No pay figure is given.',
     },
   },
@@ -172,7 +176,7 @@ export const FIT_WEIGHTS: Record<FitFactor, number> = {
 export const DEALBREAKER_CAP = 15;
 
 /** The pay answer as a level on the same 0 to 4 scale; not_given drops the factor. */
-const PAY_LEVELS: Record<string, number | null> = { strong: 4, fair: 2, low: 0, not_given: null };
+const PAY_LEVELS: Record<string, number | null> = { reach: 4, target: 3, realistic: 2, minimum: 1, below: 0, not_given: null };
 
 /** The fit factor labels, for the reason line. */
 export const FIT_FACTOR_LABELS: Record<FitFactor, { high: string; low: string }> = {

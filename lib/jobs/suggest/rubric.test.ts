@@ -98,7 +98,7 @@ describe('scoreFactor and payFactor', () => {
     const pay = payFactor({
       ok: true,
       model: 'm',
-      answer: { type: 'choice', choice: 'strong', confidence: 0.5, probabilities: { strong: 0.5, fair: 0.5, low: 0, not_given: 0 } },
+      answer: { type: 'choice', choice: 'reach', confidence: 0.5, probabilities: { reach: 0.5, realistic: 0.5, below: 0, not_given: 0 } },
     });
     expect(pay?.score).toBe(3);
   });
