@@ -1575,7 +1575,7 @@ describe('query_rows (plan #2109.4)', () => {
     const result = await run({ where: [{ column: 'status', op: 'equals', value: 'to_apply' }], columns: ['cover_letter', 'notes'] });
     const rows = expectLinkedRows(result);
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => Object.keys(r.detail))).toEqual([['cover_letter'], ['cover_letter']]);
+    expect(rows.map((r) => Object.keys(r.detail ?? {}))).toEqual([['cover_letter'], ['cover_letter']]);
     expect(result.ok && result.note).toContain('Left out notes');
     expect(result.ok && result.note).toContain('Its columns:');
   });
