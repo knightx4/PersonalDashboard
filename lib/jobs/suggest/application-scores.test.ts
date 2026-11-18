@@ -190,4 +190,13 @@ describe('scoreApplicationsFor', () => {
     const write = calls.find((call) => call.method === 'update');
     expect(write?.args[0]).toMatchObject({ scores: { fit_score: { value: 50, confidence: 1 } }, score_model: 'jev-1.13.0' });
   });
+
+  it('starts no call past its deadline, so Score now answers inside the page', async () => {
+    const { client, calls } = fakeSupabase({
+      applications: [{ id: 'a1', status: 'acknowledged', roles: { title: 'Analyst', companies: { name: 'Ramp' } } }],
+    });
+    const outcome = await scoreApplicationsFor(client, 'u1', { apiKey: 'k', fetch: jev(), deadline: Date.now() - 1 });
+    expect(outcome).toEqual({ scored: 0, failed: 0, stopped: null });
+    expect(calls.some((call) => call.method === 'update')).toBe(false);
+  });
 });
