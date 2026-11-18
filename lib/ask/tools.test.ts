@@ -1571,6 +1571,15 @@ describe('query_rows (plan #2109.4)', () => {
     expect(result.ok && result.matchedSet).toEqual({ table: 'job_search.applications', refs: [], matched: 120 });
   });
 
+  it('leaves out a guessed column next to real ones, names it, and still lists the rows', async () => {
+    const result = await run({ where: [{ column: 'status', op: 'equals', value: 'to_apply' }], columns: ['cover_letter', 'notes'] });
+    const rows = expectLinkedRows(result);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => Object.keys(r.detail))).toEqual([['cover_letter'], ['cover_letter']]);
+    expect(result.ok && result.note).toContain('Left out notes');
+    expect(result.ok && result.note).toContain('Its columns:');
+  });
+
   it('refuses a column the table does not have, wherever it is named', async () => {
     for (const input of [
       { where: [{ column: 'company_name', op: 'equals', value: 'Acme' }] },

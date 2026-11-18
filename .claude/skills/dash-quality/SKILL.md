@@ -269,6 +269,13 @@ when you see a cause of failure that one fix will not remove.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
    - ~~No lookup has a time limit.~~ Done 14 November with item 2: 20 seconds each.
+   - ~~A guessed column failed the whole query_rows call.~~ Done 18
+     November: connected apps asked for posting_url, content or notes next
+     to real columns, and 13 of 151 calls in a week failed. `columns` now
+     leaves a guessed name out and names it in the note; a guess in `where`,
+     `order` or `group_by` is still refused, since it changes which rows
+     come back. Left: ids given as 8-character prefixes or company names to
+     a uuid column fail as "invalid input syntax for type uuid".
 7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
    a reply to an `@dash` comment keeps its lookups on its turn
    (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or
