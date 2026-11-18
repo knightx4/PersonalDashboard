@@ -593,6 +593,24 @@ export function statusAt(events: readonly EventRow[], at: Date): ApplicationStat
   }).status;
 }
 
+/**
+ * The order applications are listed in: live processes, then what waits on
+ * the person (a lead or draft not sent), then what waits on the company, then
+ * what is over. Newest first within each.
+ */
+const LIVE_ORDER: Record<string, number> = {
+  offer: 0,
+  final_round: 1,
+  in_process: 2,
+  drafting: 3,
+  lead: 4,
+  submitted: 5,
+  acknowledged: 6,
+};
+export function liveRank(status: string): number {
+  return LIVE_ORDER[status] ?? 7;
+}
+
 /** Statuses of an application that was never sent. */
 const NOT_SENT_STATUSES = ['lead', 'drafting'];
 
@@ -725,7 +743,13 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   const sentApplications = applications.filter((a) => !NOT_SENT_STATUSES.includes(statusFor(a)));
   const sentWithoutDay = sentApplications.filter((a) => a.submitted_at === null).length;
 
-  const rows: AskRow[] = applications.slice(0, MAX_ROWS).map((a) => {
+  // The live ones first, so one read answers "where does my search stand":
+  // the newest 50 of 946 were mostly acknowledged, and eval case
+  // 71b0bc38 spent three reads finding its five live processes and 27 leads.
+  const listed = [...applications].sort(
+    (a, b) => liveRank(statusFor(a)) - liveRank(statusFor(b)) || b.created_at.localeCompare(a.created_at),
+  );
+  const rows: AskRow[] = listed.slice(0, MAX_ROWS).map((a) => {
     const role = roleById.get(a.role_id);
     const company = role?.company_id ? companyById.get(role.company_id) : undefined;
     const status = statusOf(a);
@@ -773,6 +797,7 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
       (quietDays !== null
         ? `Open applications with nothing heard from the company in the ${quietDays} days before ${ctx.today}; last heard is the newest reply, screen, interview, offer or rejection, or the day it was sent when nothing came back. `
         : '') +
+      'Listed live ones first (offer, final round, in process), then leads and drafts not sent, then sent and waiting, then closed, newest first within each; by_status counts every one matched. ' +
       `${matchedNote(applications.length, rows.length, readCapped)}.`,
   };
 }

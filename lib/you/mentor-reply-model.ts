@@ -116,8 +116,18 @@ export function bubblePauseMs(text: string): number {
 /** The first text's instructions, after the persona. */
 export const ACK_RULES = `They have just texted you and your full reply will take a moment. Send one short first text in your own voice, the kind you would send before a longer answer: a quick reaction to what they said, under twelve words. Do not answer the question or promise anything specific. Write only the text itself, with no quotation marks.`;
 
-/** The first text as it is kept: one line, no wrapping quotes, cut to ACK_MAX_CHARS; null when nothing usable came back. */
-export function cleanAck(text: string): string | null {
+/**
+ * The first text as it is kept: one line, no wrapping quotes, and whole
+ * sentences only; null when nothing usable came back.
+ *
+ * A first text longer than ACK_MAX_CHARS, or one the model stopped at
+ * ACK_MAX_TOKENS (`cut`), keeps the sentences that end within the limit and
+ * drops the rest. It used to be sliced at the limit with an ellipsis, which
+ * showed in the thread as a bubble ending mid-word ("about your…", "The
+ * inter…", plan #3067). When not one whole sentence fits, there is no first
+ * text: the full reply follows it anyway.
+ */
+export function cleanAck(text: string, cut = false): string | null {
   const line = text
     .split('\n')
     .map((l) => l.trim())
@@ -125,7 +135,19 @@ export function cleanAck(text: string): string | null {
   if (!line) return null;
   const bare = line.replace(/^["'“‘]+|["'”’]+$/g, '').trim();
   if (!bare) return null;
-  return bare.length > ACK_MAX_CHARS ? `${bare.slice(0, ACK_MAX_CHARS - 1).trimEnd()}…` : bare;
+  if (!cut && bare.length <= ACK_MAX_CHARS) return bare;
+  return wholeSentences(bare, ACK_MAX_CHARS);
+}
+
+/** The sentences at the start of a line that end within `max` characters, or null when the first does not. */
+function wholeSentences(line: string, max: number): string | null {
+  let kept = '';
+  for (const match of line.matchAll(/[^.!?…]*[.!?…]+["'”’)\]]*(?=\s|$)/g)) {
+    const next = (kept + match[0]).trim();
+    if (next.length > max) break;
+    kept = kept + match[0];
+  }
+  return kept.trim() || null;
 }
 
 /** What the person is told when a reply could not be written. */

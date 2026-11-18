@@ -144,6 +144,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.dash_eval_cases', reason: 'The questions the nightly Dash quality check asks and what a good answer must show; test fixtures, not something the person wrote.' },
     { table: 'core.dash_failures', reason: 'Bookkeeping for Dash answers that failed or came back unfinished: the reason, the model and each call\'s stop and tokens, for the daily health check.' },
     { table: 'core.dash_slips', reason: 'Bookkeeping for chats with Dash that refused a thin or repeated plan step or ran out of a turn\'s budget, or said a file was attached when none was sent, counted on Dev Home.' },
+    { table: 'core.dash_lookup_caps', reason: 'Bookkeeping for Ask Dash answers that used all their lookups: the question, the lookups in order, the time and the cost, listed on Dev to decide how lookups should change.' },
     { table: 'core.dash_eval_runs', reason: 'Bookkeeping for the nightly Dash quality check: each run, its graded answers, the day\'s health and the Dev note it wrote.' },
     { table: 'core.bot_handoffs', reason: 'Bookkeeping for a request one bot passed to another ("tell Bob ..."): the thread, the packet sent and what the receiver did; the person\'s words are in the chat it was asked in, and the row the receiver made is a source in its own module.' },
     { table: 'core.browser_runners', reason: 'Bookkeeping for the person\'s PC and Mac that do browser tasks: one row per computer with when its runner last sent a heartbeat, so the Mac only claims a task when the PC is off.' },

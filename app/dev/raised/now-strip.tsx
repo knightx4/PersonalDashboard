@@ -89,13 +89,25 @@ function sessionsChip(open: OpenSessions | null): Chip {
 }
 
 /**
+ * The browser runner's chip (plan #3075): whether the runner on the PC or
+ * the Mac is up, so a browser task can be done in the person's own Chrome,
+ * or when it was last seen (runnerChipValue, lib/talk/browser-runners.ts).
+ */
+function browserChip(runner: { value: string; up: boolean } | null): Chip {
+  const base = { key: 'browser', label: 'Browser runner', href: '/dev/plan' };
+  if (!runner) return { ...base, value: 'Not read', tone: 'ghost' };
+  if (runner.up) return { ...base, value: runner.value, tone: 'quiet', check: true };
+  return { ...base, value: runner.value, tone: 'caution' };
+}
+
+/**
  * The top of Home: what is running and what is waiting, one chip each, every
  * chip a link to the page that holds the detail. The first question of the
  * morning is "is anything going, and is anything broken", and it used to take
  * the whole Status card to answer. The controls that were on that card are
  * on Dev settings now (plan #1937.10).
  *
- * The chips wrap rather than scroll at phone width, so all six are read
+ * The chips wrap rather than scroll at phone width, so all seven are read
  * without a swipe.
  */
 export function NowStrip({
@@ -106,6 +118,7 @@ export function NowStrip({
   inbox,
   slips,
   sessions,
+  browserRunner,
 }: {
   run: OvernightRun | null;
   /** Features the runner could pick up, as the runner card counts them. */
@@ -118,6 +131,8 @@ export function NowStrip({
   slips: SlipCount | null;
   /** Hand-offs to a Claude Code session still open; null when not read. */
   sessions: OpenSessions | null;
+  /** The browser runner's chip words (runnerChipValue); null when not read, left out to draw no chip. */
+  browserRunner?: { value: string; up: boolean } | null;
 }) {
   const chips: Chip[] = [
     runnerChip(run, ready),
@@ -139,6 +154,7 @@ export function NowStrip({
     },
     slipsChip(slips),
     sessionsChip(sessions),
+    ...(browserRunner === undefined ? [] : [browserChip(browserRunner)]),
   ];
 
   return (

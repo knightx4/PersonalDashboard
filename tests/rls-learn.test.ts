@@ -59,7 +59,11 @@ beforeAll(async () => {
   userA = await createUser('learn-a@example.com');
   userB = await createUser('learn-b@example.com');
 
-  trackA = await seedTrack(userA, 'Value and price', 'Why does price break down when endowments differ?');
+  trackA = await seedTrack(
+    userA,
+    'Value and price',
+    'Why does price break down when endowments differ?',
+  );
   trackB = await seedTrack(userB, 'Bob reads things', 'Bob has his own question.');
 
   sourceA = await seedSource(userA, 'The Use of Knowledge in Society', 'https://example.org/a');
@@ -128,8 +132,10 @@ describe('RLS coverage', () => {
       'concepts',
       'course_embeddings',
       'course_explains',
+      'course_lectures',
       'course_reads',
       'course_topics',
+      'courses',
       'curriculum_units',
       'essay_log',
       'essay_notes',
@@ -172,6 +178,7 @@ describe('RLS coverage', () => {
       'quiz_questions',
       'quiz_sources',
       'quizzes',
+      'reader_sources',
       'reading_subjects',
       'readings',
       'review_questions',
@@ -230,17 +237,23 @@ describe('what a chat adds (plan #1807)', () => {
 
   it('refuses a row written for another account', async () => {
     await expect(
-      asUser(userB, (tx) => tx`
+      asUser(
+        userB,
+        (tx) => tx`
         insert into reading_subjects (user_id, reading_id, subject_id)
-        values (${userA}, ${readingA}, ${subjectA})`),
+        values (${userA}, ${readingA}, ${subjectA})`,
+      ),
     ).rejects.toThrow();
     await expect(
-      asUser(userB, (tx) => tx`
-        insert into learning_log (user_id, topic, summary) values (${userA}, 'x', 'y')`),
+      asUser(
+        userB,
+        (tx) => tx`
+        insert into learning_log (user_id, topic, summary) values (${userA}, 'x', 'y')`,
+      ),
     ).rejects.toThrow();
   });
 
-  it('cannot relate one account\'s reading to another account\'s subject', async () => {
+  it("cannot relate one account's reading to another account's subject", async () => {
     await expect(
       admin`
         insert into reading_subjects (user_id, reading_id, subject_id)
@@ -248,29 +261,108 @@ describe('what a chat adds (plan #1807)', () => {
     ).rejects.toThrow();
     // B's own subject, A's reading: the reading's key carries its owner too.
     await expect(
-      asUser(userB, (tx) => tx`
+      asUser(
+        userB,
+        (tx) => tx`
         insert into reading_subjects (user_id, reading_id, subject_id)
-        values (${userB}, ${readingA}, ${subjectB})`),
+        values (${userB}, ${readingA}, ${subjectB})`,
+      ),
     ).rejects.toThrow();
   });
 });
 
 describe('a topic waiting for the routine to draft it (learn 0193)', () => {
   // A press queues its own; the routine's script works them with the service role.
+  it('keeps what is prepared to read to the person it is for (learn 0195)', async () => {
+    const [source] = await asUser(
+      userA,
+      (tx) =>
+        tx<
+          { id: string }[]
+        >`insert into reader_sources (user_id, title, origin) values (${userA}, 'What Is Money?', 'asked') returning id`,
+    );
+    expect(await asUser(userA, (tx) => tx`select id from reader_sources`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from reader_sources`)).toHaveLength(0);
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into reader_sources (user_id, title) values (${userA}, 'Not mine')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(
+      userB,
+      (tx) => tx`update reader_sources set verdict = 'dropped' where id = ${source.id}`,
+    );
+    expect(
+      await admin`select id from reader_sources where id = ${source.id} and verdict is null`,
+    ).toHaveLength(1);
+    // A source cannot be marked ready with nothing prepared.
+    await expect(
+      asUser(userA, (tx) => tx`update reader_sources set status = 'ready' where id = ${source.id}`),
+    ).rejects.toThrow();
+  });
+
+  it('keeps a course and its lectures to the person who asked for it (learn 0194)', async () => {
+    const [course] = await asUser(
+      userA,
+      (tx) =>
+        tx<
+          { id: string }[]
+        >`insert into courses (user_id, title) values (${userA}, 'Quantitative finance') returning id`,
+    );
+    await admin`
+      insert into course_lectures (course_id, user_id, code, position, title, video_id, duration_seconds)
+      values (${course.id}, ${userA}, 'L01', 0, 'Introduction', 'wvXDB9dMdEo', 3630)`;
+    expect(await asUser(userA, (tx) => tx`select id from courses`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select id from course_lectures`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from courses`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from course_lectures`)).toHaveLength(0);
+    // Another person cannot queue a course in someone's name, and nobody signed in writes lectures.
+    await expect(
+      asUser(userB, (tx) => tx`insert into courses (user_id, title) values (${userA}, 'Not mine')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (
+          tx,
+        ) => tx`insert into course_lectures (course_id, user_id, code, position, title, video_id, duration_seconds)
+          values (${course.id}, ${userA}, 'L02', 1, 'Linear algebra', '9YtmGy-wfE4', 4000)`,
+      ),
+    ).rejects.toThrow();
+    // A course cannot be marked ready with no digest.
+    await expect(
+      asUser(userA, (tx) => tx`update courses set status = 'ready' where id = ${course.id}`),
+    ).rejects.toThrow();
+  });
+
   it('lets a person queue and read only their own, one open request per ask', async () => {
-    await asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'DCF')`);
+    await asUser(
+      userA,
+      (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'DCF')`,
+    );
     await expect(
-      asUser(userA, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, ' dcf ')`),
+      asUser(
+        userA,
+        (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, ' dcf ')`,
+      ),
     ).rejects.toThrow();
     await expect(
-      asUser(userB, (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'WACC')`),
+      asUser(
+        userB,
+        (tx) => tx`insert into topic_draft_requests (user_id, goal) values (${userA}, 'WACC')`,
+      ),
     ).rejects.toThrow();
-    expect(await asUser(userA, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(1);
-    expect(await asUser(userB, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`)).toHaveLength(0);
+    expect(
+      await asUser(userA, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`),
+    ).toHaveLength(1);
+    expect(
+      await asUser(userB, (tx) => tx`select id from topic_draft_requests where goal = 'DCF'`),
+    ).toHaveLength(0);
   });
 });
 
-describe('a subject\'s preparation run (plan #2276.1)', () => {
+describe("a subject's preparation run (plan #2276.1)", () => {
   // The trigger on subjects opens a run with its seven steps for a subject
   // made any way; the person may read theirs, and only the service role writes.
   let subjectA = '';
@@ -288,54 +380,109 @@ describe('a subject\'s preparation run (plan #2276.1)', () => {
     const steps = await admin<{ key: string }[]>`
       select key from subject_preparation_steps where preparation_id = ${runs[0].id} order by ordinal`;
     expect(steps.map((s) => s.key)).toEqual([
-      'classify', 'pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'write_units', 'finish', 'first_lesson',
+      'classify',
+      'pull_documents',
+      'match_weeks',
+      'compile_territory',
+      'draft_topics',
+      'write_units',
+      'finish',
+      'first_lesson',
     ]);
   });
 
   it('opens none for a hidden survey subject until it becomes a real one', async () => {
     const [{ id }] = await admin<{ id: string }[]>`
       insert into subjects (user_id, name, survey) values (${userA}, 'A survey theme', true) returning id`;
-    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(0);
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(
+      0,
+    );
     await admin`update subjects set survey = false where id = ${id}`;
-    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(1);
+    expect(await admin`select 1 from subject_preparations where subject_id = ${id}`).toHaveLength(
+      1,
+    );
   });
 
   it('shows the owner their run and nobody else', async () => {
-    expect(await asUser(userA, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(1);
+    expect(
+      await asUser(
+        userA,
+        (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`,
+      ),
+    ).toHaveLength(1);
     // B has runs of their own, for B's subjects; none of A's shows.
-    const mine = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparations`);
+    const mine = await asUser(
+      userB,
+      (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparations`,
+    );
     expect(mine.length).toBeGreaterThan(0);
     expect(mine.every((r) => r.user_id === userB)).toBe(true);
-    const steps = await asUser(userB, (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparation_steps`);
+    const steps = await asUser(
+      userB,
+      (tx) => tx<{ user_id: string }[]>`select user_id from subject_preparation_steps`,
+    );
     expect(steps.every((r) => r.user_id === userB)).toBe(true);
-    expect(await asUser(userB, (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`)).toHaveLength(0);
+    expect(
+      await asUser(
+        userB,
+        (tx) => tx`select id from subject_preparations where subject_id = ${subjectA}`,
+      ),
+    ).toHaveLength(0);
   });
 
   it('lets no session write a run, even its owner', async () => {
     await expect(
-      asUser(userA, (tx) => tx`update subject_preparations set status = 'done' where subject_id = ${subjectA}`),
+      asUser(
+        userA,
+        (tx) => tx`update subject_preparations set status = 'done' where subject_id = ${subjectA}`,
+      ),
     ).rejects.toThrow();
     await expect(
-      asUser(userA, (tx) => tx`insert into subject_preparations (user_id, subject_id) values (${userA}, ${subjectA})`),
+      asUser(
+        userA,
+        (tx) =>
+          tx`insert into subject_preparations (user_id, subject_id) values (${userA}, ${subjectA})`,
+      ),
     ).rejects.toThrow();
   });
 
   it('opens a branch run of five steps when the owner picks a direction, and only the owner (plan #2276.7)', async () => {
     const branch = { key: 'land-use', frame: 'Land use', name: 'Land use', asks: ['Bid rent'] };
     await expect(
-      asUser(userB, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`),
+      asUser(
+        userB,
+        (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`,
+      ),
     ).rejects.toThrow();
 
-    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`);
+    await asUser(
+      userA,
+      (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 31)`,
+    );
     // A second press on the same branch opens nothing more.
-    await asUser(userA, (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 32)`);
-    const runs = await admin<{ id: string; branch_key: string | null; direction: { state?: string; answers?: number } | null }[]>`
+    await asUser(
+      userA,
+      (tx) => tx`select learn.choose_subject_direction(${subjectA}, ${tx.json(branch)}, 32)`,
+    );
+    const runs = await admin<
+      {
+        id: string;
+        branch_key: string | null;
+        direction: { state?: string; answers?: number } | null;
+      }[]
+    >`
       select id, branch_key, direction from subject_preparations where subject_id = ${subjectA} order by created_at`;
     expect(runs.map((r) => r.branch_key)).toEqual([null, 'land-use']);
     expect(runs[0].direction).toMatchObject({ state: 'picked', answers: 32 });
     const steps = await admin<{ key: string }[]>`
       select key from subject_preparation_steps where preparation_id = ${runs[1].id} order by ordinal`;
-    expect(steps.map((s) => s.key)).toEqual(['pull_documents', 'match_weeks', 'compile_territory', 'draft_topics', 'finish']);
+    expect(steps.map((s) => s.key)).toEqual([
+      'pull_documents',
+      'match_weeks',
+      'compile_territory',
+      'draft_topics',
+      'finish',
+    ]);
 
     await asUser(userA, (tx) => tx`select learn.dismiss_subject_direction(${subjectA}, 40)`);
     const [own] = await admin<{ direction: { state?: string; answers?: number } }[]>`
@@ -379,8 +526,12 @@ describe('the areas, which change only by migration', () => {
   });
 
   it('refuses a placed row that names both a field and a domain, or neither', async () => {
-    const [field] = await admin<{ id: string }[]>`select id from area_fields where slug = 'physics'`;
-    const [domain] = await admin<{ id: string }[]>`select id from area_domains where slug = 'technology'`;
+    const [field] = await admin<
+      { id: string }[]
+    >`select id from area_fields where slug = 'physics'`;
+    const [domain] = await admin<
+      { id: string }[]
+    >`select id from area_domains where slug = 'technology'`;
     await expect(
       admin`insert into area_check_articles (title, section, kind, confidence, basis, placed_at, field_id, domain_id)
             values ('Both', 'x', 'topic', 'clear', 'Both.', now(), ${field.id}, ${domain.id})`,
@@ -426,7 +577,9 @@ describe('where a theme sits in the areas', () => {
       values (${userA}, 'Urban design', 'How streets shape travel.')
       returning id`;
     themeA = theme.id;
-    const [field] = await admin<{ id: string }[]>`select id from area_fields where slug = 'physics'`;
+    const [field] = await admin<
+      { id: string }[]
+    >`select id from area_fields where slug = 'physics'`;
     physics = field.id;
     await admin`
       insert into theme_fields (user_id, theme_id, field_id, confidence, basis)
@@ -452,7 +605,7 @@ describe('where a theme sits in the areas', () => {
     expect(after.moved_by_hand).toBe(true);
   });
 
-  it('refuses a placement filed under one account for another account\'s theme', async () => {
+  it("refuses a placement filed under one account for another account's theme", async () => {
     await expect(
       admin`insert into theme_fields (user_id, theme_id, field_id, confidence, basis)
             values (${userB}, ${themeA}, ${physics}, 'clear', 'Planted.')`,
@@ -666,10 +819,7 @@ describe('learning goals, stored as aims', () => {
 
   it('does not let a user file an aim under another account', async () => {
     await expect(
-      asUser(
-        userB,
-        (tx) => tx`insert into aims (user_id, name) values (${userA}, 'Planted')`,
-      ),
+      asUser(userB, (tx) => tx`insert into aims (user_id, name) values (${userA}, 'Planted')`),
     ).rejects.toThrow();
   });
 
@@ -697,9 +847,9 @@ describe('learning goals, stored as aims', () => {
   it('refuses a field with no placement, and a placement with no basis', async () => {
     const [row] = await admin<{ id: string }[]>`
       insert into aims (user_id, name) values (${userB}, 'Half placed') returning id`;
-    await expect(
-      admin`update aims set field_id = ${physics} where id = ${row.id}`,
-    ).rejects.toThrow(/aims_placement_complete_ck/);
+    await expect(admin`update aims set field_id = ${physics} where id = ${row.id}`).rejects.toThrow(
+      /aims_placement_complete_ck/,
+    );
     await expect(
       admin`update aims set placed_at = now(), placement_confidence = 'clear' where id = ${row.id}`,
     ).rejects.toThrow(/aims_placement_complete_ck/);
@@ -710,9 +860,7 @@ describe('learning goals, stored as aims', () => {
     await expect(
       admin`insert into aims (user_id, name, depth) values (${userA}, 'Too deep', 'expert')`,
     ).rejects.toThrow();
-    await expect(
-      admin`update aims set domain_id = ${domain} where id = ${aimA}`,
-    ).rejects.toThrow();
+    await expect(admin`update aims set domain_id = ${domain} where id = ${aimA}`).rejects.toThrow();
     await expect(
       admin`insert into aims (user_id, name, list_source, field_id)
             values (${userA}, 'Level 3', 'level3', ${physics})`,
@@ -822,7 +970,9 @@ describe('the cards behind Learn now', () => {
   });
 
   it('refuses a card shown before it has a summary', async () => {
-    await expect(admin`update feed_cards set status = 'ready' where id = ${cardA}`).rejects.toThrow();
+    await expect(
+      admin`update feed_cards set status = 'ready' where id = ${cardA}`,
+    ).rejects.toThrow();
   });
 
   it('keeps the card and its theme name when the theme goes', async () => {
@@ -905,7 +1055,9 @@ describe('the curriculum at the top of a track', () => {
     await expect(
       asUser(
         userB,
-        (tx) => tx`insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
+        (
+          tx,
+        ) => tx`insert into curriculum_units (user_id, subject_id, ordinal, title, covers, outcome)
                    values (${userB}, ${subjectA}, 2, 'Smuggled', 'Covers.', 'Outcome.')`,
       ),
     ).rejects.toThrow();
@@ -982,7 +1134,9 @@ describe("the pieces a goal's unit is split into", () => {
   });
 
   it('does not let a signed-in user delete a piece', async () => {
-    await expect(asUser(userA, (tx) => tx`delete from plan_pieces where id = ${pieceA}`)).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`delete from plan_pieces where id = ${pieceA}`),
+    ).rejects.toThrow();
   });
 
   // learn 0074_piece_checks.sql (plan #1141). The owner asks and answers a
@@ -996,7 +1150,9 @@ describe("the pieces a goal's unit is split into", () => {
     );
     await asUser(
       userA,
-      (tx) => tx`update piece_checks set response = 'It is a share of what remains.', correct = true,
+      (
+        tx,
+      ) => tx`update piece_checks set response = 'It is a share of what remains.', correct = true,
                    marked_why = 'Right.', answered_at = now() where piece_id = ${pieceA}`,
     );
     const own = await asUser(userA, (tx) => tx`select correct from piece_checks`);
@@ -1030,7 +1186,9 @@ describe("the pieces a goal's unit is split into", () => {
   it("lets the owner write a piece's practice task and hand it in, and shows nobody else", async () => {
     const [task] = await asUser(
       userA,
-      (tx) => tx<{ id: string }[]>`insert into piece_practice (user_id, piece_id, task, figures, points, worked)
+      (tx) => tx<
+        { id: string }[]
+      >`insert into piece_practice (user_id, piece_id, task, figures, points, worked)
                  values (${userA}, ${pieceA}, 'Work out NRR from the table.', '[{"label": "NRR", "unit": "%"}]'::jsonb,
                          array['NRR is 112%.'], 'NRR = 1,120 / 1,000 = 112%.')
                  returning id`,
@@ -1038,7 +1196,9 @@ describe("the pieces a goal's unit is split into", () => {
     practiceA = task.id;
     await asUser(
       userA,
-      (tx) => tx`insert into piece_practice_handins (user_id, practice_id, answer, figures, marks, passed)
+      (
+        tx,
+      ) => tx`insert into piece_practice_handins (user_id, practice_id, answer, figures, marks, passed)
                  values (${userA}, ${practiceA}, 'Divided.', '[{"label": "NRR", "value": "112%"}]'::jsonb,
                          '[{"point": "NRR is 112%.", "met": true, "note": "Right."}]'::jsonb, true)`,
     );
@@ -1048,7 +1208,7 @@ describe("the pieces a goal's unit is split into", () => {
     expect(await asUser(userB, (tx) => tx`select id from piece_practice_handins`)).toHaveLength(0);
   });
 
-  it('refuses a second task for a piece, a task or hand-in on another user\'s, an empty hand-in and an edit', async () => {
+  it("refuses a second task for a piece, a task or hand-in on another user's, an empty hand-in and an edit", async () => {
     await expect(
       asUser(
         userA,
@@ -1078,7 +1238,11 @@ describe("the pieces a goal's unit is split into", () => {
       ),
     ).rejects.toThrow();
     await expect(
-      asUser(userA, (tx) => tx`update piece_practice_handins set passed = true where practice_id = ${practiceA}`),
+      asUser(
+        userA,
+        (tx) =>
+          tx`update piece_practice_handins set passed = true where practice_id = ${practiceA}`,
+      ),
     ).rejects.toThrow();
   });
 
@@ -1091,7 +1255,9 @@ describe("the pieces a goal's unit is split into", () => {
   it("lets the owner write a plan's final project and hand it in, and shows nobody else", async () => {
     const [project] = await asUser(
       userA,
-      (tx) => tx<{ id: string }[]>`insert into plan_projects (user_id, subject_id, title, task, figures, points, worked)
+      (tx) => tx<
+        { id: string }[]
+      >`insert into plan_projects (user_id, subject_id, title, task, figures, points, worked)
                  values (${userA}, ${subjectA}, 'Retention and payback', 'Work out NRR and CAC payback.',
                          '[{"label": "NRR", "unit": "%"}]'::jsonb, array['NRR is 115%.'], 'NRR = 115%.')
                  returning id`,
@@ -1099,7 +1265,9 @@ describe("the pieces a goal's unit is split into", () => {
     projectA = project.id;
     await asUser(
       userA,
-      (tx) => tx`insert into plan_project_handins (user_id, project_id, answer, figures, marks, passed)
+      (
+        tx,
+      ) => tx`insert into plan_project_handins (user_id, project_id, answer, figures, marks, passed)
                  values (${userA}, ${projectA}, 'Divided.', '[{"label": "NRR", "value": "115%"}]'::jsonb,
                          '[{"point": "NRR is 115%.", "met": true, "note": "Right."}]'::jsonb, true)`,
     );
@@ -1139,7 +1307,10 @@ describe("the pieces a goal's unit is split into", () => {
       ),
     ).rejects.toThrow();
     await expect(
-      asUser(userA, (tx) => tx`update plan_project_handins set passed = false where project_id = ${projectA}`),
+      asUser(
+        userA,
+        (tx) => tx`update plan_project_handins set passed = false where project_id = ${projectA}`,
+      ),
     ).rejects.toThrow();
   });
 
@@ -1217,8 +1388,12 @@ describe("changing a goal's plan (plan #1144)", () => {
   });
 
   it("refuses to move or remove another user's unit", async () => {
-    await expect(asUser(userB, (tx) => tx`select move_curriculum_unit(${units[0]}, 3)`)).rejects.toThrow();
-    await expect(asUser(userB, (tx) => tx`select remove_curriculum_unit(${units[0]})`)).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`select move_curriculum_unit(${units[0]}, 3)`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`select remove_curriculum_unit(${units[0]})`),
+    ).rejects.toThrow();
     await expect(
       asUser(userB, (tx) => tx`select add_curriculum_unit(${subjectA}, 'Smuggled', '', '', null)`),
     ).rejects.toThrow();
@@ -1229,9 +1404,9 @@ describe("changing a goal's plan (plan #1144)", () => {
     await admin`
       insert into plan_pieces (user_id, subject_id, unit_id, ordinal, title, passed_at)
       values (${userA}, ${subjectA}, ${units[0]}, 1, 'Reading a balance sheet', now())`;
-    await expect(asUser(userA, (tx) => tx`select remove_curriculum_unit(${units[0]})`)).rejects.toThrow(
-      /passed piece/,
-    );
+    await expect(
+      asUser(userA, (tx) => tx`select remove_curriculum_unit(${units[0]})`),
+    ).rejects.toThrow(/passed piece/);
     expect(await order(subjectA)).toHaveLength(3);
   });
 
@@ -1255,7 +1430,10 @@ describe("changing a goal's plan (plan #1144)", () => {
   it('adds a unit by name at the end of its track', async () => {
     const [row] = await asUser(
       userA,
-      (tx) => tx<{ id: string }[]>`select add_curriculum_unit(${subjectA}, '  Forecasting ', 'c', 'o', null) as id`,
+      (tx) =>
+        tx<
+          { id: string }[]
+        >`select add_curriculum_unit(${subjectA}, '  Forecasting ', 'c', 'o', null) as id`,
     );
     const [unit] = await admin<{ title: string; ordinal: number; user_id: string }[]>`
       select title, ordinal, user_id from curriculum_units where id = ${row.id}`;
@@ -1292,7 +1470,7 @@ describe('review questions on passed ideas (plan #1145)', () => {
                 values (${conceptA}, ${userA}, 'known', 'tested', now())`;
   });
 
-  it("lets the owner schedule an idea and ask and answer a question on it, and shows nobody else", async () => {
+  it('lets the owner schedule an idea and ask and answer a question on it, and shows nobody else', async () => {
     await asUser(
       userA,
       (tx) => tx`update concept_state set review_interval_days = 1, review_due_on = current_date
@@ -1308,9 +1486,14 @@ describe('review questions on passed ideas (plan #1145)', () => {
       (tx) => tx`update review_questions set response = 'The base shrinks.', correct = true,
                    marked_why = 'Right.', answered_at = now() where concept_id = ${conceptA}`,
     );
-    expect(await asUser(userA, (tx) => tx`select correct from review_questions`)).toEqual([{ correct: true }]);
+    expect(await asUser(userA, (tx) => tx`select correct from review_questions`)).toEqual([
+      { correct: true },
+    ]);
     expect(await asUser(userB, (tx) => tx`select id from review_questions`)).toHaveLength(0);
-    await asUser(userB, (tx) => tx`update concept_state set review_interval_days = 35 where concept_id = ${conceptA}`);
+    await asUser(
+      userB,
+      (tx) => tx`update concept_state set review_interval_days = 35 where concept_id = ${conceptA}`,
+    );
     const [state] = await admin<{ review_interval_days: number }[]>`
       select review_interval_days from concept_state where concept_id = ${conceptA}`;
     expect(state.review_interval_days).toBe(1);
@@ -1334,7 +1517,8 @@ describe('review questions on passed ideas (plan #1145)', () => {
     await expect(
       asUser(
         userA,
-        (tx) => tx`update concept_state set review_interval_days = 3, review_due_on = null where concept_id = ${conceptA}`,
+        (tx) =>
+          tx`update concept_state set review_interval_days = 3, review_due_on = null where concept_id = ${conceptA}`,
       ),
     ).rejects.toThrow();
   });
@@ -1375,10 +1559,7 @@ describe('cross-user reads', () => {
     await admin`update readings set note = 'This changed my mind about prices.'
                 where id = ${readingA}`;
 
-    const rows = await asUser(
-      userB,
-      (tx) => tx`select note from readings where note is not null`,
-    );
+    const rows = await asUser(userB, (tx) => tx`select note from readings where note is not null`);
     expect(rows).toHaveLength(0);
   });
 
@@ -1460,7 +1641,7 @@ describe('cross-user writes', () => {
     ).rejects.toThrow();
   });
 
-  it('refuses an import filed against another account\'s track', async () => {
+  it("refuses an import filed against another account's track", async () => {
     await expect(
       admin`insert into imports (user_id, track_id, raw_text)
             values (${userA}, ${trackB}, 'not mine')`,
@@ -1519,7 +1700,7 @@ describe('a reading you wrote down yourself', () => {
 });
 
 describe('deleting', () => {
-  it('takes a track\'s readings and its import with it', async () => {
+  it("takes a track's readings and its import with it", async () => {
     // The reason there is nothing to clean up in deleteTrack: the foreign keys
     // do it. If they ever stopped, this fails rather than leaving orphans
     // nobody can see or reach.
@@ -1564,7 +1745,10 @@ describe('deleting', () => {
 
   it('lets the owner delete their own reading', async () => {
     const id = await seedReading(userA, trackA, sourceA, 'fetched');
-    const gone = await asUser(userA, (tx) => tx`delete from readings where id = ${id} returning id`);
+    const gone = await asUser(
+      userA,
+      (tx) => tx`delete from readings where id = ${id} returning id`,
+    );
     expect(gone).toHaveLength(1);
   });
 });
@@ -1894,7 +2078,9 @@ describe('notes on cards and ideas', () => {
 
   it('keeps the note on its idea when the card goes', async () => {
     await admin`delete from feed_cards where id = ${cardA}`;
-    const [row] = await admin<{ card_id: string | null; concept_id: string | null; body: string }[]>`
+    const [row] = await admin<
+      { card_id: string | null; concept_id: string | null; body: string }[]
+    >`
       select card_id, concept_id, body from card_notes where id = ${noteA}`;
     expect(row).toEqual({ card_id: null, concept_id: conceptA, body: 'Like 1930s America?' });
   });
@@ -1991,7 +2177,10 @@ describe('teach-backs and Learn settings', () => {
               'Written by hand for this test.')
       returning id`;
     conceptA = concept.id;
-    await asUser(userA, (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 20)`);
+    await asUser(
+      userA,
+      (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 20)`,
+    );
   });
 
   it('takes a teach-back card with an idea and no section', async () => {
@@ -2025,7 +2214,10 @@ describe('teach-backs and Learn settings', () => {
 
   it("does not let a user write another account's settings", async () => {
     await expect(
-      asUser(userB, (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 5)`),
+      asUser(
+        userB,
+        (tx) => tx`insert into settings (user_id, teach_back_every) values (${userA}, 5)`,
+      ),
     ).rejects.toThrow();
     await asUser(userB, (tx) => tx`update settings set teach_back_every = 0`);
     const [row] = await admin<{ teach_back_every: number }[]>`
@@ -2058,7 +2250,10 @@ describe('your list of videos', () => {
 
   it("does not let a user add to or mark another account's list", async () => {
     await expect(
-      asUser(userB, (tx) => tx`insert into watch_list (user_id, video_id) values (${userA}, 'aaaaaaaaaaa')`),
+      asUser(
+        userB,
+        (tx) => tx`insert into watch_list (user_id, video_id) values (${userA}, 'aaaaaaaaaaa')`,
+      ),
     ).rejects.toThrow();
     await asUser(userB, (tx) => tx`update watch_list set watched_at = now()`);
     const [row] = await admin<{ watched_at: Date | null }[]>`
@@ -2067,7 +2262,9 @@ describe('your list of videos', () => {
   });
 
   it('holds one row per video, and refuses a verdict or stretch that cannot be', async () => {
-    await expect(admin`insert into watch_list (user_id, video_id) values (${userA}, ${video})`).rejects.toThrow();
+    await expect(
+      admin`insert into watch_list (user_id, video_id) values (${userA}, ${video})`,
+    ).rejects.toThrow();
     await expect(
       admin`update watch_list set verdict = 'maybe' where user_id = ${userA}`,
     ).rejects.toThrow();
@@ -2106,13 +2303,18 @@ describe('the channels found for a subject', () => {
     subjectA = a.id;
     await asUser(
       userA,
-      (tx) => tx`insert into subject_channels (user_id, subject_id, youtube_channel_id, title, handle, found_why)
+      (
+        tx,
+      ) => tx`insert into subject_channels (user_id, subject_id, youtube_channel_id, title, handle, found_why)
                  values (${userA}, ${subjectA}, ${channel}, '3Blue1Brown', '@3blue1brown', 'Recommended for intuition.')`,
     );
   });
 
   it('shows the owner their channels and another user none', async () => {
-    const own = await asUser(userA, (tx) => tx`select title, verdict, samples from subject_channels`);
+    const own = await asUser(
+      userA,
+      (tx) => tx`select title, verdict, samples from subject_channels`,
+    );
     const other = await asUser(userB, (tx) => tx`select id from subject_channels`);
     expect(own).toEqual([{ title: '3Blue1Brown', verdict: null, samples: [] }]);
     expect(other).toHaveLength(0);
@@ -2126,7 +2328,10 @@ describe('the channels found for a subject', () => {
                    values (${userB}, ${subjectA}, ${channel}, 'Stolen')`,
       ),
     ).rejects.toThrow();
-    await asUser(userB, (tx) => tx`update subject_channels set decided = 'passed', decided_at = now()`);
+    await asUser(
+      userB,
+      (tx) => tx`update subject_channels set decided = 'passed', decided_at = now()`,
+    );
     const [row] = await admin<{ decided: string | null }[]>`
       select decided from subject_channels where subject_id = ${subjectA}`;
     expect(row.decided).toBeNull();
@@ -2322,14 +2527,18 @@ describe('clips cut from video transcripts', () => {
     await expect(
       asUser(
         userB,
-        (tx) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
+        (
+          tx,
+        ) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
                    values (${userA}, ${VIDEO}, 'channel', 300, 340, 'Not yours')`,
       ),
     ).rejects.toThrow();
     await expect(
       asUser(
         userB,
-        (tx) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds,
+        (
+          tx,
+        ) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds,
                                             caption, subject_id)
                    values (${userB}, ${VIDEO}, 'channel', 300, 340, 'Their track', ${subjectA})`,
       ),
@@ -2423,9 +2632,13 @@ describe('places on Idea Space (plan #1997.2)', () => {
 
   it('shows the owner their places and nobody else', async () => {
     expect(await asUser(userA, (tx) => tx`select id from idea_places`)).toHaveLength(1);
-    expect(await asUser(userA, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(
+      1,
+    );
     expect(await asUser(userB, (tx) => tx`select id from idea_places`)).toHaveLength(0);
-    expect(await asUser(userB, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(
+      0,
+    );
   });
 
   it('leaves the writing to the daily run', async () => {
@@ -2445,7 +2658,9 @@ describe('places on Idea Space (plan #1997.2)', () => {
       ),
     ).rejects.toThrow();
     await admin`delete from concepts where id = ${conceptA}`;
-    expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(0);
+    expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(
+      0,
+    );
   });
 });
 
@@ -2503,7 +2718,9 @@ describe('vault notes as dust on Idea Space (plan #1997.6)', () => {
     const [first] = await admin<{ next: string | null }[]>`
       select learn.refresh_vault_dust(${userA}::uuid, null, 200) as next`;
     expect(first!.next).toBeNull();
-    const rows = await admin<{ concept_id: string }[]>`select concept_id from vault_dust where note_id = ${noteA}`;
+    const rows = await admin<
+      { concept_id: string }[]
+    >`select concept_id from vault_dust where note_id = ${noteA}`;
     expect(rows).toEqual([{ concept_id: nearIdea }]);
   });
 
@@ -2544,9 +2761,12 @@ describe('evidence for ideas (plan #2006.1)', () => {
     expect(await asUser(userA, (tx) => tx`select id from evidence_links`)).toHaveLength(1);
     expect(await asUser(userB, (tx) => tx`select id from evidence_links`)).toHaveLength(0);
     await expect(
-      asUser(userA, (tx) => tx`
+      asUser(
+        userA,
+        (tx) => tx`
         insert into evidence_links (user_id, target_kind, target_id, source_kind, source_id, similarity, weight, basis)
-        values (${userA}, 'idea', ${ideaId}, 'course', 'c1', 0.7, 0.5, 'from a course')`),
+        values (${userA}, 'idea', ${ideaId}, 'course', 'c1', 0.7, 0.5, 'from a course')`,
+      ),
     ).rejects.toThrow();
   });
 
@@ -2594,8 +2814,14 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       on conflict (user_id) do update set repo_name = obsidian.vault_connections.repo_name
       returning id`;
     const notes: [string, string][] = [
-      ['Career/Halvorsen.md', '## Highlights\n\n- Took the lead on the revenue testing tool at work.'],
-      ['Career/Job Applications/Acme.md', '> [!NOTE] What they want\n> Someone who tests revenue in full.'],
+      [
+        'Career/Halvorsen.md',
+        '## Highlights\n\n- Took the lead on the revenue testing tool at work.',
+      ],
+      [
+        'Career/Job Applications/Acme.md',
+        '> [!NOTE] What they want\n> Someone who tests revenue in full.',
+      ],
     ];
     for (const [path, body] of notes) {
       const [note] = await admin<{ id: string }[]>`
@@ -2629,13 +2855,30 @@ describe('ideas linked to work history (plan #2006.5)', () => {
       select learn.sync_work_passages(${userA}::uuid, ${resumeId}::uuid, 'Résumé',
                                       ${sql.json(passages)}) as n`;
     expect(synced!.n).toBe(3);
-    const rows = await admin<{ origin: string; weight: number; first_line: string; embedded: boolean }[]>`
+    const rows = await admin<
+      { origin: string; weight: number; first_line: string; embedded: boolean }[]
+    >`
       select origin, weight, first_line, embedding is not null as embedded
       from work_passages where user_id = ${userA} order by origin`;
     expect(rows).toEqual([
-      { origin: 'application', weight: 0.4, first_line: 'Someone who tests revenue in full.', embedded: true },
-      { origin: 'career', weight: 1, first_line: 'Took the lead on the revenue testing tool at work.', embedded: true },
-      { origin: 'resume', weight: 1, first_line: 'Built an automated revenue testing system', embedded: false },
+      {
+        origin: 'application',
+        weight: 0.4,
+        first_line: 'Someone who tests revenue in full.',
+        embedded: true,
+      },
+      {
+        origin: 'career',
+        weight: 1,
+        first_line: 'Took the lead on the revenue testing tool at work.',
+        embedded: true,
+      },
+      {
+        origin: 'resume',
+        weight: 1,
+        first_line: 'Built an automated revenue testing system',
+        embedded: false,
+      },
     ]);
   });
 
@@ -2644,15 +2887,23 @@ describe('ideas linked to work history (plan #2006.5)', () => {
     await admin`
       update work_passages set embedding = ${sql.unsafe(NEAR)}, embedding_model = 'voyage-4-lite'
       where user_id = ${userA} and origin = 'resume'`;
-    const [linked] = await admin<{ n: number }[]>`select learn.refresh_work_evidence(${userA}::uuid) as n`;
+    const [linked] = await admin<
+      { n: number }[]
+    >`select learn.refresh_work_evidence(${userA}::uuid) as n`;
     expect(linked!.n).toBe(3);
     const links = await admin<{ weight: number; basis: string }[]>`
       select weight, basis from evidence_links
       where target_id = ${ideaId} and source_kind = 'work' order by weight desc, basis`;
     expect(links).toEqual([
-      { weight: 1, basis: 'From your note Halvorsen: "Took the lead on the revenue testing tool at work."' },
+      {
+        weight: 1,
+        basis: 'From your note Halvorsen: "Took the lead on the revenue testing tool at work."',
+      },
       { weight: 1, basis: 'From your résumé: "Built an automated revenue testing system"' },
-      { weight: 0.4, basis: 'From your application notes in Acme: "Someone who tests revenue in full."' },
+      {
+        weight: 0.4,
+        basis: 'From your application notes in Acme: "Someone who tests revenue in full."',
+      },
     ]);
   });
 
@@ -2667,7 +2918,9 @@ describe('ideas linked to work history (plan #2006.5)', () => {
   it('removes a passage that has gone, and its link with it', async () => {
     await admin`select learn.sync_work_passages(${userA}::uuid, null, null, '[]'::jsonb)`;
     await admin`select learn.refresh_work_evidence(${userA}::uuid)`;
-    expect(await admin`select 1 from work_passages where user_id = ${userA} and origin = 'resume'`).toHaveLength(0);
+    expect(
+      await admin`select 1 from work_passages where user_id = ${userA} and origin = 'resume'`,
+    ).toHaveLength(0);
     expect(
       await admin`select 1 from evidence_links where target_id = ${ideaId} and source_kind = 'work'`,
     ).toHaveLength(2);
@@ -2742,7 +2995,11 @@ describe('vault notes as evidence for ideas (plan #2006.3)', () => {
 
   it('is not open to the person', async () => {
     await expect(
-      asUser(userA, (tx) => tx`select * from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`),
+      asUser(
+        userA,
+        (tx) =>
+          tx`select * from learn.vault_note_matches(${userA}::uuid, array[${ideaId}]::uuid[], 0.6, 5)`,
+      ),
     ).rejects.toThrow();
   });
 });

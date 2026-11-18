@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { SearchHit, SearchSource } from '@/lib/search/sources';
 import { citationsOf, type AskContext, type AskDb, type AskSchema, type SchemaClient } from './db';
 import { OPENABLE } from './lookups';
-import { ASK_TOOLS, ASK_TOOL_NAMES, executeAskTool } from './tools';
+import { ASK_TOOLS, ASK_TOOL_NAMES, LOOKUP_TIME_MS, executeAskTool, isTransientDbError } from './tools';
 
 /**
  * Dash's read tools (plan #1088) against a stubbed client: an in-memory
@@ -314,6 +314,68 @@ describe('attach_saved (plan #3050.4)', () => {
   it('finds nothing of another account, and refuses a ref that names neither table', async () => {
     expect((await executeAskTool('attach_saved', { table: 'core.files', ref: OTHER }, context(tables))).ok).toBe(false);
     expect((await executeAskTool('attach_saved', { table: 'goals.items', ref: PAGE }, context(tables))).ok).toBe(false);
+  });
+});
+
+describe('a lookup that fails or hangs (dash-quality backlog item 2)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  /** A db whose first `failures` schema reads throw `error`, then answers from `tables`. */
+  function failingDb(error: unknown, failures: number): { db: AskDb; reads: () => number } {
+    let reads = 0;
+    const good = fakeDb({});
+    return {
+      db: async (schema) => {
+        reads++;
+        if (reads <= failures) throw error;
+        return good(schema);
+      },
+      reads: () => reads,
+    };
+  }
+
+  it('retries once after a dropped connection and answers', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, reads } = failingDb(new TypeError('fetch failed'), 1);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(result.ok).toBe(true);
+    expect(reads()).toBeGreaterThan(1);
+  });
+
+  it('says it failed twice, and what to try, when the retry fails too', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db } = failingDb(new Error('todo.tasks: 503 Service Unavailable'), 99);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/failed to read the database twice.*another way/) });
+  });
+
+  it('does not retry an error the same read would hit again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { db, reads } = failingDb(new Error('todo.tasks: canceling statement due to statement timeout'), 99);
+    const result = await executeAskTool('todos', {}, context({}, { db }));
+    expect(reads()).toBe(1);
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/failed to read the database\. Do not call it again/) });
+  });
+
+  it('stops a lookup that hangs and tells the model to narrow it', async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const hang: AskDb = () => new Promise(() => {});
+    const pending = executeAskTool('todos', {}, context({}, { db: hang }));
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIME_MS + 1);
+    expect(await pending).toEqual({ ok: false, error: expect.stringMatching(/timed out after 20 seconds.*narrow it/) });
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('ask tool todos failed: timed out'));
+  });
+
+  it('tells transient errors from lasting ones', () => {
+    expect(isTransientDbError(new TypeError('fetch failed'))).toBe(true);
+    expect(isTransientDbError({ status: 502, message: 'Bad Gateway' })).toBe(true);
+    expect(isTransientDbError(new Error('jobs: terminating connection due to administrator command'))).toBe(true);
+    expect(isTransientDbError(new Error('jobs: canceling statement due to statement timeout'))).toBe(false);
+    expect(isTransientDbError(new Error('column "foo" does not exist'))).toBe(false);
   });
 });
 
@@ -689,6 +751,28 @@ describe('job_applications', () => {
       title: 'Analyst at Acme',
       href: '/jobs/roles/r1',
     });
+  });
+
+  it('lists live processes and unsent leads before the sent and the closed, newest first within each', async () => {
+    const many: Tables = {
+      ...tables,
+      'job_search.applications': [
+        ...Array.from({ length: 60 }, (_, i) =>
+          app(`g${i}`, ME, 'r1', 'acknowledged', `2026-10-${String((i % 28) + 1).padStart(2, '0')}`),
+        ),
+        app('old-live', ME, 'r2', 'in_process', '2026-06-01'),
+        app('lead', ME, 'r3', 'lead', '2026-07-01', { submitted_at: null }),
+        app('newer-live', ME, 'r2', 'in_process', '2026-07-15'),
+        app('closed', ME, 'r3', 'rejected', '2026-11-01'),
+      ],
+    };
+    const result = await executeAskTool('job_applications', {}, context(many));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows.slice(0, 3).map((r) => r.ref)).toEqual(['newer-live', 'old-live', 'lead']);
+    expect(result.rows).toHaveLength(50);
+    expect(result.rows.map((r) => r.ref)).not.toContain('closed');
+    expect(result.totals).toMatchObject({ count: 64, by_status: { acknowledged: 60, in_process: 2, lead: 1, rejected: 1 } });
   });
 
   it('counts as sent an application added by hand with no sent day, and not a lead', async () => {
@@ -1485,6 +1569,15 @@ describe('query_rows (plan #2109.4)', () => {
       context({ ...tables, 'job_search.applications': many }),
     );
     expect(result.ok && result.matchedSet).toEqual({ table: 'job_search.applications', refs: [], matched: 120 });
+  });
+
+  it('leaves out a guessed column next to real ones, names it, and still lists the rows', async () => {
+    const result = await run({ where: [{ column: 'status', op: 'equals', value: 'to_apply' }], columns: ['cover_letter', 'notes'] });
+    const rows = expectLinkedRows(result);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => Object.keys(r.detail ?? {}))).toEqual([['cover_letter'], ['cover_letter']]);
+    expect(result.ok && result.note).toContain('Left out notes');
+    expect(result.ok && result.note).toContain('Its columns:');
   });
 
   it('refuses a column the table does not have, wherever it is named', async () => {

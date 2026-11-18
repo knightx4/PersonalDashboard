@@ -473,11 +473,20 @@ async function listed(
   const refColumn = source.ref ?? 'id';
 
   let asked: string[];
+  // Columns asked for that the table does not have. Connected apps guess
+  // names (posting_url, content, notes) next to real ones; a guess only
+  // changes what is shown, so it is left out and named, and the rows still
+  // come back. Only when every name is a guess is the call refused.
+  let unknown: string[] = [];
   if (input.columns === undefined || input.columns === null) {
     asked = [...source.search, ...(source.facts ?? [])].filter((c) => columns.has(c));
   } else {
     if (!Array.isArray(input.columns)) throw new AskInputError('columns must be a list of column names.');
-    asked = input.columns.map((c) => columnOf(columns, table, c, 'Each of columns').column);
+    const names = input.columns.map((c) => (typeof c === 'string' ? c.trim() : c));
+    unknown = names.filter((c): c is string => typeof c === 'string' && c !== '' && !columns.has(c));
+    const known = names.filter((c) => !(typeof c === 'string' && c !== '' && !columns.has(c)));
+    if (known.length === 0 && unknown.length > 0) columnOf(columns, table, unknown[0], 'Each of columns');
+    asked = known.map((c) => columnOf(columns, table, c, 'Each of columns').column);
   }
 
   const orderIn = input.order && typeof input.order === 'object' ? (input.order as Record<string, unknown>) : null;
@@ -509,6 +518,9 @@ async function listed(
   const order = `${orderColumn} ${ascending ? 'ascending' : 'descending'}`;
   const notes = [
     `Read ${what} in ${table}, by ${order}: ${matchedNote(matched, rows.length)}.`,
+    unknown.length > 0
+      ? `Left out ${unknown.join(', ')}: ${table} has no column of ${unknown.length === 1 ? 'that name' : 'those names'}. Its columns: ${[...columns.keys()].join(', ')}.`
+      : null,
     source.note ? `About this table: ${source.note}` : null,
   ].filter(Boolean);
   const listedRefs = found.map((row) => String(row[refColumn] ?? row.id ?? ''));

@@ -21,6 +21,7 @@ import type { SaveNotePorts } from '@/lib/vault/notes/save';
 import type { RoutineTarget } from '@/lib/feedback/routine';
 import type { TakeOnOrigin } from '@/lib/goals/take-on';
 import type { SlipWhere } from './slips';
+import type { DashAppRoutePort } from './app-route-writes';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -156,6 +157,20 @@ export type DashWriteContext = AskContext & {
    * Absent: a slip names no conversation.
    */
   slipWhere?: SlipWhere;
+  /**
+   * The bots on People behind this write, by you.board_advisors id: the one
+   * replying and, on a hand-off, the one that passed the request on. A plan
+   * step one of them adds goes under the project that bot is tied to (plan
+   * #3095). Absent outside People.
+   */
+  bots?: readonly string[];
+  /**
+   * What run_app_route needs (lib/dash/app-route-writes.ts, plan #3070.3):
+   * whether this is the owner, who is asking, the chat its finish is said in,
+   * the runner and the poll's store. Absent where no route can be run, such
+   * as the connector, and then the tool says so.
+   */
+  appRoute?: () => Promise<DashAppRoutePort>;
 };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */

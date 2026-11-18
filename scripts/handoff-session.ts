@@ -10,6 +10,11 @@
  *   npx tsx scripts/handoff-session.ts close <hand-off id> --failed "<the reason, in a sentence>"
  *   npx tsx scripts/handoff-session.ts cost              # what this session has cost so far
  *   npx tsx scripts/handoff-session.ts browser <hand-off id> --route chrome|headless|none --reason "<why>"
+ *   npx tsx scripts/handoff-session.ts runners           # is the browser runner up on the PC or Mac
+ *
+ * `runners` prints each computer's last heartbeat and the sentence a cloud
+ * session puts in its reply when it could not reach Chrome (plan #3075,
+ * lib/talk/browser-runners.ts).
  *
  * `browser` records which browser a browser task used, or that it could use
  * none (plan #3040.2, lib/talk/handoff-browser.ts). A browser task's done
@@ -57,6 +62,7 @@ import {
 } from '../lib/talk/handoff-session';
 import { BROWSER_SQL, browserChoice, browserCloseRefusal } from '../lib/talk/handoff-browser';
 import type { HandoffBrowser } from '../lib/talk/handoffs';
+import { runnerStatuses, runnerStatusSentence } from '../lib/talk/browser-runners';
 
 type Sql = { unsafe: (query: string, parameters?: readonly unknown[]) => Promise<Record<string, unknown>[]> };
 
@@ -189,11 +195,34 @@ async function browser(sql: Sql, owner: string, id: string, args: string[]) {
   console.log(JSON.stringify(rows[0], null, 2));
 }
 
+/** Prints the browser runner's status in the sentence the thread is told (plan #3075). */
+async function runners(sql: Sql, owner: string) {
+  const rows = await sql.unsafe('select machine, last_seen_at from core.browser_runners where user_id = $1', [owner]);
+  const now = Date.now();
+  const statuses = runnerStatuses(
+    rows.map((row) => ({
+      machine: String(row.machine),
+      last_seen_at: row.last_seen_at == null ? null : new Date(row.last_seen_at as string).toISOString(),
+    })),
+    now,
+  );
+  console.log(JSON.stringify({ statuses, sentence: runnerStatusSentence(statuses, now) }, null, 2));
+}
+
 async function main() {
   const [command, id, ...rest] = process.argv.slice(2);
   if (command === 'cost') {
     const spend = transcriptSpend(sessionTranscripts());
     console.log(JSON.stringify({ spend, total_micros: totalSessionMicros(spend) }, null, 2));
+    return;
+  }
+  if (command === 'runners') {
+    const { sql, end } = connect();
+    try {
+      await runners(sql, await ownerId(sql));
+    } finally {
+      await end();
+    }
     return;
   }
   if ((command !== 'seen' && command !== 'close' && command !== 'browser') || !id || !UUID.test(id)) {

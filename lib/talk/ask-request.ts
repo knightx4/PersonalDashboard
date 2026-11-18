@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { appRoutePortInRequest } from '@/lib/dash/app-route-port';
 import { createClient, requireUser } from '@/lib/auth/server';
 import {
   confirmChange,
@@ -64,6 +65,7 @@ import { botPasser } from './hand-to-bot-store';
 import { askDash, type AskDashResult, type AskLookupEvent, type AskStores } from '@/lib/dash/ask';
 import { keepFailure, lastFailureSwitches } from '@/lib/dash/failures';
 import { keepSlip } from '@/lib/dash/slips';
+import { keepLookupCap } from '@/lib/dash/lookup-caps';
 import { codeDeps } from '@/lib/dash/think-code';
 import { devAccess } from '@/lib/ask/dev';
 import { dashModelFor } from '@/lib/dash/model-choice';
@@ -238,6 +240,7 @@ export async function askDashInRequest(input: {
             createTask,
             quickNotePorts: () => sessionInboxPorts(user.id),
             goalRoutine: goalRoutineInRequest,
+            appRoute: appRoutePortInRequest(user.id, { conversationId }),
             origin: { kind: 'ask_dash', ref: conversationId },
             slipWhere: { surface: 'ask', conversation: `ask:${conversationId}`, href: `/chat/dash/${conversationId}` },
           },
@@ -271,6 +274,7 @@ export async function askDashInRequest(input: {
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       recordFailure: (failure) => keepFailure(core, user.id, failure),
       recordSlip: (slip) => keepSlip(core, user.id, slip),
+      recordLookupCap: (cap) => keepLookupCap(core, user.id, cap),
       ...(sessions?.toSession ? { toSession: sessions.toSession } : {}),
       ...(passToBot ? { passToBot } : {}),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
@@ -393,6 +397,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          appRoute: appRoutePortInRequest(userId, null),
           // A question handed to a goal from a thread is answered on the page it was asked on.
           origin: { kind: 'goal_page', ref: null },
           thread: acts,
@@ -427,8 +432,12 @@ export async function peopleDashInRequest(userId: string): Promise<PeopleDash & 
           createTask,
           quickNotePorts: () => sessionInboxPorts(userId),
           goalRoutine: goalRoutineInRequest,
+          // A route run from People says its finish in that thread, as the bot (plan #3070.3).
+          appRoute: appRoutePortInRequest(userId, cause ? { advisorChatId: cause.chatId, advisorId: cause.advisorId } : null),
           // A question handed to a goal from a People thread is answered from Chat.
           origin: { kind: 'chat', ref: null },
+          // The bot replying and any that passed the request on, for add_plan_step's project (plan #3095).
+          bots: cause ? [cause.advisorId, ...(cause.fromBot ? [cause.fromBot] : [])] : [],
           slipWhere: {
             surface: 'people',
             conversation: cause ? `people:${cause.chatId}` : null,

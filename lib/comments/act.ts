@@ -49,7 +49,8 @@ import { countChangedLines, diffFits, MAX_CHANGED_LINES, rebaseDiff } from '@/li
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { sessionStamp } from '@/lib/plan/origin';
-import type { PlanScope } from '@/lib/plan/projects';
+import { loadDevProjects, storedScopeOf, type PlanScope } from '@/lib/plan/projects';
+import { fileStep, flagComment } from '@/lib/plan/step-project';
 import { SPLIT_ACTION, splitPieces, stallRunIds } from '@/lib/plan/stall';
 import { numberFromRef, refFor, type OutlineIndex } from '@/lib/plan/ref';
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
@@ -308,7 +309,7 @@ function scopeOf(action: DashAction): ModuleId | null {
 }
 
 /** What a workspace is called on the page, or what null means. */
-function labelOf(scope: ModuleId | null): string {
+function labelOf(scope: PlanScope | null): string {
   return scope ? (MODULES.find((m) => m.id === scope)?.label ?? scope) : 'the app as a whole';
 }
 
@@ -379,9 +380,11 @@ async function fileNote(input: ActInput): Promise<ActOutcome> {
 type PlannedRow = {
   title: string;
   detail: string | null;
-  scope: ModuleId | null;
+  scope: PlanScope | null;
   parentId: string | null;
   position: number;
+  /** A line for the step's history when it names a repository that is not a project (plan #3095). */
+  flag: string | null;
 };
 
 async function plannedRow(input: ActInput): Promise<{ ok: true; row: PlannedRow } | { ok: false; why: string }> {
@@ -401,7 +404,8 @@ async function plannedRow(input: ActInput): Promise<{ ok: true; row: PlannedRow 
   }
 
   const parentId = input.target === 'step' ? input.id : null;
-  let scope = scopeOf(input.action);
+  let scope: PlanScope | null = scopeOf(input.action);
+  let flag: string | null = null;
   if (parentId) {
     const { data } = await input.supabase
       .from('plan_items')
@@ -409,14 +413,20 @@ async function plannedRow(input: ActInput): Promise<{ ok: true; row: PlannedRow 
       .eq('id', parentId)
       .maybeSingle();
     if (!data) return { ok: false, why: 'That step is not there any more, so nothing was added.' };
-    const parent = (data as { module: string | null }).module;
-    scope = parent && isModuleId(parent) ? parent : null;
+    // A project's step keeps its children in the project (plan #3095).
+    scope = storedScopeOf((data as { module: string | null }).module);
   } else if (!scope && input.target === 'raise') {
     scope = await raiseModule(input);
   }
+  if (!parentId && !scope) {
+    // Named no workspace: a repository it names may file it under a project.
+    const filing = fileStep({ title, detail, projects: await loadDevProjects(input.supabase as never, input.userId) });
+    scope = filing.scope;
+    flag = filing.flag;
+  }
 
   const position = await nextPlanPosition(input.supabase, input.userId, scope, parentId);
-  return { ok: true, row: { title, detail, scope, parentId, position } };
+  return { ok: true, row: { title, detail, scope, parentId, position, flag } };
 }
 
 /** The workspace a raise is filed under, when it is one this app has. */
@@ -462,6 +472,7 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
     detail: row.detail,
     status: 'proposed',
     kind: 'build',
+    comment: flagComment(row.flag),
     position: row.position,
   });
   if ('error' in written) return { ok: false, why: `I could not add that step: ${written.error}` };
@@ -836,6 +847,7 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
     detail: row.detail,
     status: 'not_started',
     kind: 'build',
+    comment: flagComment(row.flag),
     position: row.position,
   });
   if ('error' in inserted) return { ok: false, why: `I could not add that step: ${inserted.error}` };

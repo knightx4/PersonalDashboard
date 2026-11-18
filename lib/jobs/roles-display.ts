@@ -5,6 +5,9 @@ import { ROLE_KINDS, ROLE_KIND_LABELS } from '@/lib/jobs/role-kind';
 import { noteRank } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
+/** The person's own score of how much a role involves AI work (roles.ai_score). */
+export const AI_SCORE_LABEL = 'AI score';
+
 /**
  * What the roles table offers: the six sorts it already had, three groupings
  * it did not, and the columns a row can lose.
@@ -24,6 +27,7 @@ export type RolesSortKey =
   | 'excitement'
   | 'fit'
   | 'chance'
+  | 'ai'
   | 'ready'
   | 'questions';
 
@@ -37,6 +41,7 @@ export const ROLE_PROPERTIES = [
   { id: 'excitement', label: 'Excitement' },
   { id: 'fit', label: FIT_SCORE_LABEL },
   { id: 'chance', label: CHANCE_LABEL },
+  { id: 'ai', label: AI_SCORE_LABEL },
   { id: 'ready', label: 'Ready' },
   { id: 'questions', label: 'Questions' },
   { id: 'comp', label: 'Comp' },
@@ -83,6 +88,12 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         id: 'chance',
         label: CHANCE_LABEL,
         compare: (a, b) => noteRank(b.scoreNote, 'chance') - noteRank(a.scoreNote, 'chance'),
+      },
+      // The person's own AI score, highest first; a role without one sorts last.
+      {
+        id: 'ai',
+        label: AI_SCORE_LABEL,
+        compare: (a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1),
       },
       // The two marks set on the role page, the ones marked first.
       {

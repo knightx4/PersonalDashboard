@@ -31,6 +31,7 @@ function render(run: Partial<OvernightRun> | null) {
       notesLastRun={null}
       vision={null}
       autoApprove={false}
+      routeRuns={[]}
       now={0}
     />,
   );

@@ -461,26 +461,26 @@ Checked by: test `tests/workspace-rooms.test.ts`.
 Checked by: test `tests/workspace-rooms.test.ts`.
 
 **R3.** A page for one row draws its path from `refPath`.
-Checked by: count `row-pages-without-path`, baseline 33, target 0.
+Checked by: count `row-pages-without-path`, baseline 0, target 0.
 
 **R4.** There is one back-link component.
-Checked by: count `hand-rolled-back-links`, baseline 32, target 0.
+Checked by: count `hand-rolled-back-links`, baseline 0, target 0.
 
 **R5.** Back from a row lands on the list at the same scroll offset.
 Checked by: test `tests/flows/search-open-back.test.ts`.
 
 **R6.** A date or time becomes words only in `lib/core/when.ts`.
-Checked by: count `date-formatting-files`, baseline 122, target 0.
+Checked by: count `date-formatting-files`, baseline 1, target 0.
 
 **R7.** A row is closed with one of Done, Dropped, Later or Declined, and
 every workspace status maps onto one.
 Checked by: test `tests/lifecycle-words.test.ts`.
 
 **R8.** No section links to a page whose only job is a form.
-Checked by: count `form-only-pages`, baseline 9, target 0.
+Checked by: count `form-only-pages`, baseline 0, target 0.
 
 **R9.** The shell is mounted in one place.
-Checked by: count `shell-mounts`, baseline 15, target 1.
+Checked by: count `shell-mounts`, baseline 1, target 1.
 
 **R10.** Every route group has `error.tsx`, `not-found.tsx` and
 `loading.tsx`.
@@ -491,16 +491,16 @@ Checked by: test `tests/proxy-launch.test.ts`.
 
 **R12.** A control that calls a model names Dash, and "AI" appears on no
 control.
-Checked by: count `ai-on-controls`, baseline 1, target 0.
+Checked by: count `ai-on-controls`, baseline 0, target 0.
 
 **R13.** There is one thread component.
 Checked by: count `thread-components`, baseline 1, target 1.
 
 **R14.** A radius class is one of the four tokens (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`), `rounded-full` or `rounded-none`.
-Checked by: count `off-token-radius`, baseline 199, target 0.
+Checked by: count `off-token-radius`, baseline 0, target 0.
 
 **R15.** Lucide icons are drawn at one stroke weight.
-Checked by: count `icon-stroke-off`, baseline 31, target 0.
+Checked by: count `icon-stroke-off`, baseline 0, target 0.
 
 **R16.** The phone top bar holds at most four controls.
 Checked by: audit.

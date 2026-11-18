@@ -1,8 +1,10 @@
 import { OvernightControl } from '@/app/dev/plan/overnight-control';
+import { AppRouteRuns } from './app-route-runs';
 import { VisionReviewLine } from '@/app/dev/raised/vision-review-line';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { SettingsPage } from '@/components/patterns/settings-page';
 import { DashMark } from '@/components/ui/dash-mark';
+import type { AppRouteRunRow } from '@/lib/dev/app-route-runs';
 import type { GoalsStatus } from '@/lib/goals/runner-status';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import { overnightStanding, type OvernightRun } from '@/lib/plan/overnight';
@@ -25,6 +27,8 @@ export type DevSettingsProps = {
   vision: VisionReviewStatus | null;
   /** Whether auto approve is on, for its switch on the Plan row. */
   autoApprove: boolean;
+  /** The latest runs of the app's own routes, newest first (plan #3070.4). */
+  routeRuns: readonly AppRouteRunRow[];
   now: number;
 };
 
@@ -49,6 +53,7 @@ export function DevSettingsView({
   notesLastRun,
   vision,
   autoApprove,
+  routeRuns,
   now,
 }: DevSettingsProps) {
   return (
@@ -105,6 +110,11 @@ export function DevSettingsView({
               )}
             </div>
           ),
+        },
+        {
+          id: 'route-runs',
+          title: 'App route runs',
+          content: <AppRouteRuns runs={routeRuns} />,
         },
       ]}
     />

@@ -88,15 +88,18 @@ export const WORKSPACE_TABS: Readonly<Record<TabWorkspace, readonly WorkspaceTab
   // /goals. Idea Space and Essays became tabs at the person's ask in October
   // 2026 (docs/CUT-BACK-SPEC.md, R1).
   learn: [
-    { href: '/learn/now', label: 'Now', icon: 'readNow', exact: true },
+    // Now is the reader, Learn's front page (learn 0195): what there is to
+    // read, already prepared. The card feed and lessons it replaced are kept
+    // at /learn/now.
+    { href: '/learn/read', label: 'Now', icon: 'readNow', alsoMatches: ['/learn/read/'] },
     { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true },
-    {
-      href: '/learn/know',
-      label: 'Subjects',
-      icon: 'know',
-      exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
-    },
+    // Courses: long lecture series cut down to what you need (learn 0194).
+    { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },
+    // Idea Space left the nav when Courses came in (learn 0194) and came back
+    // at the person's ask the same day. The count of Learn's tabs is held
+    // where it is, so Subjects gave up its place: the generated subjects are
+    // what the reader replaced (docs/LEARN-READER-SPEC.md). Its pages are kept
+    // at /learn/know.
     { href: '/learn/space', label: 'Idea Space', icon: 'ideaSpace', exact: true },
     {
       href: '/learn/essays',

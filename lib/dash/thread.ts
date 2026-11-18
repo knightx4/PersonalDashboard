@@ -3,7 +3,7 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
 import type { DashChange, MadeDashChange, NewDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation, TalkToolCall } from '@/lib/talk/talk';
-import { MAX_LOOKUPS, runDash, type DashCall, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
+import { ANSWER_AT, runDash, type DashCall, type DashExecutor, type DashQueuer, type DashSeen, type DashVoice, type DashWriter } from './loop';
 import { UNFINISHED_REASON, type DashFailure } from './failures';
 import type { PaidQueued } from './paid';
 import {
@@ -48,7 +48,7 @@ answer. When the comment needs something it does not hold (a todo, an order,
 a note, an application, an email, what they said elsewhere), use the lookup
 tools: they reach everything in the app that Ask Dash reaches. Never answer
 from memory or a guess about what they probably have. You have at most
-${MAX_LOOKUPS} lookups, so choose them well: for a question about many rows
+${ANSWER_AT} lookups, so choose them well: for a question about many rows
 and what is linked to each, one query_rows call with linked conditions comes
 before looking each row up in turn.
 

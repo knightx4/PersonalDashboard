@@ -68,15 +68,9 @@ const BEFORE: Record<
 };
 
 const LEARN_SHARED: NavSection[] = [
-  { href: '/learn/now', label: 'Now', icon: 'readNow', exact: true },
+  { href: '/learn/read', label: 'Now', icon: 'readNow', alsoMatches: ['/learn/read/'] },
   { href: '/learn/inbox', label: 'Inbox', icon: 'inbox', exact: true, badge: 7 },
-  {
-    href: '/learn/know',
-    label: 'Subjects',
-    icon: 'know',
-    exact: true,
-    alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/topics'],
-  },
+  { href: '/learn/courses', label: 'Courses', icon: 'courses', alsoMatches: ['/learn/courses/'] },
   { href: '/learn/space', label: 'Idea Space', icon: 'ideaSpace', exact: true },
   {
     href: '/learn/essays',

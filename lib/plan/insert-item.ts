@@ -23,6 +23,8 @@ export async function insertPlanItem(
     priority?: number;
     size?: string | null;
     assignee?: string | null;
+    /** The step's history, such as a flag from fileStep (lib/plan/step-project). */
+    comment?: string | null;
     position: number;
   },
 ): Promise<{ id: string; number: number } | { error: string }> {
@@ -41,6 +43,7 @@ export async function insertPlanItem(
       ...(row.priority !== undefined ? { priority: row.priority } : {}),
       ...(row.size !== undefined ? { size: row.size } : {}),
       ...(row.assignee !== undefined ? { assignee: row.assignee } : {}),
+      ...(row.comment ? { comment: row.comment } : {}),
       position: row.position,
     })
     .select('id, number')

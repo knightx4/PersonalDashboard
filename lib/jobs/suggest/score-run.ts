@@ -59,14 +59,14 @@ async function readAllApplications(supabase: AppSupabaseClient, userId: string):
 }
 
 /**
- * What Jev is told about the person: evidence titles, target titles, the
- * roles on file, and how each application went (for the chance question,
+ * What Jev is told about the person: evidence titles, target titles, career
+ * goals, excluded industries, the roles on file, and how each application went (for the chance question,
  * plan #1202). An application reached an interview when an interview row is
  * on file for it or its rejection stage comes after the screen; see
  * `reachedInterview` in history.ts.
  */
 export async function loadScoringContext(supabase: AppSupabaseClient, userId: string): Promise<ScoringContext> {
-  const [evidence, profile, applications] = await Promise.all([
+  const [evidence, profile, thoughts, applications] = await Promise.all([
     supabase
       .from('evidence_items')
       .select('title, strength')
@@ -75,9 +75,15 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .limit(40),
     supabase
       .from('profiles')
-      .select('target_titles, home_location, workplace_preferences, salary_floor_cents, company_stages')
+      .select('target_titles, excluded_industries, home_location, workplace_preferences, salary_floor_cents, company_stages')
       .eq('id', userId)
       .maybeSingle(),
+    supabase
+      .from('thoughts')
+      .select('body')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20),
     readAllApplications(supabase, userId),
   ]);
 
@@ -112,6 +118,8 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
     roles,
     history,
     preferences: readPreferences(profile.data as Row | null),
+    careerGoals: ((thoughts.data ?? []) as Row[]).map((row) => row.body as string).filter(Boolean),
+    excludedIndustries: ((profile.data as Row | null)?.excluded_industries as string[] | undefined) ?? [],
   };
 }
 

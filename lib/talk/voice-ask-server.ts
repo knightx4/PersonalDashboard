@@ -11,6 +11,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import { askDash } from '@/lib/dash/ask';
+import { keepLookupCap } from '@/lib/dash/lookup-caps';
 import type { DashWriteContext } from '@/lib/dash/registry';
 import { publicEnv } from '@/lib/env';
 import { GOALS_SCHEMA, historyHeaders, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
@@ -119,6 +120,7 @@ export function voiceAskDeps(): VoiceAskDeps {
             append: (subject, turns) => appendTurns(core, userId, subject, turns),
             recordSpend: (reports) =>
               recordSpendReports(core, userId, { module: 'core', operation: 'ask-dash' }, reports),
+            recordLookupCap: (cap) => keepLookupCap(core, userId, cap),
             saveChange: (conversationId, made) => insertMadeChange(core, userId, conversationId, made),
             // No propose is passed, so the loop refuses every proposal before one is kept.
             saveProposal: () => Promise.reject(new Error('Dash proposes nothing when asked by voice.')),

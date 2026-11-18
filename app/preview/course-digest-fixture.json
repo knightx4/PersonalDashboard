@@ -1,0 +1,2320 @@
+{
+ "digest": {
+  "madeFor": "Cut for a CPA and MBA who already knows OLS, Markowitz and accounting, so the review lectures are cards or skims. They want the practitioner view: how a sell-side quant desk measures risk and prices by replication. The practitioner stories and live worked examples get clips, mechanisms get worked numbers, and the math they already hold is cut to a sentence.",
+  "intro": "This is one lesson plan cut from all 24 lectures of MIT 18.S096 *Topics in Mathematics with Applications in Finance* (Fall 2013) and four guest lectures from the 2024 run of the course, 18.642. That is 28 videos and about 37 hours, and every transcript was read in full.\n\nWork through a stage from its first step to its last. Each step is one sitting: some commentary, a clip that plays in the page, usually a drawing, and a question to try before you move on. After the first stage the plan branches, and you choose which branch to follow.\n\n- Lecture codes: **L01 to L26** are the 2013 lectures (the playlist has no L04 or L22). **P09, P18, P20 and P23** are the 2024 lectures 9, 18, 20 and 23.\n- Every timestamp in the text opens the lecture at that moment.\n- Numbers come from the lectures. Numbers marked *illustrative* were added to make a mechanism concrete. Where the plan uses a figure a lecturer got wrong, the step says so, and the list of errors after the plan collects them all.",
+  "plan": {
+   "intro": "Start with the shared ground: the matrices, probability and regression that every later lesson uses. Then pick one of three paths: measuring risk and building portfolios, time series and volatility, or stochastic calculus and pricing, which leads on to credit or commodities.",
+   "budgetMinutes": 240,
+   "stages": [
+    {
+     "key": "A",
+     "title": "Matrices, probability and regression",
+     "short": "Shared ground",
+     "about": "The tools every later lesson uses: what a symmetric matrix does to data, why returns are modelled and prices are not, how a small edge becomes a reliable profit, and how the risk of a book comes out of a covariance matrix.",
+     "after": [],
+     "steps": [
+      {
+       "key": "A.1",
+       "title": "What a matrix does to data: eigenvectors and the SVD",
+       "gain": "Read a matrix as stretches along directions, and say why the reduced SVD of 5 stocks over 365 dates loses nothing.",
+       "minutes": 9,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": "A table of returns, one row per stock and one column per date, is a matrix. Choongbum Lee opens by reading a matrix two ways: as stored data, and as an operator that moves vectors [[L02 1:33]]. An eigenvector is a direction the operator only stretches, and the eigenvalue is the stretch [[L02 5:30]].\n\nThe case that matters for finance is the symmetric matrix, because every covariance matrix is one. A symmetric matrix always has real eigenvalues and eigenvectors at right angles to each other [[L02 16:27]]. Lee's line is \"wherever you see a symmetric matrix you have control\". The Value at Risk lessons use this to simulate correlated markets, and the lessons on factors and PCA use it for principal components.\n\nThe clip covers the tool for data that is not square, such as 5 stocks over 365 dates."
+        },
+        {
+         "type": "clip",
+         "code": "L02",
+         "start": 1502,
+         "end": 1905,
+         "minutes": 7,
+         "listenFor": "The eigenvalue decomposition uses one set of axes and only stretches, while the SVD uses two sets and sends each input direction to a stretched output direction."
+        },
+        {
+         "type": "text",
+         "title": "The lecture's worked example",
+         "body": "Lee works one by hand [[L02 46:37]]. Take the matrix A with rows (3, 2, 2) and (2, 3, −2). The eigenvalues of A-transpose times A are 25, 9 and 0, so the singular values are 5 and 3.\n\n- The input direction v1 = (1, 1, 0)/√2 comes out as 5 times (1, 1)/√2.\n- The input direction v2 = (1, −1, 4)/√18 comes out as 3 times (1, −1)/√2.\n- The third direction, with eigenvalue 0, is sent to zero and can be dropped.\n\nDropping the directions that do nothing is the reduced SVD. For 5 stocks over 365 dates it stores a 5 × 5, a 5 × 5 and a 5 × 365 matrix, where the full version would need a 365 × 365 one [[L02 54:38]]."
+        },
+        {
+         "type": "figure",
+         "caption": "The SVD in three moves, using the singular values 5 and 3 from the lecture's example.",
+         "svg": "<svg viewBox=\"0 0 360 98\" role=\"img\" aria-label=\"The singular value decomposition as three moves: rotate the input, stretch by the singular values 5 and 3, rotate the output\"><text x=\"180\" y=\"20\" font-size=\"12\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">A = U x Sigma x V transpose, read right to left</text><rect x=\"8\" y=\"34\" width=\"105.3\" height=\"52\" rx=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"60.7\" y=\"56\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">V transpose</text><text x=\"60.7\" y=\"73\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">rotates input</text><line x1=\"114.3\" y1=\"60\" x2=\"119.3\" y2=\"60\" class=\"muted\" stroke=\"currentColor\" stroke-width=\"1.5\"/><polygon points=\"126.3,60 119.3,63.5 119.3,56.5\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"127.3\" y=\"34\" width=\"105.3\" height=\"52\" rx=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"180\" y=\"56\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">Sigma stretches</text><text x=\"180\" y=\"73\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">by 5 and by 3</text><line x1=\"233.7\" y1=\"60\" x2=\"238.7\" y2=\"60\" class=\"muted\" stroke=\"currentColor\" stroke-width=\"1.5\"/><polygon points=\"245.7,60 238.7,63.5 238.7,56.5\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"246.7\" y=\"34\" width=\"105.3\" height=\"52\" rx=\"5\" class=\"accent\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"299.3\" y=\"56\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">U rotates</text><text x=\"299.3\" y=\"73\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">the output</text></svg>"
+        },
+        {
+         "type": "text",
+         "title": "Perron-Frobenius, for later",
+         "body": "A matrix whose entries are all positive has one largest eigenvalue, and its eigenvector has all positive entries [[L02 1:02:30]]. The course uses this twice: for the long-run state of a Markov chain in the step on random walks, and for Ross's recovery theorem in the pricing lessons.\n\nLee cannot say on camera what the eigenvectors of a stock-price matrix mean in finance. The answer arrives in the lessons on factors and PCA: they are the level, slope and curvature of the yield curve. The rest of L02 is review and can be skipped."
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 2: Linear Algebra (lecture notes)",
+         "author": "Choongbum Lee",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": "https://ocw.mit.edu/courses/18-s096-topics-in-mathematics-with-applications-in-finance-fall-2013/bf77e900565f6487e3f46ba38dcc6dd6_MIT18_S096F13_lecnote2.pdf",
+         "body": "Lee's own six pages for this lecture. Sections 2 and 3 state the symmetric-matrix result and the SVD theorem, and section 3 carries the hand example above in full. Read those two sections if you want the proofs the clip skips.",
+         "excerpt": [
+          "Note that the matrix A applied to its eigenvector acts as if it is a scalar multiplication. Thus eigenvectors are 'the important' directions of a matrix, when considered as an operator.",
+          "Singular value decomposition is a generalization of the eigenvalue decomposition that acheives this goal. It is a tool which allows one to understand a matrix through a diagonal matrix."
+         ],
+         "licence": "CC BY-NC-SA 4.0, MIT OpenCourseWare"
+        },
+        {
+         "type": "check",
+         "question": "For the matrix A with rows (3, 2, 2) and (2, 3, −2), work out A times v1 = (1, 1, 0)/√2 and A times (2, −2, −1)/3. What do the two results say about how many directions this matrix really uses?",
+         "answer": "A times (1, 1, 0) is (5, 5), so A times v1 is (5, 5)/√2, which is 5 times the unit vector (1, 1)/√2: a singular value of 5. A times (2, −2, −1) is (6 − 4 − 2, 4 − 6 + 2) = (0, 0), so that direction is wiped out. A takes three-dimensional inputs but only two directions survive, stretched by 5 and by 3. That is why the reduced SVD can drop the third direction and lose nothing."
+        }
+       ]
+      },
+      {
+       "key": "A.2",
+       "title": "Why returns are modelled and prices are not: the lognormal",
+       "gain": "Explain why returns are modelled as normal and prices are not, and work out a lognormal's median and mean from μ and σ.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": "Every model in the course needs a random variable for a price move. The obvious choice, a normally distributed change in dollars, fails for two reasons that Lee gives in the clip: a $10 stock and a $50 stock would move by the same dollar amounts, and over a long horizon the price would go negative. The fix is to make the percentage change normal, which makes the price lognormal."
+        },
+        {
+         "type": "clip",
+         "code": "L03",
+         "start": 665,
+         "end": 929,
+         "minutes": 4,
+         "listenFor": "Why a normal dollar change fails, and why a normal percentage change gives a lognormal price."
+        },
+        {
+         "type": "text",
+         "title": "The parameter trap",
+         "body": "The parameters μ and σ of a lognormal are the mean and standard deviation of the log of the price. They are not the mean and standard deviation of the price itself [[L03 22:26]]. The mean of the price is e^(μ + σ²/2), so it sits above the median e^μ.\n\n*Illustrative:* with a log mean of 0 and σ = 20%, the median outcome is 1.00 and the mean is e^0.02 = 1.0202. A few very large outcomes pull the average up. The same ½σ² returns in the stochastic calculus lessons as the extra term in Itô's lemma.\n\nThree smaller points from the lectures:\n\n- Volatility is quoted per year. Daily σ is multiplied by √252, weekly by √52 [[L09 23:35]].\n- On daily data, percent changes and log changes are nearly the same number [[L07 31:19]].\n- The lognormal has no moment generating function, so two distributions can share every moment and still differ [[L03 36:51]] · [[L03 41:49]]. The tidy toolkit of that lecture fails for the course's main price model."
+        },
+        {
+         "type": "figure",
+         "caption": "A lognormal with a log standard deviation of 0.5 (illustrative, chosen large so the skew shows): half the outcomes fall below 1.00, yet the average is 1.13.",
+         "svg": "<svg viewBox=\"0 0 360 188\" role=\"img\" aria-label=\"Lognormal density with a log standard deviation of 0.5: the median is 1.00 and the mean is 1.13, pulled right by the long upper tail\"><line x1=\"30\" y1=\"150\" x2=\"340\" y2=\"150\" class=\"muted\" stroke=\"currentColor\" stroke-width=\"1\"/><polyline points=\"30,150 32.6,150 35.2,150 37.8,150 40.3,150 42.9,149.9 45.5,149.5 48.1,148.7 50.7,147.3 53.2,145 55.8,141.8 58.4,137.6 61,132.4 63.6,126.4 66.2,119.8 68.8,112.7 71.3,105.4 73.9,97.9 76.5,90.6 79.1,83.5 81.7,76.7 84.2,70.5 86.8,64.8 89.4,59.7 92,55.3 94.6,51.5 97.2,48.4 99.8,45.9 102.3,43.9 104.9,42.6 107.5,41.8 110.1,41.5 112.7,41.7 115.2,42.2 117.8,43.2 120.4,44.4 123,46 125.6,47.7 128.2,49.7 130.8,51.9 133.3,54.3 135.9,56.7 138.5,59.2 141.1,61.9 143.7,64.5 146.2,67.2 148.8,69.9 151.4,72.6 154,75.3 156.6,78 159.2,80.7 161.8,83.3 164.3,85.8 166.9,88.3 169.5,90.8 172.1,93.1 174.7,95.5 177.2,97.7 179.8,99.9 182.4,102 185,104.1 187.6,106 190.2,107.9 192.8,109.8 195.3,111.5 197.9,113.2 200.5,114.9 203.1,116.4 205.7,117.9 208.2,119.4 210.8,120.8 213.4,122.1 216,123.3 218.6,124.6 221.2,125.7 223.8,126.8 226.3,127.9 228.9,128.9 231.5,129.9 234.1,130.8 236.7,131.7 239.2,132.5 241.8,133.3 244.4,134.1 247,134.8 249.6,135.5 252.2,136.2 254.8,136.8 257.3,137.4 259.9,138 262.5,138.6 265.1,139.1 267.7,139.6 270.2,140.1 272.8,140.5 275.4,141 278,141.4 280.6,141.8 283.2,142.2 285.8,142.5 288.3,142.9 290.9,143.2 293.5,143.5 296.1,143.8 298.7,144.1 301.2,144.3 303.8,144.6 306.4,144.8 309,145.1 311.6,145.3 314.2,145.5 316.8,145.7 319.3,145.9 321.9,146.1 324.5,146.3 327.1,146.4 329.7,146.6 332.2,146.7 334.8,146.9 337.4,147 340,147.1\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"round\"/><line x1=\"133.3\" y1=\"150\" x2=\"133.3\" y2=\"40\" class=\"muted\" stroke=\"currentColor\" stroke-width=\"1\" stroke-dasharray=\"4 3\"/><line x1=\"147.1\" y1=\"150\" x2=\"147.1\" y2=\"62\" class=\"accent\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"4 3\"/><text x=\"128.3\" y=\"36\" font-size=\"12\" text-anchor=\"end\" class=\"muted\" fill=\"currentColor\">median 1.00</text><text x=\"152.1\" y=\"58\" font-size=\"12\" class=\"accent\" fill=\"currentColor\">mean 1.13</text><text x=\"30\" y=\"166\" font-size=\"11\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">0</text><text x=\"133.3\" y=\"166\" font-size=\"11\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">1</text><text x=\"236.7\" y=\"166\" font-size=\"11\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">2</text><text x=\"340\" y=\"166\" font-size=\"11\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">3</text><text x=\"340\" y=\"182\" font-size=\"11\" text-anchor=\"end\" class=\"muted\" fill=\"currentColor\">price after one period, start = 1</text></svg>"
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 3: Probability Theory (lecture notes)",
+         "author": "Choongbum Lee",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": "https://ocw.mit.edu/courses/18-s096-topics-in-mathematics-with-applications-in-finance-fall-2013/94dc1d08ef12065198102ae23b2e4a8f_MIT18_S096F13_lecnote3.pdf",
+         "body": "The notes behind L03. Section 1.1 defines the normal and lognormal and derives the lognormal density by a change of variable, which is the board work that follows the clip. The later sections on moment generating functions and the two limit theorems back the next step.",
+         "excerpt": [
+          "To model the stock market, it is more reasonable to assert that the rate of change of the stock price has normal distribution (compared to the stock price itself having normal distribution). Log-normal distribution can be used to model such situation, where a log-normal distribution is a probability distribution whose (natural) logarithm has normal distribution. In other words, if the cumulative distribution function of normal distribution is F (x), then that for log-normal distribution is F (ln x)."
+         ],
+         "licence": "CC BY-NC-SA 4.0, MIT OpenCourseWare"
+        },
+        {
+         "type": "check",
+         "question": "A stock is at $100. Its log return over the next year is normal with mean 0 and σ = 40% (*illustrative*). What are the median and the mean of the year-end price, what is the chance it ends below $100, and what is the one-standard-deviation range?",
+         "answer": "The median is $100 × e^0 = $100, so the chance of ending below $100 is 50%. The mean is $100 × e^(0.16/2) = $100 × e^0.08 = $108.33. The one-standard-deviation range is $100 × e^(−0.4) = $67.03 to $100 × e^0.4 = $149.18: the upside is $49 and the downside $33. That lopsided range is why the mean is above the median while half the outcomes still lose money."
+        }
+       ]
+      },
+      {
+       "key": "A.3",
+       "title": "A small edge and many trials: the two limit theorems",
+       "gain": "Work out how many bets turn a 2% edge into a near-certain profit, and say why the normal shows up in risk numbers.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": "The law of large numbers is the business model of a casino, a market maker and a high-frequency trader: a small edge per trial becomes a near-certain profit once there are enough trials. Lee makes the point with blackjack and poker."
+        },
+        {
+         "type": "clip",
+         "code": "L03",
+         "start": 3074,
+         "end": 3401,
+         "minutes": 5,
+         "listenFor": "Why the casino's 52% against the player's 48% is a sure profit for the casino and a gamble for the player."
+        },
+        {
+         "type": "text",
+         "title": "The mechanism, with the lecture's 48%",
+         "body": "The variance of an average of n independent trials is σ²/n [[L03 57:32]]. For a total, the mean grows like n and the standard deviation like √n. Take the lecture's 48% player on even-money $1 bets, so the casino wins $0.04 a bet on average with a standard deviation of about $1 a bet. The sums below are worked from that:\n\n- After 100 bets the casino expects $4 with a standard deviation of $10. It is behind about 34% of the time.\n- After 10,000 bets it expects $400 with a standard deviation of $100. Being behind is a 4σ event, about 0.003%.\n- After 1,000,000 bets it expects $40,000 with a standard deviation of $1,000.\n\nThe central limit theorem adds the shape: whatever the single bet looks like, the total scaled by √n is normal [[L03 1:03:01]]. This is the reason the normal distribution appears in Value at Risk. Lee says normal tails are \"very small\" [[L03 1:16:04]], and the step on fat tails shows where real returns break that.\n\nKen Abbott's version of the same idea, from the risk desk: \"if you win 51% of the time, life is pretty good\" [[L07 5:27]]. Lee also admits the other side. With a small edge and few trials the variance hides the mean, and his own poker swings left his \"faith in mathematics challenged\" [[L03 56:41]]."
+        },
+        {
+         "type": "check",
+         "question": "A strategy wins 51% of even-money $1 bets (*illustrative*). What are the expected profit and the standard deviation after 100 bets and after 10,000 bets, and roughly how often is it behind at each point?",
+         "answer": "The edge is 0.51 − 0.49 = $0.02 a bet and the standard deviation is about $1 a bet. After 100 bets: expected +$2, standard deviation $10, so being behind is a −0.2σ event and happens about 42% of the time. After 10,000 bets: expected +$200, standard deviation $100, so being behind is a −2σ event, about 2.3%. The edge is the same in both cases. Only the number of trials changed."
+        }
+       ]
+      },
+      {
+       "key": "A.4",
+       "title": "Random walks: the √t band, gambler's ruin and long-run states",
+       "gain": "Find the chance of reaching a profit target before a stop-loss, and show that neither changes the expected result.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": "A simple random walk adds +1 or −1 with equal chance at each step. After t steps it could be as far as t from the start, but it is typically about √t away: around 100 after 10,000 steps [[L05 15:16]]. Brownian motion in the stochastic calculus lessons is this walk with the steps made small, and the unit-root series in the time series lessons is the same walk in statistical dress.\n\nThe clip asks a question with a clean answer: betting $1 a toss, what is the chance of reaching a target before going broke?"
+        },
+        {
+         "type": "clip",
+         "code": "L05",
+         "start": 1402,
+         "end": 1671,
+         "minutes": 4,
+         "listenFor": "Stopping at +100 or −100 wins half the time, stopping at +100 or −50 wins a third of the time, and the general rule is A/(A+B)."
+        },
+        {
+         "type": "figure",
+         "caption": "Fair $1 bets stopped at a $100 win or a $50 loss: the nearer barrier is hit twice as often, and the expected result is zero.",
+         "svg": "<svg viewBox=\"0 0 360 134\" role=\"img\" aria-label=\"A number line from a loss of 50 to a win of 100 with the start at zero: two thirds of paths end at the loss and one third at the win\"><line x1=\"40\" y1=\"70\" x2=\"320\" y2=\"70\" stroke=\"currentColor\" stroke-width=\"2\"/><line x1=\"40\" y1=\"62\" x2=\"40\" y2=\"78\" stroke=\"currentColor\" stroke-width=\"2\"/><text x=\"40\" y=\"96\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">lose $50</text><line x1=\"133.3\" y1=\"62\" x2=\"133.3\" y2=\"78\" stroke=\"currentColor\" stroke-width=\"2\"/><text x=\"133.3\" y=\"96\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">start</text><line x1=\"320\" y1=\"62\" x2=\"320\" y2=\"78\" stroke=\"currentColor\" stroke-width=\"2\"/><text x=\"320\" y=\"96\" font-size=\"12\" text-anchor=\"middle\" fill=\"currentColor\">win $100</text><circle cx=\"133.3\" cy=\"70\" r=\"5\" class=\"accent\" fill=\"currentColor\" stroke=\"none\"/><line x1=\"125.3\" y1=\"50\" x2=\"53\" y2=\"50\" class=\"muted\" stroke=\"currentColor\" stroke-width=\"1.5\"/><polygon points=\"46,50 53,46.5 53,53.5\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><line x1=\"141.3\" y1=\"50\" x2=\"307\" y2=\"50\" class=\"accent\" stroke=\"currentColor\" stroke-width=\"1.5\"/><polygon points=\"314,50 307,53.5 307,46.5\" class=\"accent\" fill=\"currentColor\" stroke=\"none\"/><text x=\"86.7\" y=\"40\" font-size=\"13\" text-anchor=\"middle\" class=\"muted\" font-weight=\"600\" fill=\"currentColor\">2/3</text><text x=\"226.7\" y=\"40\" font-size=\"13\" text-anchor=\"middle\" class=\"accent\" font-weight=\"600\" fill=\"currentColor\">1/3</text><text x=\"180\" y=\"122\" font-size=\"12\" text-anchor=\"middle\" class=\"muted\" fill=\"currentColor\">Expected result: 1/3 x 100 - 2/3 x 50 = 0</text></svg>"
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": "The chance of reaching +B before −A is A/(A+B). With a win at +100 and a stop at −50 it is 50/150 = 1/3. The expected result is ⅓ × 100 − ⅔ × 50 = 0. A stop-loss and a profit target change the shape of the outcome and leave its average alone. The step on martingales turns this into a theorem."
+        },
+        {
+         "type": "text",
+         "title": "Markov chains and the long run",
+         "body": "A Markov chain is a process whose next state depends only on the current one. Lee's example is a machine that breaks with probability 0.01 a day and is repaired with probability 0.8 a day [[L05 44:48]]. In the long run it is working 0.8/0.81 = 98.8% of the time. That long-run split is the eigenvector of the transition matrix with eigenvalue 1, and the Perron-Frobenius result from the first step says it is unique [[L05 49:36]]. Lee loses the thread of the argument at [[L05 56:57]] and Peter Kempthorne patches it. The result stands."
+        },
+        {
+         "type": "check",
+         "question": "You make fair $1 bets and stop at +$30 or −$90 (*illustrative*). What is the chance you stop a winner, and what is the expected profit? Separately, a machine breaks with probability 0.02 a day and is repaired with probability 0.5 a day (*illustrative*): what share of days is it working in the long run?",
+         "answer": "The chance of reaching +30 before −90 is 90/(90 + 30) = 75%. Expected profit = 0.75 × 30 − 0.25 × 90 = 22.5 − 22.5 = 0: frequent small wins, rare large losses, no edge. For the machine, the flow out of working (0.02 × share working) must equal the flow back (0.5 × share broken), so the working share is 0.5/0.52 = 96.2%."
+        }
+       ]
+      },
+      {
+       "key": "A.5",
+       "title": "Regression in practice, and the risk of a book: x'Σx",
+       "gain": "Spot a regression that fits too well, and compute a book's risk from its positions, signs and correlations.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": "You already know ordinary least squares, so regression gets no clip here. What is worth taking from Kempthorne's two regression lectures is how a working statistician uses it, because the same habits return in every later stage.\n\nHis protocol has five steps [[L06 7:46]]:\n\n1. Propose a model, including the scale of the variable. Use log prices, since moves are proportional.\n2. Choose what \"best fit\" means.\n3. Fit.\n4. Check the assumptions against the residuals.\n5. Change the model and repeat.\n\nThe philosophy is to tailor the model to the process instead of forcing the data into a straight line [[L06 12:22]]. He adds that \"probably all statistical modeling is essentially subjective\" [[L06 24:45]].\n\nThe linear algebra from the first step gives the geometry in two sentences. Least squares projects the observed returns onto the space spanned by the explanatory variables, and the residual is at right angles to every one of them [[L06 39:28]] · [[L06 42:34]]. The fit breaks down when one explanatory variable is nearly a combination of the others [[L06 36:23]], which is the same instability that the step on regularization treats."
+        },
+        {
+         "type": "text",
+         "title": "Three warnings he gives",
+         "body": "- A handful of observations can drive a coefficient in a very large data set, and the outliers are often the interesting part [[L06 27:06]].\n- With as many parameters as observations the fit is perfect and the estimated error variance is zero. A perfect fit of that kind is a warning [[L08 6:10]].\n- AIC admits an extra variable when its |t| is above 1.41, a looser bar than the usual 1.96 [[L09 6:18]]."
+        },
+        {
+         "type": "text",
+         "title": "One case, and the 2024 counterpoint",
+         "body": "Kempthorne regresses GE's daily excess return on the market's, the regression that defines alpha and beta [[L01 28:55]], and then adds the return on crude oil. GE's oil coefficient is −0.03 with t = −3.56, and Exxon Mobil's is +0.13 with t = 16 [[L08 20:26]]. He reads the GE result as the market being \"not efficient in explaining the return on GE\". Seven lectures later the same coefficient is just a second factor [[L15 1:36]]. The step on factor models picks that up.\n\nJohn Hull's 2024 lecture describes the opposite order of work: machine learning collects the data first and lets a held-out validation set choose the model [[P23 10:18]]. Both camps are guarding against the same failure. Kempthorne penalises parameters with AIC and BIC [[L09 2:22]], and Hull stops adding complexity when validation error turns up [[P23 16:41]]."
+        },
+        {
+         "type": "check",
+         "question": "A stock's oil coefficient is +0.13 with t = 16, and another's is −0.03 with t = −3.56. Which pass the usual 1.96 bar and AIC's 1.41 bar? If oil rises 10% in a day and nothing else moves, what does the model say happens to each stock? And what should you conclude from a regression that fits 250 daily observations with 250 parameters and has no residual?",
+         "answer": "Both coefficients clear both bars, since 16 and 3.56 are above 1.96. A 10% rise in oil adds 0.13 × 10% = +1.3% to the first stock and −0.03 × 10% = −0.3% to the second. The 250-parameter regression has learned nothing: it has one parameter per observation, so the fit is exact by construction and the error variance estimate is zero. It will not predict day 251."
+        },
+        {
+         "type": "text",
+         "title": "The risk of a book",
+         "body": "The rest of this step joins the two halves of the stage. Probability gives each position a variance, and linear algebra combines them into the risk of the whole book.\n\nKen Abbott (Morgan Stanley risk management) starts with units. A covariance carries the units of both series, and a correlation is the same number with the units divided out. You can get a correlation from a covariance, and going back needs the two variances [[L07 39:04]] · [[L07 41:22]]. For two positions, Var(a + b) = Var a + Var b + 2 Cov(a, b) [[L07 42:10]]. The clip is the general case."
+        },
+        {
+         "type": "clip",
+         "code": "L07",
+         "start": 2813,
+         "end": 3048,
+         "minutes": 4,
+         "listenFor": "The book's variance is the dollar position vector times the covariance matrix times the vector again, and each position's sign has to be right before you multiply."
+        },
+        {
+         "type": "text",
+         "title": "Worked with numbers",
+         "body": "*Illustrative:* hold two $1M positions, each with a daily standard deviation of $10K. Their correlation is 0.83, the figure Abbott measures between 10-year Treasuries and 10-year AAA bonds [[L07 1:12:33]].\n\n- Book σ = √(100 + 100 + 2 × 0.83 × 100) = √366 = $19.1K.\n- At a correlation of 1 it would be $20K, and at 0 it would be $14.1K.\n- Flip one position to short and it is √(100 + 100 − 166) = √34 = $5.8K.\n\nThe last line is why signs matter. A long bond position enters with a negative PV01, because its price falls when yields rise. A long yen position quoted in yen per dollar also enters negative [[L07 49:14]]."
+        },
+        {
+         "type": "figure",
+         "caption": "The same two $10K positions at different correlations, and with one of them short.",
+         "svg": "<svg viewBox=\"0 0 360 138\" role=\"img\" aria-label=\"Daily risk of two positions of 10 thousand dollars each: 20.0 at correlation 1, 19.1 at 0.83, 14.1 at zero, and 5.8 when one position is short\"><text x=\"142\" y=\"27\" font-size=\"12\" text-anchor=\"end\" fill=\"currentColor\">correlation 1</text><rect x=\"150\" y=\"14\" width=\"140\" height=\"18\" rx=\"3\" class=\"accent\" fill=\"currentColor\" stroke=\"none\"/><text x=\"296\" y=\"27\" font-size=\"12\" fill=\"currentColor\">$20.0K</text><text x=\"142\" y=\"57\" font-size=\"12\" text-anchor=\"end\" fill=\"currentColor\">correlation 0.83</text><rect x=\"150\" y=\"44\" width=\"133.9\" height=\"18\" rx=\"3\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><text x=\"289.9\" y=\"57\" font-size=\"12\" fill=\"currentColor\">$19.1K</text><text x=\"142\" y=\"87\" font-size=\"12\" text-anchor=\"end\" fill=\"currentColor\">correlation 0</text><rect x=\"150\" y=\"74\" width=\"99\" height=\"18\" rx=\"3\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><text x=\"255\" y=\"87\" font-size=\"12\" fill=\"currentColor\">$14.1K</text><text x=\"142\" y=\"117\" font-size=\"12\" text-anchor=\"end\" fill=\"currentColor\">one side short, 0.83</text><rect x=\"150\" y=\"104\" width=\"40.8\" height=\"18\" rx=\"3\" class=\"muted\" fill=\"currentColor\" stroke=\"none\"/><text x=\"196.8\" y=\"117\" font-size=\"12\" fill=\"currentColor\">$5.8K</text></svg>"
+        },
+        {
+         "type": "text",
+         "title": "Why a bank needs the number",
+         "body": "Abbott gives a balance sheet in thirty seconds: assets are bought with equity or with debt, there is no third way, and when losses take equity to zero the firm is finished [[L07 14:00]]. The risk number exists to say how much equity a position needs. Jake Xia's introduction supplies the scale: banks ran at about 40 times leverage before the crisis [[L01 34:01]], so a 2.5% fall in assets erased the equity.\n\nAbbott's two standing warnings: \"everything you estimate you estimate with error\" [[L07 17:09]], and \"don't trust anyone's software\", after a programmer's check that matched \"to 16 decimals\" turned out to hide a bug [[L07 42:56]]."
+        },
+        {
+         "type": "text",
+         "title": "Where to go next",
+         "body": "From here the course forks, and you can take the paths in any order.\n\n- **Measuring risk:** Value at Risk first, then either factors and PCA or building portfolios.\n- **Time series:** how prices and their volatility move through time.\n- **Pricing:** stochastic calculus, then pricing by replication, then its use in credit or in commodities."
+        },
+        {
+         "type": "check",
+         "question": "Position A has a daily standard deviation of $30K and position B $40K (*illustrative*). What is the book's standard deviation at a correlation of 0.5, at 0, and at 0.5 when B is held short?",
+         "answer": "At 0.5: √(900 + 1,600 + 2 × 0.5 × 1,200) = √3,700 = $60.8K. At 0: √2,500 = $50K. With B short at 0.5 the cross term changes sign: √(2,500 − 1,200) = √1,300 = $36.1K. The standalone risks add to $70K in every case, so the correlation and the signs decide how much of that the book really carries."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "B1",
+     "title": "Measuring risk with Value at Risk",
+     "short": "Measuring risk",
+     "about": "How a risk desk turns the covariance matrix into one loss number, where the normal assumption fails, why the weighting of old data is a judgment call, and how the number is simulated.",
+     "after": [
+      "A"
+     ],
+     "steps": [
+      {
+       "key": "B1.1",
+       "title": "VaR: one number for a bad day",
+       "gain": "Turn a daily volatility into a one-day 99% VaR in dollars, and say why a backtest finds more bad days than it predicts.",
+       "minutes": 10,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 7: Value At Risk (VAR) Models (slides)",
+         "author": "Ken Abbott",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "clip",
+         "code": "L07",
+         "start": 1309,
+         "end": 1779,
+         "minutes": 8,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B1.2",
+       "title": "Fat tails: where the normal stops working",
+       "gain": "Say how often a six-sigma day comes under a t and under a normal, and why a 95% VaR hides the difference.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L11",
+         "start": 1172,
+         "end": 1356,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B1.3",
+       "title": "How much the recent past counts: equal weights or EWMA",
+       "gain": "Work out how many days carry the weight at a given decay, and say why Abbott and Kempthorne disagree over using it.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L07",
+         "start": 3373,
+         "end": 3653,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B1.4",
+       "title": "Simulating VaR: the square root of the covariance matrix",
+       "gain": "Turn independent random draws into correlated ones with the square root of a covariance matrix, and read VaR off the sorted results.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L07",
+         "start": 3981,
+         "end": 4214,
+         "minutes": 4,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "B2",
+     "title": "Compressing risk: factors, PCA and regularization",
+     "short": "Factors and PCA",
+     "about": "A few factors carry most of the risk in a stock universe or a yield curve. This stage shows how they are found, how a rates desk hedges and trades with them, and why fitting the remainder exactly makes a model unstable.",
+     "after": [
+      "B1"
+     ],
+     "steps": [
+      {
+       "key": "B2.1",
+       "title": "Factor models and PCA: the same risk from far fewer numbers",
+       "gain": "Count the parameters a factor model saves, and prepare data for PCA: demean it, use changes, normalize only mixed units.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L15",
+         "start": 519,
+         "end": 661,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P09",
+         "start": 327,
+         "end": 474,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B2.2",
+       "title": "The Treasury curve in three moves: level, slope, curvature",
+       "gain": "Name the three moves that explain about 97% of Treasury yield changes, and size a slope move against a level move.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P09",
+         "start": 2797,
+         "end": 3080,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Case Study 7: Factor Modeling of US Treasury Yields",
+         "author": "Peter Kempthorne",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B2.3",
+       "title": "Trading what is left after the level is hedged",
+       "gain": "Work out the leverage a slope or curvature trade needs, and say why that worries a regulator on a volatile day.",
+       "minutes": 8,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P09",
+         "start": 3318,
+         "end": 3736,
+         "minutes": 7,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B2.4",
+       "title": "The risk ladder: hedge five directions, not every bucket",
+       "gain": "Explain how hedging five PCA directions cut a swap desk's hedging cost from $3.6M to about $400K, and what stays unhedged.",
+       "minutes": 12,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L10",
+         "start": 2247,
+         "end": 2855,
+         "minutes": 10,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B2.5",
+       "title": "Why an exact fit is unstable: regularization",
+       "gain": "Work out how a small singular value amplifies input error, and how a roughness penalty stops it at some cost in fit.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L10",
+         "start": 3730,
+         "end": 3965,
+         "minutes": 4,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "clip",
+         "code": "L10",
+         "start": 4306,
+         "end": 4400,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "B3",
+     "title": "Building portfolios",
+     "short": "Portfolios",
+     "about": "Diversification is the one input that costs nothing, but optimizers magnify bad estimates and crowds undo good strategies. These lessons show how positions are sized when expected returns cannot be trusted.",
+     "after": [
+      "B1"
+     ],
+     "steps": [
+      {
+       "key": "B3.1",
+       "title": "Diversification, and why optimizers magnify bad inputs",
+       "gain": "Find the lowest-risk mix of two uncorrelated assets, and show why ten years of returns cannot pin down an expected return.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L16",
+         "start": 1981,
+         "end": 2124,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L14",
+         "start": 1245,
+         "end": 1340,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B3.2",
+       "title": "Risk parity and rebalancing",
+       "gain": "Size a risk-parity portfolio and its leverage, and work out when rebalancing adds return and when it gives return up.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L16",
+         "start": 3009,
+         "end": 3340,
+         "minutes": 6,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B3.3",
+       "title": "Crowding: when everyone holds the optimal portfolio",
+       "gain": "Trace how funds that follow the same sensible rule push prices against themselves, as walkers did on the Millennium Bridge.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L16",
+         "start": 3867,
+         "end": 4244,
+         "minutes": 6,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "B3.4",
+       "title": "Portfolios of long shots: Lo's megafund",
+       "gain": "Work out how pooling independent long shots cuts risk by √n, and how a pairwise correlation of 0.1 puts a floor under it.",
+       "minutes": 11,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P18",
+         "start": 1539,
+         "end": 1860,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P18",
+         "start": 1910,
+         "end": 2144,
+         "minutes": 4,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "C",
+     "title": "Time series and volatility",
+     "short": "Time series",
+     "about": "How a price and its volatility move through time: mean reversion, the clock problem, GARCH, cointegration and the Kalman filter. The GARCH lesson also shows what the argument over weighting old data in Value at Risk comes down to.",
+     "after": [
+      "A"
+     ],
+     "steps": [
+      {
+       "key": "C.1",
+       "title": "Mean reversion: the AR(1) model",
+       "gain": "Work out the half-life and long-run variance of a mean-reverting series from its coefficient, and test for a random walk.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L08",
+         "start": 3380,
+         "end": 3668,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "C.2",
+       "title": "What volatility is, and why the clock changes it",
+       "gain": "Annualize a volatility, say why the choice of clock moves it by a fifth, and why high and low prices sharpen the estimate.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L09",
+         "start": 2235,
+         "end": 2468,
+         "minutes": 4,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "C.3",
+       "title": "GARCH: volatility clusters and fades toward a level",
+       "gain": "Work out a GARCH model's long-run volatility and the half-life of a shock, and say what EWMA assumes instead.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L11",
+         "start": 418,
+         "end": 510,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "clip",
+         "code": "L11",
+         "start": 1544,
+         "end": 1683,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "C.4",
+       "title": "Cointegration and the Kalman filter: prices that wander together, a state that drifts",
+       "gain": "Evaluate a stationary combination of three wandering prices, and run one Kalman filter update by hand.",
+       "minutes": 8,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L12",
+         "start": 1128,
+         "end": 1505,
+         "minutes": 6,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "D1",
+     "title": "Stochastic calculus: the toolkit for pricing",
+     "short": "Stochastic calculus",
+     "about": "Four ideas the pricing lectures lean on: a fair game cannot be beaten by timing, Brownian motion's squared moves add up to elapsed time, that fact puts a ½σ² term into every formula, and a trading strategy may only use what is already known.",
+     "after": [
+      "A"
+     ],
+     "steps": [
+      {
+       "key": "D1.1",
+       "title": "Martingales: a fair game cannot be beaten by choosing when to stop",
+       "gain": "Explain why no stopping rule beats a fair game, and tell a rule that uses only the past from one that peeks ahead.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L05",
+         "start": 3998,
+         "end": 4296,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D1.2",
+       "title": "Brownian motion, and why its squared moves add up to elapsed time",
+       "gain": "Show why Brownian motion's squared moves add up to elapsed time, and how many hedge rebalances average the noise away.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L17",
+         "start": 2876,
+         "end": 3236,
+         "minutes": 6,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D1.3",
+       "title": "Itô's lemma and the ½σ² term",
+       "gain": "Apply Itô's lemma to a stock price, and work out how far the typical path trails the average because of ½σ².",
+       "minutes": 9,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L17",
+         "start": 3996,
+         "end": 4335,
+         "minutes": 6,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L18",
+         "start": 1517,
+         "end": 1672,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D1.4",
+       "title": "No peeking: the left endpoint, and drift as the only source of expected gain",
+       "gain": "Tell a trading rule that uses only known prices from one that peeks, and explain why only drift earns expected gain.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L18",
+         "start": 2345,
+         "end": 2531,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 18: Itō Calculus (lecture notes)",
+         "author": "Choongbum Lee",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "D2",
+     "title": "Pricing by replication",
+     "short": "Pricing",
+     "about": "A derivative's price is the cost of the hedge that reproduces it, so the expected return of the underlying drops out. Then what option prices reveal, why they are not forecasts, and where the argument strains.",
+     "after": [
+      "D1"
+     ],
+     "steps": [
+      {
+       "key": "D2.1",
+       "title": "The bookie: price from the money, not from the odds",
+       "gain": "Set a bookie's odds so he cannot lose, and price a forward from the stock price and the interest rate alone.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L19",
+         "start": 22,
+         "end": 215,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 19: Black-Scholes Formula and Risk-neutral Valuation (slides)",
+         "author": "Vasily Strela",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D2.2",
+       "title": "Replication and Black-Scholes: why the expected return drops out",
+       "gain": "Price an option over one step by building it from stock and cash, and explain why the stock's expected return never enters.",
+       "minutes": 13,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L19",
+         "start": 1132,
+         "end": 1816,
+         "minutes": 11,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D2.3",
+       "title": "What holds under any model: parity, the digital and the smile",
+       "gain": "Price a put from a call by parity, and a digital option from a call spread, with no model of the stock.",
+       "minutes": 6,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L19",
+         "start": 2599,
+         "end": 2908,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D2.4",
+       "title": "Option prices are probabilities you can trade",
+       "gain": "Read the market's probability of a price band from a butterfly of three calls, and of ending above a strike from a call spread.",
+       "minutes": 13,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L20",
+         "start": 1619,
+         "end": 2284,
+         "minutes": 11,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D2.5",
+       "title": "A price is not a forecast: three kinds of probability",
+       "gain": "Explain why a contract priced at 40 cents is not a 40% forecast, and name the two things that separate a price from a belief.",
+       "minutes": 13,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L25",
+         "start": 336,
+         "end": 762,
+         "minutes": 7,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L24",
+         "start": 5294,
+         "end": 5387,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P20",
+         "start": 229,
+         "end": 321,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D2.6",
+       "title": "Where replication strains: capital, trading costs and slow pricers",
+       "gain": "Say when identical payoffs can trade apart, and compare the cost of rehedging now with the cost of waiting a period.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L20",
+         "start": 3493,
+         "end": 3683,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "P23",
+         "start": 3934,
+         "end": 4084,
+         "minutes": 3,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "D3",
+     "title": "Credit and counterparty risk",
+     "short": "Credit",
+     "about": "Replication applied to default: how a credit spread becomes a default probability, why currency and credit cannot be hedged separately, and what a dealer charges for the chance its counterparty fails. Ends on a hedge that moves the price it is hedging.",
+     "after": [
+      "D2"
+     ],
+     "steps": [
+      {
+       "key": "D3.1",
+       "title": "Default as a random arrival: hazard rates, and the issuer's option to call",
+       "gain": "Turn a CDS spread and a recovery rate into a hazard rate and a survival chance, and value an issuer's option to call a bond.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "clip",
+         "code": "L24",
+         "start": 4445,
+         "end": 4586,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D3.2",
+       "title": "Quanto credit: when the currency falls with the issuer",
+       "gain": "Explain why one issuer's euro and dollar bonds are worth different amounts when default and devaluation come together.",
+       "minutes": 7,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L23",
+         "start": 937,
+         "end": 1221,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D3.3",
+       "title": "CVA: the price of your counterparty's default",
+       "gain": "Work out a hedged dealer's loss when a counterparty defaults, and estimate CVA from exposure, CDS spread and duration.",
+       "minutes": 9,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L26",
+         "start": 514,
+         "end": 940,
+         "minutes": 7,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 26: Introduction to Counterparty Credit Risk (slides)",
+         "author": "Yi Tang",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D3.4",
+       "title": "Wrong-way risk, funding, and a hedge that moves its own target",
+       "gain": "Show why CVA is understated when exposure and default risk rise together, and how hedging Berkshire widened its spread.",
+       "minutes": 13,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L26",
+         "start": 1747,
+         "end": 2455,
+         "minutes": 12,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "D4",
+     "title": "Commodities and real options",
+     "short": "Commodities",
+     "about": "Replication applied to physical assets. A storage tank and a power plant are options, and a quant who sees that can outbid a trader who does not.",
+     "after": [
+      "D2"
+     ],
+     "steps": [
+      {
+       "key": "D4.1",
+       "title": "Contango and storage: a tank is an option on a price spread",
+       "gain": "Work out what cash-and-carry locks in on a rising futures curve, and why a quant can bid more for a storage tank than a trader.",
+       "minutes": 17,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "clip",
+         "code": "L13",
+         "start": 330,
+         "end": 424,
+         "minutes": 2,
+         "listenFor": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L13",
+         "start": 477,
+         "end": 1279,
+         "minutes": 13,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "reading",
+         "title": "Lecture 13: Commodity Models (slides)",
+         "author": "Alexander Eydeland",
+         "source": "MIT OpenCourseWare, 18.S096 Topics in Mathematics with Applications in Finance, Fall 2013",
+         "url": null,
+         "body": "",
+         "excerpt": [],
+         "licence": null
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D4.2",
+       "title": "A power plant is a strip of options",
+       "gain": "Work out a gas plant's break-even power price, and explain why the plant is worth more when power prices are volatile.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L13",
+         "start": 2622,
+         "end": 2900,
+         "minutes": 5,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      },
+      {
+       "key": "D4.3",
+       "title": "Why supply and demand beats a jump model for power prices",
+       "gain": "Read a power price off a supply stack, and explain why the stack gives spikes that a mean-reverting model cannot.",
+       "minutes": 5,
+       "blocks": [
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "clip",
+         "code": "L13",
+         "start": 4500,
+         "end": 4732,
+         "minutes": 4,
+         "listenFor": ""
+        },
+        {
+         "type": "figure",
+         "caption": "",
+         "svg": ""
+        },
+        {
+         "type": "text",
+         "title": null,
+         "body": ""
+        },
+        {
+         "type": "check",
+         "question": "",
+         "answer": ""
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "ratings": {
+   "intro": "Five lectures are worth watching whole: L07, L13, L16, L19 and L20. Eight more have must-watch stretches, fourteen are worth skimming at the timestamps below, and only L02 is a full skip. The practitioner lectures rate higher than the math lectures throughout, because they show where the math breaks.",
+   "rows": [
+    {
+     "code": "L01",
+     "rating": "skim",
+     "watch": "[[L01 5:46]] vega story · [[L01 44:30-51:23]] risk-aversion quiz · [[L01 54:13]] to end, student projects",
+     "why": "Orientation for non-finance majors. The quiz and the noisy Monte Carlo delta project are the parts worth your time."
+    },
+    {
+     "code": "L02",
+     "rating": "skip",
+     "watch": "[[L02 1:02:30]] Perron-Frobenius, only if you watch L25",
+     "why": "Linear algebra review, and a 3Blue1Brown video teaches it better."
+    },
+    {
+     "code": "L03",
+     "rating": "skim",
+     "watch": "[[L03 11:05-15:29]] why lognormal · [[L03 51:14-56:41]] casino edge and the law of large numbers",
+     "why": "The rest is standard probability review."
+    },
+    {
+     "code": "L05",
+     "rating": "parts",
+     "watch": "[[L05 23:22-31:20]] gambler's ruin · [[L05 58:35]] to end, martingales and optional stopping",
+     "why": "\"You can't beat a fair game\" is the logic underneath risk-neutral pricing."
+    },
+    {
+     "code": "L06",
+     "rating": "skim",
+     "watch": "[[L06 7:46-13:54]] modeling protocol · [[L06 25:31-28:38]] influential points",
+     "why": "Textbook OLS you already know from SOM."
+    },
+    {
+     "code": "L07",
+     "rating": "watch",
+     "watch": "Whole lecture",
+     "why": "Practitioner risk management with an accounting tie-in at [[L07 14:00]] and honest limits. Closest to an audit-and-controls mindset."
+    },
+    {
+     "code": "L08",
+     "rating": "skim",
+     "watch": "[[L08 16:31-25:10]] CAPM plus an oil factor · [[L08 56:20-1:01:08]] AR(1) mean reversion",
+     "why": "Two applied cases inside a theory lecture."
+    },
+    {
+     "code": "L09",
+     "rating": "parts",
+     "watch": "[[L09 20:31]] to end · [[L09 6:18]] AIC vs t-stat",
+     "why": "The volatility half: clocks, range estimators, fat tails, GARCH."
+    },
+    {
+     "code": "L10",
+     "rating": "parts",
+     "watch": "[[L10 36:40-53:06]] risk ladder and PCA hedging · [[L10 1:02:10-1:19:37]] Manhattan skyline and Tikhonov",
+     "why": "The clearest lecture on why exact fits fail. It transfers directly to anything you calibrate."
+    },
+    {
+     "code": "L11",
+     "rating": "skim",
+     "watch": "[[L11 16:23-28:03]] t tails, persistence, RiskMetrics · [[L11 1:17:54]] to end macro VAR (optional)",
+     "why": "The VAR estimation half is derivations."
+    },
+    {
+     "code": "L12",
+     "rating": "skim",
+     "watch": "[[L12 10:42-25:51]] cointegration and crack spreads · [[L12 1:06:13-1:15:43]] Kalman filter",
+     "why": "Two good ideas, with long derivations between them."
+    },
+    {
+     "code": "L13",
+     "rating": "watch",
+     "watch": "Whole lecture",
+     "why": "The best applied lecture in the series: options hidden in physical assets, and a structural model that beats curve fitting."
+    },
+    {
+     "code": "L14",
+     "rating": "skim",
+     "watch": "[[L14 4:42-22:20]] simulation and estimation error · [[L14 1:04:54]] to end, ETF case and risk measures",
+     "why": "You know Markowitz. The estimation-error demo is the new part."
+    },
+    {
+     "code": "L15",
+     "rating": "parts",
+     "watch": "[[L15 1:11:36-1:25:31]] Treasury PCA · skim [[L15 8:39-39:48]] factor-model logic",
+     "why": "Level, slope and curvature, and the last PC as a hedge."
+    },
+    {
+     "code": "L16",
+     "rating": "watch",
+     "watch": "Whole lecture",
+     "why": "The most transferable lecture: goals, diversification, rebalancing, risk parity, crowding."
+    },
+    {
+     "code": "L17",
+     "rating": "skim",
+     "watch": "[[L17 14:40-25:00]] · [[L17 30:38-33:04]] · [[L17 47:56-53:56]] · [[L17 1:06:36-1:15:25]]",
+     "why": "About 35 minutes: Brownian intuition, the max formula, quadratic variation, Itô."
+    },
+    {
+     "code": "L18",
+     "rating": "skim",
+     "watch": "[[L18 25:17-27:52]] · [[L18 36:38-42:11]] · [[L18 52:02-58:30]]",
+     "why": "The ½σ² correction, the no-peeking rule, drift vs martingale."
+    },
+    {
+     "code": "L19",
+     "rating": "watch",
+     "watch": "Whole lecture (50 min)",
+     "why": "The clearest explanation in the series of why the drift doesn't matter."
+    },
+    {
+     "code": "L20",
+     "rating": "watch",
+     "watch": "Whole lecture",
+     "why": "Option prices as probabilities. Best conceptual lecture, and it has the post-2008 arbitrage warning."
+    },
+    {
+     "code": "L21",
+     "rating": "skim",
+     "watch": "[[L21 12:52-15:10]] · [[L21 21:30-35:11]] · [[L21 49:58-55:03]]",
+     "why": "Ornstein-Uhlenbeck, numerical methods, and the heat kernel as Brownian particles."
+    },
+    {
+     "code": "L23",
+     "rating": "skim",
+     "watch": "[[L23 15:37-20:21]] · [[L23 30:41-33:48]] · [[L23 37:01-40:10]] · [[L23 1:28:17-1:31:26]]",
+     "why": "The bet game and the compensator drift are memorable. The jump calculus is not needed."
+    },
+    {
+     "code": "L24",
+     "rating": "parts",
+     "watch": "[[L24 1:14:05-1:31:21]] callable bond and structured note · [[L24 1:40:42-1:46:54]] · skim [[L24 20:35-33:17]]",
+     "why": "How banks actually make money on exotics."
+    },
+    {
+     "code": "L25",
+     "rating": "skim",
+     "watch": "[[L25 5:36-15:46]] · [[L25 42:10-1:01:08]] · [[L25 1:11:29-1:17:06]]",
+     "why": "P vs Q vs R, and why prices are not probabilities. The rest is heavy."
+    },
+    {
+     "code": "L26",
+     "rating": "parts",
+     "watch": "[[L26 0:00-44:56]]",
+     "why": "CVA through two quizzes and the Berkshire puts. Skip the measure theory after that."
+    },
+    {
+     "code": "P09",
+     "rating": "parts",
+     "watch": "[[P09 35:44-1:04:37]] · [[P09 1:05:23-1:10:03]] · [[P09 5:27-16:27]] if you skip L15",
+     "why": "PCA from a current Two Sigma practitioner, including how it is traded."
+    },
+    {
+     "code": "P18",
+     "rating": "parts",
+     "watch": "[[P18 14:44-41:53]] · [[P18 59:50-1:03:43]]",
+     "why": "Portfolio math applied to drug development. The fusion section is skimmable."
+    },
+    {
+     "code": "P20",
+     "rating": "skim",
+     "watch": "[[P20 3:49-8:29]] · [[P20 11:33-13:52]] · [[P20 17:46-20:08]]",
+     "why": "Event contracts and collateral. The rest is career talk."
+    },
+    {
+     "code": "P23",
+     "rating": "skim",
+     "watch": "[[P23 38:08-50:42]] · [[P23 1:05:34-1:10:25]] · [[P23 54:35-1:03:12]] if Q-learning is new",
+     "why": "Mostly ML basics you know as a builder. The finance applications are the new part."
+    }
+   ]
+  },
+  "ideas": [
+   {
+    "title": "The price of a bet doesn't depend on who you think will win.",
+    "body": "A bookie who sets odds from the money bet ($10K vs $50K, so 5:1) pays $60K whatever happens and has no risk. A bookie who sets odds from the true 20/80 probabilities can lose. Black-Scholes is the same move: hedge, and the stock's expected return drops out of the price. [[L19 0:22]] · [[L19 27:47]]"
+   },
+   {
+    "title": "Option prices are probabilities you can trade.",
+    "body": "Three calls at neighboring strikes form a butterfly whose price is the market's probability of ending in that band. Rates desks trade 10bp-wide butterflies when they think that probability is wrong. [[L20 30:10]]"
+   },
+   {
+    "title": "Physical assets hide options.",
+    "body": "A storage tank looks like it is worth the $3 calendar spread. As an option on the spread it is worth $4.47, so the quant outbids the trader and still keeps $0.27. Power plants, pipelines and tankers work the same way. [[L13 13:27]] · [[L13 42:06]]"
+   },
+   {
+    "title": "Low prices can make traders rich.",
+    "body": "In early 2009 crude cost $35 for delivery now and $60 for delivery a year later. Anyone with storage locked in about $21 a barrel risk-free, which is how Trafigura had a record year while oil collapsed. [[L13 1:37]] · [[L13 5:30]]"
+   },
+   {
+    "title": "Your hedge can turn a recovery into a loss.",
+    "body": "A counterparty owes you $100M, defaults, and pays 50 cents on the dollar. You collect $50M and are down $50M, because the offsetting hedge you owe is $100M and is paid in full. In 2008 these counterparty adjustments cost banks more than the defaults themselves. [[L26 8:34]] · [[L26 6:13]]"
+   },
+   {
+    "title": "A model that fits perfectly is usually wrong.",
+    "body": "Hedging every point on a yield curve costs $3.6M in bid-offer, while hedging its 5 main directions costs about $400K. A volatility surface fitted exactly to market prices looks like the Manhattan skyline. Accepting small errors buys stability. [[L10 37:27]] · [[L10 1:02:10]]"
+   }
+  ],
+  "errors": {
+   "intro": "Most of the lectures' numbers check out. These are the ones that don't, plus the claims you shouldn't reuse without checking.\n\n**Speaker naming.** L13's speaker is not named on the tape. MIT OCW lists Alexander Eydeland (Morgan Stanley).\n\n**Time-sensitive facts.** Market figures are as of each lecture and are now stale. That covers Fall 2013 for the 2013 course (a 10y Treasury yield of 1.7% at the end of 2012, S&P near 1,800) and Fall 2024 for the 2024 lectures (Kalshi's volume, BridgeBio's ~$4.6B market cap, the Fed's 50bp cut).",
+   "rows": [
+    {
+     "where": "[[L07 24:55]]",
+     "said": "Abbott: a 3σ move happens \"about once per 10,000\" observations",
+     "correction": "For a normal, a one-sided 3σ loss has probability 0.135%, about 1 in 740 days (1 in 370 counting both tails). His broader point, that normal tails are too thin, still stands."
+    },
+    {
+     "where": "[[L08 56:20]]",
+     "said": "Slide gives AR(1) variance as σ²/(1 − φ)",
+     "correction": "It is σ²/(1 − φ²). At φ = 0.9 the slide gives 10σ² and the correct value is 5.3σ²."
+    },
+    {
+     "where": "[[L16 44:21]]",
+     "said": "Xia's statement of the Kelly criterion is garbled",
+     "correction": "For an even-money bet won with probability p, bet the fraction 2p − 1. At p = 0.55 that is 10% of the bankroll."
+    }
+   ]
+  }
+ },
+ "lectures": [
+  {
+   "code": "L01",
+   "title": "1. Introduction, Financial Terms and Concepts",
+   "videoId": "wvXDB9dMdEo",
+   "durationSeconds": 3630,
+   "speaker": "Jake Xia (Morgan Stanley)"
+  },
+  {
+   "code": "L02",
+   "title": "2. Linear Algebra",
+   "videoId": "9YtmGy-wfE4",
+   "durationSeconds": 4357,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L03",
+   "title": "3. Probability Theory",
+   "videoId": "f9XFM8YLccg",
+   "durationSeconds": 4705,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L05",
+   "title": "5. Stochastic Processes I",
+   "videoId": "TuTmC8aOQJE",
+   "durationSeconds": 4661,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L06",
+   "title": "6. Regression Analysis",
+   "videoId": "l1kLCrxL9Hk",
+   "durationSeconds": 4933,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L07",
+   "title": "7. Value At Risk (VaR) Models",
+   "videoId": "92WaNz9mPeY",
+   "durationSeconds": 4875,
+   "speaker": "Ken Abbott (Morgan Stanley)"
+  },
+  {
+   "code": "L08",
+   "title": "8. Time Series Analysis I",
+   "videoId": "uBeM1FUk4Ps",
+   "durationSeconds": 4579,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L09",
+   "title": "9. Volatility Modeling",
+   "videoId": "cDlbEQz1PQk",
+   "durationSeconds": 4876,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L10",
+   "title": "10. Regularized Pricing and Risk Models",
+   "videoId": "aga-Tak3c3M",
+   "durationSeconds": 5397,
+   "speaker": "Ivan Masyukov (Morgan Stanley)"
+  },
+  {
+   "code": "L11",
+   "title": "11. Time Series Analysis II",
+   "videoId": "_IFUfFuyQlU",
+   "durationSeconds": 5028,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L12",
+   "title": "12. Time Series Analysis III",
+   "videoId": "9G1IDAqrWkg",
+   "durationSeconds": 4659,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L13",
+   "title": "13. Commodity Models",
+   "videoId": "nmehlS-8b3Y",
+   "durationSeconds": 4845,
+   "speaker": "Alexander Eydeland (Morgan Stanley; named on OCW, not on tape)"
+  },
+  {
+   "code": "L14",
+   "title": "14. Portfolio Theory",
+   "videoId": "ywl3pq6yc54",
+   "durationSeconds": 5095,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L15",
+   "title": "15. Factor Modeling",
+   "videoId": "ro07evEWbCE",
+   "durationSeconds": 5149,
+   "speaker": "Peter Kempthorne"
+  },
+  {
+   "code": "L16",
+   "title": "16. Portfolio Management",
+   "videoId": "8TJQhQ2GZ0Y",
+   "durationSeconds": 5318,
+   "speaker": "Jake Xia"
+  },
+  {
+   "code": "L17",
+   "title": "17. Stochastic Processes II",
+   "videoId": "PPl-7_RL0Ko",
+   "durationSeconds": 4559,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L18",
+   "title": "18. Itō Calculus",
+   "videoId": "Z5yRMMVUC5w",
+   "durationSeconds": 4683,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L19",
+   "title": "19. Black-Scholes Formula, Risk-neutral Valuation",
+   "videoId": "TnS8kI_KuJc",
+   "durationSeconds": 2992,
+   "speaker": "Vasily Strela (Morgan Stanley)"
+  },
+  {
+   "code": "L20",
+   "title": "20. Option Price and Probability Duality",
+   "videoId": "eG_aRPy1KVE",
+   "durationSeconds": 4829,
+   "speaker": "Stephen Blythe (Harvard Management Co.)"
+  },
+  {
+   "code": "L21",
+   "title": "21. Stochastic Differential Equations",
+   "videoId": "qdbkvD4N-us",
+   "durationSeconds": 3365,
+   "speaker": "Choongbum Lee"
+  },
+  {
+   "code": "L23",
+   "title": "23. Quanto Credit Hedging",
+   "videoId": "55OXxe_ix2o",
+   "durationSeconds": 5857,
+   "speaker": "Stefan Andreev (Morgan Stanley)"
+  },
+  {
+   "code": "L24",
+   "title": "24. HJM Model for Interest Rates and Credit",
+   "videoId": "D2Jn1VrqjWI",
+   "durationSeconds": 6436,
+   "speaker": "Denis Gorokhov (Morgan Stanley)"
+  },
+  {
+   "code": "L25",
+   "title": "25. Ross Recovery Theorem",
+   "videoId": "vc5dotshPZc",
+   "durationSeconds": 5266,
+   "speaker": "Peter Carr (Morgan Stanley, NYU)"
+  },
+  {
+   "code": "L26",
+   "title": "26. Introduction to Counterparty Credit Risk",
+   "videoId": "bKmcRfE3I6E",
+   "durationSeconds": 4895,
+   "speaker": "Yi Tang (Morgan Stanley)"
+  },
+  {
+   "code": "P09",
+   "title": "Principal Component Analysis in Finance",
+   "videoId": "CechARGinR4",
+   "durationSeconds": 4994,
+   "speaker": "Stefan Andreev (Two Sigma)"
+  },
+  {
+   "code": "P18",
+   "title": "Applying Data Science and AI to Managing Biomedical Portfolios",
+   "videoId": "_e2nDnV7FQs",
+   "durationSeconds": 4860,
+   "speaker": "Andrew Lo (MIT Sloan)"
+  },
+  {
+   "code": "P20",
+   "title": "CFTC-Regulated Event Exchange",
+   "videoId": "8XrYjnDHmE4",
+   "durationSeconds": 2677,
+   "speaker": "Tarek Mansour (Kalshi)"
+  },
+  {
+   "code": "P23",
+   "title": "Introduction to Machine Learning",
+   "videoId": "kTsieIl_YBA",
+   "durationSeconds": 4581,
+   "speaker": "John Hull (Toronto)"
+  }
+ ]
+}

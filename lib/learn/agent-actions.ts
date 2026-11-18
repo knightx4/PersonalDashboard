@@ -38,28 +38,52 @@ export const learnActions: ModuleActions = {
     draftTopicFromGoal: tool('draft_topic'),
   },
   'app/learn/topics/[id]/actions.ts': {
-    mergeTopicDraft: none('theirs', 'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").'),
+    mergeTopicDraft: none(
+      'theirs',
+      'Whether a draft duplicates a topic is the person’s call (LEARN-LEVELS-SPEC, "Drafting a topic").',
+    ),
     draftWantedTopic: {
       tool: 'draft_topic',
       note: 'Dash names the topic whose links want it as for_topic_id, and the levels that wanted it are linked to the draft.',
     },
-    rewordLevel: none('theirs', 'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").'),
-    markRowsPersonal: none('theirs', 'Dash marks an uncited row personal when it approves a draft (plan #2356.6); taking the mark off or putting it back is the person’s.'),
+    rewordLevel: none(
+      'theirs',
+      'What meeting a level of a topic means is the person’s to word (LEARN-LEVELS-SPEC, "Drafting a topic").',
+    ),
+    markRowsPersonal: none(
+      'theirs',
+      'Dash marks an uncited row personal when it approves a draft (plan #2356.6); taking the mark off or putting it back is the person’s.',
+    ),
   },
   'app/learn/flow/theme-lens-actions.ts': {
-    makeLensFromTheme: none('theirs', 'Whether a vault theme becomes a lens of its own is the person’s to say (plan #2138.14).'),
-    declineLensFromTheme: none('theirs', 'Saying no to the offer of a lens is the person’s (plan #2138.14).'),
+    makeLensFromTheme: none(
+      'theirs',
+      'Whether a vault theme becomes a lens of its own is the person’s to say (plan #2138.14).',
+    ),
+    declineLensFromTheme: none(
+      'theirs',
+      'Saying no to the offer of a lens is the person’s (plan #2138.14).',
+    ),
   },
   'app/learn/lens/[id]/actions.ts': {
-    saveLensTargets: none('theirs', 'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").'),
+    saveLensTargets: none(
+      'theirs',
+      'How far they want to go on each topic of a subject or goal is the person’s to say (LEARN-LEVELS-SPEC, "Lenses: subjects and goals").',
+    ),
   },
   'app/learn/topics/review/actions.ts': {
     moveClaimsSubject: none(
       'spends',
       "One subject for each call the page's Move makes as it works through every subject in turn, and the person answers its placements on the same page.",
     ),
-    refreshMoveReview: none('page', 'Reloads the review page once a run of moves ends; changes nothing.'),
-    answerMoveReview: none('theirs', 'Where an idea sits and whether a need between two ideas stands is the person’s call (LEARN-LEVELS-SPEC, "Migration from the claims graph").'),
+    refreshMoveReview: none(
+      'page',
+      'Reloads the review page once a run of moves ends; changes nothing.',
+    ),
+    answerMoveReview: none(
+      'theirs',
+      'Where an idea sits and whether a need between two ideas stands is the person’s call (LEARN-LEVELS-SPEC, "Migration from the claims graph").',
+    ),
   },
   'app/learn/b/[id]/actions.ts': {
     saveShortAnswer: none('own'),
@@ -67,14 +91,20 @@ export const learnActions: ModuleActions = {
     setBriefArchived: none('own'),
     retryBrief: tool('retry_research_brief'),
     startEssayOnBrief: none('own'),
-    draftBriefTopics: none('theirs', 'Which goal a research brief feeds is the person’s to choose (plan #2184.1); the draft is approved as it is kept when every row cites a source (plan #2356.2).'),
+    draftBriefTopics: none(
+      'theirs',
+      'Which goal a research brief feeds is the person’s to choose (plan #2184.1); the draft is approved as it is kept when every row cites a source (plan #2356.2).',
+    ),
   },
   'app/learn/clips/actions.ts': {
     loadMoreClipsAction: none('page'),
     clipShownAction: none('own'),
     clipFinishedAction: none('own'),
     clipSkippedAction: none('own'),
-    clipSavedAction: none('own', "Saving a clip is the person's own reaction to what they watched, as finishing or skipping one is."),
+    clipSavedAction: none(
+      'own',
+      "Saving a clip is the person's own reaction to what they watched, as finishing or skipping one is.",
+    ),
     clipNotInterestedAction: none('own'),
   },
   'app/learn/essays/actions.ts': {
@@ -102,12 +132,18 @@ export const learnActions: ModuleActions = {
     unpublishEssay: none('outside'),
   },
   'app/learn/e/[id]/attached-actions.ts': {
-    detachVaultNote: none('theirs', 'Takes a vault note off the essay; one Dash attached is taken off with its Undo on Home.'),
+    detachVaultNote: none(
+      'theirs',
+      'Takes a vault note off the essay; one Dash attached is taken off with its Undo on Home.',
+    ),
     searchEssayVaultNotes: none('page'),
   },
   'app/learn/e/[id]/bring-note-actions.ts': {
     previewVaultNoteInNotes: none('page'),
-    addVaultNoteToNotes: none('own', "Adds a vault note's text to the essay's notes page, which is the person's own writing."),
+    addVaultNoteToNotes: none(
+      'own',
+      "Adds a vault note's text to the essay's notes page, which is the person's own writing.",
+    ),
   },
   'app/learn/e/[id]/notes-to-vault-actions.ts': {
     previewEssayNotesInVaultNote: none('page'),
@@ -140,8 +176,14 @@ export const learnActions: ModuleActions = {
     saveRecordingAction: none('setting'),
   },
   'app/learn/space/pairs/actions.ts': {
-    mergeIdeasAction: none('theirs', 'Whether two ideas are one is the person\'s call; closeness only found the pair.'),
-    keepBothIdeasAction: none('theirs', 'Whether two ideas are one is the person\'s call; closeness only found the pair.'),
+    mergeIdeasAction: none(
+      'theirs',
+      "Whether two ideas are one is the person's call; closeness only found the pair.",
+    ),
+    keepBothIdeasAction: none(
+      'theirs',
+      "Whether two ideas are one is the person's call; closeness only found the pair.",
+    ),
   },
   'app/learn/know/actions.ts': {
     proposeGoal: {
@@ -161,7 +203,10 @@ export const learnActions: ModuleActions = {
     },
   },
   'app/learn/know/move-actions.ts': {
-    moveTheme: none('setting', 'Where a theme sits on the areas grid is how the person arranges their own map.'),
+    moveTheme: none(
+      'setting',
+      'Where a theme sits on the areas grid is how the person arranges their own map.',
+    ),
   },
   'app/learn/know/level3-actions.ts': {
     addLevel3Goal: none(
@@ -186,7 +231,10 @@ export const learnActions: ModuleActions = {
     dismissCard: none('own'),
     rateCard: none('own'),
     swipeCard: none('own'),
-    saveCard: none('own', "Saving a card is the person's own verdict on it, as a swipe or a rating is."),
+    saveCard: none(
+      'own',
+      "Saving a card is the person's own verdict on it, as a swipe or a rating is.",
+    ),
     testMeOnCard: none('spends', ON_A_CARD),
     startTrackOffer: none('theirs'),
     makeTrackOfCard: none('spends', ON_A_CARD),
@@ -211,7 +259,10 @@ export const learnActions: ModuleActions = {
   },
   'app/learn/r/[id]/actions.ts': {
     findSources: none('spends', PROPOSES),
-    attachSource: { tool: 'change_reading', note: 'Dash attaches the link it is given, where the page picks from a search.' },
+    attachSource: {
+      tool: 'change_reading',
+      note: 'Dash attaches the link it is given, where the page picks from a search.',
+    },
     updateStatus: tool('change_reading'),
     toggleReadNow: tool('change_reading'),
     updateNote: tool('change_reading'),
@@ -223,13 +274,19 @@ export const learnActions: ModuleActions = {
       'Opens one step of a route into a topic of its own and plans nothing; the spending is Plan this topic on the page it lands on, which proposes.',
     ),
     saveReadingText: tool('change_reading'),
-    saveReadingPdf: { tool: 'change_reading', note: "Dash keeps the PDF's text, which is what an upload is read into." },
+    saveReadingPdf: {
+      tool: 'change_reading',
+      note: "Dash keeps the PDF's text, which is what an upload is read into.",
+    },
     clearReadingText: tool('change_reading'),
     summarizeReading: tool('summarize_reading'),
     addReadingComment: none('theirs'),
   },
   'app/learn/go/actions.ts': {
-    nextSessionItem: none('spends', 'Writes whatever the next item of the learning session needs as it comes up; the person is in the session.'),
+    nextSessionItem: none(
+      'spends',
+      'Writes whatever the next item of the learning session needs as it comes up; the person is in the session.',
+    ),
     markSessionLessonRead: none('own'),
     markSessionLevelLessonRead: none('own'),
     endSession: none('own'),
@@ -239,25 +296,49 @@ export const learnActions: ModuleActions = {
     answerReview: none('own'),
   },
   'app/learn/s/[id]/actions.ts': {
-    continuePreparation: none('spends', "Restarts a subject's preparation run, which spends on the person's account; the daily run also resumes them."),
-    chooseDirection: none('spends', "The person picks a branch to go deeper on, which starts a branch preparation run."),
-    dismissDirection: none('theirs', 'Holds the offer of a direction back until another thirty answers.'),
+    continuePreparation: none(
+      'spends',
+      "Restarts a subject's preparation run, which spends on the person's account; the daily run also resumes them.",
+    ),
+    chooseDirection: none(
+      'spends',
+      'The person picks a branch to go deeper on, which starts a branch preparation run.',
+    ),
+    dismissDirection: none(
+      'theirs',
+      'Holds the offer of a direction back until another thirty answers.',
+    ),
     readAboutConcept: none(
       'spends',
       'Lands the person on the reading it found for one idea of the graph, or the row already queued for it; the page it lands on is the result.',
     ),
     addSubjectSource: none('spends', CATALOGUE),
     findSubjectChannels: none('spends', OWNER_ONLY),
-    archiveSubject: none('setting', 'Whether a subject stays in front of the person is theirs to choose; archiving is undone by restoring.'),
-    restoreSubject: none('setting', 'Putting an archived subject back in front of the person is theirs to choose.'),
+    archiveSubject: none(
+      'setting',
+      'Whether a subject stays in front of the person is theirs to choose; archiving is undone by restoring.',
+    ),
+    restoreSubject: none(
+      'setting',
+      'Putting an archived subject back in front of the person is theirs to choose.',
+    ),
     deleteSubject: none('deletes'),
     writeTrackCurriculum: tool('write_subject_curriculum'),
-    moveUnitInPlan: none('setting', "The order of a learning goal's units is how the person arranges their own plan."),
+    moveUnitInPlan: none(
+      'setting',
+      "The order of a learning goal's units is how the person arranges their own plan.",
+    ),
     removeUnitFromPlan: none('deletes'),
-    addUnitToPlan: { tool: 'add_plan_unit', note: 'Each unit added is described by a model before it is kept.' },
+    addUnitToPlan: {
+      tool: 'add_plan_unit',
+      note: 'Each unit added is described by a model before it is kept.',
+    },
   },
   'app/learn/s/[id]/p/[piece]/actions.ts': {
-    writeLessonForPiece: none('spends', "Written as the piece's page opens on an idea with no lesson; no button presses it."),
+    writeLessonForPiece: none(
+      'spends',
+      "Written as the piece's page opens on an idea with no lesson; no button presses it.",
+    ),
     askPieceCheck: none('spends', STUDYING),
     answerPieceCheck: none('own'),
     writePiecePractice: none('spends', STUDYING),
@@ -287,8 +368,14 @@ export const learnActions: ModuleActions = {
     moveVideoAction: tool('change_video'),
   },
   'app/learn/youtube/actions.ts': {
-    addChannelAction: none('spends', `${OWNER_ONLY} Following a channel lists it and queues its transcripts.`),
-    relistChannelAction: none('spends', `${OWNER_ONLY} Listing a channel again queues its new transcripts.`),
+    addChannelAction: none(
+      'spends',
+      `${OWNER_ONLY} Following a channel lists it and queues its transcripts.`,
+    ),
+    relistChannelAction: none(
+      'spends',
+      `${OWNER_ONLY} Listing a channel again queues its new transcripts.`,
+    ),
     setAutoTranscribeAction: none('setting'),
     removeChannelAction: none('deletes'),
     unfollowSubjectChannelAction: none(
@@ -304,9 +391,47 @@ export const learnActions: ModuleActions = {
     setOfferSubjects: none('setting'),
     setTeachBackRate: none('setting'),
   },
+  'app/learn/read/actions.ts': {
+    finishSection: none('own', 'Finishing a section records the person\'s own reading.'),
+    unreadSection: none('own', 'Taking back a section marked read is the person correcting their own record.'),
+    judgeSource: none('theirs', 'Keeping a source or saying it is not for them is the person\'s verdict on what Dash chose.'),
+    askFor: none('spends', 'Starts a routine to find and prepare a source, a few minutes of the subscription; what is worth preparing is the person\'s to ask for.'),
+    goDeeper: none('spends', 'Starts a routine for more on one section; the person asks for it while reading.'),
+    addYourCopy: none('own', 'The person pastes their own copy of a text; nobody else has it to give.'),
+    findMore: none('spends', 'Starts a routine to find more to read; it runs only when the person asks, so a week away costs nothing.'),
+    startPreparing: none('spends', 'Starts the routine again on a source that stopped or has been waiting; the person decides whether to spend the run.'),
+  },
+  'app/learn/courses/actions.ts': {
+    buildCatalogueCourse: none(
+      'spends',
+      "Starts a routine that reads a whole lecture series, an hour or more of the subscription; which course is worth that is the person's to choose.",
+    ),
+    addCourse: none(
+      'spends',
+      "Starts a routine that reads a whole lecture series, an hour or more of the subscription; which course is worth that is the person's to choose.",
+    ),
+    retryCourse: none(
+      'spends',
+      'Starts the build routine again on a course that stopped; the person decides whether it is worth another run.',
+    ),
+    startWaitingCourse: none(
+      'spends',
+      'Starts the build routine on a course that has been waiting; the person decides when to spend the run.',
+    ),
+    markCourseProgress: none(
+      'own',
+      "Ticking a step of a course's plan done records the person's own study.",
+    ),
+  },
   'app/learn/settings/external/actions.ts': {
-    startExternalCheck: none('own', 'Pasting a published set to sit once is the person starting their own measurement.'),
-    answerExternal: none('own', 'The answers are the person\'s own, given blind; marking one spends.'),
+    startExternalCheck: none(
+      'own',
+      'Pasting a published set to sit once is the person starting their own measurement.',
+    ),
+    answerExternal: none(
+      'own',
+      "The answers are the person's own, given blind; marking one spends.",
+    ),
     skipExternal: none('own'),
   },
 };

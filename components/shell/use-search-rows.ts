@@ -514,7 +514,11 @@ export function useSearchRows({
     );
   }, [scope, openCapture, captureActions]);
 
-  /** Every workspace you can switch to, Home first, the one you are in included. */
+  /**
+   * Every workspace you can switch to, Home first, the one you are in included.
+   * Dash has no row of its own: its chats are Chat's Dash tab, as in the
+   * switcher (plan #2748.1, note ed5d974e).
+   */
   const workspaces = useMemo<SearchCommand[]>(
     () => [
       {
@@ -523,15 +527,6 @@ export function useSearchRows({
         hint: 'Workspace',
         module: null,
         run: () => router.push('/home'),
-      },
-      // Dash's page sits with Home above the workspaces, as in the switcher (plan #1899.2).
-      {
-        id: 'workspace:dash',
-        label: 'Dash',
-        hint: 'Your chats with Dash',
-        module: null,
-        icon: 'dash',
-        run: () => router.push('/chat/dash'),
       },
       ...visibleModules(enabledModules, module).map((entry) => ({
         id: `workspace:${entry.id}`,

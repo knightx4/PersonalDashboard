@@ -254,10 +254,12 @@ describe('the daily cron route', () => {
     expect(runGoalsWeekly).toHaveBeenCalled();
     expect(body.results['goals-weekly']).toMatchObject({ started: true, ignored: 2 });
 
-    // Watched research briefs are checked for new sources by this cron too
-    // (plan #2023.8), each keeping its own week.
-    expect(runBriefWatch).toHaveBeenCalled();
-    expect(body.results['learn-brief-watch']).toEqual({ due: 1, checked: [], cards: 0 });
+    // The watch on research briefs (plan #2023.8) is one of the Learn stages
+    // paused on 16 November 2026 because it calls a model: the run passes
+    // over it and says so.
+    expect(runBriefWatch).not.toHaveBeenCalled();
+    expect(body.results['learn-brief-watch']).toEqual({ paused: true });
+    expect(body.results['learn-preparations']).toEqual({ paused: true });
 
     // Goal runs that stopped reporting are closed before the morning run
     // reads what is still going (plan #1002).

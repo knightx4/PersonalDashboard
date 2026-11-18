@@ -43,12 +43,17 @@ export type DevProject = {
   setUpAt: string | null;
   /** When it was put away. An archived project draws no section. */
   archivedAt: string | null;
+  /**
+   * The bot on People whose requests are this project's work (migration
+   * 0318): a plan step it adds or passes on is filed here (lib/plan/step-project).
+   */
+  botId?: string | null;
 };
 
 /** The columns `projectFromRow` reads. */
 export const PROJECT_COLUMNS =
   'id, label, description, owner, repo, branch, url, skill, check_command, set_up_at, archived_at, ' +
-  'created_at';
+  'bot_id, created_at';
 
 /** What a project id looks like: the check on `dev_projects.id`. */
 const SLUG = /^[a-z][a-z0-9-]{0,39}$/;
@@ -80,6 +85,7 @@ export function projectFromRow(row: Record<string, unknown>): DevProject | null 
     checkCommand: text(row.check_command),
     setUpAt: stamp(row.set_up_at),
     archivedAt: stamp(row.archived_at),
+    ...(text(row.bot_id) ? { botId: text(row.bot_id) } : {}),
   };
 }
 

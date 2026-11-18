@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { insertPlanItem } from '@/lib/plan/insert-item';
+import { fileStep, flagComment } from '@/lib/plan/step-project';
 import { editFeature, editPlanItem, friendlyPlanError, type PlanItemEdit } from '@/lib/plan/edit-item';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
@@ -243,10 +244,22 @@ export async function addPlanItem(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   let scope = await askedScope(supabase, user.id, parsed.data.module);
+  let flag: string | null = null;
   if (parsed.data.parent) {
     const parent = await parentModule(supabase, user.id, parsed.data.parent);
     if (!parent.ok) return { error: parent.error };
     scope = parent.module;
+  } else if (scope === null) {
+    // Added to the app as a whole: a repository the step names may say it
+    // belongs to a project (plan #3095). A workspace or project picked on
+    // the form is kept as picked.
+    const filing = fileStep({
+      title: parsed.data.title,
+      detail: parsed.data.detail,
+      projects: await loadDevProjects(supabase, user.id),
+    });
+    scope = filing.scope;
+    flag = filing.flag;
   }
 
   const position = await nextPlanPosition(supabase, user.id, scope, parsed.data.parent);
@@ -265,12 +278,13 @@ export async function addPlanItem(
     priority: parsed.data.priority,
     size: parsed.data.size,
     assignee: parsed.data.assignee,
+    comment: flagComment(flag),
     position,
   });
   if ('error' in written) return { error: written.error };
 
   revalidatePlan();
-  return { message: 'Added.' };
+  return { message: flag ? `Added. ${flag}` : 'Added.' };
 }
 
 const updateSchema = z.object({

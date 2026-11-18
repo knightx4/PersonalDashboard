@@ -55,8 +55,11 @@ fix, re-ask the one case it is about, never all of them.
   reply check:" that names the model and the rule; the fix is the rule, or
   `readReply` in `lib/core/model-call.ts` for a new shape.
 - **One case by hand**: `npx tsx scripts/sql.ts "select core.run_dash_quality('<case id>')"`
-  re-asks one case against whatever is deployed, in under a minute, for a
-  few cents. This is how a fix is proven. `core.run_dash_quality()` with no
+  re-asks one case against whatever is deployed, in under a minute. This is
+  how a fix is proven. It is not a few cents: on 11 November, with the
+  person's model and a 95,000-token prompt, a one-lookup case cost $0.56 and
+  a ten-lookup case $1.10. Re-ask only the case the fix is about, the
+  shortest one that shows it, and never a case whose cause is still open. `core.run_dash_quality()` with no
   id asks every case for about $1: do that only when a change touches every
   answer (the prompt, the loop), and at most once a week.
 - **Code**: `lib/dash/quality/` (grade, health, run), `inngest/core/dash-quality.ts`
@@ -119,7 +122,11 @@ is not one. Work it down:
   scan over embeddings (see migrations 0275 and 0276 for how recall was
   fixed). A bad argument from the model repeated across days means the tool's
   description or input schema misleads it: fix the description, or make the
-  tool accept what the model naturally sends.
+  tool accept what the model naturally sends. A lookup that says a row
+  exists nowhere when it does is often a read cut at the API's 1,000 rows
+  a request: `read_dev_row` named #2897.6 no step for a week because the
+  outline index stopped at 1,000 of 3,061 plan rows (fixed 11 November).
+  Count the rows the read should see before blaming the model.
 - **"I could not finish", a limit, or a refused lookup.** Read the spend
   rows of that minute (`core.model_spend`, operation `ask-dash`): how many
   calls, how many tokens each. Compare with `INPUT_BUDGET`, `MAX_LOOKUPS`
@@ -200,23 +207,35 @@ when you see a cause of failure that one fix will not remove.
    workspace or by a cheap first pass, rather than all of them. Measure with
    the health's `avgPromptTokens` before and after; the alert is at 85,000
    (`PROMPT_TOKENS_ALERT`) and the aim is under 30,000.
-2. **No lookup may hang or fail opaquely.** Give every lookup a time limit
-   and one retry for a transient database error (`lib/ask/tools.ts`
-   `executeAskTool`), and make every error tell the model what to try
-   instead.
+2. ~~**No lookup may hang or fail opaquely.**~~ Done 14 November:
+   `executeAskTool` (`lib/ask/tools.ts`) stops a lookup at `LOOKUP_TIME_MS`
+   (20 seconds), retries once on a dropped connection or a 5xx
+   (`isTransientDbError`), and each error tells the model what to try
+   instead. The Vercel log says `ask tool <name> failed: timed out` or
+   `failed once, retrying`; count those before raising the limit. Left: the
+   lookups that catch their own errors and answer `ok: false` (search_mail,
+   read_job_board, find_places) still word their own failures.
 3. **Whole answers, not a page.** Questions about all of something ("roles at
    X", "how much on Y") must reach a filtered query or a count, not the first
    50 rows of a list. Find where the tools return a page and the prompt lets
-   the model answer from it.
+   the model answer from it. Done 12 November: `job_applications` lists
+   live processes and unsent leads first (case e8554e9d). Next: the "full
+   picture" case 71b0bc38 still read interviews, todos and goals through
+   `query_rows`/`list_rows`/`table_info`; a failed case's `lookups` now keep
+   each call's input, so read them there before guessing which page it was.
 4. **Grounding.** Every factual claim about their data must rest on a row a
    lookup returned. On 22 October a thread reply said an answer "calls
    Decagon's pricing on work done a finance question"; the answer says
    nothing of the kind, and Dash had read only its first 160 characters. Add a check (cheap model or rules) that flags an answer
    naming rows, amounts or dates its lookups did not return, and record it
    in the run's grading.
-5. **Cover every workspace.** At least one case per workspace that is on
-   (jobs, shopping, todo, goals, learn, vault, news, you), and one for
-   recall. Write them from real questions in their chats.
+5. ~~**Cover every workspace.**~~ Done 17 November: every workspace that is
+   on (jobs, shopping, todo, goals, learn, vault, news, you, money) and
+   recall has at least one case. The last three added were vault
+   (b5037dcc, the MGT 847 note), you (80d00677, places lived) and news
+   (8c1bb116, saved stories); none has been asked yet, so the 1 December
+   run is their first. Retire the news case if those stories are unsaved.
+   A new workspace gets its case when it is turned on.
 6. **The connector (MCP) is Dash too.** Connected apps (claude.ai, Claude
    Desktop) call the same lookups through `app/api/mcp` and `lib/connector/`;
    the daily health reads `core.connector_calls` and alerts on `error` and
@@ -224,26 +243,39 @@ when you see a cause of failure that one fix will not remove.
    - The tool list a client loads is 109 tools, about 40,000 tokens: the
      catalogue of tables is repeated in list_rows, open_row, query_rows and
      table_info (`lib/ask/tools.ts`). Name it once.
-   - Descriptions name tools the connector does not have: `propose_delete`,
-     `change_todo`, `close_todo`, `move_roles`, `search_mail`,
-     `propose_watch` (`lib/ask/tools.ts`, `lib/dash/todo-writes.ts`,
-     `lib/dash/jobs-writes.ts`, `lib/dash/news-writes.ts`). Make each
-     description true for the surface it is sent to.
+   - ~~Descriptions name tools the connector does not have.~~ Done 16
+     November: the connector now has `change_todo`, `close_todo` and
+     `move_roles`, and the last mentions of `search_mail` and
+     `propose_delete` were reworded. `lib/connector/mcp.test.ts` fails when
+     a connector tool's description or input schema names a Dash tool the
+     connector does not offer (names with an underscore only).
    - The connector cannot add, rename or close a plain todo, move a role to
      another stage, or delete anything (`CONNECTOR_WRITE_TOOLS` in
      `lib/connector/writes.ts` against the Ask registry).
-   - `recordConnectorCall` runs after a write and throws if the log insert
-     fails, so the app sees an error for a change that was made and may make
-     it again (`lib/connector/mcp.ts`). Log first or never fail the call on
-     the log.
+   - ~~A failed log insert after a write turned a made change into an
+     error.~~ Done 13 November: `runConnectorWriteTool` answers with the
+     change and logs `connector write <tool> was not logged` to Vercel.
+     Lookups still throw on a failed log, by design.
    - Partial failures still answer as clean: `agenda` drops the workspaces it
      could not read, `recall` drops rows whose link failed while its totals
      still count them, and `open_row` drops a thread it could not read. Say
      what could not be read in the note, as `search` does, so the log and the
      health see it.
+   - The connector counts every ref as seen (`seen: () => …` in
+     `lib/connector/writes.ts`), so a write that takes two tables reads a
+     bare id as the first. On 15 November `add_role_note` refused 11
+     application ids as roles; it now reads the id as either (fixed). Any
+     other write whose `seenRef` lists two tables needs the same check.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
-   - No lookup has a time limit; the route allows 300 seconds.
+   - ~~No lookup has a time limit.~~ Done 14 November with item 2: 20 seconds each.
+   - ~~A guessed column failed the whole query_rows call.~~ Done 18
+     November: connected apps asked for posting_url, content or notes next
+     to real columns, and 13 of 151 calls in a week failed. `columns` now
+     leaves a guessed name out and names it in the note; a guess in `where`,
+     `order` or `group_by` is still refused, since it changes which rows
+     come back. Left: ids given as 8-character prefixes or company names to
+     a uuid column fail as "invalid input syntax for type uuid".
 7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
    a reply to an `@dash` comment keeps its lookups on its turn
    (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or

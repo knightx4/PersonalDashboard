@@ -7,7 +7,8 @@ import {
   parseRepositoryName,
   repositoryByName,
 } from '@/lib/plan/project-add';
-import { loadDevProjects, PROJECT_COLUMNS } from '@/lib/plan/projects';
+import { activeProjects, loadDevProjects, projectById, PROJECT_COLUMNS } from '@/lib/plan/projects';
+import { fileStep, flagComment } from '@/lib/plan/step-project';
 import { decidesSomething } from '@/lib/plan/decision-titles';
 import { insertPlanItem } from '@/lib/plan/insert-item';
 import { nextPlanPosition } from '@/lib/plan/position';
@@ -150,8 +151,9 @@ async function recentRepeat(
  * A step on the plan, as the plan page's Add and a comment's add_step write
  * it: always `proposed`, which is no work until the person approves it on the
  * page. Nothing here sets a status, assignee or priority. With `under` it
- * hangs beneath that step and takes its workspace; without, it goes at the top
- * of the named workspace (or the app as a whole).
+ * hangs beneath that step and takes its workspace or project; without, it goes
+ * at the top of the project fileStep picks (lib/plan/step-project, plan
+ * #3095), else of the named workspace (or the app as a whole).
  *
  * Every caller is a chat (Ask Dash, a People thread, a row's thread), so a
  * detail shorter than MIN_DETAIL is refused, and so is a title that repeats a
@@ -198,7 +200,8 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
   }
 
   let parentId: string | null = null;
-  let scope: string | null = null;
+  let parentScope: string | null | undefined;
+  let fallback: string | null = null;
   if (args.under !== undefined && args.under !== null && args.under !== '') {
     const number = Number(String(args.under).replace(/^#/, '').split('.')[0]);
     const ref = typeof args.under === 'string' && /^[0-9a-f-]{36}$/i.test(args.under) ? args.under : null;
@@ -208,13 +211,35 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
     const parent = data as { id: string; module: string | null } | null;
     if (!parent) throw new Refused(`No step on the plan is numbered ${String(args.under)}. Look it up with read_dev_row or find_dev_text.`);
     parentId = parent.id;
-    scope = parent.module;
+    parentScope = parent.module;
   } else if (typeof args.module === 'string' && args.module.trim()) {
-    scope = args.module.trim();
-    if (!(MODULE_IDS as readonly string[]).includes(scope)) {
-      throw new Refused(`"${scope}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
+    fallback = args.module.trim();
+    if (!(MODULE_IDS as readonly string[]).includes(fallback)) {
+      throw new Refused(`"${fallback}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
     }
   }
+
+  // Which project it is built in (plan #3095): the parent's, the one named,
+  // the repository the detail names, or the project of a bot asking for it.
+  const projects = await loadDevProjects(db, ctx.userId);
+  const named = typeof args.project === 'string' ? args.project.trim() : '';
+  if (named && parentId === null && !activeProjects(projects).some((p) => p.id === named)) {
+    const ids = activeProjects(projects).map((p) => p.id);
+    throw new Refused(
+      `"${named}" is not one of their projects in Dev.${ids.length ? ` Use one of ${ids.join(', ')}, or leave it out.` : ' Leave it out.'}`,
+    );
+  }
+  const filing = fileStep({
+    title,
+    detail,
+    projects,
+    parentScope,
+    project: named || null,
+    botIds: ctx.bots ?? [],
+    fallback,
+  });
+  const scope = filing.scope;
+  const project = projectById(projects, scope);
 
   const position = await nextPlanPosition(db, ctx.userId, scope as never, parentId);
   const written = await insertPlanItem(db, {
@@ -225,6 +250,7 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
     detail,
     status: 'proposed',
     kind: 'build',
+    comment: flagComment(filing.flag),
     position,
   });
   if ('error' in written) throw new Error(written.error);
@@ -236,7 +262,7 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
   const input: PostChangeInput = {
     verb: 'Added the step',
     what: `#${written.number} ${title}`,
-    rest: ', proposed for you to approve',
+    rest: project ? `, proposed for you to approve, in the ${project.label} project` : ', proposed for you to approve',
     href,
     where: 'Open the step',
     paths: ['/dev/plan', href],
@@ -250,7 +276,11 @@ async function addPlanStep(ctx: DashWriteContext, args: Args): Promise<DashWrite
     before: null,
     after,
     // Says how much detail went in, so a reply has no room to claim more (plan #2999).
-    summary: `Dash added the plan step #${written.number} "${title}" as a proposal, with a detail of ${detail.length} characters. It is not work until you approve it.`,
+    summary:
+      `Dash added the plan step #${written.number} "${title}" as a proposal, with a detail of ${detail.length} characters` +
+      (project ? `, in the ${project.label} project, built in ${project.repo.owner}/${project.repo.repo}` : '') +
+      `. It is not work until you approve it.` +
+      (filing.flag ? ` ${filing.flag}` : ''),
     row: { table: STEP_TABLE, ref: written.id, title: `#${written.number} ${title}`, href },
   };
 }
@@ -295,7 +325,11 @@ const STEP_INPUT: Anthropic.Tool['input_schema'] = {
     },
     under: {
       type: 'string',
-      description: 'The number of a step it belongs beneath ("2483" or "#2483.5"), when they say it is part of that one. It takes that step\'s workspace.',
+      description: 'The number of a step it belongs beneath ("2483" or "#2483.5"), when they say it is part of that one. It takes that step\'s workspace or project.',
+    },
+    project: {
+      type: 'string',
+      description: 'The project in Dev it is built in, by id ("music-pipeline"), when the work is in another repository than this app. Left out, a step whose detail says "Repository: owner/name" for one of their projects, or that a bot tied to a project asks for, is filed under that project. Ignored when under is given.',
     },
   },
   // Required since plan #2999: while it was optional, a chat left it out.

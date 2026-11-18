@@ -106,6 +106,10 @@ const MAX_AREA = 14_000_000;
 const ALL_WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'laptop', width: 1280, height: 900 },
+  // A tablet held upright. Asked for by name (SHOOT_WIDTHS=tablet): the shell
+  // changes between the phone's and the laptop's here, so a page can break
+  // at this width and at neither of the two shot by default.
+  { name: 'tablet', width: 820, height: 1180 },
   // A post's picture on X: a 16:9 window, shot as the screen shows it rather
   // than stretched to the whole page, so it lands horizontal in the timeline.
   { name: 'landscape', width: 1440, height: 810 },
@@ -141,7 +145,7 @@ const WIDTHS = (() => {
     .map((value) => value.trim())
     .filter(Boolean);
   if (!asked || asked.length === 0) {
-    return ALL_WIDTHS.filter((size) => !WINDOW_ONLY.has(size.name));
+    return ALL_WIDTHS.filter((size) => !WINDOW_ONLY.has(size.name) && size.name !== 'tablet');
   }
   const known = ALL_WIDTHS.filter((size) => asked.includes(size.name));
   if (known.length !== asked.length) {

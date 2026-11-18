@@ -42,7 +42,7 @@ import {
 } from '@/lib/you/group-chats-model';
 import { GroupMark, Reactions } from '../../group-parts';
 import { SpeakRun, VoicedBubble } from '../../people/[key]/thread-view';
-import { SpeakingPill, useSpeakArrivals } from '@/components/talk/speak-reply';
+import { SpeakingPill, SpeakingScope, SpeakSwitch, useSpeakArrivals } from '@/components/talk/speak-reply';
 import { BubbleCharts } from '@/components/talk/reply-chart';
 import { unlockSpeechOutput } from '@/lib/talk/speech/output';
 
@@ -121,7 +121,19 @@ export type GroupThreadProps = {
   onDraftChange?: (text: string) => void;
 };
 
-export function GroupThreadView({
+/**
+ * A group chat keeps its own voice switch, so turning voice on here plays this
+ * group's replies without turning it on in every chat (plan #3082).
+ */
+export function GroupThreadView(props: GroupThreadProps) {
+  return (
+    <SpeakingScope scope={`group.${props.chatId}`}>
+      <GroupThread {...props} />
+    </SpeakingScope>
+  );
+}
+
+function GroupThread({
   chatId,
   title,
   members: firstMembers,
@@ -408,13 +420,19 @@ export function GroupThreadView({
       name={title}
       // A group with no name of its own is already called by its members, so the line under says how many.
       detail={title === groupDetailOf(members) ? `Group of ${members.length}` : groupDetailOf(members)}
+      // One line, so the voice switch beside Settings does not push the header taller on a phone (plan #3082).
+      detailOneLine
       avatar={<GroupMark members={members} size="sm" />}
       back={{ href: '/chat', label: 'Messages' }}
       crumbs={[{ label: 'Messages', href: '/chat' }, { label: title, href: groupHref(chatId) }]}
       actions={
-        <Link href={groupSettingsHref(chatId)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-          Settings
-        </Link>
+        <>
+          {/* Each bot's new replies read aloud in its own voice while on (plan #3082). */}
+          <SpeakSwitch look="icon" />
+          <Link href={groupSettingsHref(chatId)} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+            Settings
+          </Link>
+        </>
       }
       scrollRef={scroller}
       onScroll={onScroll}

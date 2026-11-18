@@ -16,6 +16,8 @@ import { ROLE_KINDS, ROLE_KIND_LABELS, type RoleKind } from '@/lib/jobs/role-kin
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { experienceAsk, experienceShown } from '@/lib/jobs/jd/experience';
+import { AI_SCORE_LABEL } from '@/lib/jobs/roles-display';
+import { POSTING_PLATFORMS, POSTING_PLATFORM_LABELS, platformFromLink, shownPlatform } from '@/lib/jobs/roles/platform';
 import { lookUpJobDescription, updateRole, type JdLookupResult } from '../actions';
 import { matchRoleRequirements, rebuildRequirementMap } from './posting-actions';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -36,6 +38,8 @@ export function Posting({
   compSource,
   experienceMinYears,
   experienceMaxYears,
+  aiScore,
+  postingPlatform,
   detailsEditing,
   requirements,
   requirementMatches,
@@ -107,6 +111,8 @@ export function Posting({
         compSource={compSource}
         experienceMinYears={experienceMinYears}
         experienceMaxYears={experienceMaxYears}
+        aiScore={aiScore}
+        postingPlatform={postingPlatform}
         startEditing={detailsEditing}
         jdText={jdText}
       />
@@ -262,6 +268,8 @@ function RoleDetailsCard({
   compSource,
   experienceMinYears,
   experienceMaxYears,
+  aiScore,
+  postingPlatform,
   startEditing,
   jdText,
 }: {
@@ -275,6 +283,8 @@ function RoleDetailsCard({
   compSource: string | null;
   experienceMinYears: number | null;
   experienceMaxYears: number | null;
+  aiScore: number | null;
+  postingPlatform: string | null;
   startEditing?: boolean;
   /** Only to know whether the lookup is offered: it never overwrites one. */
   jdText: string;
@@ -297,12 +307,16 @@ function RoleDetailsCard({
   const [expMaxDraft, setExpMaxDraft] = useState(
     experienceMaxYears !== null ? String(experienceMaxYears) : '',
   );
+  const [aiDraft, setAiDraft] = useState(aiScore !== null ? String(aiScore) : '');
+  const [platformDraft, setPlatformDraft] = useState(postingPlatform ?? '');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [lookup, setLookup] = useState<JdLookupResult | null>(null);
   const [looking, startLooking] = useTransition();
 
   const compBand = formatCompBand(compMinCents, compMaxCents);
+  const platform = shownPlatform(postingPlatform, jdUrl);
+  const linkPlatform = platformFromLink(jdUrlDraft);
   const experience = experienceAsk(jdText);
   const shownExperience = experienceShown(
     { min: experienceMinYears, max: experienceMaxYears },
@@ -341,6 +355,11 @@ function RoleDetailsCard({
       setError('Give a minimum number of years too, or clear the maximum.');
       return;
     }
+    const ai = aiDraft.trim() ? Number(aiDraft) : null;
+    if (ai !== null && (!Number.isInteger(ai) || ai < 0 || ai > 100)) {
+      setError('The AI score is a whole number from 0 to 100.');
+      return;
+    }
     const nextUrl = jdUrlDraft.trim() || null;
     startTransition(async () => {
       const result = await updateRole(roleId, {
@@ -352,6 +371,8 @@ function RoleDetailsCard({
         compMaxCents: max,
         experienceMinYears: expMin,
         experienceMaxYears: expMax,
+        aiScore: ai,
+        postingPlatform: platformDraft || null,
         compSource:
           min !== null || max !== null
             ? ((compSource ?? 'recruiter') as 'posted' | 'recruiter' | 'estimate')
@@ -409,6 +430,17 @@ function RoleDetailsCard({
             }
           />
           <ValueRow label="Kind" value={ROLE_KIND_LABELS[kind]} />
+          <ValueRow
+            label="Platform"
+            value={
+              platform ? (
+                <>
+                  {platform.label}
+                  {platform.fromLink && <span className="ml-1.5 text-small text-ink-muted">from the link</span>}
+                </>
+              ) : null
+            }
+          />
           <ValueRow label="Location" value={location} />
           <ValueRow label="ATS job id" value={atsJobId} />
           <ValueRow
@@ -424,6 +456,7 @@ function RoleDetailsCard({
               ) : null
             }
           />
+          <ValueRow label={AI_SCORE_LABEL} value={aiScore !== null ? <span className="tabular">{aiScore}</span> : null} />
           {/* What you typed leads; the lines read from the description stay
               beneath it as what the posting says (note a7495ede). */}
           <ValueRow
@@ -506,6 +539,22 @@ function RoleDetailsCard({
             ))}
           </Select>
         </Field>
+        <Field id={`platform-${roleId}`} label="Platform">
+          <Select
+            className="max-sm:min-h-11"
+            value={platformDraft}
+            onChange={(event) => setPlatformDraft(event.target.value)}
+          >
+            <option value="">
+              {linkPlatform ? `Not set (the link says ${POSTING_PLATFORM_LABELS[linkPlatform]})` : 'Not set'}
+            </option>
+            {POSTING_PLATFORMS.map((option) => (
+              <option key={option} value={option}>
+                {POSTING_PLATFORM_LABELS[option]}
+              </option>
+            ))}
+          </Select>
+        </Field>
         <Field id={`location-${roleId}`} label="Location">
           <Input
             className="max-sm:min-h-11"
@@ -558,6 +607,17 @@ function RoleDetailsCard({
             />
           </Field>
         </div>
+        <Field id={`ai-${roleId}`} label={`${AI_SCORE_LABEL} (0 to 100)`}>
+          <Input
+            className="max-sm:min-h-11"
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={aiDraft}
+            onChange={(event) => setAiDraft(event.target.value)}
+          />
+        </Field>
       </div>
       <FieldError>{error}</FieldError>
       <div className="mt-3 flex gap-2">

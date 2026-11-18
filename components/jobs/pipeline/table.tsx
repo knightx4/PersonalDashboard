@@ -11,6 +11,7 @@ import type { ColumnFilter } from '@/lib/table-view';
 import type { DisplayChoice } from '@/lib/list-display';
 import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
+import { AI_SCORE_LABEL } from '@/lib/jobs/roles-display';
 
 /**
  * The Pipeline page's table view (plan #1590), which was the Roles page.
@@ -153,6 +154,11 @@ export function RolesTable({
               </Unsure>
             </TD>
             )}
+            {showing('ai') && (
+            <TD label={AI_SCORE_LABEL} muted className={cn(cell, 'tabular')}>
+              {row.aiScore ?? '—'}
+            </TD>
+            )}
             {showing('ready') && (
             <TD label="Ready" muted className={cn(cell, 'whitespace-nowrap')}>
               {row.readyToApply ? 'Ready' : '—'}
@@ -193,6 +199,7 @@ function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: strin
     showing('excitement') && row.excitement ? '★'.repeat(row.excitement) : null,
     fit ? `${FIT_SCORE_LABEL} ${fit}` : null,
     chance ? `${chance} chance` : null,
+    showing('ai') && row.aiScore !== null ? `${AI_SCORE_LABEL} ${row.aiScore}` : null,
     showing('ready') && row.readyToApply ? 'Ready' : null,
     showing('questions') && row.allQuestionsAdded ? 'Questions added' : null,
     comp,

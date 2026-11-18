@@ -70,10 +70,35 @@ describe('cleanAck', () => {
     expect(cleanAck('""')).toBeNull();
   });
 
-  it('cuts a long line', () => {
-    const cut = cleanAck('x'.repeat(400))!;
-    expect(cut.length).toBe(ACK_MAX_CHARS);
-    expect(cut.endsWith('…')).toBe(true);
+  // The first texts of 6 and 8 November 2026 (plan #3067), as the model wrote them past the limit.
+  const LONG_ACKS = [
+    "Hopes and fears is a good place to start, and I can help you get at them. Let's begin with the fear. What's the one you'd least want to say out loud about your future?",
+    'Better, but it\'s still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes. The interviewer wants a story.',
+  ];
+
+  it('keeps the whole sentences of a long line, never part of a word', () => {
+    expect(cleanAck(LONG_ACKS[0])).toBe(
+      'Hopes and fears is a good place to start, and I can help you get at them. Let\'s begin with the fear.',
+    );
+    expect(cleanAck(LONG_ACKS[1])).toBe(
+      'Better, but it\'s still a claim about AI rather than evidence of you doing it. Every implementation candidate will say they want to reshape processes.',
+    );
+    for (const text of LONG_ACKS) {
+      const kept = cleanAck(text)!;
+      expect(kept.length).toBeLessThanOrEqual(ACK_MAX_CHARS);
+      expect(kept).toMatch(/[.!?]$/);
+      expect(text.startsWith(kept)).toBe(true);
+    }
+  });
+
+  it('drops the unfinished sentence of a text stopped at its token cap', () => {
+    expect(cleanAck('Fair point. Let me think about the inter', true)).toBe('Fair point.');
+    expect(cleanAck('Ha, fair question.', true)).toBe('Ha, fair question.');
+  });
+
+  it('is null when no whole sentence fits', () => {
+    expect(cleanAck('x'.repeat(400))).toBeNull();
+    expect(cleanAck('Let me think about the inter', true)).toBeNull();
   });
 });
 

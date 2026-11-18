@@ -56,6 +56,8 @@ export const MODELS = {
   devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
   dayBrief: HAIKU,
+  /** lib/talk/speech/script-model.ts, a chat bubble's short spoken version for voice (plan #3079) */
+  spokenScript: HAIKU,
   /** lib/dev/inspiration/merge.ts */
   inspirationMerge: HAIKU,
   /** lib/dev/inspiration/summary.ts */

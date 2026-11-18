@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-import { fishEnv, fishSpeak, fishVoice, fishVoices, FISH_TTS_URL } from './fish';
-import { sampleLine, voiceIdOf, voicesOf } from './voices-model';
+import { fishEnv, fishSpeak, fishVoice, fishVoicePage, FISH_MODEL_URL, FISH_TTS_URL } from './fish';
+import { DEFAULT_VOICE_FILTERS, filtersActive, filtersOf, languageName, sampleLine, usesLabel, voiceIdOf, voiceListUrl, voicesOf } from './voices-model';
 
 const MODEL = (id: string, title: string, extra: Record<string, unknown> = {}) => ({
   _id: id,
@@ -27,14 +27,46 @@ describe('fish voices', () => {
     ]);
   });
 
-  it('lists your own voices first and keeps them out of the library', async () => {
-    const fetchImpl = vi.fn(async (url: string) =>
-      Response.json(url.includes('self=true') ? { total: 1, items: [MODEL('mine', 'My clone')] } : { total: 2, items: [MODEL('mine', 'My clone'), MODEL('lib', 'Library voice')] }),
-    );
-    const out = await fishVoices({ apiKey: 'k', voiceId: null }, ' calm ', fetchImpl as unknown as typeof fetch);
-    expect(out.mine.map((v) => v.id)).toEqual(['mine']);
-    expect(out.library.map((v) => v.id)).toEqual(['lib']);
-    expect(fetchImpl.mock.calls.every(([url]) => String(url).includes('title=calm'))).toBe(true);
+  it('keeps the tags, languages and use count the picker shows (plan #3081)', () => {
+    const [voice] = voicesOf({ items: [MODEL('v1', 'Calm', { tags: ['male', ' calm ', 3], languages: ['en'], task_count: 1200 })] });
+    expect(voice).toMatchObject({ tags: ['male', 'calm'], languages: ['en'], uses: 1200 });
+  });
+
+  it('asks Fish for one page with every filter the picker set (plan #3081)', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({ total: 45, items: Array.from({ length: 20 }, (_, i) => MODEL(`v${i}`, `Voice ${i}`)) }));
+    const filters = { search: ' calm ', gender: 'male' as const, language: 'en', tags: ['narrator', 'deep'], mine: true, sort: 'created_at' as const };
+    const out = await fishVoicePage({ apiKey: 'k', voiceId: null }, filters, 2, fetchImpl as unknown as typeof fetch);
+    expect(out.voices).toHaveLength(20);
+    expect(out.total).toBe(45);
+    expect(out.more).toBe(true);
+    const url = new URL(String((fetchImpl.mock.calls[0] as unknown as [string])[0]));
+    expect(url.origin + url.pathname).toBe(FISH_MODEL_URL);
+    expect(url.searchParams.get('title')).toBe('calm');
+    expect(url.searchParams.getAll('tag')).toEqual(['male', 'narrator', 'deep']);
+    expect(url.searchParams.get('language')).toBe('en');
+    expect(url.searchParams.get('self')).toBe('true');
+    expect(url.searchParams.get('sort_by')).toBe('created_at');
+    expect(url.searchParams.get('page_number')).toBe('2');
+  });
+
+  it('leaves out what is at its default, and says when the last page is reached', async () => {
+    const url = new URL(voiceListUrl(FISH_MODEL_URL, DEFAULT_VOICE_FILTERS, 1));
+    expect([...url.searchParams.keys()].sort()).toEqual(['page_number', 'page_size', 'sort_by']);
+    expect(url.searchParams.get('sort_by')).toBe('task_count');
+    const fetchImpl = vi.fn(async () => Response.json({ total: 22, items: [MODEL('a', 'A'), MODEL('b', 'B')] }));
+    expect((await fishVoicePage({ apiKey: 'k', voiceId: null }, DEFAULT_VOICE_FILTERS, 2, fetchImpl as unknown as typeof fetch)).more).toBe(false);
+    const refused = vi.fn(async () => new Response('', { status: 500 }));
+    await expect(fishVoicePage({ apiKey: 'k', voiceId: null }, DEFAULT_VOICE_FILTERS, 1, refused as unknown as typeof fetch)).rejects.toThrow();
+  });
+
+  it('reads filters back from storage, dropping anything it does not know', () => {
+    expect(filtersOf(null)).toEqual(DEFAULT_VOICE_FILTERS);
+    expect(filtersOf({ gender: 'robot', sort: 'random', language: 'English!', tags: ['calm', 'calm', '<b>'], mine: 'yes' })).toEqual({ ...DEFAULT_VOICE_FILTERS, tags: ['calm'] });
+    expect(filtersActive(DEFAULT_VOICE_FILTERS)).toBe(false);
+    expect(filtersActive({ ...DEFAULT_VOICE_FILTERS, mine: true })).toBe(true);
+    expect(languageName('en')).toBe('English');
+    expect(languageName('xx')).toBe('XX');
+    expect([usesLabel(1), usesLabel(312), usesLabel(9870), usesLabel(48210), usesLabel(1203400), usesLabel(undefined)]).toEqual(['1 use', '312 uses', '9,870 uses', '48.2k uses', '1.2m uses', null]);
   });
 
   it('tells a voice that is gone from one Fish could not be asked about', async () => {

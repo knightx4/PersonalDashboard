@@ -1,4 +1,5 @@
 import type { RequirementMatch } from '../evidence/match-payload';
+import { FIT_FACTOR_LABELS, fitDrivers, type RubricBreakdown } from './rubric';
 import { summariseHistory, titleLevel, wasSent, type Channel, type PastApplication } from './history';
 import {
   SCORE_CONFIDENCE_FLOOR,
@@ -113,8 +114,31 @@ function fitLevelSentence(value: number): string {
   return FIT_LEVEL_SENTENCES[index];
 }
 
+/** Capitalise the first letter. */
+function sentence(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /**
- * Why the fit is what it is, in order of how much each says:
+ * Fit from the rubric: the dealbreaker that capped it, else the factor that
+ * pulled it up most and the one that pulled it down most. Null when no factor
+ * pulls either way.
+ */
+export function rubricFitReason(fit: RubricBreakdown['fit']): string | null {
+  const { dealbreaker, best, worst } = fitDrivers(fit);
+  if (dealbreaker === 'excluded_industry') return 'In an industry you excluded';
+  if (dealbreaker === 'ruled_out') return 'Mostly work your career goals rule out';
+  if (best && worst) return `${sentence(FIT_FACTOR_LABELS[best].high)}, but ${FIT_FACTOR_LABELS[worst].low}`;
+  if (best) return sentence(FIT_FACTOR_LABELS[best].high);
+  if (worst) return sentence(FIT_FACTOR_LABELS[worst].low);
+  return null;
+}
+
+/**
+ * Why the fit is what it is. Fit is how much the person would want the job,
+ * built from the rubric since 17 November 2026, so a row scored that way
+ * says which factors drove it. An older row falls back, in order of how much
+ * each says, to:
  * the requirement verdicts where the match has run, a level unusual for
  * the person's applications, the fit label, the fit_score level, and last what little
  * the score was read from. Null when there is no fit answer at all.
@@ -122,6 +146,10 @@ function fitLevelSentence(value: number): string {
 export function fitReason(input: ScoreReasonInput): string | null {
   const { scores } = input;
   if (!scores.fit && !scores.fit_score) return null;
+  if (scores.fit_score && scores.rubric) {
+    const reason = rubricFitReason(scores.rubric.fit);
+    if (reason) return reason;
+  }
 
   const matches = input.requirementMatches ?? [];
   if (matches.length > 0) {
@@ -173,7 +201,8 @@ export function chanceReason(input: ScoreReasonInput): string | null {
   const similar = summary.similar;
 
   let lead: string | null = null;
-  if (input.scores.red_flags?.value && confident(input.scores.red_flags)) lead = 'Red flags in the posting';
+  if ((input.scores.rubric?.chance.chance_blocker?.score ?? 0) >= 0.5) lead = 'Asks for something you lack';
+  else if (input.scores.red_flags?.value && confident(input.scores.red_flags)) lead = 'Red flags in the posting';
   else if (levelAgainstHistory(jobLevel(input), input.history, input.excludeId) === 'above') lead = 'Above your usual level';
 
   if (similar.applied > 0) {

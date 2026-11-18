@@ -24,6 +24,7 @@ vi.mock('./writes', async (importActual) => ({
 }));
 
 import { ASK_TOOLS, ASK_TOOL_NAMES } from '@/lib/ask/tools';
+import { dashToolsOf } from '@/lib/dash/registry';
 import { CONNECTOR_WRITE_TOOLS } from './writes';
 import type { ConnectorAccess } from './access';
 import { protectedResourceResponse, serveMcp } from './mcp';
@@ -143,6 +144,23 @@ describe('the tool list', () => {
     for (const tool of tools.filter((t) => WRITE_NAMES.includes(t.name))) {
       expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
+  });
+
+  it('never tells a connected app to call a tool the connector does not offer', async () => {
+    const { tools } = (await call('tools/list')) as {
+      tools: { name: string; description: string; inputSchema: Record<string, unknown> }[];
+    };
+    const offered = new Set(tools.map((t) => t.name));
+    // Names with an underscore only: "search", "schedule" and "reword" are tools and also words.
+    const absent = (['lookup', 'proposal', 'handoff', 'write', 'paid'] as const)
+      .flatMap((kind) => dashToolsOf(kind).map((tool) => tool.definition.name))
+      .filter((name) => name.includes('_') && !offered.has(name));
+    expect(absent.length).toBeGreaterThan(0);
+    const named = tools.flatMap((tool) => {
+      const text = `${tool.description} ${JSON.stringify(tool.inputSchema)}`;
+      return absent.filter((name) => new RegExp(`\\b${name}\\b`).test(text)).map((name) => `${tool.name} names ${name}`);
+    });
+    expect(named).toEqual([]);
   });
 });
 
@@ -309,6 +327,21 @@ describe('a write call', () => {
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
     expect(calls.recordConnectorCall).toHaveBeenCalledWith(logClient, expect.objectContaining({ tool: 'add_to_reading_list', result }));
     expect(JSON.parse(answer.content[0].text).rows[0].href).toBe(`${HOST}/learn/r/r1`);
+  });
+
+  it('still answers with what it changed when the log insert fails, so the client does not make it again', async () => {
+    const result: AskToolResult = { ok: true, rows: [{ table: 'learn.readings', ref: 'r2', title: 'Evals', href: '/learn/r/r2' }] };
+    calls.runConnectorWrite.mockResolvedValue(result);
+    calls.recordConnectorCall.mockRejectedValue(new Error('Could not record the connector call: timeout'));
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const answer = await write('add_to_reading_list', { items: [{ title: 'Evals' }], subjects: ['AI'] });
+
+    expect(calls.runConnectorWrite).toHaveBeenCalledTimes(1);
+    expect(answer.isError).toBeUndefined();
+    expect(JSON.parse(answer.content[0].text).rows[0].href).toBe(`${HOST}/learn/r/r2`);
+    expect(quiet).toHaveBeenCalledWith('connector write add_to_reading_list was not logged', expect.any(Error));
+    quiet.mockRestore();
   });
 
   it('is refused, and logged, when the route gave no way to write', async () => {

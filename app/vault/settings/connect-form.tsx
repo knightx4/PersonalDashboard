@@ -57,6 +57,13 @@ export function ConnectVaultForm({
             defaultValue={defaults?.subpath ?? ''}
             placeholder="notes"
             autoComplete="off"
+            // A password manager reads the field before a password field as
+            // the username and fills an email into it. That once saved an
+            // email as the vault folder and the sync stopped seeing the vault.
+            data-1p-ignore
+            data-lpignore="true"
+            data-bwignore
+            data-form-type="other"
           />
           <p className="mt-1 text-ui text-ink-muted">
             Only if the vault is a subfolder of the repository.
@@ -72,7 +79,11 @@ export function ConnectVaultForm({
           type="password"
           required
           placeholder="github_pat_…"
-          autoComplete="off"
+          autoComplete="new-password"
+          data-1p-ignore
+          data-lpignore="true"
+          data-bwignore
+          data-form-type="other"
         />
         <p className="mt-1 text-ui text-ink-muted">
           Needs <strong>Contents: Read and write</strong> on this one repository, and nothing

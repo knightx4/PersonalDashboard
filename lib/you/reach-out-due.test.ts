@@ -5,6 +5,7 @@ import {
   dueBriefLines,
   dueSummary,
   dueWatchesOf,
+  keepGoalRowsInView,
   namedLately,
   readWatchRows,
   watchClock,
@@ -320,5 +321,72 @@ describe('reading the tables a rule watches', () => {
     const { db, calls } = fakeDb([{ id: 'x' }]);
     expect(await readWatchRows(db, 'owner-id', 'public.no_such_table', null)).toEqual([]);
     expect(calls.from).toBe('');
+  });
+});
+
+/** A goals-schema stand-in: items and item_goals rows, filtered by eq, is and in as PostgREST would. */
+function fakeGoalsDb(tables: Record<string, Record<string, unknown>[]>) {
+  const seen: { table: string; ops: [string, ...unknown[]][] }[] = [];
+  const db = ((schema: string) => ({
+    from: (table: string) => {
+      const call = { table: `${schema}.${table}`, ops: [] as [string, ...unknown[]][] };
+      seen.push(call);
+      let rows = tables[`${schema}.${table}`] ?? [];
+      const query: Record<string, unknown> = {
+        select: () => query,
+        eq: (col: string, v: unknown) => {
+          call.ops.push(['eq', col, v]);
+          rows = rows.filter((r) => r[col] === v);
+          return query;
+        },
+        is: (col: string, v: unknown) => {
+          rows = rows.filter((r) => (r[col] ?? null) === v);
+          return query;
+        },
+        in: (col: string, vs: unknown[]) => {
+          rows = rows.filter((r) => vs.includes(r[col]));
+          return query;
+        },
+        then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),
+      };
+      return query;
+    },
+  })) as unknown as SchemaReader;
+  return { db, seen };
+}
+
+describe("a morning plan's goal steps (plan #3069)", () => {
+  const OWNER = 'owner-id';
+  const goal = (id: string, activity: string | null) => ({ id, user_id: OWNER, parent_id: null, level: 'goal', status: 'open', activity, archived_at: null, starts_on: null });
+  const step = (id: string, parent: string, startsOn: string | null = null) => ({ id, user_id: OWNER, parent_id: parent, level: 'step', status: 'open', activity: null, archived_at: null, starts_on: startsOn });
+  const row = (ref: string, title: string): CandidateRow => ({ table: 'goals.items', ref, title, at: '2026-11-08T07:00:00Z' });
+
+  it('names none of a passive goal\'s dated steps, and the active goal\'s as before', async () => {
+    const { db, seen } = fakeGoalsDb({
+      'goals.items': [
+        goal('grad', 'passive'),
+        step('materials', 'grad'),
+        step('recommenders', 'materials'),
+        step('transcripts', 'materials'),
+        step('enrol', 'grad', '2026-11-29'),
+        goal('job', 'active'),
+        step('apply', 'job'),
+      ],
+      'goals.item_goals': [],
+    });
+    const rows = [row('recommenders', 'Ask three recommenders'), row('transcripts', 'Order transcripts'), row('enrol', 'Enrol in the spring courses'), row('apply', 'Apply to Acme')];
+    const other: CandidateRow = { table: 'you.insights', ref: 'i1', title: 'An insight', at: null };
+    const kept = await keepGoalRowsInView(db, OWNER, [...rows, other], '2026-11-08');
+    expect(kept.map((r) => r.ref)).toEqual(['apply', 'i1']);
+    expect(seen.every((c) => c.ops.some(([op, col, v]) => op === 'eq' && col === 'user_id' && v === OWNER))).toBe(true);
+  });
+
+  it('keeps a passive goal\'s step that also counts towards an active goal', async () => {
+    const { db } = fakeGoalsDb({
+      'goals.items': [goal('grad', 'passive'), step('recommenders', 'grad'), goal('job', 'active')],
+      'goals.item_goals': [{ user_id: OWNER, item_id: 'recommenders', goal_id: 'job', archived_at: null }],
+    });
+    const kept = await keepGoalRowsInView(db, OWNER, [row('recommenders', 'Ask three recommenders')], '2026-11-08');
+    expect(kept.map((r) => r.ref)).toEqual(['recommenders']);
   });
 });

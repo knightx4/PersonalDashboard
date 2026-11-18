@@ -25,7 +25,8 @@ export type CaseResult = {
   failures: string[];
   body: string;
   stop: string;
-  lookups: { name: string; ok: boolean; error?: string }[];
+  /** Each lookup with what it was asked (input, cut to 300 characters), so a failed case can be read without re-asking it. */
+  lookups: { name: string; ok: boolean; input?: string; error?: string }[];
   seconds: number;
   costMicros: number;
 };
@@ -39,7 +40,14 @@ export type DashQualityPorts = {
    * Asks one question as a new chat, read-only, and kept nowhere: of Ask
    * Dash, or of the advisor named, as a first message to them.
    */
-  ask(userId: string, question: string, advisor?: string | null, think?: boolean): Promise<{ outcome: CaseOutcome; costMicros: number }>;
+  ask(
+    userId: string,
+    question: string,
+    advisor?: string | null,
+    think?: boolean,
+    /** The run and case asking, kept with an answer that ran out of lookups (plan #3092). */
+    asked?: { runId: string; caseId: string },
+  ): Promise<{ outcome: CaseOutcome; costMicros: number }>;
   turns(userId: string, since: string): Promise<HealthTurn[]>;
   spend(userId: string, since: string): Promise<HealthSpend[]>;
   /** What connected apps called through the connector (core.connector_calls). */
@@ -57,11 +65,14 @@ export const CASE_CONCURRENCY = 3;
 /** The window of real answers the health covers. */
 export const HEALTH_HOURS = 24;
 
-function lookupsOf(outcome: CaseOutcome): CaseResult['lookups'] {
+export function lookupsOf(outcome: CaseOutcome): CaseResult['lookups'] {
   return outcome.toolCalls.map((call) => {
     const result = call.result as { ok?: unknown; error?: unknown } | undefined;
     const ok = result?.ok !== false;
-    return ok ? { name: call.name, ok } : { name: call.name, ok, error: String(result?.error ?? '').slice(0, 200) };
+    const asked = JSON.stringify(call.input ?? {}) ?? '{}';
+    const input = asked === '{}' ? undefined : asked.slice(0, 300);
+    const head = { name: call.name, ok, ...(input ? { input } : {}) };
+    return ok ? head : { ...head, error: String(result?.error ?? '').slice(0, 200) };
   });
 }
 
@@ -121,7 +132,7 @@ export async function runDashQuality(
       // A question put to an advisor names them, so the note says who failed it.
       const asked = c.advisor ? `(to ${c.advisor}) ${c.question}` : c.think ? `(thinking it through) ${c.question}` : c.question;
       try {
-        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null, c.think === true);
+        const { outcome, costMicros } = await ports.ask(userId, c.question, c.advisor ?? null, c.think === true, { runId, caseId: c.id });
         const failures = gradeAnswer(parseExpect(c.expect), outcome);
         return {
           case: c.id,

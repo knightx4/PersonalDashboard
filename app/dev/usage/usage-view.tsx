@@ -1,4 +1,6 @@
+import Link from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -12,6 +14,7 @@ import { DayBarChart } from '@/components/ui/day-bar-chart';
 import { hitRate } from '@/lib/usage/function-spend';
 import type { DayValue } from '@/lib/usage/day-bars';
 import type { SpendDays } from '@/lib/usage/per-day';
+import { LOOKUPS_HREF } from './lookups/lookups-view';
 
 /**
  * The Usage tab in Dev (plans #1482, #1693, #1752 and #2036.2). It opens on
@@ -268,7 +271,14 @@ export function UsageScreen({
 }) {
   return (
     <PageColumn>
-      <PageHeader title="Usage" />
+      <PageHeader
+        title="Usage"
+        actions={
+          <Link href={LOOKUPS_HREF} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+            Ran out of lookups
+          </Link>
+        }
+      />
       {days && <DayCharts days={days} />}
       <OpensByWorkspace report={report} phoneShare={phoneShare} />
       <section aria-labelledby="usage-functions" className="mt-8">

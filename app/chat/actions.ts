@@ -10,8 +10,8 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { createYouClient } from '@/lib/you/auth/server';
 import { setBotPhoto } from '@/lib/you/bot-photos';
 import { setBotVoice } from '@/lib/you/bot-voices';
-import { fishEnv, fishVoice, fishVoices } from '@/lib/talk/speech/fish';
-import { VOICE_ID, type VoiceList } from '@/lib/talk/speech/voices-model';
+import { fishEnv, fishVoice, fishVoicePage } from '@/lib/talk/speech/fish';
+import { VOICE_ID, filtersOf, type VoicePage } from '@/lib/talk/speech/voices-model';
 import { forgetMemory, markMentorRead } from '@/lib/you/council';
 import { loadPeople, loadThreadPage, markThreadRead, startChat, threadHref, withChats, type ThreadPage } from '@/lib/you/chat-threads';
 import { messageFiles, withMessageFiles } from '@/lib/you/chat-message-files';
@@ -467,17 +467,19 @@ export async function saveBotPhoto(advisorId: string, path: string | null): Prom
 }
 
 /**
- * The voices a bot's form offers (plan #3006.5): the person's own Fish
- * voices first, then the public library searched by name. `configured` is
- * false when the deployment has no Fish key, and the form says so.
+ * The voices a bot's form offers (plan #3006.5): one page of Fish's list
+ * with the picker's filters and order (plan #3081). The Fish key stays
+ * here, on the server. `configured` is false when the deployment has no
+ * Fish key, and the form says so.
  */
 // latency: pending
-export async function listBotVoices(search: string): Promise<({ configured: true } & VoiceList) | { configured: false } | { error: string }> {
+export async function listBotVoices(filters: unknown, page: number = 1): Promise<({ configured: true } & VoicePage) | { configured: false } | { error: string }> {
   await requireUser();
   const fish = fishEnv();
   if (!fish) return { configured: false };
+  const pageNumber = Number.isInteger(page) && page >= 1 && page <= 50 ? page : 1;
   try {
-    return { configured: true, ...(await fishVoices(fish, typeof search === 'string' ? search : '')) };
+    return { configured: true, ...(await fishVoicePage(fish, filtersOf(filters), pageNumber)) };
   } catch (error) {
     console.error('voices not listed', error);
     return { error: 'The voices could not be listed. Try again in a moment.' };

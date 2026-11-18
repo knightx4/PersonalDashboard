@@ -390,6 +390,24 @@ import {
   TodaysPieceNoneSurface,
   TodaysPieceSurface,
 } from './todays-piece-surfaces';
+import {
+  ReaderCopyrightPreview,
+  ReaderHomePreview,
+  ReaderIdeasPreview,
+  ReaderPreparingPreview,
+  ReaderSectionPreview,
+  ReaderSourcePreview,
+  ReaderSummaryPreview,
+} from './reader-surfaces';
+import {
+  CourseDigestBuildingPreview,
+  CourseDigestLecturesPreview,
+  CourseDigestLessonBranchPreview,
+  CourseDigestLessonPreview,
+  CourseDigestListPreview,
+  CourseDigestPlanPreview,
+  CourseDigestPlanUnderWayPreview,
+} from './course-digest-surfaces';
 import { BriefQuickPreview, LearnNowResearchNewPreview, LearnNowResearchPreview } from './brief-quick-surfaces';
 import { NowHeader } from '@/app/learn/now/header';
 import {
@@ -514,7 +532,7 @@ import {
   WRITING_QUESTION,
 } from './ask-surfaces';
 import { SessionThreadSurface } from './chat-session-surfaces';
-import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
+import { AskDashChatSpeakingSurface, AskSpeakSurface, ChatGroupSpeakingSurface, ChatThreadSpeakingSurface, ChatThreadSpeakSurface } from './speak-surfaces';
 import {
   ChatArrivalMomentSurface,
   ChatBuilderTextSurface,
@@ -695,6 +713,7 @@ import {
   DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import { DevLookupCapsEmptySurface, DevLookupCapsSurface } from './dev-lookup-caps-surfaces';
 import { DevModuleIdeasSurface, DevModuleSurface, DevModulesSurface } from './module-surfaces';
 import { FinancesSettingsView } from '@/app/finances/settings/settings-view';
 import { FinancesAccountSurface, FinancesAccountsSurface } from './finances-accounts-surfaces';
@@ -900,6 +919,8 @@ const rolePanels: PanelProps = {
   atsJobId: 'REQ-4471',
   experienceMinYears: null,
   experienceMaxYears: null,
+  aiScore: 70,
+  postingPlatform: null,
   compMinCents: 18000000,
   compMaxCents: 24000000,
   compSource: 'posting',
@@ -1056,6 +1077,7 @@ const pipelineRow = (
   source: 'portal',
   attempt: 1,
   excitement: 3,
+  aiScore: null,
   needsReview: false,
   readyToApply: false,
   allQuestionsAdded: false,
@@ -8143,6 +8165,122 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnCourseCheckPreview />,
   },
   {
+    /* Learn's front page (learn 0195): one press picks up where you left off, then what you started, what was chosen against your notes, what is new and what you asked for. */
+    id: 'learn-read-home',
+    label: 'Read · What there is to read',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderHomePreview />,
+  },
+  {
+    /* A source in layers: its context, the work in brief, the one idea, then each section opening to its summary. */
+    id: 'learn-read-source',
+    label: 'Read · A source in layers',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSourcePreview />,
+  },
+  {
+    /* A source whose text may not be shown: summaries, and where to paste your own copy. */
+    id: 'learn-read-copyright',
+    label: 'Read · A source in copyright',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderCopyrightPreview />,
+  },
+  {
+    /* Something asked for while reading, still being prepared. */
+    id: 'learn-read-preparing',
+    label: 'Read · Being prepared',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderPreparingPreview />,
+  },
+  {
+    /* One section: where you are in the argument, the author's text with a note behind each dotted phrase, the one idea. */
+    id: 'learn-read-section',
+    label: 'Read · A section of text',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSectionPreview />,
+  },
+  {
+    /* A section of a work in copyright, read as its summary. */
+    id: 'learn-read-summary',
+    label: 'Read · A section as its summary',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderSummaryPreview />,
+  },
+  {
+    /* The one idea of every section read, each a way back to its passage. */
+    id: 'learn-read-ideas',
+    label: 'Read · Ideas you have met',
+    module: 'learn',
+    width: 'page',
+    render: () => <ReaderIdeasPreview />,
+  },
+  {
+    /* Learn's Courses tab (learn 0194): a course being built, one built, the
+     * box that takes any playlist, and the open courses Dash can build. */
+    id: 'learn-digest-list',
+    label: 'Courses · Yours and the catalogue',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestListPreview />,
+  },
+  {
+    /* A course part way through its build: each stage named, the one running
+     * with its count. */
+    id: 'learn-digest-building',
+    label: 'Courses · A build under way',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestBuildingPreview />,
+  },
+  {
+    /* A built course on its map before a step is taken: each stage a place
+     * under the stages it rests on, and the opening stage open beside it. */
+    id: 'learn-digest-plan',
+    label: 'Courses · The map',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestPlanPreview />,
+  },
+  {
+    /* The same map with the opening stage done and a branch begun. */
+    id: 'learn-digest-plan-under-way',
+    label: 'Courses · The map, a branch under way',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestPlanUnderWayPreview />,
+  },
+  {
+    /* A built course's lectures: a verdict on each, and each playing in the page. */
+    id: 'learn-digest-lectures',
+    label: 'Courses · The lectures',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestLecturesPreview />,
+  },
+  {
+    /* One step of the plan: where it sits in its stage, commentary, a clip in
+     * the page, a drawing, a reading, a question, and one press to go on. */
+    id: 'learn-digest-lesson',
+    label: 'Courses · A step of the plan',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestLessonPreview />,
+  },
+  {
+    /* The last step of a stage: the foot offers the branches that follow. */
+    id: 'learn-digest-lesson-branch',
+    label: 'Courses · A step where the course branches',
+    module: 'learn',
+    width: 'page',
+    render: () => <CourseDigestLessonBranchPreview />,
+  },
+  {
     /* A Learn-area goal's Learning section: how well you want to know it,
      * its plan and the Practise link (plan #1491, from Learn's old Goals tab). */
     id: 'learn-goals-list',
@@ -9510,6 +9648,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatGroupSurface state="made-files" />,
   },
   {
+    /* A group with its voice switch on (plan #3082): the switch lit in the
+     * header beside Settings, a speaker on each bot's bubble, and the CFO's
+     * newest text being read in the CFO's voice, named in the pill. */
+    id: 'chat-group-speaking',
+    label: 'Chat · A group chat, voice on and a reply being read',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatGroupSpeakingSurface />,
+  },
+  {
     /* A group's settings in the thread's place: its name, who is in it ticked from everyone, and Delete group at the foot. */
     id: 'chat-group-settings',
     label: 'Chat · A group chat, settings',
@@ -9606,7 +9754,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="photo-failed" />,
   },
   {
-    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture names it, with a sample to hear, Change voice and Use default. */
+    /* A bot with a Fish voice of its own (plan #3006.5): the Voice row under the picture is one Choose voice button naming it, with a sample to hear beside it (plan #3081). */
     id: 'chat-person-edit-voice',
     label: 'Chat · Editing a bot, with their own voice',
     module: 'chat',
@@ -9614,12 +9762,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <ChatPersonEditSurface state="voice" />,
   },
   {
-    /* The voice picker open: a search over Fish voices, the person's own voices first, then the library, each with a sample and Use; the voice in use says so; a pasted ID or link at the foot. */
+    /* The voice picker's pop-up (plan #3081): a modal on a laptop, a full-height sheet on a phone. Search, gender chips and Mine, style tag chips with the note on uploaders' tags, language and sort; Male and calm on, so Clear filters shows; each voice with its tags, language, uses, a sample and Use this voice; the voice in use says so; Show more voices; a pasted ID or link and Dash's default at the foot. */
     id: 'chat-person-edit-voice-picker',
     label: 'Chat · Editing a bot, choosing a voice',
     module: 'chat',
     width: 'screen',
     render: () => <ChatPersonEditSurface state="voice-picker" />,
+  },
+  {
+    /* The voice picker's pop-up with nothing for its filters (plan #3081): Mine, Female, young, Japanese and a search on, the empty line, and Clear filters. */
+    id: 'chat-person-edit-voice-picker-empty',
+    label: 'Chat · Editing a bot, no voice for these filters',
+    module: 'chat',
+    width: 'screen',
+    render: () => <ChatPersonEditSurface state="voice-picker-empty" />,
   },
   {
     /* A saved voice Fish no longer offers: the row says Voice unavailable, using default. */
@@ -13278,6 +13434,27 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageEmptySurface />,
+  },
+  {
+    id: 'dev-lookup-caps',
+    label: "Dev · Ran out of lookups",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface />,
+  },
+  {
+    id: 'dev-lookup-caps-open',
+    label: "Dev · Ran out of lookups, lookups open",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsSurface open />,
+  },
+  {
+    id: 'dev-lookup-caps-empty',
+    label: "Dev · Ran out of lookups, none yet",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevLookupCapsEmptySurface />,
   },
   {
     id: 'dev-modules',

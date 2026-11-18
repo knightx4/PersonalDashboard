@@ -78,6 +78,26 @@ describe('the strip at the top of Home', () => {
     expect(html).toContain('href="/chat/people/builder"');
     expect(html).toContain('Sessions');
     expect(html).toContain('2 working · 1 waiting');
+    expect(html).not.toContain('Browser runner');
+  });
+
+  it('says whether the browser runner is up on the PC or the Mac (plan #3075)', () => {
+    const strip = (browserRunner: { value: string; up: boolean } | null) =>
+      renderToStaticMarkup(
+        <NowStrip
+          run={null}
+          ready={0}
+          openNotes={0}
+          mainCheck={check()}
+          inbox={0}
+          slips={null}
+          sessions={null}
+          browserRunner={browserRunner}
+        />,
+      );
+    expect(strip({ value: 'Never run', up: false })).toContain('Never run');
+    expect(strip({ value: 'PC up', up: true })).toContain('PC up');
+    expect(strip(null)).toContain('Browser runner');
   });
 });
 

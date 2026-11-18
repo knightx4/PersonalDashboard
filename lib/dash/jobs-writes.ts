@@ -43,7 +43,8 @@ import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } fr
 import { CLASSIFICATIONS, type MessageClassification } from '@/lib/jobs/email/classify';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { fileJobNote } from '@/lib/jobs/notes';
-import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { aiScoreError, descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { POSTING_PLATFORMS } from '@/lib/jobs/roles/platform';
 import { channelEdit, excitementError, saveApplicationEdit, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import {
   changedRoleFacts,
@@ -395,6 +396,19 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (given(args, 'posting_status')) {
     update.posting_status = oneOf(args, 'posting_status', POSTING_STATUSES, false);
     changed.push('whether the posting is open');
+  }
+  if (given(args, 'ai_score')) {
+    // The person's own score; nothing computes it. Empty or null clears it.
+    const raw = args.ai_score;
+    const score = raw === null || raw === '' ? null : Number(raw);
+    const bad = aiScoreError(score);
+    if (bad) throw new JobsRefused(bad);
+    update.ai_score = score;
+    changed.push('the AI score');
+  }
+  if (given(args, 'posting_platform')) {
+    update.posting_platform = oneOf(args, 'posting_platform', POSTING_PLATFORMS, true);
+    changed.push('the recruiting platform');
   }
   if (given(args, 'posting_url')) {
     const url = clearable(args, 'posting_url', 2000);
@@ -1592,7 +1606,7 @@ async function namedEmail(env: JobsWriteEnv, ref: string): Promise<Row> {
   if (isUuid(ref)) query = query.eq('id', ref);
   else {
     const at = ref.indexOf(':');
-    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('email_ref must be the ref search_mail or a lookup returned for the email.');
+    if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('email_ref must be the ref a mail search or a lookup returned for the email.');
     query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
   }
   const { data, error } = await query.maybeSingle();
@@ -1781,7 +1795,7 @@ async function changeRoleEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade>
   const application = await namedApplication(env, args);
   const applicationId = application.id as string;
   const emailRef = text(args, 'email_ref');
-  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref a mail search or a lookup returned.');
   // Through the inbox view, which carries the person's user id.
   const email = await namedEmail(env, emailRef);
   const messageId = email.id as string;
@@ -2154,7 +2168,7 @@ const pickMessage = (row: Row): Row => Object.fromEntries(MESSAGE_COLUMNS.map((c
 /** The emails a call names, read through the inbox view by the person's user id; refused unless every one is theirs. */
 async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
   const list = Array.isArray(refs) ? refs : [];
-  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as search_mail or a lookup returned them.');
+  if (list.length === 0) throw new JobsRefused('Name the emails: email_refs, as a mail search or a lookup returned them.');
   if (list.length > EMAILS_MAX) throw new JobsRefused(`Up to ${EMAILS_MAX} emails at a time.`);
   const byId = new Map<string, Row>();
   for (const raw of list) {
@@ -2164,7 +2178,7 @@ async function namedEmails(env: JobsWriteEnv, refs: unknown): Promise<Row[]> {
     if (isUuid(ref)) query = query.eq('id', ref);
     else {
       const at = ref.indexOf(':');
-      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref search_mail or a lookup returned for the email.');
+      if (at <= 0 || !isUuid(ref.slice(0, at))) throw new JobsRefused('Each of email_refs must be the ref a mail search or a lookup returned for the email.');
       query = query.eq('email_account_id', ref.slice(0, at)).eq('provider_message_id', ref.slice(at + 1));
     }
     const { data, error } = await query.maybeSingle();
@@ -2266,7 +2280,7 @@ async function addRoleFromEmail(env: JobsWriteEnv, args: Args): Promise<JobsMade
   if (companyGiven.length > COMPANY_MAX) throw new JobsRefused(`Keep company under ${COMPANY_MAX} characters.`);
   let emailRef = text(args, 'email_ref');
   if (emailRef.startsWith('job_search.inbox_messages:')) emailRef = emailRef.slice('job_search.inbox_messages:'.length);
-  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref search_mail or a lookup returned.');
+  if (!emailRef) throw new JobsRefused('Name the email: email_ref, the ref a mail search or a lookup returned.');
   const email = await namedEmail(env, emailRef);
   const messageId = email.id as string;
   const { data: stored, error: storedError } = await env.jobs.from('ingested_messages').select('resulting_application_id').eq('id', messageId).maybeSingle();
@@ -3024,7 +3038,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
     ),
     description:
-      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
+      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, the recruiting platform it is posted on (Ashby, Greenhouse, Workday, the company's own site and so on), its AI score (their own 0 to 100 rating of how much the role involves AI work, set only when they give it), or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
       type: 'object',
       properties: {
@@ -3041,6 +3055,14 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         pay_min: { type: 'number', description: 'The bottom of the yearly pay band, a whole amount such as 150000. 0 clears it.' },
         pay_max: { type: 'number', description: 'The top of the yearly pay band. 0 clears it.' },
         pay_source: { type: 'string', description: `Where the pay came from: ${PAY_SOURCES.join(', ')}. ${CLEARABLE}` },
+        posting_platform: {
+          type: 'string',
+          description: `The recruiting platform the posting is on: ${POSTING_PLATFORMS.join(', ')}. in_house is the company's own careers site. ${CLEARABLE}`,
+        },
+        ai_score: {
+          type: ['number', 'string'],
+          description: `Their AI score for the role: a whole number from 0 to 100, as they gave it. ${CLEARABLE}`,
+        },
         company: { type: 'string', description: 'The company the role belongs to, by name.' },
         company_priority: {
           type: 'string',
@@ -3053,7 +3075,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
           description:
             'Where the location, work mode, seniority, posting status and pay given came from: posting when quoted from the posting, email when quoted from an email (give email_ref), person when they told you the value, guess when you worked it out. Left out, they are recorded as your guess, except pay with pay_source posted or recruiter. A guess does not replace a value that came from the posting or an email.',
         },
-        email_ref: { type: 'string', description: 'With fact_source email: the ref search_mail or a lookup returned for the email the values came from.' },
+        email_ref: { type: 'string', description: 'With fact_source email: the ref a mail search or a lookup returned for the email the values came from.' },
       },
       additionalProperties: false,
     },
@@ -3245,7 +3267,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         due: { type: 'string', description: 'The new due day, YYYY-MM-DD.' },
         email_ref: {
           type: 'string',
-          description: 'The email to link it to: the ref search_mail returned, or a job_search.inbox_messages ref. An empty string unlinks it.',
+          description: 'The email to link it to: a job_search.inbox_messages ref, or the ref a mail search returned. An empty string unlinks it.',
         },
       },
       required: ['reminder_ref'],
@@ -3290,7 +3312,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         role_ref: { type: 'string', description: "Instead of application_ref: the job_search.roles ref, for the role's latest application." },
         email_ref: {
           type: 'string',
-          description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.',
+          description: 'The email: a job_search.inbox_messages ref, or the ref a mail search returned.',
         },
       },
       required: ['action', 'email_ref'],
@@ -3345,11 +3367,11 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/review/actions.ts#dismissMessages', 'lib/jobs/review/verdicts.ts#dismissMessageRows'],
       ['app/jobs/(app)/review/actions.ts#restoreDismissedMessages', 'lib/jobs/review/verdicts.ts#restoreMessageRow'],
     ),
-    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by the refs search_mail returned or their job_search.inbox_messages refs. Linking an email to a role is change_role_email.`,
+    description: `Dismiss emails waiting in Jobs review when they ask (mail that is not about their job search): each is marked not relevant and leaves the queue. restore brings a dismissed one back to the queue, with the classification it has unless classification gives the right one. Up to ${EMAILS_MAX} at a time, named by their job_search.inbox_messages refs or the refs a mail search returned. Linking an email to a role is change_role_email.`,
     input_schema: {
       type: 'object',
       properties: {
-        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: refs from search_mail, or job_search.inbox_messages refs.' },
+        email_refs: { type: 'array', items: { type: 'string' }, description: 'The emails: job_search.inbox_messages refs, or refs a mail search returned.' },
         verb: { type: 'string', enum: ['dismiss', 'restore'], description: 'dismiss to take them out of the queue; restore to bring dismissed ones back.' },
         classification: {
           type: 'string',
@@ -3446,7 +3468,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
     input_schema: {
       type: 'object',
       properties: {
-        email_ref: { type: 'string', description: 'The email: the ref search_mail returned, or a job_search.inbox_messages ref.' },
+        email_ref: { type: 'string', description: 'The email: a job_search.inbox_messages ref, or the ref a mail search returned.' },
         company: { type: 'string', description: 'The company the role is at, by name.' },
         title: { type: 'string', description: 'What the role is called.' },
       },

@@ -41,6 +41,7 @@ import { INTERVIEW_WRITE_TOOLS } from './interview-writes';
 import { POST_WRITE_TOOLS } from './post-writes';
 import { MODEL_WRITE_TOOLS } from './model-writes';
 import { PROJECT_WRITE_TOOLS } from './project-writes';
+import { APP_ROUTE_WRITE_TOOLS } from './app-route-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -633,18 +634,24 @@ async function noteOnRole(
   if (body.length > ROLE_NOTE_MAX) throw new Refused(`Keep the note under ${ROLE_NOTE_MAX} characters.`);
 
   const jobs = await ctx.db('job_search');
-  let roleId = id;
-  if (table === TABLE.application) {
+  type Role = { id: string; title: string; companies: { name: string } | null };
+  const readRole = (roleId: string) =>
+    one<Role>(
+      jobs.from('roles').select('id, title, companies ( name )').eq('id', roleId).eq('user_id', ctx.userId).limit(1),
+    );
+  // A bare id may be either: the connector takes any ref, so an
+  // application's id arrives as a role_ref (11 refusals on 15 November).
+  // Read it as a role first, then as the application that names one.
+  let role = table === TABLE.role ? await readRole(id) : null;
+  if (!role) {
     const application = await one<{ role_id: string }>(
       jobs.from('applications').select('role_id').eq('id', id).eq('user_id', ctx.userId).limit(1),
     );
-    if (!application) throw new Refused('That application is not one of theirs.');
-    roleId = application.role_id;
+    if (application) role = await readRole(application.role_id);
+    else if (table === TABLE.application) throw new Refused('That application is not one of theirs.');
   }
-  const role = await one<{ id: string; title: string; companies: { name: string } | null }>(
-    jobs.from('roles').select('id, title, companies ( name )').eq('id', roleId).eq('user_id', ctx.userId).limit(1),
-  );
   if (!role) throw new Refused('That role is not one of theirs, or it has been deleted.');
+  const roleId = role.id;
   const roleTitle = `${role.title}${role.companies?.name ? ` at ${role.companies.name}` : ''}`;
 
   // Their note, written down for them in the role's thread: it reads as
@@ -1304,6 +1311,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ...POST_WRITE_TOOLS,
   // A repository added as a Dev project (plan #2553.5).
   ...PROJECT_WRITE_TOOLS,
+  // One of the app's own cron routes run, and polled in the background (plan #3070.3).
+  ...APP_ROUTE_WRITE_TOOLS,
   ...MODEL_WRITE_TOOLS,
 ];
 

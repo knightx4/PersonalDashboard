@@ -342,6 +342,22 @@ Reading tracks, each answering one question.
 - Name a row by `title`; link it by `id`
 - Opens at `/learn/t/<id>`
 
+### `learn.reader_sources` (Learn)
+
+Things prepared for them to read: why each was chosen, what they asked for, what they have read of it and whether they kept it.
+
+- Search: `title`, `author`, `why`, `asked`
+- Name a row by `title`; link it by `id`
+- Opens at `/learn/read/<id>`
+
+### `learn.courses` (Learn)
+
+Lecture series cut down for them: what they wanted from each, the digest and what they have watched.
+
+- Search: `title`, `about`, `goal`
+- Name a row by `title`; link it by `id`
+- Opens at `/learn/courses/<id>`
+
 ### `learn.readings` (Learn)
 
 Things they read or mean to read, with why and their note.

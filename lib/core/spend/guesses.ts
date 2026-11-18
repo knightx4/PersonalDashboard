@@ -409,6 +409,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'ask-dash': run(SONNET, 30_000, 1_000),
   // One reply of about 500 characters, as bytes; nothing comes back to bill.
   'speak-reply': run(FISH_S2_1_PRO, 500, 0),
+  // The rules and one bubble in, up to about 2,000 characters; two sentences
+  // and Haiku's thinking out.
+  'write-spoken-script': run(HAIKU, 1_000, 300),
   // Twelve weeks of the timeline, 381 events to 21 September 2026 at about
   // 30 tokens each, and the weekly lines; up to three sentences with their
   // ids out.

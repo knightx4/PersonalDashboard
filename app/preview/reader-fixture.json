@@ -1,0 +1,133 @@
+{
+ "open": {
+  "title": "What Is Money?",
+  "author": "A. Mitchell Innes",
+  "published": "Banking Law Journal, May 1913",
+  "kind": "text",
+  "rights": "open",
+  "minutes": 78,
+  "context": "Alfred Mitchell Innes was a British diplomat, serving at the embassy in Washington when he published this in an American bankers' journal. He was arguing against the account of money that economists had taken from Adam Smith: barter first, then gold and silver as a medium of exchange, with credit as a later substitute for metal. Keynes reviewed the essay in 1914 and agreed with much of the theory while doubting parts of the history. It was then largely forgotten until the 1990s, when writers on state money and credit revived it, and David Graeber's history of debt later drew on it. It gets read now because money did become what Innes said it always was.",
+  "brief": "Innes argues that coins never held a fixed value in metal and that the unit of account was always separate from any coin, so metal cannot be what money is. A sale is the exchange of goods for a credit, and commerce is the creation of debts and their cancellation against one another, recorded for millennia on tallies, tablets and ledgers. Government money is the government's debt, given value by the taxes that must be settled with it, and a bank is a place where debts and credits are brought together to cancel. The gold standard, on this view, is a law propping up the price of a metal.",
+  "idea": "Money is a transferable debt: what you hold is someone's obligation, and its worth is that you can use it to cancel an obligation of your own.",
+  "figure": null,
+  "sections": [
+   {
+    "title": "A sale is goods exchanged for a credit",
+    "minutes": 3,
+    "pages": null,
+    "context": "The history is done and the positive theory starts here. Innes goes back to Adam Smith's butcher, brewer and baker, the passage from which the barter story comes, and asks whether the difficulty Smith describes is real.",
+    "summary": "Smith says the butcher cannot trade with a baker who has nothing he wants today, so people must have started keeping a commodity that everyone accepts. Innes answers that the butcher can simply take the baker's acknowledgment of the debt, to be redeemed in bread later. That needs no special commodity. It needs a community that holds people to their obligations, and law of debt is found in the oldest records there are.",
+    "idea": "Trade without coins needs only that a promise to pay later be enforceable, and the law of debt is older than any coin.",
+    "text": [
+     "If we assume that in pre-historic ages man lived by barter, what is the development that would naturally have taken place, whereby he grew to his present knowledge of the methods of commerce? The situation is thus explained by Adam Smith:",
+     "\"But when the division of labor first began to take place, this power of exchanging must frequently have been very much clogged and embarrassed in its operations. One man, we shall suppose, has more of a certain commodity than he himself has occasion for, while another has less. The former consequently would be glad to dispose of, and the latter to purchase, a part of this superfluity. But if this latter should chance to have nothing that the former stands in need of, no exchange can be made between them. The butcher has more meat in his shop than he himself can consume, and the brewer and the baker would each of them be willing to purchase a part of it. But they have nothing to offer in exchange, except the different productions of their respective trades, and the butcher is already provided with all the bread and beer which he has immediate occasion for. No change can in this case be made between them. He cannot offer to be their merchant nor they his customers; and they are all of them thus mutually less serviceable to one another. In order to avoid the inconveniency of such situations, every prudent man in every period of society, after the first establishment of the division of labor, must naturally have endeavored to manage his affairs in such a manner, as to have at all times by him, besides the peculiar produce of his own industry, a certain quantity of some one commodity or other, such as he imagined that few people would be likely to refuse in exchange for the produce of their industry.\"",
+     "\"Many different commodities, it is probable, were successively both thought of and employed for this purpose.... In all countries, however, men seem at last to have been determined by irresistible reasons to give the preference, for this employment, to metals above every other commodity.\""
+    ],
+    "glosses": [
+     {
+      "phrase": "division of labor",
+      "note": "Smith's term for people specialising in one trade and exchanging for the rest. The quotation is from the Wealth of Nations, Book I, chapter 4."
+     },
+     {
+      "phrase": "clogged and embarrassed",
+      "note": "Eighteenth-century English for hampered and obstructed."
+     }
+    ],
+    "questions": [
+     {
+      "question": "Smith's problem is that the baker has nothing the butcher wants. What does Innes add to the scene that makes the problem go away?",
+      "answer": "Time, and trust backed by the community. The baker does not need to hand anything over today. He gives a promise, and the butcher can hold it until he wants bread or pass it to someone who does. So the precondition for trade is enforceable debt. That shifts the question about money from 'what substance is it made of' to 'whose promise is it and who will accept it'."
+     }
+    ],
+    "figure": null
+   },
+   {
+    "title": "What a credit is, and how debts cancel",
+    "minutes": 6,
+    "pages": null,
+    "context": "This is the core of the essay. Innes defines credit and debt as one relationship seen from two sides, then explains what a credit is for. Read the worked example with A, B and C slowly; the diagram shows it.",
+    "summary": "A credit is the right to be paid, and Innes says its important use is that it lets the holder cancel a debt of his own. Everyone both buys and sells, so everyone is debtor and creditor at once, and commerce is the constant creation of debts and their cancellation against each other. A credit is worth what the debtor's own incoming credits make it worth. A person is solvent only if the credits available to him now cover the debts due now.",
+    "idea": "A credit matters because you can hand it back to the person who issued it and so cancel what you owe him.",
+    "text": [
+     "It is here necessary to explain the primitive and the only true commercial or economic meaning of the word \"credit.\" It is simply the correlative of debt. What A owes to B is A's debt to B and B's credit on A. A is B's debtor and B is A's creditor. The words \"credit\" and \"debt\" express a legal relationship between two parties, and they express the same legal relationship seen from two opposite sides. A will speak of this relationship as a debt, while B will speak of it as a credit. As I shall have frequent occasion to use these two words, it is necessary that the reader should familiarize himself with this conception which, though simple enough to the banker or financial expert, is apt to be confusing to the ordinary reader, owing to the many derivative meanings which are associated with the word \"credit.\" Whether, therefore, in the following pages, the word credit or debt is used, the thing spoken of is precisely the same in both cases, the one or the other word being used according as the situation is being looked at from the point of view of the creditor or of the debtor.",
+     "A first class credit is the most valuable kind of property. Having no corporeal existence, it has no weight and takes no room. It can easily be transferred, often without any formality whatever. It is movable at will from place to place by a simple order with nothing but the cost of a letter or a telegram. It can be immediately used to supply any material want, and it can be guarded against destruction and theft at little expense. It is the most easily handled of all forms of property and is one of the most permanent. It lives with the debtor and shares his fortunes, and when he dies, it passes to the heirs of his estate. As long as the estate exists, the obligation continues, and under favorable circumstances and in a healthy state of commerce there seems to be no reason why it should ever suffer deterioration.",
+     "Credit is the purchasing power so often mentioned in economic works as being one of the principal attributes of money, and, as I shall try to show, credit and credit alone is money. Credit and not gold or silver is the one property which all men seek, the acquisition of which is the aim and object of all commerce."
+    ],
+    "glosses": [
+     {
+      "phrase": "correlative of debt",
+      "note": "The same fact named from the other side, as 'employer' is to 'employee'. In accounting terms, every receivable is someone else's payable."
+     }
+    ],
+    "questions": [
+     {
+      "question": "By Innes's definition, can someone with large assets be insolvent?",
+      "answer": "Yes. His test is whether credits available now cover debts due now, which is closer to what an accountant would call liquidity than to balance-sheet solvency. Land or stock helps only if it can be sold for credits in time. Innes adds that when someone fails the test, his debts are worth to their holders only what his available credits can cover. The same test, applied to banks, comes back in the later sections."
+     }
+    ],
+    "figure": {
+     "caption": "A owes B, and B owes C. A sells goods to C and takes B's note as payment, then hands the note back to B, and both debts are gone without a coin.",
+     "svg": "<svg viewBox=\"0 0 360 262\"><circle cx=\"60\" cy=\"200\" r=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"60\" y=\"205\" text-anchor=\"middle\" font-size=\"14\" fill=\"currentColor\" stroke=\"none\">A</text><circle cx=\"180\" cy=\"50\" r=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"180\" y=\"55\" text-anchor=\"middle\" font-size=\"14\" fill=\"currentColor\" stroke=\"none\">B</text><circle cx=\"300\" cy=\"200\" r=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><text x=\"300\" y=\"205\" text-anchor=\"middle\" font-size=\"14\" fill=\"currentColor\" stroke=\"none\">C</text><line x1=\"76.2\" y1=\"179.7\" x2=\"158.8\" y2=\"76.5\" stroke=\"currentColor\" stroke-width=\"1.5\" fill=\"none\"/><polygon points=\"163.8,70.3 161.9,79.0 155.6,74.1\" fill=\"currentColor\" stroke=\"none\"/><line x1=\"196.2\" y1=\"70.3\" x2=\"278.8\" y2=\"173.5\" stroke=\"currentColor\" stroke-width=\"1.5\" fill=\"none\"/><polygon points=\"283.8,179.7 275.6,175.9 281.9,171.0\" fill=\"currentColor\" stroke=\"none\"/><line class=\"accent\" x1=\"86.0\" y1=\"200.0\" x2=\"266.0\" y2=\"200.0\" stroke=\"currentColor\" stroke-width=\"1.5\" fill=\"none\"/><polygon class=\"accent\" points=\"274.0,200.0 266.0,204.0 266.0,196.0\" fill=\"currentColor\" stroke=\"none\"/><text x=\"106\" y=\"118\" text-anchor=\"end\" font-size=\"12\" fill=\"currentColor\" stroke=\"none\">A owes B $100</text><text x=\"254\" y=\"118\" text-anchor=\"start\" font-size=\"12\" fill=\"currentColor\" stroke=\"none\">B owes C $100</text><text class=\"accent\" x=\"180\" y=\"222\" text-anchor=\"middle\" font-size=\"12\" fill=\"currentColor\" stroke=\"none\">A sells C goods for B's note</text><text class=\"muted\" x=\"180\" y=\"252\" text-anchor=\"middle\" font-size=\"12\" fill=\"currentColor\" stroke=\"none\">A returns the note to B. Both debts cancel.</text></svg>"
+    }
+   }
+  ]
+ },
+ "copyright": {
+  "title": "The Kind of Problem a City Is",
+  "author": "Jane Jacobs",
+  "published": "The Death and Life of Great American Cities, chapter 22 (1961)",
+  "kind": "text",
+  "rights": "copyright",
+  "minutes": 39,
+  "context": "Jane Jacobs was a magazine writer on architecture living in Greenwich Village, with no planning degree, when she wrote this book against the urban renewal of the 1950s: slum clearance, tower blocks set in lawns, and expressways through old districts. Most of the book is close observation of what makes particular streets and parks work or fail. In this final chapter she asks why the profession's theories, from Ebenezer Howard's Garden City to Le Corbusier's Radiant City, went wrong in the same way. Her answer rests on an essay by Warren Weaver, a mathematician who directed science funding at the Rockefeller Foundation, the body that also funded her book. The chapter is still read because the question returns whenever someone proposes to run a city from a model or a data feed.",
+  "brief": "Weaver sorted scientific problems into three kinds: simple ones with two variables, disorganized ones with millions of unrelated variables that statistics can average, and organized ones with many variables tied to each other. Jacobs argues that a city is of the third kind, like a living thing, and that planners treated it first as a two-variable system and then as a statistical one. Both mistakes let them move people and uses around by ratio and average while missing the relations that make a place work. She proposes studying cities by following particular processes, reasoning upward from cases, and watching for small unusual facts, and she closes by defending the dense city as natural and as the source of its own remedies.",
+  "idea": "A city's parts depend on each other in specific ways, so it cannot be run by fixed ratios or by averages; it has to be understood case by case.",
+  "figure": null,
+  "sections": [
+   {
+    "title": "The subject decides how you must think about it",
+    "minutes": 3,
+    "pages": null,
+    "context": "This is the last chapter of a book that has spent 400 pages on sidewalks, parks, old buildings and slum clearance. Jacobs now steps back and asks why trained planners kept getting cities wrong. Her answer starts with method, and she borrows it from a scientist.",
+    "summary": "Jacobs opens by saying that the useful ways of thinking about a subject depend on what the subject is like, and that our preferences about how to think have no say in it. She holds that the largest change of her century was in methods of analysis, more than in machines. To describe that change she turns to an essay by Warren Weaver in the Rockefeller Foundation's 1958 annual report, which sorts the history of scientific thought into three stages, each defined by the kind of problem it learned to handle.",
+    "idea": "A method of thinking has to fit the kind of problem in front of it, and choosing the wrong kind produces confident errors.",
+    "text": null,
+    "glosses": [],
+    "questions": [],
+    "figure": null
+   },
+   {
+    "title": "Problems of simplicity: two variables",
+    "minutes": 3,
+    "pages": null,
+    "context": "The first of Weaver's three kinds, covering physical science from roughly the seventeenth century through the nineteenth. Watch the definition closely, because Jacobs will later say that the founders of city planning never left this stage.",
+    "summary": "In a problem of simplicity, two quantities are related directly to each other, and everything else can be held still or ignored. Weaver's example is how the pressure of a gas depends on its volume. Science of this kind gave us theories of light, sound, heat and electricity, and from them the telephone, the radio, the car and the turbine. Its success made it the public picture of what science is.",
+    "idea": "Classical physics succeeded on problems where one quantity depends on one other and the rest can be ignored.",
+    "text": null,
+    "glosses": [],
+    "questions": [],
+    "figure": {
+     "caption": "Weaver's three kinds of problem, with the number of variables, the method that works on each, and an example.",
+     "svg": "<svg viewBox=\"0 0 360 206\" xmlns=\"http://www.w3.org/2000/svg\" font-size=\"11\" text-anchor=\"middle\"><line x1=\"120\" y1=\"6\" x2=\"120\" y2=\"200\" stroke=\"currentColor\" class=\"muted\"/><line x1=\"240\" y1=\"6\" x2=\"240\" y2=\"200\" stroke=\"currentColor\" class=\"muted\"/><text x=\"60\" y=\"16\" font-size=\"12\" fill=\"currentColor\">Simplicity</text><text x=\"180\" y=\"16\" font-size=\"12\" fill=\"currentColor\">Disorganized</text><text x=\"180\" y=\"30\" font-size=\"12\" fill=\"currentColor\">complexity</text><text x=\"300\" y=\"16\" font-size=\"12\" fill=\"currentColor\">Organized</text><text x=\"300\" y=\"30\" font-size=\"12\" fill=\"currentColor\">complexity</text><path d=\"M24 46 V128 H100\" fill=\"none\" stroke=\"currentColor\"/><path d=\"M32 54 Q40 112 96 120\" fill=\"none\" stroke=\"currentColor\" class=\"accent\"/><g fill=\"currentColor\" stroke=\"none\" class=\"muted\"><circle cx=\"138\" cy=\"60\" r=\"2\"/><circle cx=\"150\" cy=\"104\" r=\"2\"/><circle cx=\"158\" cy=\"76\" r=\"2\"/><circle cx=\"166\" cy=\"120\" r=\"2\"/><circle cx=\"172\" cy=\"52\" r=\"2\"/><circle cx=\"178\" cy=\"98\" r=\"2\"/><circle cx=\"186\" cy=\"70\" r=\"2\"/><circle cx=\"192\" cy=\"112\" r=\"2\"/><circle cx=\"198\" cy=\"58\" r=\"2\"/><circle cx=\"206\" cy=\"82\" r=\"2\"/><circle cx=\"212\" cy=\"124\" r=\"2\"/><circle cx=\"218\" cy=\"66\" r=\"2\"/><circle cx=\"224\" cy=\"102\" r=\"2\"/><circle cx=\"144\" cy=\"84\" r=\"2\"/><circle cx=\"134\" cy=\"116\" r=\"2\"/><circle cx=\"204\" cy=\"100\" r=\"2\"/><circle cx=\"162\" cy=\"96\" r=\"2\"/><circle cx=\"228\" cy=\"80\" r=\"2\"/></g><line x1=\"130\" y1=\"88\" x2=\"230\" y2=\"88\" stroke=\"currentColor\" class=\"accent\"/><g fill=\"none\" stroke=\"currentColor\" class=\"accent\"><line x1=\"268\" y1=\"62\" x2=\"304\" y2=\"54\"/><line x1=\"304\" y1=\"54\" x2=\"334\" y2=\"78\"/><line x1=\"268\" y1=\"62\" x2=\"290\" y2=\"92\"/><line x1=\"290\" y1=\"92\" x2=\"334\" y2=\"78\"/><line x1=\"290\" y1=\"92\" x2=\"272\" y2=\"122\"/><line x1=\"290\" y1=\"92\" x2=\"322\" y2=\"120\"/><line x1=\"334\" y1=\"78\" x2=\"322\" y2=\"120\"/><line x1=\"304\" y1=\"54\" x2=\"290\" y2=\"92\"/></g><g fill=\"currentColor\" stroke=\"none\"><circle cx=\"268\" cy=\"62\" r=\"5\"/><circle cx=\"304\" cy=\"54\" r=\"5\"/><circle cx=\"334\" cy=\"78\" r=\"5\"/><circle cx=\"290\" cy=\"92\" r=\"5\"/><circle cx=\"272\" cy=\"122\" r=\"5\"/><circle cx=\"322\" cy=\"120\" r=\"5\"/></g><text x=\"60\" y=\"154\" fill=\"currentColor\">2 variables</text><text x=\"180\" y=\"154\" fill=\"currentColor\">millions, random</text><text x=\"300\" y=\"154\" fill=\"currentColor\">dozens, linked</text><text x=\"60\" y=\"172\" fill=\"currentColor\" class=\"accent\">one equation</text><text x=\"180\" y=\"172\" fill=\"currentColor\" class=\"accent\">averages</text><text x=\"300\" y=\"172\" fill=\"currentColor\" class=\"accent\">trace the links</text><text x=\"60\" y=\"190\" fill=\"currentColor\" class=\"muted\">gas in a cylinder</text><text x=\"180\" y=\"190\" fill=\"currentColor\" class=\"muted\">life insurance</text><text x=\"300\" y=\"190\" fill=\"currentColor\" class=\"muted\">a cell, a city</text></svg>"
+    }
+   },
+   {
+    "title": "Disorganized complexity: millions of variables and the law of averages",
+    "minutes": 3,
+    "pages": null,
+    "context": "After 1900 some physicists and mathematicians jumped to the opposite extreme from two variables. The key move is that a very large number of things acting independently becomes easier to describe than a handful.",
+    "summary": "Weaver's illustration is a billiard table. The path of one ball is an easy problem, two or three balls are hard, and ten or fifteen cannot be followed in practice. Yet with millions of balls rolling at random on a huge table, you can answer questions about the average: how often balls hit a rail, how far one travels between collisions. This is the method of probability and statistical mechanics. It runs a life insurance company, which cannot say when one person will die but knows the death rate of a large group, and it works for a telephone exchange and for the molecules in a gas. It works only when the units behave independently, so that their individual quirks cancel out.",
+    "idea": "Statistics can describe a huge population only when its members act independently, so that individual differences cancel out.",
+    "text": null,
+    "glosses": [],
+    "questions": [
+     {
+      "question": "An insurer prices a life policy from mortality tables without knowing anything about how you spend your days. What has to be true of policyholders for that to work, and where would it break?",
+      "answer": "The deaths have to be roughly independent of each other and numerous enough for the group rate to be stable. It breaks when the units are linked: an epidemic, a war or a flood kills many policyholders through one cause, and the average stops predicting. Jacobs will argue that the people and uses in a city are linked in this way all the time, which is why averages of them say little."
+     }
+    ],
+    "figure": null
+   }
+  ]
+ }
+}
