@@ -8,6 +8,7 @@ import {
   hasPipelineFilters,
   parsePipeline,
   pipelineDescription,
+  pipelineCounts,
   pipelineHref,
   rolesRedirect,
 } from './pipeline-view';
@@ -64,6 +65,31 @@ describe('filterPipeline', () => {
     expect(scoped).toHaveLength(2);
     expect(filtered.map((r) => r.status)).toEqual(['submitted']);
     expect(filterPipeline(rows, parsePipeline({ status: 'closed', source: 'referral' })).filtered).toHaveLength(1);
+  });
+});
+
+describe('the posting site filter', () => {
+  const rows = [
+    row('lead', { postingPlatform: 'ashby' }),
+    row('submitted', { postingPlatform: 'workday' }),
+    row('submitted', { postingPlatform: 'ashby' }),
+    row('drafting', { postingPlatform: null }),
+  ];
+
+  it('narrows to one site, or to the rows whose site is not known', () => {
+    expect(filterPipeline(rows, parsePipeline({ site: 'ashby' })).filtered).toHaveLength(2);
+    expect(filterPipeline(rows, parsePipeline({ site: 'workday' })).filtered).toHaveLength(1);
+    expect(filterPipeline(rows, parsePipeline({ site: 'none' })).filtered.map((r) => r.status)).toEqual(['drafting']);
+    expect(parsePipeline({ site: 'myspace' }).site).toBeNull();
+  });
+
+  it('counts each site without its own choice, and clears with the rest', () => {
+    const counts = pipelineCounts(rows, parsePipeline({ site: 'ashby' }));
+    expect(counts.sites.get('ashby')).toBe(2);
+    expect(counts.sites.get('workday')).toBe(1);
+    expect(counts.sites.get('none')).toBe(1);
+    expect(hasPipelineFilters({ site: 'ashby' })).toBe(true);
+    expect(clearPipelineFiltersHref({ view: 'table', site: 'ashby' })).toBe('/jobs/pipeline?view=table');
   });
 });
 

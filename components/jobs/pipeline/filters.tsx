@@ -18,6 +18,7 @@ import {
   type PipelineParams,
   type PipelineState,
 } from '@/lib/jobs/pipeline-view';
+import { POSTING_PLATFORM_LABELS, type PostingPlatform } from '@/lib/jobs/roles/platform';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS } from '@/lib/jobs/suggest/score-notes';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -36,6 +37,7 @@ export function PipelineFilters({
   state,
   counts,
   sources,
+  sites = [],
   scored,
   marks,
   companyName,
@@ -45,6 +47,8 @@ export function PipelineFilters({
   counts: { live: number; closed: number; all: number };
   /** The sources with an application in scope, and how many each. */
   sources: readonly (readonly [ApplicationSource, number])[];
+  /** The posting sites with an application in scope, and how many each; `none` is not known. */
+  sites?: readonly (readonly [PostingPlatform | 'none', number])[];
   /** Whether any application has a fit or a chance to filter by. */
   scored: boolean;
   /** How many applications in scope each ready and cover letter choice would show. */
@@ -119,6 +123,22 @@ export function PipelineFilters({
           </option>
         ))}
       </PressChip>
+      {(sites.length > 1 || state.site) && (
+        <PressChip
+          name="site"
+          aria-label="Filter by posting site"
+          placeholderValue=""
+          value={state.site ?? ''}
+          onChange={(event) => go({ site: event.currentTarget.value || undefined })}
+        >
+          <option value="">Any posting site</option>
+          {sites.map(([site, count]) => (
+            <option key={site} value={site}>
+              {site === 'none' ? 'Site not known' : POSTING_PLATFORM_LABELS[site]} · {count}
+            </option>
+          ))}
+        </PressChip>
+      )}
       <PressChip
         className={tucked(state.excitement !== null)}
         name="excitement"

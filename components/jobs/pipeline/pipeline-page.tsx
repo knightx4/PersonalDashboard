@@ -19,6 +19,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { askListFilter } from '@/lib/ask/list-filter';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { APPLICATION_SOURCES, isLive } from '@/lib/jobs/pipeline';
+import { POSTING_PLATFORMS } from '@/lib/jobs/roles/platform';
 import { openApplications } from '@/lib/jobs/board-moment';
 import { pipelineColumnFilters } from '@/lib/jobs/pipeline-columns';
 import {
@@ -118,7 +119,7 @@ export function PipelinePage({
   const display = parseListDisplay(displaySpec, listParams);
 
   const counts = pipelineCounts(rows, state);
-  const { sources: countsBySource, marks } = counts;
+  const { sources: countsBySource, sites: countsBySite, marks } = counts;
   const scored = rows.some((row) => row.scoreNote);
 
   const askFilter = askListFilter('pipeline', params);
@@ -155,6 +156,9 @@ export function PipelinePage({
             sources={APPLICATION_SOURCES.filter((s) => countsBySource.has(s)).map(
               (source) => [source, countsBySource.get(source) ?? 0] as const,
             )}
+            sites={[...POSTING_PLATFORMS, 'none' as const]
+              .filter((site) => countsBySite.has(site))
+              .map((site) => [site, countsBySite.get(site) ?? 0] as const)}
             scored={scored}
             marks={marks}
             companyName={state.company ? rows.find((row) => row.companySlug === state.company)?.companyName : undefined}
