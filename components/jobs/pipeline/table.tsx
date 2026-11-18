@@ -11,7 +11,7 @@ import type { ColumnFilter } from '@/lib/table-view';
 import type { DisplayChoice } from '@/lib/list-display';
 import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
-import { AI_SCORE_LABEL } from '@/lib/jobs/roles-display';
+import { AI_SCORE_LABEL, siteLabel } from '@/lib/jobs/roles-display';
 
 /**
  * The Pipeline page's table view (plan #1590), which was the Roles page.
@@ -135,9 +135,9 @@ export function RolesTable({
               {shortDate(row.submittedAt)}
             </TD>
             )}
-            {showing('excitement') && (
-            <TD label="Excitement" muted className={cn(cell, 'tabular whitespace-nowrap')}>
-              {row.excitement ? '★'.repeat(row.excitement) : '—'}
+            {showing('site') && (
+            <TD label="Site" muted className={cn(cell, 'whitespace-nowrap')}>
+              {siteLabel(row.postingPlatform) ?? '—'}
             </TD>
             )}
             {showing('fit') && (
@@ -196,7 +196,7 @@ function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: strin
   const comp = showing('comp') ? formatCompBand(row.compMinCents, row.compMaxCents) : null;
   const facts = [
     showing('activity') && row.lastActivityAt ? shortAge(row.lastActivityAt) : null,
-    showing('excitement') && row.excitement ? '★'.repeat(row.excitement) : null,
+    showing('site') ? siteLabel(row.postingPlatform) : null,
     fit ? `${FIT_SCORE_LABEL} ${fit}` : null,
     chance ? `${chance} chance` : null,
     showing('ai') && row.aiScore !== null ? `${AI_SCORE_LABEL} ${row.aiScore}` : null,

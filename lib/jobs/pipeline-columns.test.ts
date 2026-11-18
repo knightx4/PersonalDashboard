@@ -26,7 +26,7 @@ function filtersFor(params: PipelineParams, scored = false) {
 describe('pipelineColumnFilters', () => {
   it('offers a filter on the columns that have one, and none on the rest', () => {
     const filters = filtersFor({ view: 'table' });
-    expect(Object.keys(filters).sort()).toEqual(['applied', 'company', 'excitement', 'questions', 'ready', 'status']);
+    expect(Object.keys(filters).sort()).toEqual(['applied', 'company', 'questions', 'ready', 'site', 'status']);
     expect(Object.keys(filtersFor({ view: 'table' }, true))).toContain('fit');
   });
 

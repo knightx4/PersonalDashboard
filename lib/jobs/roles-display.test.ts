@@ -38,14 +38,14 @@ const spec = rolesDisplay();
 const arranged = (params: Record<string, string>) => parseListDisplay(spec, params);
 
 describe('the roles table', () => {
-  it('keeps the sort ids the column headers link to, with fit, chance, AI score, ready and questions after them', () => {
+  it('keeps the sort ids the column headers link to, with site, fit, chance, AI score, ready and questions after them', () => {
     expect(spec.sorts.map((sort) => sort.id)).toEqual([
       'title',
       'company',
       'status',
       'activity',
       'applied',
-      'excitement',
+      'site',
       'fit',
       'chance',
       'ai',
@@ -83,7 +83,16 @@ describe('the roles table', () => {
   });
 
   it('hides a column it was asked to hide', () => {
-    expect(arranged({ hide: 'comp,excitement' }).hidden).toEqual(['excitement', 'comp']);
+    expect(arranged({ hide: 'comp,site' }).hidden).toEqual(['site', 'comp']);
+  });
+
+  it('sorts by posting site name, a role whose site is not known last', () => {
+    const rows = [
+      role({ applicationId: 'none', postingPlatform: null }),
+      role({ applicationId: 'workday', postingPlatform: 'workday' }),
+      role({ applicationId: 'ashby', postingPlatform: 'ashby' }),
+    ];
+    expect(sortRows(rows, arranged({ sort: 'site' })).map((row) => row.applicationId)).toEqual(['ashby', 'workday', 'none']);
   });
 });
 

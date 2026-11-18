@@ -18,7 +18,7 @@ import {
   type PipelineParams,
   type PipelineState,
 } from '@/lib/jobs/pipeline-view';
-import { POSTING_PLATFORM_LABELS, type PostingPlatform } from '@/lib/jobs/roles/platform';
+import { siteLabel } from '@/lib/jobs/roles-display';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS } from '@/lib/jobs/suggest/score-notes';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -37,7 +37,6 @@ export function PipelineFilters({
   state,
   counts,
   sources,
-  sites = [],
   scored,
   marks,
   companyName,
@@ -47,8 +46,6 @@ export function PipelineFilters({
   counts: { live: number; closed: number; all: number };
   /** The sources with an application in scope, and how many each. */
   sources: readonly (readonly [ApplicationSource, number])[];
-  /** The posting sites with an application in scope, and how many each; `none` is not known. */
-  sites?: readonly (readonly [PostingPlatform | 'none', number])[];
   /** Whether any application has a fit or a chance to filter by. */
   scored: boolean;
   /** How many applications in scope each ready and cover letter choice would show. */
@@ -82,6 +79,7 @@ export function PipelineFilters({
       {state.stage && <input type="hidden" name="stage" value={state.stage.key} />}
       {state.sentDays !== null && <input type="hidden" name="sent" value={state.sentDays} />}
       {state.company && <input type="hidden" name="company" value={state.company} />}
+      {state.site && <input type="hidden" name="site" value={state.site} />}
       {/* What a number on Today narrowed the page to (plan #1591), each with
           its own way out, ahead of the chips anybody can set here. */}
       {state.stage && (
@@ -95,6 +93,13 @@ export function PipelineFilters({
       )}
       {state.company && (
         <ClearChip href={pipelineHref(params, { company: undefined })} label={companyName ?? state.company} />
+      )}
+      {/* Set from the table's Site column; shown here so every view says so. */}
+      {state.site && (
+        <ClearChip
+          href={pipelineHref(params, { site: undefined })}
+          label={state.site === 'none' ? 'Site not known' : `On ${siteLabel(state.site)}`}
+        />
       )}
       <PressChip
         name="status"
@@ -123,22 +128,6 @@ export function PipelineFilters({
           </option>
         ))}
       </PressChip>
-      {(sites.length > 1 || state.site) && (
-        <PressChip
-          name="site"
-          aria-label="Filter by posting site"
-          placeholderValue=""
-          value={state.site ?? ''}
-          onChange={(event) => go({ site: event.currentTarget.value || undefined })}
-        >
-          <option value="">Any posting site</option>
-          {sites.map(([site, count]) => (
-            <option key={site} value={site}>
-              {site === 'none' ? 'Site not known' : POSTING_PLATFORM_LABELS[site]} · {count}
-            </option>
-          ))}
-        </PressChip>
-      )}
       <PressChip
         className={tucked(state.excitement !== null)}
         name="excitement"

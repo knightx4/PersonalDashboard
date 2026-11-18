@@ -1,11 +1,12 @@
 import {
-  EXCITEMENT_MINIMUMS,
   PIPELINE_STAGES,
   pipelineHref,
   type PipelineCounts,
   type PipelineParams,
   type PipelineState,
 } from '@/lib/jobs/pipeline-view';
+import { POSTING_PLATFORMS } from '@/lib/jobs/roles/platform';
+import { siteLabel } from '@/lib/jobs/roles-display';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS } from '@/lib/jobs/suggest/score-notes';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -105,15 +106,18 @@ export function pipelineColumnFilters(
         anyLabel: 'Any time',
         choices: SENT_CHOICES.map((days) => ({ value: String(days), label: `In the last ${days} days` })),
       }),
+      // The sites the other filters leave a role on, then the roles on none known.
       choiceColumn({
-        id: 'excitement',
-        param: 'excitement',
-        current: state.excitement ? String(state.excitement) : null,
-        anyLabel: 'Any excitement',
-        choices: EXCITEMENT_MINIMUMS.map((level) => ({
-          value: String(level),
-          label: level === 5 ? '★'.repeat(level) : `${'★'.repeat(level)} and up`,
-        })),
+        id: 'site',
+        param: 'site',
+        current: state.site,
+        anyLabel: 'Any site',
+        choices: [...POSTING_PLATFORMS, 'none' as const]
+          .filter((site) => counts.sites.has(site))
+          .map((site) => ({
+            value: site,
+            label: `${site === 'none' ? 'Not known' : siteLabel(site)} · ${counts.sites.get(site)}`,
+          })),
       }),
       scored &&
         choiceColumn({
