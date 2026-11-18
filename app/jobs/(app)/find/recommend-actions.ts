@@ -6,7 +6,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { addContact, addTouch, BEFORE_CONTACTED_AGAIN, markContacted, suggestedContact } from '@/lib/jobs/contacts/edit';
 import { detectPosting } from '@/lib/jobs/ats';
-import { startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
+import { scoreLeadsNowFor, startOpeningSearchFor, suggestPeopleFor } from '@/lib/jobs/suggest/press';
 import { declineText } from '@/lib/jobs/suggest/decline-text';
 
 /**
@@ -54,6 +54,19 @@ export async function suggestOpenings(): Promise<SuggestState> {
   const user = await requireUser();
   const started = await startOpeningSearchFor(user.id, apiKey);
   return started.error ? { error: started.error } : started.message ? { error: null, message: started.message } : { error: null };
+}
+
+/**
+ * Score now: fit and the chance of an interview for every lead not scored
+ * yet, on Find and in the pipeline, instead of waiting for the daily run.
+ */
+// latency: pending -- model calls; the button says it is working
+export async function scoreLeads(): Promise<SuggestState> {
+  const user = await requireUser();
+  const result = await scoreLeadsNowFor(user.id);
+  revalidatePaths();
+  revalidatePath('/jobs/pipeline');
+  return result;
 }
 
 async function closeSuggestion(

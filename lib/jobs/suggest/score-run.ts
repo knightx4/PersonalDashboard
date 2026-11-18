@@ -131,10 +131,20 @@ export type ScoreRunOutcome = {
   stopped: string | null;
 };
 
+export type ScoreRunOptions = {
+  onSpend?: SpendSink;
+  rescore?: boolean;
+  limit?: number;
+  apiKey?: string | null;
+  fetch?: typeof fetch;
+  /** A time (ms since epoch) past which no further call is started; what is left waits for the next run. */
+  deadline?: number;
+};
+
 export async function scoreOpeningsFor(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { onSpend?: SpendSink; rescore?: boolean; limit?: number; apiKey?: string | null; fetch?: typeof fetch } = {},
+  options: ScoreRunOptions = {},
 ): Promise<ScoreRunOutcome> {
   const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
   let query = supabase
@@ -157,6 +167,7 @@ export async function scoreOpeningsFor(
   ]);
   const minimum = readMinFitScore((gate.data as Row | null)?.min_fit_score);
   for (const row of openings) {
+    if (options.deadline && Date.now() > options.deadline) break;
     const company = one(row.companies as Row | Row[] | null);
     const result = await scoreOpening({
       opening: {
@@ -215,7 +226,7 @@ export async function scoreOpeningsFor(
 export async function scoreApplicationsFor(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { onSpend?: SpendSink; rescore?: boolean; limit?: number; apiKey?: string | null; fetch?: typeof fetch } = {},
+  options: ScoreRunOptions = {},
 ): Promise<ScoreRunOutcome> {
   const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
   let query = supabase
@@ -235,6 +246,7 @@ export async function scoreApplicationsFor(
 
   const context = await loadScoringContext(supabase, userId);
   for (const row of applications) {
+    if (options.deadline && Date.now() > options.deadline) break;
     const role = one(row.roles as Row | Row[] | null);
     if (!role) continue;
     const company = one(role.companies as Row | Row[] | null);

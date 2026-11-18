@@ -172,6 +172,8 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/follow-ups/actions.ts#findFollowUp': ['find-follow-up-person', 'draft-outreach'],
   'app/jobs/(app)/follow-ups/actions.ts#redraftFollowUp': ['draft-outreach'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
+  // Score now: fit and interview chance for the leads not scored yet
+  'app/jobs/(app)/find/recommend-actions.ts#scoreLeads': ['score-openings', 'score-applications'],
 
   // Shopping
   'app/shopping/sell/actions.ts#priceSellItems': ['estimate-resale-price'],

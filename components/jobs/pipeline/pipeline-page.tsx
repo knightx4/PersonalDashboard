@@ -1,6 +1,7 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { KanbanSquare } from 'lucide-react';
 import { AimButton } from '@/components/shell/aim-button';
+import { ScoreNowButton } from '@/components/jobs/ui/score-now-button';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';
 import { PipelineFocus } from '@/components/jobs/pipeline/focus';
@@ -120,6 +121,8 @@ export function PipelinePage({
   const counts = pipelineCounts(rows, state);
   const { sources: countsBySource, marks } = counts;
   const scored = rows.some((row) => row.scoreNote);
+  // Open applications with no fit or chance yet, for Score now.
+  const unscored = rows.filter((row) => !row.scoreNote && isLive(row.status)).length;
 
   const askFilter = askListFilter('pipeline', params);
   const header = (
@@ -135,6 +138,7 @@ export function PipelinePage({
           {state.view === 'table' && (
             <DisplayMenu menu={menu} views={false} initialOpen={openPanel === 'display'} className="max-sm:hidden" />
           )}
+          <ScoreNowButton unscored={unscored} className="shrink-0 max-sm:hidden" />
           <AimButton aim={{ kind: 'job-role' }} label="Add a role" />
         </>
       }

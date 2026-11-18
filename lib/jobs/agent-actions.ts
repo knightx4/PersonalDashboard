@@ -108,6 +108,7 @@ export const jobsActions: ModuleActions = {
   'app/jobs/(app)/find/recommend-actions.ts': {
     suggestPeople: tool('suggest_people'),
     suggestOpenings: tool('find_openings'),
+    scoreLeads: none('spends', 'Score now: the daily run scores the same leads for nothing extra.'),
     dismissSuggestion: none('theirs'),
     reopenSuggestion: none('theirs', 'Undo: takes back their own decline.'),
     dismissOpening: none('theirs'),

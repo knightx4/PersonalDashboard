@@ -8,7 +8,7 @@ import { runWeeklyDiscovery, type WeeklyOutcome } from '@/lib/jobs/discover/week
 import { checkOpeningPostings } from './posting';
 import { loadLatestRun, recordRuns, startRun } from './search-runs';
 import { runSuggestionsFor } from './run';
-import { scoreOpeningsFor } from './score-run';
+import { scoreApplicationsFor, scoreOpeningsFor, type ScoreRunOutcome } from './score-run';
 
 /**
  * The Find page's three search presses as plain functions (plan #2228.3):
@@ -158,4 +158,56 @@ export async function startOpeningSearchFor(
   });
 
   return { error: null, runId };
+}
+
+/** Leaves the page's five minutes room to answer after the scoring. */
+const SCORE_BUDGET_MS = 240_000;
+
+const STOPPED_TEXT: Record<string, string> = {
+  'no-key': 'Scoring is not configured.',
+  refused: 'The scoring service refused the key.',
+  'rate-limited': 'The scoring service asked for a pause. Try again in a few minutes.',
+  overloaded: 'The scoring service is busy. Try again in a few minutes.',
+};
+
+/**
+ * Score now: fit and the chance of an interview for every job lead not
+ * scored yet, the recommended roles on Find and the open applications in the
+ * pipeline, without waiting for the daily run (inngest/jobs/suggestions.ts).
+ * Stops starting calls past the page's budget; the rest wait for the next
+ * press or the daily run.
+ */
+export async function scoreLeadsNowFor(userId: string): Promise<SearchState> {
+  if (!(await jevEnabledFor(await createCoreClient(), userId))) {
+    return { error: 'Scoring is off for this account: it needs Jev turned on in settings.' };
+  }
+  const supabase = await createClient();
+  const deadline = Date.now() + SCORE_BUDGET_MS;
+  const openingSpend: SpendReport[] = [];
+  const applicationSpend: SpendReport[] = [];
+  let openings: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
+  let applications: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
+  try {
+    openings = await scoreOpeningsFor(supabase, userId, { onSpend: (r) => openingSpend.push(r), deadline });
+    if (!openings.stopped) {
+      applications = await scoreApplicationsFor(supabase, userId, {
+        onSpend: (r) => applicationSpend.push(r),
+        deadline,
+      });
+    }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'The scoring failed.' };
+  } finally {
+    await recordSessionSpend(userId, { module: 'jobs', operation: 'score-openings' }, openingSpend);
+    await recordSessionSpend(userId, { module: 'jobs', operation: 'score-applications' }, applicationSpend);
+  }
+
+  const stopped = openings.stopped ?? applications.stopped;
+  const scored = openings.scored + applications.scored;
+  const failed = openings.failed + applications.failed;
+  if (stopped) return { error: STOPPED_TEXT[stopped] ?? 'The scoring stopped early.' };
+  if (scored === 0 && failed === 0) return { error: null, message: 'Every lead is already scored.' };
+  const parts = [`Dash scored ${scored} ${scored === 1 ? 'lead' : 'leads'}`];
+  if (failed > 0) parts.push(`${failed} could not be scored and will be tried again`);
+  return { error: null, message: `${parts.join('; ')}.` };
 }
