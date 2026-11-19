@@ -9,7 +9,7 @@ import { APPLICATION_CHILDREN, ROLE_CHILDREN } from '@/lib/dash/jobs-writes';
  * reads it back: select, insert, upsert (on its conflict columns, `id` by
  * default, merging or with ignoreDuplicates leaving the row alone and
  * returning nothing for it), update and delete, the filters eq, neq, gt,
- * gte, lt, is, ilike (without wildcards), in, not (is null) and or (of eq,
+ * gte, lte, lt, is, ilike (without wildcards), in, not (is null) and or (of eq,
  * neq, lt and is null), order, limit, single and maybeSingle. Every query returns whole
  * rows whatever columns it selected. An insert without an id gets one, and a
  * created_at, so a writer that asks for its new row's id gets one back; an
@@ -177,6 +177,7 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           gt: (c: string, v: string) => (filters.push((r) => String(r[c]) > v), query),
           gte: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) >= v), query),
           lt: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) < v), query),
+          lte: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) <= v), query),
           is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), query),
           ilike: (c: string, v: string) => (
             filters.push((r) => typeof r[c] === 'string' && (r[c] as string).toLowerCase() === v.toLowerCase()), query

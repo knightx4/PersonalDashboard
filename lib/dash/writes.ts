@@ -4,7 +4,7 @@ import { sameAs, noButton, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { writeChange, type ChangeDeps } from '@/lib/ask/changes';
 import { checkChange, taggedWords, type ProposalToolName } from '@/lib/ask/propose';
-import { isUuid, type AskRow } from '@/lib/ask/db';
+import { idPrefixRange, isUuid, ownIdFor, type AskRow } from '@/lib/ask/db';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import { insertArea, insertGoal, updateGoal } from '@/lib/goals/store';
@@ -595,7 +595,17 @@ export const ROLE_NOTE_MAX = COMMENT_MAX;
 
 async function addRoleNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
-  const { table, id } = seenRef(ctx, args, 'role_ref', [TABLE.role, TABLE.application]);
+  // A ref cut to its first 8 characters is read as the one role, or
+  // application, of theirs it starts (18 November, from a connected app).
+  const given = text(args, 'role_ref');
+  let named = args;
+  if (given && idPrefixRange(given)) {
+    const jobs = await ctx.db('job_search');
+    const full =
+      (await ownIdFor(jobs, 'roles', ctx.userId, given)) ?? (await ownIdFor(jobs, 'applications', ctx.userId, given));
+    if (full) named = { ...args, role_ref: full };
+  }
+  const { table, id } = seenRef(ctx, named, 'role_ref', [TABLE.role, TABLE.application]);
   return noteOnRole(ctx, table, id, text(args, 'body'));
 }
 

@@ -2,7 +2,7 @@ import { sameAs, type DashWriteRuns } from './runs';
 import { ROLE_KINDS } from '@/lib/jobs/role-kind';
 import type Anthropic from '@anthropic-ai/sdk';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
-import { bareRef, isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
+import { bareRef, isUuid, ownIdFor, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { channelForMessage } from '@/lib/jobs/applications/channel';
@@ -258,6 +258,12 @@ function idOf(value: string, what: string): string {
   return id;
 }
 
+/** The row of theirs a ref names, given whole or as an id prefix of 8 or more characters. */
+async function ownRowByRef(client: SchemaClient, table: string, ref: string, userId: string, what: string): Promise<Row> {
+  const id = await ownIdFor(client, table, userId, ref);
+  return ownRow(client, table, id ?? idOf(ref, what), userId, what);
+}
+
 async function ownRow(client: SchemaClient, table: string, id: string, userId: string, what: string): Promise<Row> {
   const { data, error } = await client.from(table).select('*').eq('id', id).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(`Reading the ${what} failed: ${error.message}`);
@@ -295,10 +301,10 @@ const rolePaths = (id: string) => ['/jobs', '/jobs/roles', '/jobs/pipeline', '/j
 /** The role a call names: by its own ref, or by an application on it. */
 async function namedRole(env: JobsWriteEnv, args: Args): Promise<Row> {
   const roleRef = text(args, 'role_ref');
-  if (roleRef) return ownRow(env.jobs, 'roles', idOf(roleRef, 'role'), env.userId, 'role');
+  if (roleRef) return ownRowByRef(env.jobs, 'roles', roleRef, env.userId, 'role');
   const applicationRef = text(args, 'application_ref');
   if (!applicationRef) throw new JobsRefused('Name the role: role_ref, or application_ref for one of its applications.');
-  const application = await ownRow(env.jobs, 'applications', idOf(applicationRef, 'application'), env.userId, 'application');
+  const application = await ownRowByRef(env.jobs, 'applications', applicationRef, env.userId, 'application');
   return ownRow(env.jobs, 'roles', application.role_id as string, env.userId, 'role');
 }
 
@@ -512,10 +518,10 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 /** The application a call names: by its own ref, or the latest one on a role, the one the board shows. */
 async function namedApplication(env: JobsWriteEnv, args: Args): Promise<Row> {
   const applicationRef = text(args, 'application_ref');
-  if (applicationRef) return ownRow(env.jobs, 'applications', idOf(applicationRef, 'application'), env.userId, 'application');
+  if (applicationRef) return ownRowByRef(env.jobs, 'applications', applicationRef, env.userId, 'application');
   const roleRef = text(args, 'role_ref');
   if (!roleRef) throw new JobsRefused('Name the application: application_ref, or role_ref for the role it is on.');
-  const role = await ownRow(env.jobs, 'roles', idOf(roleRef, 'role'), env.userId, 'role');
+  const role = await ownRowByRef(env.jobs, 'roles', roleRef, env.userId, 'role');
   const { data, error } = await env.jobs
     .from('applications')
     .select('*')

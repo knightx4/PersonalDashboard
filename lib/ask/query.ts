@@ -1,5 +1,5 @@
 import { readableName, type Source } from '@/lib/sources/types';
-import { AskInputError, clip, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
+import { AskInputError, clip, idPrefixRange, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
 import { asText, fallbackHref, LISTABLE, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
 import { listableShapes, type TableColumn, type TableShape } from './table-info';
 
@@ -240,6 +240,8 @@ type Filterable<Q> = {
   eq(column: string, value: unknown): Q;
   neq(column: string, value: unknown): Q;
   gt(column: string, value: unknown): Q;
+  gte(column: string, value: unknown): Q;
+  lte(column: string, value: unknown): Q;
   lt(column: string, value: unknown): Q;
   in(column: string, values: readonly unknown[]): Q;
   is(column: string, value: null): Q;
@@ -259,8 +261,11 @@ export function applyCondition<Q extends Filterable<Q>>(query: Q, c: Condition):
   const kind = typeKind(c.type);
   const col = c.column;
   switch (c.op) {
-    case 'equals':
-      return query.eq(col, c.value);
+    case 'equals': {
+      // An id cut to its first 8 characters reads as the ids it starts.
+      const range = c.type === 'uuid' && typeof c.value === 'string' ? idPrefixRange(c.value) : null;
+      return range ? query.gte(col, range[0]).lte(col, range[1]) : query.eq(col, c.value);
+    }
     case 'not_equals':
       // A row with nothing in the column is not equal to the value either;
       // SQL's <> alone would leave it out.
@@ -269,8 +274,19 @@ export function applyCondition<Q extends Filterable<Q>>(query: Q, c: Condition):
       return query.gt(col, c.value);
     case 'less':
       return query.lt(col, c.value);
-    case 'one_of':
-      return query.in(col, c.value as Scalar[]);
+    case 'one_of': {
+      const values = c.value as Scalar[];
+      const ranges = c.type === 'uuid' ? values.map((v) => (typeof v === 'string' ? idPrefixRange(v) : null)) : [];
+      if (!ranges.some(Boolean)) return query.in(col, values);
+      return query.or(
+        values
+          .map((v, i) => {
+            const range = ranges[i];
+            return range ? `and(${col}.gte.${range[0]},${col}.lte.${range[1]})` : `${col}.eq.${quoted(v)}`;
+          })
+          .join(','),
+      );
+    }
     case 'contains':
       return kind === 'array' ? query.contains(col, [c.value]) : query.ilike(col, `%${likeEscaped(String(c.value))}%`);
     case 'empty':

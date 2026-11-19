@@ -91,6 +91,22 @@ describe('the Jobs writes', () => {
     expect(change.row).toMatchObject({ table: 'job_search.roles', ref: ROLE, title: 'Data Engineer at Acme', href: `/jobs/roles/${ROLE}` });
   });
 
+  it('reads a role or application ref cut to its first 8 characters as the one row it starts', async () => {
+    // A connected app sent "9d69522d" for a role it had read in full (18 November).
+    const byRole = await made('change_role', tables(), { role_ref: ROLE.slice(0, 8), title: 'Data Engineer' });
+    expect(byRole.subjectRef).toBe(`job_search.roles:${ROLE}`);
+    const byApp = await made('change_application', tables(), { application_ref: APP_1.slice(0, 8), excitement: 3 });
+    expect(byApp.subjectRef).toBe(`job_search.applications:${APP_1}`);
+    // A prefix two rows share names neither.
+    const shared = tables();
+    shared['job_search.roles'].push({ ...shared['job_search.roles'][0], id: '11111111-2222-4111-8111-111111111111' });
+    expect(await refused('change_role', shared, { role_ref: '11111111', title: 'X' })).toMatch(/not a role's ref/);
+    // Someone else's row is never found by its prefix.
+    const theirs = tables();
+    theirs['job_search.roles'][0].user_id = SOMEONE;
+    expect(await refused('change_role', theirs, { role_ref: ROLE.slice(0, 8), title: 'X' })).toMatch(/not a role's ref/);
+  });
+
   it('moves a role to a company not on file yet, making it', async () => {
     const t = tables();
     const change = await made('change_role', t, { application_ref: APP_1, company: 'Globex' });

@@ -274,8 +274,16 @@ when you see a cause of failure that one fix will not remove.
      to real columns, and 13 of 151 calls in a week failed. `columns` now
      leaves a guessed name out and names it in the note; a guess in `where`,
      `order` or `group_by` is still refused, since it changes which rows
-     come back. Left: ids given as 8-character prefixes or company names to
-     a uuid column fail as "invalid input syntax for type uuid".
+     come back. Done 19 November: an id cut to its first 8 characters
+     ("9d69522d") reads as the ids it starts in query_rows, and as the one
+     row of theirs it starts in change_role, change_application and
+     add_role_note (`idPrefixRange`, `ownIdFor` in `lib/ask/db.ts`). Left:
+     a company name given to a uuid column still fails as "invalid input
+     syntax for type uuid", and other writes' refs still need the whole id.
+   - A connector failure is proven fixed for free: this session can call
+     the Dash connector's own tools (`mcp__Dash__*`, loaded with
+     ToolSearch), so re-send the failing read after the deploy instead of
+     paying for a case. Cases ask Ask Dash, not the connector.
 7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
    a reply to an `@dash` comment keeps its lookups on its turn
    (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or
