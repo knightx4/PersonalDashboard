@@ -2,7 +2,6 @@ import { MainRail } from '@/components/patterns/main-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { PageWide } from '@/components/shell/page-width';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
-import { CheckInboxNow, type CheckableAccount } from '@/components/jobs/activity/check-inbox-now';
 import type { Activity } from '@/lib/jobs/activity/load';
 import type { FunnelView } from '@/lib/jobs/home/funnel';
 import type { SinceView } from '@/lib/jobs/home/since-load';
@@ -57,23 +56,15 @@ export function TodayPage({ timezone, board, funnel, since, dashToday }: TodayPa
 
 /**
  * Jobs' Activity tab (note eb898bfd): the whole feed of what the syncs
- * changed, with the button that checks the inbox now. It was a tab of Now
- * from plan #1496.7.2 until then. Here beside Now so the gallery draws both.
+ * changed. It was a tab of Now from plan #1496.7.2 until then. Check now
+ * lives in Settings only (note d6454af0). Here beside Now so the gallery
+ * draws both.
  */
-export function ActivityPage({
-  timezone,
-  activity,
-  accounts,
-}: {
-  timezone: string;
-  activity: Activity;
-  accounts: readonly CheckableAccount[];
-}) {
+export function ActivityPage({ timezone, activity }: { timezone: string; activity: Activity }) {
   return (
     <PageWide>
       <PageHeader title="Activity" />
       <section aria-label="Activity">
-        <CheckInboxNow accounts={accounts} />
         <ActivityFeed activity={activity} timezone={timezone} />
       </section>
     </PageWide>

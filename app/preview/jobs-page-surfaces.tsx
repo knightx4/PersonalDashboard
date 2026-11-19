@@ -36,7 +36,17 @@ function entry(
   subject: string | null,
   detail: string | null = null,
 ): ActivityEntry {
-  return { id, at, source, tone, stage, label, subject, detail, roleId: subject ? `r-${id}` : null };
+  return {
+    id,
+    at,
+    source,
+    tone,
+    stage,
+    label,
+    subject,
+    detail,
+    roleId: subject ? `r-${id}` : null,
+  };
 }
 
 const ACTIVITY: Activity = {
@@ -54,33 +64,79 @@ const ACTIVITY: Activity = {
   highlights: { days: 7, newRoles: 4, movedForward: 3, rejections: 2, closedOut: 5 },
   lastSweepAt: '2026-10-06T07:00:00Z',
   entries: [
-    entry('a1', '2026-10-06T11:03:00Z', 'email', 'good', 'in_process', 'Interview booked', 'Copperline · Senior Financial Analyst, Revenue Operations and Planning', 'Hiring manager, Thursday 9 October at 2:00 pm'),
-    entry('a2', '2026-10-06T11:03:00Z', 'email', 'info', 'acknowledged', 'Application confirmed', 'Wrenfield · Strategic Finance Associate'),
-    entry('a3', '2026-10-06T07:00:00Z', 'sweep', 'muted', 'ghosted', 'Closed as ghosted', 'Thornbury · FP&A Manager', 'No reply in 45 days'),
-    entry('a4', '2026-10-05T18:20:00Z', 'email', 'bad', 'rejected', 'Rejected after the recruiter screen', 'Saltmarsh Labs · Finance Business Partner'),
-    entry('a5', '2026-10-05T09:15:00Z', 'you', 'muted', 'lead', 'Added the role', 'Ollerton Pay · Strategic Finance Lead'),
-    entry('a6', '2026-10-04T16:40:00Z', 'auto', 'info', 'submitted', 'Marked as sent', 'Kittiwake · FP&A Analyst', 'A confirmation arrived for a role still in drafting'),
-    entry('a7', '2026-10-03T07:00:00Z', 'sweep', 'info', 'submitted', 'Follow-up sent', 'Fenwright · Finance Operations', null),
+    entry(
+      'a1',
+      '2026-10-06T11:03:00Z',
+      'email',
+      'good',
+      'in_process',
+      'Interview booked',
+      'Copperline · Senior Financial Analyst, Revenue Operations and Planning',
+      'Hiring manager, Thursday 9 October at 2:00 pm',
+    ),
+    entry(
+      'a2',
+      '2026-10-06T11:03:00Z',
+      'email',
+      'info',
+      'acknowledged',
+      'Application confirmed',
+      'Wrenfield · Strategic Finance Associate',
+    ),
+    entry(
+      'a3',
+      '2026-10-06T07:00:00Z',
+      'sweep',
+      'muted',
+      'ghosted',
+      'Closed as ghosted',
+      'Thornbury · FP&A Manager',
+      'No reply in 45 days',
+    ),
+    entry(
+      'a4',
+      '2026-10-05T18:20:00Z',
+      'email',
+      'bad',
+      'rejected',
+      'Rejected after the recruiter screen',
+      'Saltmarsh Labs · Finance Business Partner',
+    ),
+    entry(
+      'a5',
+      '2026-10-05T09:15:00Z',
+      'you',
+      'muted',
+      'lead',
+      'Added the role',
+      'Ollerton Pay · Strategic Finance Lead',
+    ),
+    entry(
+      'a6',
+      '2026-10-04T16:40:00Z',
+      'auto',
+      'info',
+      'submitted',
+      'Marked as sent',
+      'Kittiwake · FP&A Analyst',
+      'A confirmation arrived for a role still in drafting',
+    ),
+    entry(
+      'a7',
+      '2026-10-03T07:00:00Z',
+      'sweep',
+      'info',
+      'submitted',
+      'Follow-up sent',
+      'Fenwright · Finance Operations',
+      null,
+    ),
   ],
 };
 
 /** Jobs' Activity tab, its own page again (note eb898bfd). */
 export function JobsActivitySurface() {
-  return (
-    <ActivityPage
-      timezone="America/New_York"
-      activity={ACTIVITY}
-      accounts={[
-        {
-          id: 'acc1',
-          emailAddress: 'christopher.kloughton@example.com',
-          status: 'active',
-          lastSyncedAt: '2026-10-06T11:03:41Z',
-          backfillCompletedAt: '2026-08-14T10:00:00Z',
-        },
-      ]}
-    />
-  );
+  return <ActivityPage timezone="America/New_York" activity={ACTIVITY} />;
 }
 
 // ---- Answers ----------------------------------------------------------------
@@ -175,7 +231,9 @@ export function JobsOnboardingSurface() {
             <div
               key={entry}
               className={
-                position <= index ? 'h-1 flex-1 rounded-full bg-accent' : 'h-1 flex-1 rounded-full bg-border'
+                position <= index
+                  ? 'h-1 flex-1 rounded-full bg-accent'
+                  : 'h-1 flex-1 rounded-full bg-border'
               }
             />
           ))}
@@ -196,16 +254,34 @@ export function JobsOnboardingSurface() {
             </p>
             <ul className="space-y-3 text-body text-ink">
               <li className="flex gap-3">
-                <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                <span>Confirmations, rejections, interview invites and recruiter mail, read and filed.</span>
+                <Inbox
+                  className="mt-0.5 size-4 shrink-0 text-accent"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <span>
+                  Confirmations, rejections, interview invites and recruiter mail, read and filed.
+                </span>
               </li>
               <li className="flex gap-3">
-                <FileText className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                <span>Paste a job link and the description, requirements and questions come with it.</span>
+                <FileText
+                  className="mt-0.5 size-4 shrink-0 text-accent"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <span>
+                  Paste a job link and the description, requirements and questions come with it.
+                </span>
               </li>
               <li className="flex gap-3">
-                <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                <span>Email bodies are never stored. Never fills in a form or applies for you.</span>
+                <Shield
+                  className="mt-0.5 size-4 shrink-0 text-accent"
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+                <span>
+                  Email bodies are never stored. Never fills in a form or applies for you.
+                </span>
               </li>
             </ul>
           </div>
@@ -223,10 +299,34 @@ const CASE: CasePage = {
   role: 'Senior Financial Analyst, Revenue Operations and Planning',
   body: 'I have spent four years building the planning models finance teams run the year on, most recently for a 400-person payments company. The role asks for someone who can own the revenue model and sit with the operators who move it. Below is each thing the posting asks for and the work I would point to for it. The full model behind the second example is at https://example.com/cohort-model.',
   matches: [
-    { requirement: 'Own the revenue forecast and the monthly reforecast process', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: 'e1' },
-    { requirement: 'Build cohort and unit economics analyses that change how budget is spent', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: 'e2' },
-    { requirement: 'Advanced SQL', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: null },
-    { requirement: 'Experience at a fintech or payments company', kind: 'nice_to_have', verdict: 'match', why: '', evidenceItemId: 'e3' },
+    {
+      requirement: 'Own the revenue forecast and the monthly reforecast process',
+      kind: 'must_have',
+      verdict: 'match',
+      why: '',
+      evidenceItemId: 'e1',
+    },
+    {
+      requirement: 'Build cohort and unit economics analyses that change how budget is spent',
+      kind: 'must_have',
+      verdict: 'match',
+      why: '',
+      evidenceItemId: 'e2',
+    },
+    {
+      requirement: 'Advanced SQL',
+      kind: 'must_have',
+      verdict: 'match',
+      why: '',
+      evidenceItemId: null,
+    },
+    {
+      requirement: 'Experience at a fintech or payments company',
+      kind: 'nice_to_have',
+      verdict: 'match',
+      why: '',
+      evidenceItemId: 'e3',
+    },
   ],
   evidence: [
     {
