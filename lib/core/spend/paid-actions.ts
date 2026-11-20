@@ -161,8 +161,11 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-application'],
   // Draft all answers, and Redraft with the replies to Dash's questions (plan #2130.4)
   'app/jobs/(app)/roles/actions.ts#draftApplication': ['draft-application'],
-  // Draft a cover letter, and Redraft with the replies to Dash's questions (plan #2135.2)
-  'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter': ['draft-cover-letter'],
+  // Draft a cover letter, and Redraft with the replies to Dash's questions
+  // (plan #2135.2). It queues the letter for the routine, which writes it
+  // with the person's cover letter skill and no API spend, so it names
+  // nothing; it stays listed because Dash's draft_cover_letter tool presses it.
+  'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter': [],
   'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],
   'app/jobs/(app)/find/recommend-actions.ts#suggestPeople': ['suggest-outreach'],

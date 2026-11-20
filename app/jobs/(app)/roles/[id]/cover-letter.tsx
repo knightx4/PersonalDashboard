@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { DashAction } from '@/components/ui/dash-action';
@@ -14,6 +14,7 @@ import { CopyText } from './copy-text';
 import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
 import type { StoredAsk } from '@/lib/jobs/drafting/store';
 import {
+  coverLetterRun,
   draftCoverLetter,
   dropCoverLetterDraft,
   saveCoverLetter,
@@ -25,12 +26,19 @@ import { LetterPdf } from './letter-pdf';
 
 const DRAFT_LETTER = 'app/jobs/(app)/roles/[id]/actions.ts#draftCoverLetter';
 
+/** How often the tab asks whether the routine has saved the letter. */
+const POLL_MS = 10_000;
+/** When the tab stops asking; the run's row goes stale at an hour, and a reload asks again. */
+const POLL_LIMIT_MS = 30 * 60_000;
+
 /**
  * The cover letter sent with this application (note b4cecf70), under the
  * answers because it is part of the same submission. Read as prose and edited
  * in place, as an answer is.
  *
- * Dash drafts one from everything on file (plan #2135.2). The draft sits
+ * Dash drafts one from everything on file (plan #2135.2), in a routine that
+ * writes it with the person's cover letter skill, so Draft queues it and the
+ * tab asks every few seconds until the letter has landed. The draft sits
  * beside the letter in the shared draft panel and never in it: Insert puts it
  * in the editor, and the Save after that writes the letter and marks the
  * application as having a cover letter in one write. Dash's questions about
@@ -72,24 +80,52 @@ export function CoverLetter({
   // The draft's text is in the editor, waiting for Save. The panel steps
   // aside meanwhile, and Cancel brings it back.
   const [inserted, setInserted] = useState(false);
-  // Not a transition: the letter stays readable for the minute a draft takes.
+  // Not a transition: the letter stays readable for the minutes a draft takes.
   const [running, setRunning] = useState(initialRun?.pending ?? false);
   const [runError, setRunError] = useState<string | null>(initialRun?.error ?? null);
+  const pollStarted = useRef<number | null>(null);
 
-  /** Drafts the letter, with any replies; returns the error to show, or null. */
+  /** Asks whether the routine has saved the letter, and takes it when it has. */
+  const poll = useCallback(async () => {
+    const result = await coverLetterRun({ applicationId }).catch(() => null);
+    if (!result || result.pending) {
+      if (pollStarted.current !== null && Date.now() - pollStarted.current > POLL_LIMIT_MS) {
+        setRunning(false);
+        setRunError('Dash is still writing. Reload the page in a few minutes to see the letter.');
+      }
+      return;
+    }
+    setRunning(false);
+    if (result.error) {
+      setRunError(result.error);
+      return;
+    }
+    if (result.draft) {
+      setDraft(result.draft);
+      setInserted(false);
+    }
+  }, [applicationId]);
+
+  useEffect(() => {
+    if (!running) {
+      pollStarted.current = null;
+      return;
+    }
+    pollStarted.current ??= Date.now();
+    const timer = setInterval(() => void poll(), POLL_MS);
+    return () => clearInterval(timer);
+  }, [running, poll]);
+
+  /** Queues the letter, with any replies; returns the error to show, or null. */
   async function run(replies?: Record<string, string>): Promise<string | null> {
-    setRunning(true);
     setRunError(null);
     try {
       const result = await draftCoverLetter({ applicationId, replies });
-      if (result.error || !result.draft) return result.error ?? 'Nothing came back.';
-      setDraft(result.draft);
-      setInserted(false);
+      if (result.error || !result.queued) return result.error ?? 'The letter could not be queued.';
+      setRunning(true);
       return null;
     } catch {
-      return 'Drafting stopped before it finished. Try again.';
-    } finally {
-      setRunning(false);
+      return 'The letter could not be queued. Try again.';
     }
   }
 
@@ -193,8 +229,8 @@ export function CoverLetter({
 
         {running ? (
           <Note role="status" className="mt-2 px-3 py-2 text-small text-ink-muted">
-            Dash is writing the letter from everything on file, which takes a minute. You can keep
-            working.
+            Dash is writing the letter from everything on file with your cover letter skill. It
+            lands here in a few minutes, and you can leave the page meanwhile.
           </Note>
         ) : (
           runError && (

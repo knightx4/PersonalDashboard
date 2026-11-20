@@ -6,8 +6,8 @@ import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings'
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import { runApplicationDraft } from './draft-application';
 import { fromStoredDraft } from './draft-application-payload';
-import { draftAndSaveCoverLetter } from './draft-cover-letter';
-import type { CoverLetterDraftView } from './draft-cover-letter-payload';
+import { queueCoverLetter } from './letter-request';
+import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
 import { loadThreads } from '@/lib/thread/store';
 import { VAULT_SOURCES, type ThreadReader } from './gather';
 import type { ApplicationDrafts, StoredAsk } from './store';
@@ -110,21 +110,29 @@ export async function draftAnswerFor(userId: string, apiKey: string, answerId: s
   return { draft: fromStoredDraft(stored), applicationId, asks: result.drafts.asks, error: null };
 }
 
-/** Drafts the cover letter for an application and records what it spent. */
+/**
+ * Queues the cover letter for the routine, which writes it with the person's
+ * cover letter skill (./letter-request.ts). No API spend: the letter is
+ * written in a Claude Code session, and lands beside the editor in a few
+ * minutes.
+ */
 export async function draftCoverLetterFor(
   userId: string,
-  apiKey: string,
   input: { applicationId: string; replies?: Record<string, string> },
-): Promise<{ draft: CoverLetterDraftView | null; error: string | null }> {
-  const [jobs, core] = await Promise.all([createClient(), createCoreClient()]);
-
-  const spend: SpendReport[] = [];
-  const result = await draftAndSaveCoverLetter(
-    { jobs, core, threads: threadReader(core, userId), apiKey, onSpend: (report) => spend.push(report) },
+): Promise<{ queued: boolean; requestId: string | null; error: string | null }> {
+  const routine = goalsRoutine();
+  if (!routine.id || !routine.token) {
+    return {
+      queued: false,
+      requestId: null,
+      error: 'Letters are written on the goals routine, which is not set up here: it needs CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN.',
+    };
+  }
+  const jobs = await createClient();
+  const result = await queueCoverLetter(
+    { jobs, fire: (text) => fireFeatureRoutine({ apiKey: routine.token, routineId: routine.id, text }) },
     { userId, applicationId: input.applicationId, replies: input.replies },
   );
-  await recordSessionSpend(userId, { module: 'jobs', operation: 'draft-cover-letter' }, spend);
-
-  if (!result.ok) return { draft: null, error: result.error };
-  return { draft: result.draft, error: null };
+  if (!result.ok) return { queued: false, requestId: null, error: result.error };
+  return { queued: true, requestId: result.requestId, error: null };
 }

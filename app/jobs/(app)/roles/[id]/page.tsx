@@ -40,8 +40,9 @@ import { RelatedNotes } from '@/components/vault/related-notes';
 import { loadThread, loadThreads } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
 import { loadDrafts } from '@/lib/jobs/drafting/store';
+import { latestLetterRequest, letterRequestOpen } from '@/lib/jobs/drafting/letter-request';
 import { coverLetterView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
-import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
+import { bannedOrDefault } from '@/lib/jobs/evidence/draft-payload';
 import { fromStoredDraft } from '@/lib/jobs/drafting/draft-application-payload';
 import { rowSubject } from '@/lib/core/subject';
 import { toRef } from '@/lib/core/refs';
@@ -180,6 +181,7 @@ export default async function RoleDetailPage({
     { drafts: storedDrafts },
     { drafts: storedLetter },
     factOrigins,
+    letterRequest,
   ] = await Promise.all([
     supabase
       .from('application_events')
@@ -262,6 +264,9 @@ export default async function RoleDetailPage({
     // Where each fact in the properties came from (plan #2343.3). A failed
     // read shows the facts with no labels, as for a fact saved before origins.
     loadRoleFactOrigins(supabase, id, company.id).catch(() => roleFactOrigins([])),
+    // A letter the routine is still writing, so the tab shows it under way
+    // after a reload. A failed read shows no run.
+    latestLetterRequest(supabase, user.id, current.id as string).catch(() => null),
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -739,6 +744,7 @@ export default async function RoleDetailPage({
             storedLetter ? { drafts: storedLetter.drafts, asks: storedLetter.asks } : null,
             bannedOrDefault(profile?.banned_constructions),
           )}
+          coverLetterRun={letterRequestOpen(letterRequest) ? { pending: true, error: null } : undefined}
           thread={notes ?? []}
           answerThreads={Object.fromEntries(answerThreads)}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
@@ -795,8 +801,3 @@ function debriefDue(iso: string | null): boolean {
   return scheduledAt < now && scheduledAt >= now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS;
 }
 
-/** The person's banned constructions, or the defaults the drafter uses when they have set none. */
-function bannedOrDefault(value: unknown): string[] {
-  const own = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
-  return own.length > 0 ? own : [...DEFAULT_BANNED_CONSTRUCTIONS];
-}
