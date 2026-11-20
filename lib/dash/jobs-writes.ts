@@ -1269,6 +1269,7 @@ export const APPLICATION_CHILDREN = [
   { table: 'job_search.application_outreach', column: 'application_id', owned: true, unique: 'contact_id' },
   { table: 'job_search.attachments', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.contact_touches', column: 'application_id', owned: true, unique: null },
+  { table: 'job_search.cover_letter_requests', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.cover_letters', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.interviews', column: 'application_id', owned: true, unique: 'ics_uid' },
   { table: 'job_search.interview_groups', column: 'application_id', owned: true, unique: null },
