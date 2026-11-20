@@ -101,9 +101,49 @@ function likeEscaped(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+/**
+ * Names connected apps and Dash guess for a column, read as the column they
+ * mean. Each is a name another tool uses for the same value: change_role and
+ * save_job take a role's link as posting_url and store it in jd_url, so a
+ * client that has seen one asks query_rows for posting_url (20 November: two
+ * calls refused in a day, nine in a week). Only names whose value is the very
+ * same column belong here; a guess in other units (pay_min against
+ * comp_min_cents, in cents) stays refused.
+ */
+export const COLUMN_ALIASES: Record<string, Record<string, string>> = {
+  'job_search.roles': { posting_url: 'jd_url', description: 'jd_text' },
+  'job_search.resume_versions': { content: 'text_content' },
+  'core.conversation_turns': { content: 'body', text: 'body' },
+};
+
+/** The column a name means in this table: itself, or the column it is an alias for. */
+export function columnName(columns: Map<string, TableColumn>, table: string, name: string): string | null {
+  if (columns.has(name)) return name;
+  const alias = COLUMN_ALIASES[table]?.[name];
+  return alias && columns.has(alias) ? alias : null;
+}
+
+/** "Read posting_url as jd_url." for each alias the call named, or null. */
+function aliasNote(table: string, columns: Map<string, TableColumn>, input: Record<string, unknown>): string | null {
+  const named: unknown[] = [];
+  if (Array.isArray(input.columns)) named.push(...input.columns);
+  if (Array.isArray(input.where)) for (const c of input.where) named.push((c as { column?: unknown } | null)?.column);
+  if (input.order && typeof input.order === 'object') named.push((input.order as { column?: unknown }).column);
+  named.push(input.group_by);
+  const read = new Map<string, string>();
+  for (const name of named) {
+    if (typeof name !== 'string') continue;
+    const real = columnName(columns, table, name.trim());
+    if (real && real !== name.trim()) read.set(name.trim(), real);
+  }
+  if (read.size === 0) return null;
+  return `Read ${[...read].map(([from, to]) => `${from} as ${to}`).join(', ')}: ${table} keeps ${read.size === 1 ? 'that value' : 'those values'} under the second name.`;
+}
+
 function columnOf(columns: Map<string, TableColumn>, table: string, name: unknown, what: string): TableColumn {
   if (typeof name !== 'string' || !name.trim()) throw new AskInputError(`${what} must name a column.`);
-  const column = columns.get(name.trim());
+  const real = columnName(columns, table, name.trim());
+  const column = real ? columns.get(real) : undefined;
   if (!column) {
     throw new AskInputError(`${table} has no column ${name.trim()}. Its columns: ${[...columns.keys()].join(', ')}.`);
   }
@@ -499,10 +539,11 @@ async function listed(
   } else {
     if (!Array.isArray(input.columns)) throw new AskInputError('columns must be a list of column names.');
     const names = input.columns.map((c) => (typeof c === 'string' ? c.trim() : c));
-    unknown = names.filter((c): c is string => typeof c === 'string' && c !== '' && !columns.has(c));
-    const known = names.filter((c) => !(typeof c === 'string' && c !== '' && !columns.has(c)));
+    const guessed = (c: unknown): c is string => typeof c === 'string' && c !== '' && !columnName(columns, table, c);
+    unknown = names.filter(guessed);
+    const known = names.filter((c) => !guessed(c));
     if (known.length === 0 && unknown.length > 0) columnOf(columns, table, unknown[0], 'Each of columns');
-    asked = known.map((c) => columnOf(columns, table, c, 'Each of columns').column);
+    asked = [...new Set(known.map((c) => columnOf(columns, table, c, 'Each of columns').column))];
   }
 
   const orderIn = input.order && typeof input.order === 'object' ? (input.order as Record<string, unknown>) : null;
@@ -534,6 +575,7 @@ async function listed(
   const order = `${orderColumn} ${ascending ? 'ascending' : 'descending'}`;
   const notes = [
     `Read ${what} in ${table}, by ${order}: ${matchedNote(matched, rows.length)}.`,
+    aliasNote(table, columns, input),
     unknown.length > 0
       ? `Left out ${unknown.join(', ')}: ${table} has no column of ${unknown.length === 1 ? 'that name' : 'those names'}. Its columns: ${[...columns.keys()].join(', ')}.`
       : null,

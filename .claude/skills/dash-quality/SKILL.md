@@ -277,7 +277,12 @@ when you see a cause of failure that one fix will not remove.
      come back. Done 19 November: an id cut to its first 8 characters
      ("9d69522d") reads as the ids it starts in query_rows, and as the one
      row of theirs it starts in change_role, change_application and
-     add_role_note (`idPrefixRange`, `ownIdFor` in `lib/ask/db.ts`). Left:
+     add_role_note (`idPrefixRange`, `ownIdFor` in `lib/ask/db.ts`). Done
+     20 November: a name another tool uses for the same column reads as
+     that column anywhere in query_rows (`COLUMN_ALIASES` in
+     `lib/ask/query.ts`: a role's posting_url is jd_url), and the note says
+     so. Add a pair there when the health shows a guess repeated; a guess in
+     other units (pay_min against comp_min_cents) stays refused. Left:
      a company name given to a uuid column still fails as "invalid input
      syntax for type uuid", and other writes' refs still need the whole id.
    - A connector failure is proven fixed for free: this session can call
