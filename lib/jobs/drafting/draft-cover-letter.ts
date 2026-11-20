@@ -1,12 +1,13 @@
 /**
  * A cover letter, drafted from everything on file (plan #2135.1), written by
- * the routine with the person's cover letter skill.
+ * the routine with the cover letter skill.
  *
  * The Draft button no longer calls the API. It queues a request
  * (./letter-request.ts) and fires the goals routine with
- * .claude/skills/cover-letters/SKILL.md. The routine's session reads what
+ * .claude/skills/cover-letters/SKILL.md, the one cover letter skill, which
+ * holds the voice, structure and facts. The routine's session reads what
  * letterPrompt() renders through scripts/cover-letter.ts, writes the letter
- * itself following the person's cover letter skill, and hands its report to
+ * itself following that skill, and hands its report to
  * keepLetter(), which checks it with the parser the API reply went through.
  *
  * The letter lands beside the editor, not in it: it is kept in
@@ -21,6 +22,7 @@ import 'server-only';
 
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import {
+  countWords,
   coverLetterView,
   mergeAsks,
   parseCoverLetterPayload,
@@ -39,6 +41,13 @@ import { LETTER_KEY, loadDrafts, saveDrafts, type StoredAsk } from './store';
  * vault passages rarely reach them.
  */
 const AI_NOTES_QUESTION = 'What I have noticed and learned building things with AI, agents and automation';
+
+/**
+ * The words a letter may run to: the skill asks for 300 to 400, with room
+ * for the greeting and sign-off. A person's comment asking for another
+ * length lifts it (`--any-length` on the script).
+ */
+export const LETTER_WORDS = { min: 250, max: 420 } as const;
 
 /** The shape the routine writes its report in, as the API's tool schema was. */
 export const LETTER_TOOL = {
@@ -122,11 +131,18 @@ export type DraftCoverLetterResult =
 
 /**
  * Check the routine's report and keep it beside the editor, as the API reply
- * was kept. The row is written only when a letter came back.
+ * was kept. The row is written only when a letter came back with none of
+ * their banned constructions in it.
  */
 export async function keepLetter(
   deps: { jobs: GatherDeps['jobs']; newId?: () => string },
-  input: { userId: string; applicationId: string; prompt: Pick<LetterPrompt, 'material' | 'earlierAsks'> },
+  input: {
+    userId: string;
+    applicationId: string;
+    prompt: Pick<LetterPrompt, 'material' | 'earlierAsks'>;
+    /** The word range the letter must fall in; null when the person asked for another length. */
+    words?: { min: number; max: number } | null;
+  },
   report: unknown,
 ): Promise<DraftCoverLetterResult> {
   const { userId, applicationId, prompt } = input;
@@ -139,6 +155,23 @@ export async function keepLetter(
     material.style.banned,
   );
   if (!result.ok) return result;
+  // A letter carrying a banned construction is not kept: the routine rewrites
+  // those lines and saves again, rather than leaving the person to find them.
+  if (result.draft.bannedFound.length > 0) {
+    return {
+      ok: false,
+      error: `The letter uses ${result.draft.bannedFound.map((b) => `"${b}"`).join(', ')}, which ${result.draft.bannedFound.length === 1 ? 'is' : 'are'} on their banned list. Rewrite those lines and save again.`,
+    };
+  }
+
+  const range = input.words === undefined ? LETTER_WORDS : input.words;
+  const words = countWords(result.draft.letter);
+  if (range && (words < range.min || words > range.max)) {
+    return {
+      ok: false,
+      error: `The letter is ${words} words; it should be ${range.min} to ${range.max}. ${words > range.max ? 'Cut it' : 'Fill it out'} and save again.`,
+    };
+  }
 
   const asks = mergeAsks(earlierAsks, result.draft.asks, deps.newId ?? (() => crypto.randomUUID()));
   const row = storedLetter(result.draft, asks);

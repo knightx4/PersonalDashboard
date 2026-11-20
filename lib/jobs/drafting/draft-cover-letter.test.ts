@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
-import { keepLetter, letterPrompt } from './draft-cover-letter';
+import { keepLetter, letterPrompt, LETTER_WORDS } from './draft-cover-letter';
 import type { JobsClient } from './gather';
 import { LETTER_KEY } from './store';
 
@@ -47,7 +47,12 @@ function deps(tables: FakeTables) {
 }
 
 /** Render the prompt, then keep the report the routine wrote from it. */
-async function draft(tables: FakeTables, report: Record<string, unknown>, replies?: Record<string, string>) {
+async function draft(
+  tables: FakeTables,
+  report: Record<string, unknown>,
+  replies?: Record<string, string>,
+  words: { min: number; max: number } | null = null,
+) {
   const d = deps(tables);
   if (replies) {
     const rows = tables['job_search.application_drafts'] as { asks: { id: string; reply: string | null }[] }[];
@@ -55,7 +60,7 @@ async function draft(tables: FakeTables, report: Record<string, unknown>, replie
   }
   const prepared = await letterPrompt(d, { userId: ME, applicationId: APP });
   if (!prepared.ok) throw new Error(prepared.error);
-  const kept = await keepLetter(d, { userId: ME, applicationId: APP, prompt: prepared.prompt }, report);
+  const kept = await keepLetter(d, { userId: ME, applicationId: APP, prompt: prepared.prompt, words }, report);
   return { prompt: prepared.prompt, kept };
 }
 
@@ -63,7 +68,7 @@ describe('letterPrompt and keepLetter', () => {
   it('renders the material, keeps the letter and its asks, and renders the replies next time', async () => {
     const tables = fixture();
     const first = await draft(tables, {
-      letter: 'Acme is getting serious about runway, and I leverage that. I cut burn by 30% at Beta Corp.',
+      letter: 'Acme is getting serious about runway. I cut burn by 30% at Beta Corp.',
       evidence_item_ids: ['e2', 'e-invented'],
       unsupported_claims: [],
       asks: ['Do you know anyone at Acme?', 'When could you start?'],
@@ -77,7 +82,7 @@ describe('letterPrompt and keepLetter', () => {
 
     expect(first.kept.draft.evidenceItemIds).toEqual(['e2']);
     expect(first.kept.draft.unsupportedClaims).toEqual(['Part of this cited an evidence item that does not exist.']);
-    expect(first.kept.draft.bannedFound).toEqual(['leverage']);
+    expect(first.kept.draft.bannedFound).toEqual([]);
     expect(first.kept.draft.asks.map((a) => [a.id, a.question, a.reply])).toEqual([
       ['ask-1', 'Do you know anyone at Acme?', null],
       ['ask-2', 'When could you start?', null],
@@ -122,6 +127,40 @@ describe('letterPrompt and keepLetter', () => {
       applicationId: APP,
     });
     expect(result).toEqual({ ok: false, error: 'That application is not yours.' });
+  });
+
+  it('keeps nothing when the letter uses a banned construction, and says which', async () => {
+    const tables = fixture();
+    const { kept } = await draft(tables, {
+      letter: 'Acme is getting serious about runway, and I leverage that.',
+      evidence_item_ids: [],
+      unsupported_claims: [],
+      asks: [],
+    });
+    expect(kept).toEqual({ ok: false, error: expect.stringContaining('"leverage"') });
+    expect(tables['job_search.application_drafts'] ?? []).toHaveLength(0);
+  });
+
+  it('keeps nothing outside the word range, and says by how much', async () => {
+    const tables = fixture();
+    const { kept } = await draft(
+      tables,
+      { letter: 'Acme is getting serious about runway. I cut burn by 30% at Beta Corp.', evidence_item_ids: [], unsupported_claims: [], asks: [] },
+      undefined,
+      LETTER_WORDS,
+    );
+    expect(kept).toEqual({ ok: false, error: expect.stringContaining('it should be 250 to 420') });
+    expect(tables['job_search.application_drafts'] ?? []).toHaveLength(0);
+  });
+
+  it('tells an AI role to lead with AI, without pointing at a template', async () => {
+    const tables = fixture();
+    (tables['job_search.roles'][0] as Record<string, unknown>).jd_text =
+      'AI Generalist. Build with LLMs and AI agents, run AI pilots, and teach generative AI and machine learning tools.';
+    const prepared = await letterPrompt(deps(tables), { userId: ME, applicationId: APP });
+    if (!prepared.ok) throw new Error(prepared.error);
+    expect(prepared.prompt.requestText).toContain('AI is central to this role, so AI leads the letter.');
+    expect(prepared.prompt.requestText).not.toContain('template');
   });
 
   it('keeps nothing when the report has no letter', async () => {

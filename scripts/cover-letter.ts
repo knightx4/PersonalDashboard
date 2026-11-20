@@ -1,13 +1,14 @@
 /**
- * The routine's side of drafting a cover letter (job_search 0084;
- * .claude/skills/cover-letters/SKILL.md). The Draft button queues a request
- * instead of calling the API; the routine's session reads the material here,
- * writes the letter itself with the person's cover letter skill, and saves it
- * here, which checks it as the API reply was checked and keeps it beside the
- * editor.
+ * The session's side of drafting a cover letter (job_search 0084;
+ * .claude/skills/cover-letters/SKILL.md, the one cover letter skill). The
+ * Draft button queues a request and fires the routine; a session asked
+ * directly queues one with `start`. Either way the session reads the material
+ * here, writes the letter itself with the skill, and saves it here, which
+ * checks it and keeps it beside the editor.
  *
+ *   npm run cover-letter -- start <application or role id>  # queue a letter without the button (a session asked directly); prints the request id
  *   npm run cover-letter -- show <request id>          # mark it drafting; print the material, the request and the report's shape
- *   npm run cover-letter -- save <request id> <file>   # keep the report in <file> (JSON: letter, evidence_item_ids, unsupported_claims, asks)
+ *   npm run cover-letter -- save <request id> <file> [--any-length]   # keep the report in <file> (JSON: letter, evidence_item_ids, unsupported_claims, asks); --any-length only when the person asked for another length
  *   npm run cover-letter -- fail <request id> "<why>"  # give it up, saying why; the tab shows the reason
  *
  * Every read and write is for the app's owner. Needs SUPABASE_SERVICE_ROLE_KEY
@@ -30,12 +31,15 @@ async function main() {
   const { loadThreads } = await import('@/lib/thread/store');
   const { VAULT_SOURCES } = await import('@/lib/jobs/drafting/gather');
   const { LETTER_TOOL, keepLetter, letterPrompt } = await import('@/lib/jobs/drafting/draft-cover-letter');
+  const { aiWeight } = await import('@/lib/jobs/drafting/draft-cover-letter-payload');
   const { LETTER_REQUEST_COLUMNS, readLetterRequest, settleLetterRequest } = await import(
     '@/lib/jobs/drafting/letter-request'
   );
 
-  const [command, id, arg] = process.argv.slice(2);
-  if (!command || !id) throw new Error('Usage: cover-letter <show|save|fail> <request id> …');
+  const argv = process.argv.slice(2);
+  const anyLength = argv.includes('--any-length');
+  const [command, id, arg] = argv.filter((a) => a !== '--any-length');
+  if (!command || !id) throw new Error('Usage: cover-letter <start|show|save|fail> <id> …');
 
   const { data: owner } = await createServiceSupabase().rpc('app_owner');
   const userId = (owner as { userId?: string } | null)?.userId;
@@ -43,6 +47,42 @@ async function main() {
   const jobs = createJobsServiceSupabase();
   const core = createServiceSchemaSupabase('core');
   const print = (value: unknown) => console.log(JSON.stringify(value, null, 2));
+
+  if (command === 'start') {
+    // An application id, or a role id whose newest application is taken.
+    const { data: byId } = await jobs.from('applications').select('id').eq('id', id).eq('user_id', userId).maybeSingle();
+    const { data: byRole } = byId
+      ? { data: null }
+      : await jobs
+          .from('applications')
+          .select('id')
+          .eq('role_id', id)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+    const applicationId = (byId?.id ?? byRole?.id) as string | undefined;
+    if (!applicationId) throw new Error(`No application or role ${id} for the owner.`);
+    const { data: open } = await jobs
+      .from('cover_letter_requests')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('application_id', applicationId)
+      .in('status', ['queued', 'drafting'])
+      .maybeSingle();
+    if (open) {
+      print({ request: open.id, applicationId, note: 'A letter was already queued for this application; use this request.' });
+      return;
+    }
+    const { data: made, error: madeError } = await jobs
+      .from('cover_letter_requests')
+      .insert({ user_id: userId, application_id: applicationId, status: 'queued' })
+      .select('id')
+      .single();
+    if (madeError || !made) throw new Error(madeError?.message ?? 'Could not queue the letter.');
+    print({ request: made.id, applicationId });
+    return;
+  }
 
   const { data: row, error } = await jobs
     .from('cover_letter_requests')
@@ -81,6 +121,7 @@ async function main() {
     print({
       request: { id, applicationId: request.applicationId },
       role: { id: prompt.material.role.roleId, title: prompt.material.role.title, company: prompt.material.role.company },
+      ai_weight: aiWeight(prompt.material.role),
       material: prompt.materialText,
       request_text: prompt.requestText,
       evidence_ids: prompt.material.evidence.items.map((item) => item.id),
@@ -98,7 +139,11 @@ async function main() {
     } catch (caught) {
       throw new Error(`Could not read ${arg} as JSON: ${caught instanceof Error ? caught.message : caught}`);
     }
-    const kept = await keepLetter({ jobs }, { userId, applicationId: request.applicationId, prompt }, report);
+    const kept = await keepLetter(
+      { jobs },
+      { userId, applicationId: request.applicationId, prompt, ...(anyLength ? { words: null } : {}) },
+      report,
+    );
     if (!kept.ok) {
       print(kept);
       process.exitCode = 1;
@@ -110,7 +155,7 @@ async function main() {
     return;
   }
 
-  throw new Error(`Unknown command ${command}: show, save or fail.`);
+  throw new Error(`Unknown command ${command}: start, show, save or fail.`);
 }
 
 main().catch((error: unknown) => {
