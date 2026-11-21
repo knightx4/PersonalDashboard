@@ -414,6 +414,10 @@ export const learnActions: ModuleActions = {
       'spends',
       'Starts the build routine again on a course that stopped; the person decides whether it is worth another run.',
     ),
+    resumeBuild: none(
+      'spends',
+      'Starts the build routine again on a course whose build went quiet; the person decides whether to spend the run.',
+    ),
     startWaitingCourse: none(
       'spends',
       'Starts the build routine on a course that has been waiting; the person decides when to spend the run.',
