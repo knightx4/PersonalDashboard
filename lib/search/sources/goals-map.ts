@@ -15,6 +15,12 @@ import { areaHref, stepHref } from '@/lib/goals/all-goals';
  * Decisions are left out as they are from the dev plan's hits: a question put
  * to you is answered where it is asked, not found. So are dropped rows.
  * Open work comes before finished work, which is what the box is for.
+ *
+ * A step that is not open says so in its subtitle, as a done goal does. Ask
+ * and the connector read the subtitle as the hit's `about`, and nothing else
+ * in a hit tells a closed step from an open one: on 20 November 2026 a
+ * connected app found three Edfinancial steps by search and tried to close
+ * all three, two of them done since 3 November.
  */
 
 export type GoalItemRow = {
@@ -95,7 +101,7 @@ export function goalHits(
           id: row.id,
           ref: `goals.items:${row.id}`,
           title: row.title,
-          subtitle: `Step · ${goal.title}`,
+          subtitle: row.status === 'open' ? `Step · ${goal.title}` : `Step · ${row.status.replace('_', ' ')} · ${goal.title}`,
           href: goalItemHref(row, byId),
         },
       });

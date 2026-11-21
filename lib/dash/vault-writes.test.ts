@@ -100,6 +100,18 @@ describe('the Vault writes', () => {
     expect(rows.find((row) => row.id === NOTE)?.body).toBe('# Flat\n\nThe boiler is due a service.\n');
   });
 
+  it('finds the note by its path as well as its id, as a lookup shows both', async () => {
+    const { env, rows } = setup();
+    const body = () => rows.find((row) => row.id === NOTE)?.body;
+    await made(env, 'edit_vault_note', { note_ref: 'Home/Flat.md', append: 'One.' });
+    await made(env, 'edit_vault_note', { note_ref: 'Home/Flat', append: 'Two.' });
+    await made(env, 'edit_vault_note', { note_ref: `obsidian.notes:${NOTE}`, append: 'Three.' });
+    expect(body()).toBe('# Flat\n\nThe boiler is due a service.\n\nOne.\n\nTwo.\n\nThree.\n');
+    expect(await refused(env, 'edit_vault_note', { note_ref: 'Home/Boat.md', append: 'x' })).toMatch(/No note of theirs is at the path "Home\/Boat.md"/);
+    rows.find((row) => row.id === NOTE)!.user_id = SOMEONE;
+    expect(await refused(env, 'edit_vault_note', { note_ref: 'Home/Flat.md', append: 'x' })).toMatch(/No note of theirs/);
+  });
+
   it('refuses an Undo once the note has moved on', async () => {
     const { env, rows } = setup();
     const change = await made(env, 'edit_vault_note', { note_ref: NOTE, body: '# Flat\n\nSold.\n' });

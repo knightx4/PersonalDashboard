@@ -285,6 +285,10 @@ when you see a cause of failure that one fix will not remove.
      other units (pay_min against comp_min_cents) stays refused. Left:
      a company name given to a uuid column still fails as "invalid input
      syntax for type uuid", and other writes' refs still need the whole id.
+     Done 21 November: the vault writes take a note's path (with or without
+     `.md`) as its ref (`noteNamed` in `lib/dash/vault-writes.ts`), and a
+     goal step that is not open says so in its search hit ("Step · done ·
+     …"), after a client tried to close two steps done for weeks.
    - A connector failure is proven fixed for free: this session can call
      the Dash connector's own tools (`mcp__Dash__*`, loaded with
      ToolSearch), so re-send the failing read after the deploy instead of

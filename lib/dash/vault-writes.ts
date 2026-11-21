@@ -150,6 +150,34 @@ async function ownNote(env: VaultWriteEnv, id: string): Promise<Row> {
   return note;
 }
 
+/**
+ * The note `key` names: its id, its `obsidian.notes:<id>` ref, or its path in
+ * the vault, with or without `.md`. vault_notes and search show each note's
+ * path beside its ref, and a model sends the path as often as the id: on 20
+ * November 2026 a connected app's edit_vault_note was refused twice for
+ * "ai red team.md" and "Inbox/Strategy for using weak model for red
+ * teaming.md", both notes of theirs, and it took a search to find the ids.
+ */
+async function noteNamed(env: VaultWriteEnv, args: Args, key: string): Promise<Row> {
+  const given = text(args, key);
+  if (!given) throw new VaultRefused(`${key} is missing: give the note's ref from a lookup.`);
+  const id = given.startsWith('obsidian.notes:') ? given.slice('obsidian.notes:'.length) : given;
+  if (isUuid(id)) return ownNote(env, id);
+  const path = given.replace(/^\/+/, '');
+  for (const candidate of path.toLowerCase().endsWith('.md') ? [path] : [path, `${path}.md`]) {
+    const { data, error } = await env.vault
+      .from('notes')
+      .select(NOTE_COLUMNS)
+      .eq('path', candidate)
+      .eq('user_id', env.userId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw new Error(`Reading the note at ${candidate} failed: ${error.message}`);
+    if (data) return data as unknown as Row;
+  }
+  throw new VaultRefused(`No note of theirs is at the path "${given}". Give the note's ref, or its whole path, as a lookup returned it.`);
+}
+
 async function noteAt(env: VaultWriteEnv, path: string): Promise<Row> {
   const { data, error } = await env.vault
     .from('notes')
@@ -235,7 +263,7 @@ export function appendToBody(body: string, addition: string): string {
 }
 
 async function editVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
-  const before = await ownNote(env, idOf(args, 'note_ref', 'note'));
+  const before = await noteNamed(env, args, 'note_ref');
   const path = before.path as string;
   if (isTriageNotePath(path)) {
     throw new VaultRefused('Quick note triage holds the quick notes waiting, one section each: add one with add_quick_note and file one with file_quick_note.');
@@ -266,7 +294,7 @@ async function editVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMade>
 // ---------------------------------------------------------------------------
 
 async function renameVaultNote(env: VaultWriteEnv, args: Args): Promise<VaultMade> {
-  const before = await ownNote(env, idOf(args, 'note_ref', 'note'));
+  const before = await noteNamed(env, args, 'note_ref');
   const name = text(args, 'name');
   const oldPath = before.path as string;
   const renamed = await renameNote(env.notes.rename, { path: oldPath, name, expectedBlobSha: before.blob_sha as string });
@@ -320,7 +348,7 @@ async function fileQuickNoteTool(env: VaultWriteEnv, args: Args): Promise<VaultM
   const triage = await env.notes.save.loadNote(TRIAGE_NOTE_PATH);
   if (!triage) throw new VaultRefused('Quick note triage has no quick notes waiting.');
   const section = pickSection(parseQuickSections(triage.body), wanted);
-  const into = text(args, 'into_note_ref') ? await ownNote(env, idOf(args, 'into_note_ref', 'note')) : null;
+  const into = text(args, 'into_note_ref') ? await noteNamed(env, args, 'into_note_ref') : null;
   if (into && isTriageNotePath(into.path as string)) throw new VaultRefused('A quick note cannot be filed into Quick note triage itself.');
 
   const filed = await fileQuickNote(
@@ -423,7 +451,7 @@ async function renameMayaQuestion(env: VaultWriteEnv, args: Args): Promise<Vault
 
   let query = env.core.from('conversations').select(THREAD_COLUMNS).eq('user_id', env.userId).eq('voice', 'maya');
   if (text(args, 'thread_ref')) query = query.eq('id', idOf(args, 'thread_ref', 'thread'));
-  else if (text(args, 'note_ref')) query = query.eq('subject_ref', toRef('obsidian.notes', idOf(args, 'note_ref', 'note')));
+  else if (text(args, 'note_ref')) query = query.eq('subject_ref', toRef('obsidian.notes', (await noteNamed(env, args, 'note_ref')).id as string));
   else throw new VaultRefused('Name the thread: thread_ref, or note_ref for the note it is about.');
   const { data: found, error: readError } = await query.maybeSingle();
   if (readError) throw new Error(`Reading the thread failed: ${readError.message}`);
@@ -560,7 +588,7 @@ async function saveTranscript(env: VaultWriteEnv, args: Args): Promise<VaultMade
 // The tools
 // ---------------------------------------------------------------------------
 
-const NOTE_REF = { type: 'string', description: 'The obsidian.notes ref a lookup returned for the note.' } as const;
+const NOTE_REF = { type: 'string', description: "The obsidian.notes ref a lookup returned for the note, or the note's whole path in the vault." } as const;
 const COURSE_TEXT = (what: string) => ({ type: 'string', description: `${what}. An empty string clears it.` }) as const;
 
 export const VAULT_WRITES: readonly VaultWrite[] = [

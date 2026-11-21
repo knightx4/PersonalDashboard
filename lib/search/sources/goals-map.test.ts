@@ -44,10 +44,18 @@ describe('goals search hits', () => {
     expect(hit).toMatchObject({
       kind: 'step',
       ref: 'goals.items:s2',
-      subtitle: 'Step · Run a marathon',
+      subtitle: 'Step · done · Run a marathon',
       href: '/goals/g1/s/s2',
     });
     expect(parseRef(hit.ref!)).toMatchObject({ table: 'goals.items', id: 's2' });
+  });
+
+  it('names an open step plainly, and says what a step that is not open is', () => {
+    const steps = [...rows, row({ id: 's4', parent_id: 'g1', title: 'Running coach', status: 'in_progress' })];
+    const about = (query: string) => goalHits(steps, { query, limit: 6 })[0].subtitle;
+    expect(about('club')).toBe('Step · Run a marathon');
+    expect(about('shoes')).toBe('Step · done · Run a marathon');
+    expect(about('coach')).toBe('Step · in progress · Run a marathon');
   });
 
   it('leaves out decisions, dropped rows and steps with no goal, and puts open first', () => {
