@@ -6,7 +6,9 @@ import { svgProblems, type Figure } from '@/lib/learn/reader/source';
  * is written into the page as it was saved, so it is checked once more here
  * (svgProblems: shapes and words only, no colour of its own) and left out if
  * it does not pass. It takes its colours from the page: ink by default, the
- * accent where it is marked `accent`, quieter where `muted` or `soft`.
+ * accent where it is marked `accent`, quieter where `muted` or `soft`. A
+ * shape or label with no fill of its own takes the ink, as words on the page
+ * do, where SVG would paint it black and lose it on a dark theme.
  */
 export function ReaderFigure({ figure }: { figure: Figure }) {
   if (svgProblems(figure.svg).length > 0) return null;
@@ -14,7 +16,7 @@ export function ReaderFigure({ figure }: { figure: Figure }) {
     <Card padding="dense">
       <figure className="space-y-2">
         <div
-          className="text-ink [&_.accent]:text-accent [&_.muted]:text-ink-muted [&_.soft]:text-border-strong [&_svg]:h-auto [&_svg]:w-full [&_text]:font-sans"
+          className="text-ink [&_svg]:fill-current [&_.accent]:text-accent [&_.muted]:text-ink-muted [&_.soft]:text-border-strong [&_svg]:h-auto [&_svg]:w-full [&_text]:font-sans"
           // The drawing passed svgProblems above: shapes and words, nothing that runs.
           dangerouslySetInnerHTML={{ __html: figure.svg }}
         />
