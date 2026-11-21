@@ -56,6 +56,7 @@ const READY: Course = {
   requestedAt: '2026-11-16T06:00:00Z',
   takenAt: '2026-11-16T06:01:00Z',
   builtAt: '2026-11-16T07:10:00Z',
+  updatedAt: '2026-11-16T07:10:00Z',
   digest,
   lectures,
 };

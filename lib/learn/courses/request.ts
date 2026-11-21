@@ -2,7 +2,8 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fireFeatureRoutine, goalsRoutine } from '@/lib/feedback/routine';
-import { BUILD_STALE_MS, queueCourse, type NewCourse } from '@/lib/learn/courses/store';
+import { BUILD_STALE_MS } from '@/lib/learn/courses/build';
+import { queueCourse, type NewCourse } from '@/lib/learn/courses/store';
 
 /**
  * Asking for a course. Nothing here calls a model: the press writes a row and

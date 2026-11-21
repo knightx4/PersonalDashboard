@@ -9,6 +9,7 @@ import {
   type Lecture,
 } from '@/lib/learn/courses/digest';
 import {
+  BUILD_STALE_MS,
   BUILD_STEPS,
   freshSteps,
   type BuildStep,
@@ -17,6 +18,14 @@ import {
   type StepKey,
   type StepState,
 } from '@/lib/learn/courses/build';
+import {
+  checkOutline,
+  checkStage,
+  draftProgress,
+  readDraft,
+  type Draft,
+} from '@/lib/learn/courses/draft';
+import { stageMathsProblems } from '@/lib/learn/courses/maths';
 
 /**
  * Reading and writing course digests (learn 0194). The pages read with the
@@ -44,12 +53,14 @@ export type CourseSummary = {
   requestedAt: string;
   takenAt: string | null;
   builtAt: string | null;
+  /** When the build last reported; a build quiet for BUILD_STALE_MS can be resumed. */
+  updatedAt: string | null;
 };
 
 export type Course = CourseSummary & { digest: Digest | null; lectures: Lecture[] };
 
 const SUMMARY_COLUMNS =
-  'id, title, provider, source_url, about, goal, budget_minutes, catalogue_key, status, steps, totals, progress, error, run_url, requested_at, taken_at, built_at';
+  'id, title, provider, source_url, about, goal, budget_minutes, catalogue_key, status, steps, totals, progress, error, run_url, requested_at, taken_at, built_at, updated_at';
 
 type Row = Record<string, unknown>;
 
@@ -73,6 +84,7 @@ function readSummary(row: Row): CourseSummary {
     requestedAt: row.requested_at as string,
     takenAt: (row.taken_at as string | null) ?? null,
     builtAt: (row.built_at as string | null) ?? null,
+    updatedAt: (row.updated_at as string | null) ?? null,
   };
 }
 
@@ -182,9 +194,6 @@ export async function queueCourse(
   return { id: (data as { id: string }).id, created: true };
 }
 
-/** A build nobody has touched for this long is handed out again. */
-export const BUILD_STALE_MS = 90 * 60 * 1000;
-
 /** Take the oldest queued course, or one whose build went quiet, for the routine's session. */
 export async function takeCourse(
   client: LearnSupabaseClient,
@@ -230,10 +239,11 @@ export async function reportStep(
     .eq('user_id', userId)
     .maybeSingle();
   if (error || !data) throw new Error(`No course ${courseId} for the owner.`);
-  const current =
-    Array.isArray((data as Row).steps) && ((data as Row).steps as BuildStep[]).length > 0
-      ? ((data as Row).steps as BuildStep[])
-      : freshSteps();
+  // A build taken before the stages were renamed keeps what it reported, under today's stages.
+  const stored = Array.isArray((data as Row).steps) ? ((data as Row).steps as BuildStep[]) : [];
+  const current = freshSteps().map(
+    (fresh) => stored.find((step) => step.key === fresh.key) ?? fresh,
+  );
   const now = new Date().toISOString();
   const at = BUILD_STEPS.findIndex((step) => step.key === key);
   const steps = current.map((step, index) => {
@@ -439,3 +449,110 @@ export async function setProgress(
 }
 
 export { freshSteps };
+
+/** A build's work in progress (learn 0197). */
+export async function loadDraft(
+  client: LearnSupabaseClient,
+  userId: string,
+  courseId: string,
+): Promise<Draft> {
+  const { data, error } = await client
+    .from('courses')
+    .select('draft')
+    .eq('id', courseId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error || !data) throw new Error(`No course ${courseId} for the owner.`);
+  return readDraft((data as Row).draft);
+}
+
+async function writeDraft(
+  client: LearnSupabaseClient,
+  userId: string,
+  courseId: string,
+  draft: Draft,
+): Promise<void> {
+  const { error } = await client
+    .from('courses')
+    .update({ draft, updated_at: new Date().toISOString() })
+    .eq('id', courseId)
+    .eq('user_id', userId);
+  if (error) throw new Error(`Keeping the draft failed: ${error.message}`);
+}
+
+/**
+ * Keep the designed outline. A new outline starts the writing again: stages
+ * written against an earlier one are dropped, since their place may have
+ * moved.
+ */
+export async function saveOutline(
+  client: LearnSupabaseClient,
+  userId: string,
+  courseId: string,
+  outline: unknown,
+): Promise<ReturnType<typeof checkOutline>> {
+  const lectures = await loadLectures(client, userId, courseId);
+  const checked = checkOutline(outline, lectures);
+  if (!checked.ok) return checked;
+  await writeDraft(client, userId, courseId, {
+    outline: outline as Draft['outline'],
+    stages: {},
+    reviewed: [],
+  });
+  return checked;
+}
+
+/** Keep one written stage, checked in its place; `reviewed` when a second reader has rechecked it. */
+export async function saveStage(
+  client: LearnSupabaseClient,
+  userId: string,
+  courseId: string,
+  key: string,
+  stage: unknown,
+  reviewed: boolean,
+): Promise<
+  | { ok: true; steps: number; clips: number; progress: ReturnType<typeof draftProgress> }
+  | { ok: false; problems: string[] }
+> {
+  const [draft, lectures] = await Promise.all([
+    loadDraft(client, userId, courseId),
+    loadLectures(client, userId, courseId),
+  ]);
+  const checked = checkStage(draft.outline, key, stage, lectures);
+  if (!checked.ok) return checked;
+  if (draft.outline?.maths === true) {
+    const maths = stageMathsProblems(stage);
+    if (maths.length > 0) return { ok: false, problems: maths };
+  }
+  const next: Draft = {
+    outline: draft.outline,
+    stages: { ...draft.stages, [key]: stage as Draft['stages'][string] },
+    // A stage written again is rechecked again.
+    reviewed: reviewed
+      ? [...new Set([...draft.reviewed, key])]
+      : draft.reviewed.filter((item) => item !== key),
+  };
+  await writeDraft(client, userId, courseId, next);
+  return { ...checked, progress: draftProgress(next) };
+}
+
+/**
+ * Put a build that went quiet back in the queue, keeping everything it kept:
+ * its notes, its outline and its stages. The routine's session picks up from
+ * there (takeCourse keeps the steps).
+ */
+export async function resumeCourse(
+  client: LearnSupabaseClient,
+  userId: string,
+  courseId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await client
+    .from('courses')
+    .update({ status: 'queued', error: null, updated_at: now })
+    .eq('id', courseId)
+    .eq('user_id', userId)
+    .eq('status', 'building')
+    .lt('updated_at', new Date(Date.now() - BUILD_STALE_MS).toISOString());
+  if (error) throw new Error(`Resuming the build failed: ${error.message}`);
+}

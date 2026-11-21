@@ -4,7 +4,7 @@ import { PageColumn } from '@/components/shell/page-width';
 import { Card } from '@/components/ui/card';
 import { LiveDot } from '@/components/ui/live-dot';
 import { sectionSubject } from '@/lib/core/section-path';
-import { freshSteps, type BuildStep } from '@/lib/learn/courses/build';
+import { BUILD_STALE_MS, freshSteps, type BuildStep } from '@/lib/learn/courses/build';
 import type { Course } from '@/lib/learn/courses/store';
 import { hours } from '../format';
 import { BuildActions, BuildRefresh } from './build-live';
@@ -63,7 +63,7 @@ export function BuildView({ course }: { course: Course }) {
         {course.status === 'failed' && course.error && (
           <p className="text-small text-caution [overflow-wrap:anywhere]">{course.error}</p>
         )}
-        <BuildActions courseId={course.id} status={course.status} />
+        <BuildActions courseId={course.id} status={course.status} quiet={isQuiet(course)} />
       </Card>
 
       {course.goal && (
@@ -74,6 +74,12 @@ export function BuildView({ course }: { course: Course }) {
       {open && <BuildRefresh />}
     </PageColumn>
   );
+}
+
+/** A build that has not reported for BUILD_STALE_MS, so its session has most likely stopped. */
+function isQuiet(course: Course): boolean {
+  if (course.status !== 'building' || !course.updatedAt) return false;
+  return Date.now() - new Date(course.updatedAt).getTime() > BUILD_STALE_MS;
 }
 
 function headline(course: Course): string {

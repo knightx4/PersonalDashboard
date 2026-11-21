@@ -1,13 +1,15 @@
 ---
 name: learn-courses
-description: Build the course digests waiting in learn.courses. For each one, list every video of the lecture series, fetch every transcript, write a notes file per lecture, work out across all the notes what this person needs (one lesson plan of stages that follow what rests on what and branch where the course forks, each step holding its clips, commentary, drawings, readings and a question, then a rating per lecture, the big ideas and the lecturers' errors), check it, and save it through npm run learn:course, reporting each stage so the course's page shows where the build is. No API spend. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/learn-courses/SKILL.md" and names "Course digests", or the user says "build the waiting courses" or "digest this course".
+description: Build the course digests waiting in learn.courses, or pick up one that stopped. For each one, list every video of the lecture series (or several series), fetch every transcript, have subagents write a notes file per lecture, design the lessons across all the notes, write each stage and recheck every number in it, keeping each piece as it lands so a build can stop and resume, and work out what this person needs (one lesson plan of stages that follow what rests on what and branch where the course forks, each step holding its clips, commentary, drawings, readings and a question, then a rating per lecture, the big ideas and the lecturers' errors), check it, and save it through npm run learn:course, reporting each stage so the course's page shows where the build is. No API spend. Use when the goals routine is fired with a brief that starts "Follow .claude/skills/learn-courses/SKILL.md" and names "Course digests", or the user says "build the waiting courses" or "digest this course".
 ---
 
 # Building a course digest
 
 The person asked for a lecture series on Learn's Courses tab. The app does
 not call the API for this: it wrote a row in `learn.courses` and fired this
-routine. You read the whole series and write the digest yourself.
+routine. You run the build: the reading, designing, writing and rechecking
+are done by subagents with the briefs in this folder, and you keep the
+pieces and the page up to date.
 
 Read `docs/LEARN-DIGEST-SPEC.md` first, above all "The treatment rule" and
 "What building the first one taught". `lib/learn/courses/digest.ts` is the
@@ -22,8 +24,9 @@ In anything the person reads, the assistant is **Dash**, never "Claude".
   over a million characters of transcript. Every stage writes its output to
   disk and to the database before the next starts, and a build that is
   interrupted picks up from what is stored (`next` prints what already is).
-- **Never read a transcript in the main session.** One subagent reads one
-  transcript file and writes one notes file. The main session reads notes.
+- **Never read a transcript or a notes file in the main session.** Readers
+  read transcripts, the designer and writers read notes. The main session
+  sends them, keeps count and reads their reports.
 - **Never type a link.** A moment in a lecture is a token, `[[L07 21:49]]` or
   `[[L07 21:49-29:39]]`. The app builds the link from the stored video id.
   The check refuses a typed YouTube address.
@@ -72,53 +75,58 @@ Make a working folder in your scratchpad for the course.
    transcript at all fails the course, since a digest is built from every
    lecture.
 
-5. **Notes** (`step <id> notes running "0 of N"`). For each lecture without
-   stored notes, send one subagent with the path of its transcript file,
-   `madeFor`, and the notes format below. Run several at once. Each writes
-   `<dir>/<code>.notes.md`; save each as it lands with
-   `npm run learn:course -- notes <id> <code> <file>`, which also moves the
-   count on the page. Before going on, `npm run learn:course -- counts <id>`
-   must show no lecture missing.
+The rest of the build is done by subagents, each with one of the briefs in
+this folder, and every piece they make is kept in the database as it lands
+(learn 0197). Give each subagent the course id, your working folder, the
+learner (`madeFor` as you wrote it in step 2) and its part. Run three to
+five at once, no more: a build of fifty lectures ran into the owner's usage
+limit twice with nine.
 
-6. **Synthesis** (`step <id> synthesis running`). Read every notes file, and
-   only the notes. Write the digest as one JSON file in the shape below. This
-   stage runs only when all the notes exist, because contradictions between
-   lecturers, the dependency order the plan follows and the best single clip
-   for an idea are invisible one lecture at a time.
+5. **Notes** (`step <id> notes running "0 of N"`). Send readers with
+   [notes.md](notes.md), three to five lectures each, for every lecture
+   `next` lists as missing. Each reads its transcripts in full and keeps one
+   notes file per lecture (`notes <id> <code> <file>`), which moves the
+   count on the page. A reader fetches a transcript the batch command
+   missed. Before going on, `counts <id>` must show none missing.
 
-7. **Verify** (`step <id> verify running`). Recompute every number the digest
-   states. Then `npm run learn:course -- check <dir>/lectures.json <file>`
-   (write `lectures.json` with `export <id> <dir>`), fix what it lists, and
-   read the digest once against the writing guide.
+6. **Design** (`step <id> design running`). Send one designer with
+   [design.md](design.md) and the clip budget. It reads every notes file and
+   keeps an outline (`outline <id> <file>`): the plan with every stage
+   placed and named, every step titled with what it gets you and a brief for
+   its writer, the planned clips, a rating per lecture, the big ideas and the
+   lecturers' errors. The command checks it as the finished course will be
+   checked, and marks the stage done.
 
-8. `npm run learn:course -- save <id> <file>`. `"ok": true` marks the course
-   ready. `"ok": false` lists what failed; fix and save again. If the course
-   cannot be built, run `npm run learn:course -- fail <id> "<why>"`.
+7. **Writing**. Send one writer per stage with [stage.md](stage.md), three
+   to five at a time. Each writes its stage in full (commentary, clips,
+   worked examples, drawings, readings, a question), checks it in place
+   (`check-stage <id> <KEY> <file>`) and keeps it (`stage <id> <KEY>
+   <file>`), which moves the count on the page.
 
-9. Go back to step 1. End with one line: which courses you built and which
+8. **Review**. Send reviewers with [review.md](review.md), three or four
+   stages each. They recompute every number, drawing and answer in a stage
+   they did not write, fix what is wrong in place, and keep it again with
+   `--reviewed`.
+
+9. **Save**: `save <id>` with no file assembles the course from the outline
+   and the kept stages, checks it whole and marks it ready. `"ok": false`
+   lists what failed; fix the stage it names (`stage` again) and save again.
+   If the course cannot be built, `fail <id> "<why>"`.
+
+**Picking up a build.** A build stops when the session ends or meets a usage
+limit; the course's page offers Resume once it has been quiet for 90
+minutes, and `next` takes it again. `next` prints what is kept: notes per
+lecture, and `draft` with the outline and which stages are written and
+rechecked. `export <id> <dir>` writes all of it back to files. Carry on from
+the first part not done; never redo a kept part unless a check says it is
+wrong.
+
+**A course from more than one series.** Give each series its own letter in
+the codes (`M01`, `G01`), so a clip says whose it is. Tell the designer what
+each series is best at; it chooses per idea.
+
+10. Go back to step 1. End with one line: which courses you built and which
    you gave up on.
-
-## The notes file for one lecture
-
-2 to 6 KB of markdown. Read the whole transcript, then write:
-
-```
-# L07 7. Value At Risk (VaR) Models
-1:21:15 | Ken Abbott (Morgan Stanley)
-
-## Segments
-- 2:20 What the stretch covers, with every concrete number and example verbatim.
-- 21:49 KEY worked example: daily σ = 1.8% -> 2.33 × 1.8% ≈ 4.2% one-day 99% VaR.
-...
-## Concepts: each concept with its single best timestamp.
-## Tensions: where this lecture contradicts itself or what another lecturer is likely to say.
-## Errors: every number or claim that does not check, with the right figure.
-## Rating: a draft verdict for this learner, with the timestamp ranges worth watching.
-```
-
-Mark the stretches that matter `KEY`. Take timestamps from the `[m:ss|…]`
-marks, never from memory. An auto-captioned transcript garbles numbers, so
-check those against the sentence around them.
 
 ## The digest file
 

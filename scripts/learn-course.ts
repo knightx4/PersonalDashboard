@@ -13,9 +13,13 @@
  *   npm run learn:course -- transcripts <id> <dir>          # fetch every transcript, write <dir>/<code>.txt, count them
  *   npm run learn:course -- notes <id> <code> <file>        # keep one lecture's notes
  *   npm run learn:course -- counts <id>                     # lectures against notes
- *   npm run learn:course -- export <id> <dir>               # write lectures.json and every notes file back out
+ *   npm run learn:course -- export <id> <dir>               # write lectures.json, every notes file and the draft back out
  *   npm run learn:course -- check <lectures.json> <digest>  # check a digest file without the database
- *   npm run learn:course -- save <id> <file>                # check the digest against the stored lectures and keep it
+ *   npm run learn:course -- outline <id> <file>             # check and keep the designed plan (every step briefed)
+ *   npm run learn:course -- check-stage <id> <KEY> <file>   # check a written stage in its place, without keeping it
+ *   npm run learn:course -- stage <id> <KEY> <file> [--reviewed]
+ *                                                           # check and keep a written stage; --reviewed once rechecked
+ *   npm run learn:course -- save <id> [file]                # keep the digest: from the file, or assembled from the draft
  *   npm run learn:course -- fail <id> "<why>"               # give a course up, saying why
  *
  * Every read and write is for the app's owner. Needs SUPABASE_SERVICE_ROLE_KEY
@@ -69,7 +73,10 @@ async function main() {
     print({
       ok: true,
       totals: digestTotals(checked.digest, lectures.lectures),
-      stages: checked.digest.plan.stages.map((stage) => `${stage.key} (${stage.steps.length} steps, after ${stage.after.join(" and ") || "nothing"})`),
+      stages: checked.digest.plan.stages.map(
+        (stage) =>
+          `${stage.key} (${stage.steps.length} steps, after ${stage.after.join(' and ') || 'nothing'})`,
+      ),
     });
     return;
   }
@@ -78,6 +85,8 @@ async function main() {
   const { createServiceSupabase } = await import('@/inngest/supabase-admin');
   const store = await import('@/lib/learn/courses/store');
   const { isStepKey, BUILD_STEPS } = await import('@/lib/learn/courses/build');
+  const { assembleDraft, checkStage, draftProgress } = await import('@/lib/learn/courses/draft');
+  const { stageMathsProblems } = await import('@/lib/learn/courses/maths');
 
   const { data: owner } = await createServiceSupabase().rpc('app_owner');
   const userId = (owner as { userId?: string } | null)?.userId;
@@ -114,6 +123,7 @@ async function main() {
       },
       // A build that was interrupted picks up from what is stored.
       stored: counts,
+      draft: draftProgress(await store.loadDraft(learn, userId, course.id)),
     });
     return;
   }
@@ -280,12 +290,115 @@ async function main() {
       writeFileSync(join(dir, `${row.code}.notes.md`), row.notes);
       notes += 1;
     }
-    print({ ok: true, lectures: lectures.length, notes });
+    // The build's work so far, so a session that picks it up starts from the same files.
+    const draft = await store.loadDraft(learn, userId, id);
+    if (draft.outline)
+      writeFileSync(join(dir, 'outline.json'), JSON.stringify(draft.outline, null, 2));
+    const stagesWritten = Object.entries(draft.stages);
+    if (stagesWritten.length > 0) mkdirSync(join(dir, 'stages'), { recursive: true });
+    for (const [key, stage] of stagesWritten)
+      writeFileSync(join(dir, 'stages', `${key}.json`), JSON.stringify(stage, null, 2));
+    print({ ok: true, lectures: lectures.length, notes, draft: draftProgress(draft) });
+    return;
+  }
+
+  if (command === 'outline') {
+    if (!args[0]) throw new Error('Usage: learn-course outline <id> <file>');
+    const saved = await store.saveOutline(learn, userId, id, readJson(args[0]));
+    print(saved);
+    if (!saved.ok) {
+      process.exitCode = 1;
+      return;
+    }
+    await store.reportStep(
+      learn,
+      userId,
+      id,
+      'design',
+      'done',
+      `${saved.stages} stages, ${saved.steps} steps`,
+    );
+    await store.reportStep(learn, userId, id, 'writing', 'running', `0 of ${saved.stages} stages`);
+    return;
+  }
+
+  if (command === 'check-stage') {
+    const [key, file] = args;
+    if (!key || !file) throw new Error('Usage: learn-course check-stage <id> <KEY> <file>');
+    const [draft, lectures] = await Promise.all([
+      store.loadDraft(learn, userId, id),
+      store.loadLectures(learn, userId, id),
+    ]);
+    const stage = readJson(file);
+    const checked = checkStage(draft.outline, key, stage, lectures);
+    const maths = checked.ok && draft.outline?.maths === true ? stageMathsProblems(stage) : [];
+    const result = !checked.ok
+      ? checked
+      : maths.length > 0
+        ? { ok: false, problems: maths }
+        : checked;
+    print(result);
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
+
+  if (command === 'stage') {
+    const [key, file, flag] = args;
+    if (!key || !file) throw new Error('Usage: learn-course stage <id> <KEY> <file> [--reviewed]');
+    const reviewed = flag === '--reviewed';
+    const saved = await store.saveStage(learn, userId, id, key, readJson(file), reviewed);
+    print(saved);
+    if (!saved.ok) {
+      process.exitCode = 1;
+      return;
+    }
+    const { stages, written, reviewed: rechecked } = saved.progress;
+    if (written.length < stages)
+      await store.reportStep(
+        learn,
+        userId,
+        id,
+        'writing',
+        'running',
+        `${written.length} of ${stages} stages`,
+      );
+    else {
+      await store.reportStep(learn, userId, id, 'writing', 'done', `${stages} of ${stages} stages`);
+      await store.reportStep(
+        learn,
+        userId,
+        id,
+        'review',
+        rechecked.length < stages ? 'running' : 'done',
+        `${rechecked.length} of ${stages} stages`,
+      );
+    }
+    return;
+  }
+
+  if (command === 'save' && !args[0]) {
+    // With no file, the digest is assembled from the draft: the outline with every stage as written.
+    const [draft, lectures] = await Promise.all([
+      store.loadDraft(learn, userId, id),
+      store.loadLectures(learn, userId, id),
+    ]);
+    const assembled = assembleDraft(draft, lectures);
+    if (!assembled.ok) {
+      print(assembled);
+      process.exitCode = 1;
+      return;
+    }
+    const progress = draftProgress(draft);
+    if (progress.toReview.length > 0)
+      console.error(`Not rechecked yet: ${progress.toReview.join(', ')}. Saving anyway.`);
+    const saved = await store.saveDigest(learn, userId, id, assembled.input);
+    print(saved);
+    if (!saved.ok) process.exitCode = 1;
     return;
   }
 
   if (command === 'save') {
-    if (!args[0]) throw new Error('Usage: learn-course save <id> <file>');
+    if (!args[0]) throw new Error('Usage: learn-course save <id> [file]');
     const saved = await store.saveDigest(learn, userId, id, readJson(args[0]));
     print(saved);
     if (!saved.ok) process.exitCode = 1;

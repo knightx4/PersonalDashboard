@@ -4,7 +4,7 @@ import { useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import type { CourseStatus } from '@/lib/learn/courses/build';
-import { retryCourse, startWaitingCourse } from '../actions';
+import { resumeBuild, retryCourse, startWaitingCourse } from '../actions';
 
 /** Reload the page's data every few seconds while a build is open, so the stages move without a press. */
 export function BuildRefresh() {
@@ -18,8 +18,21 @@ export function BuildRefresh() {
   return null;
 }
 
-/** Try a stopped build again, or start one that has been waiting. */
-export function BuildActions({ courseId, status }: { courseId: string; status: CourseStatus }) {
+/**
+ * Try a stopped build again, start one that has been waiting, or resume one
+ * that went quiet (its session ended or met a usage limit): what it kept is
+ * kept, and the routine picks up from there.
+ */
+export function BuildActions({
+  courseId,
+  status,
+  quiet,
+}: {
+  courseId: string;
+  status: CourseStatus;
+  /** The build has not reported for BUILD_STALE_MS. */
+  quiet: boolean;
+}) {
   const [pending, start] = useTransition();
   if (status === 'failed') {
     return (
@@ -31,6 +44,24 @@ export function BuildActions({ courseId, status }: { courseId: string; status: C
       >
         Try again
       </Button>
+    );
+  }
+  if (status === 'building' && quiet) {
+    return (
+      <div className="space-y-2">
+        <p className="text-small text-ink-muted">
+          Nothing has moved for a while. The build may have stopped at a usage limit; what it
+          finished is kept.
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          pending={pending}
+          onClick={() => start(() => resumeBuild(courseId))}
+        >
+          Resume the build
+        </Button>
+      </div>
     );
   }
   if (status === 'queued') {

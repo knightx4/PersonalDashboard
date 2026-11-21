@@ -10,9 +10,13 @@ export const BUILD_STEPS = [
   { key: 'inventory', label: 'List every video' },
   { key: 'transcripts', label: 'Fetch every transcript' },
   { key: 'notes', label: 'Read each lecture and write notes' },
-  { key: 'synthesis', label: 'Work out what matters across the lectures' },
-  { key: 'verify', label: 'Check every number and link' },
+  { key: 'design', label: 'Design the lessons across the lectures' },
+  { key: 'writing', label: 'Write each stage of lessons' },
+  { key: 'review', label: 'Recheck every number, drawing and answer' },
 ] as const;
+
+/** A build nobody has touched for this long is handed out again, and the page offers to resume it. */
+export const BUILD_STALE_MS = 90 * 60 * 1000;
 
 export type StepKey = (typeof BUILD_STEPS)[number]['key'];
 
@@ -34,7 +38,13 @@ export type CourseProgress = {
 
 /** The steps a build starts with: all waiting. */
 export function freshSteps(): BuildStep[] {
-  return BUILD_STEPS.map((step) => ({ key: step.key, label: step.label, state: 'waiting', detail: null, at: null }));
+  return BUILD_STEPS.map((step) => ({
+    key: step.key,
+    label: step.label,
+    state: 'waiting',
+    detail: null,
+    at: null,
+  }));
 }
 
 export function isStepKey(value: string): value is StepKey {

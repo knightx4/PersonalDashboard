@@ -7,7 +7,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { playlistIdOf } from '@/lib/learn/courses/build';
 import { catalogueCourse } from '@/lib/learn/courses/catalogue';
 import { fireCourseRoutine, requestCourse } from '@/lib/learn/courses/request';
-import { requeueCourse, setProgress } from '@/lib/learn/courses/store';
+import { requeueCourse, resumeCourse, setProgress } from '@/lib/learn/courses/store';
 
 /**
  * What the Courses tab can do. Asking for a course queues it for the routine
@@ -68,6 +68,16 @@ export async function retryCourse(courseId: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createLearnClient();
   await requeueCourse(supabase, user.id, courseId);
+  await fireCourseRoutine(supabase, user.id);
+  revalidatePath(`/learn/courses/${courseId}`);
+}
+
+/** Put a build that went quiet back in the queue, keeping what it kept, and start the routine. */
+// latency: pending
+export async function resumeBuild(courseId: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createLearnClient();
+  await resumeCourse(supabase, user.id, courseId);
   await fireCourseRoutine(supabase, user.id);
   revalidatePath(`/learn/courses/${courseId}`);
 }
