@@ -198,6 +198,32 @@ The shape and its checks are `Plan`, `Stage`, `Step` and `Block` in
 `lib/learn/courses/digest.ts`; which step comes next and what a finished
 stage opens are in `lib/learn/courses/plan.ts`.
 
+### How a course is built, and picks up
+
+Decided on 21 November 2026, after the linear algebra course (51 lectures
+from two series) took one build three hours and ran into the owner's usage
+limit twice, with its design and half its stages in scratch files a restart
+would have lost.
+
+- The build runs in parts, each done by subagents with a brief beside the
+  skill: readers write a notes file per lecture (`notes.md`), one designer
+  lays out the plan with a brief for every step (`design.md`), one writer
+  per stage writes it in full (`stage.md`), and a second reader rechecks
+  every number, drawing and answer in a stage they did not write
+  (`review.md`).
+- Every part is kept in the database as it lands: notes per lecture, and the
+  outline and each stage in `learn.courses.draft` (learn 0197), each checked
+  before it is kept with the same checks the finished course meets
+  (`lib/learn/courses/draft.ts`). `save` with no file assembles the course
+  from the draft.
+- A build that goes quiet for 90 minutes is handed out again, and the
+  course's page offers Resume. The session that picks it up reads what is
+  kept and carries on from the first part not done.
+- A course may mix series; each gets its own letter in the codes, and the
+  designer chooses the better source per idea.
+- A course in mathematics sets `maths`, and its formulas are checked to set
+  in KaTeX before a stage is kept.
+
 The two sections below describe the first shape and are kept for the
 reasoning. Where they disagree with this one, this one holds.
 
