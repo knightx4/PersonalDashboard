@@ -368,7 +368,25 @@ export async function saveDigest(
     videos: lectures.length,
   };
   const now = new Date().toISOString();
-  const steps = freshSteps().map((step) => ({ ...step, state: 'done' as const, at: now }));
+  // Every stage is done; what each reported (its counts) stays on the page.
+  const { data: kept } = await client
+    .from('courses')
+    .select('steps')
+    .eq('id', courseId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  const reported = Array.isArray((kept as Row | null)?.steps)
+    ? ((kept as Row).steps as BuildStep[])
+    : [];
+  const steps = freshSteps().map((step) => {
+    const before = reported.find((item) => item.key === step.key);
+    return {
+      ...step,
+      detail: before?.detail ?? null,
+      state: 'done' as const,
+      at: before?.at ?? now,
+    };
+  });
   const { error } = await client
     .from('courses')
     .update({
