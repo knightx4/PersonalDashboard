@@ -82,6 +82,12 @@ export const DEFAULT_BANNED_CONSTRUCTIONS = [
   'I am excited about the opportunity',
 ];
 
+/** The person's banned constructions, or the defaults when they have set none. */
+export function bannedOrDefault(value: unknown): string[] {
+  const own = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+  return own.length > 0 ? own : [...DEFAULT_BANNED_CONSTRUCTIONS];
+}
+
 /** Validate a drafted answer against the evidence that was actually offered. */
 export function parseDraftPayload(
   raw: unknown,

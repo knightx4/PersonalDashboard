@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  chancePercent,
   duplicateByRule,
   NO_OPENING_FILTER,
   openingState,
@@ -8,12 +7,13 @@ import {
   passesFilter,
   scoreChips,
   scoreOpening,
-  scaleScore,
   sortOpenings,
   type OpeningScores,
   type OpeningText,
   type ScoringContext,
 } from './scores';
+import { CHANCE_QUESTIONS, FIT_QUESTIONS } from './rubric';
+import { rubricAnswers } from './fixtures/rubric-answers';
 
 const OPENING: OpeningText = {
   title: 'AI Solutions Strategist',
@@ -43,11 +43,11 @@ const CONTEXT: ScoringContext = {
   ],
 };
 
-/** A stubbed Jev answering all ten questions. */
-function jev() {
+/** A stubbed Jev answering the eight label questions and the rubric's factors. */
+function jev(rubric: Record<string, unknown> = rubricAnswers(3)) {
   return vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
-    expect(Object.keys(body.questions)).toHaveLength(10);
+    expect(Object.keys(body.questions)).toHaveLength(8 + Object.keys(FIT_QUESTIONS).length + Object.keys(CHANCE_QUESTIONS).length);
     return new Response(
       JSON.stringify({
         model: 'jev-1.13.0',
@@ -61,8 +61,7 @@ function jev() {
           duplicate: { noul: 0.7 },
           // Out of range: this one answer is lost, the rest are kept.
           closeness: { score: 9, confidence: 0.5 },
-          fit_score: { score: 2.6, confidence: 0.7 },
-          chance: { score: 1, confidence: 0.9 },
+          ...rubric,
         },
         usage: { input_tokens: 1800, output_tokens: 0 },
       }),
@@ -76,7 +75,13 @@ describe('openingState', () => {
     expect(state.your_roles_at_this_company).toEqual(['Associate, Strategic Finance (rejected)']);
     expect(state.roles_you_applied_to).toEqual(CONTEXT.applied);
   });
-  it('carries the history of similar applications for the chance question', () => {
+  it('carries the career goals, excluded industries and interview levels for the rubric', () => {
+    const state = openingState(OPENING, { ...CONTEXT, careerGoals: [' Plan work, not books ', ''], excludedIndustries: ['Crypto'] });
+    expect(state.your_career_goals).toEqual(['Plan work, not books']);
+    expect(state.your_excluded_industries).toEqual(['Crypto']);
+    expect(state.your_interview_levels).toEqual({});
+  });
+  it('carries the history of similar applications for the background question', () => {
     const state = openingState({ ...OPENING, title: 'Strategic Finance Associate' }, CONTEXT);
     expect(state.your_history_with_similar_roles).toEqual({
       applied: 1,
@@ -104,7 +109,7 @@ describe('duplicateByRule', () => {
 });
 
 describe('scoreOpening', () => {
-  it('asks the ten questions in one request and keeps every readable answer', async () => {
+  it('asks every question in one request and builds fit and chance from the factors', async () => {
     const spend = vi.fn();
     const result = await scoreOpening({ opening: OPENING, context: CONTEXT, apiKey: 'k', fetch: jev(), onSpend: spend });
     expect(result.ok).toBe(true);
@@ -113,31 +118,30 @@ describe('scoreOpening', () => {
     expect(result.scores.salary?.value).toBe(true);
     expect(result.scores.duplicate).toEqual({ value: true, confidence: 0.4 });
     expect(result.scores.closeness).toBeUndefined();
-    expect(result.scores.fit_score).toEqual({ value: 65, confidence: 0.7 });
-    // Level 1 of the chance levels is 5 to 15 in 100, stored as 10.
-    expect(result.scores.chance).toEqual({ value: 10, confidence: 0.9 });
+    // Every wanting factor at 3 of 4, pay not given: 75, pinned exactly.
+    expect(result.scores.fit_score).toEqual({ value: 75, confidence: 1 });
+    expect(result.scores.rubric?.fit.fit_pay).toBeUndefined();
+    // One old rejection behind it: the base rate is near the 8% prior, and the
+    // chance factors above their middle lift it.
+    expect(result.scores.rubric?.chance.base).toBeCloseTo(0.0762, 3);
+    expect(result.scores.chance?.value).toBeGreaterThan(8);
     expect(spend).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps fit when the company is in an excluded industry', async () => {
+    const result = await scoreOpening({
+      opening: OPENING,
+      context: CONTEXT,
+      apiKey: 'k',
+      fetch: jev(rubricAnswers(4, { fit_excluded_industry: { noul: 0.9 } })),
+    });
+    expect(result.ok && result.scores.fit_score?.value).toBe(15);
   });
 
   it('hands back the failure when the request fails', async () => {
     const down = vi.fn(async () => new Response('down', { status: 529 })) as unknown as typeof fetch;
     const result = await scoreOpening({ opening: OPENING, context: CONTEXT, apiKey: 'k', fetch: down });
     expect(result).toMatchObject({ ok: false, reason: 'overloaded' });
-  });
-});
-
-describe('scaleScore', () => {
-  it('puts the weighted score on 0 to 100 by the top level', () => {
-    expect(scaleScore(0, 5)).toBe(0);
-    expect(scaleScore(2, 5)).toBe(50);
-    expect(scaleScore(4, 5)).toBe(100);
-    expect(scaleScore(1.3, 5)).toBe(33);
-    expect(scaleScore(2, 4)).toBe(67);
-  });
-  it('holds a score outside the levels to the ends', () => {
-    expect(scaleScore(-1, 5)).toBe(0);
-    expect(scaleScore(7, 5)).toBe(100);
-    expect(scaleScore(Number.NaN, 5)).toBe(0);
   });
 });
 
@@ -153,6 +157,9 @@ describe('parseOpeningScores', () => {
         chance: { value: 40, confidence: 0.6 },
       }),
     ).toEqual({ fit: { value: 'strong', confidence: 0.9 }, chance: { value: 40, confidence: 0.6 } });
+    expect(parseOpeningScores({ rubric: { fit: { fit_work: { score: 3, sd: 0 } }, chance: 'x' } })).toEqual({
+      rubric: { fit: { fit_work: { score: 3, sd: 0 } }, chance: {} },
+    });
     expect(parseOpeningScores(null)).toBeNull();
     expect(parseOpeningScores([])).toBeNull();
   });
@@ -198,7 +205,7 @@ describe('sorting and filtering', () => {
 describe('fit and chance on the openings (plan #1206)', () => {
   const row = (id: string, createdAt: string, scores: OpeningScores | null) => ({ id, createdAt, scores });
   const rows = [
-    row('a', '2026-09-01', { fit_score: { value: 70, confidence: 0.5 }, chance: { value: 8, confidence: 0.9 } }),
+    row('a', '2026-09-01', { fit_score: { value: 70, confidence: 0.5 }, chance: { value: 3, confidence: 0.9 } }),
     row('b', '2026-09-02', { fit_score: { value: 45, confidence: 0.9 }, chance: { value: 40, confidence: 0.9 } }),
     row('c', '2026-09-03', null),
     row('d', '2026-09-04', { fit: { value: 'strong', confidence: 0.9 } }),
@@ -216,15 +223,5 @@ describe('fit and chance on the openings (plan #1206)', () => {
     // Chance is chosen by band: 8 is low, 40 is high on the filter edges.
     expect(keep({ minChance: 'medium' })).toEqual(['b', 'c', 'd']);
     expect(keep({ minChance: 'high' })).toEqual(['b', 'c', 'd']);
-  });
-});
-
-describe('chancePercent', () => {
-  it('reads each level as its rate and a score between levels between their rates', () => {
-    expect([0, 1, 2, 3, 4].map(chancePercent)).toEqual([2, 10, 22, 40, 65]);
-    expect(chancePercent(1.5)).toBe(16);
-    expect(chancePercent(-1)).toBe(2);
-    expect(chancePercent(9)).toBe(65);
-    expect(chancePercent(Number.NaN)).toBe(0);
   });
 });

@@ -31,6 +31,7 @@
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
     "learn:prepare": "tsx --conditions=react-server scripts/learn-prepare-subject.ts",
     "learn:drafts": "tsx --conditions=react-server scripts/learn-drafts.ts",
+    "cover-letter": "tsx --conditions=react-server scripts/cover-letter.ts",
     "learn:course": "tsx --conditions=react-server scripts/learn-course.ts",
     "learn:reader": "tsx --conditions=react-server scripts/learn-reader.ts",
     "broker": "tsx --conditions=react-server scripts/session-broker.ts",

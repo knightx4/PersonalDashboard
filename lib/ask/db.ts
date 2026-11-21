@@ -232,6 +232,46 @@ export function isUuid(value: string): boolean {
   return UUID.test(value);
 }
 
+/**
+ * The span of ids an id prefix covers, for a ref cut short. Connected apps
+ * shorten a uuid they were given in full to its first 8 characters
+ * ("9d69522d"), and Postgres refuses that as a uuid. A prefix of 8 to 31 hex
+ * characters, dashes where a uuid has them, gives the lowest and highest id
+ * it could be; any other text gives null.
+ */
+export function idPrefixRange(value: string): [string, string] | null {
+  const given = value.trim().toLowerCase();
+  if (isUuid(given)) return null;
+  const hex = given.replace(/-/g, '');
+  if (!/^[0-9a-f]{8,31}$/.test(hex)) return null;
+  const asUuid = (h: string) => `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  const low = asUuid(hex.padEnd(32, '0'));
+  if (!low.startsWith(given)) return null;
+  return [low, asUuid(hex.padEnd(32, 'f'))];
+}
+
+/**
+ * The full id of the one row of theirs a ref names, given whole or as a
+ * prefix of 8 or more characters. Null when no row, or more than one,
+ * starts with it, or when the ref is not an id at all.
+ */
+export async function ownIdFor(client: SchemaClient, table: string, userId: string, ref: string): Promise<string | null> {
+  const bare = bareRef(ref.trim());
+  if (isUuid(bare)) return bare.toLowerCase();
+  const range = idPrefixRange(bare);
+  if (!range) return null;
+  const { data, error } = await client
+    .from(table)
+    .select('id')
+    .eq('user_id', userId)
+    .gte('id', range[0])
+    .lte('id', range[1])
+    .limit(2);
+  if (error) throw new Error(`Reading ${table} by id prefix failed: ${error.message}`);
+  const rows = (data ?? []) as { id: string }[];
+  return rows.length === 1 ? rows[0].id : null;
+}
+
 /** A row's id from a ref written bare or as "schema.table:id", which the model sometimes sends. */
 export function bareRef(value: string): string {
   const at = value.lastIndexOf(':');

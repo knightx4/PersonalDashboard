@@ -63,6 +63,16 @@ export function experienceYearsError(min: number | null, max: number | null): st
   return null;
 }
 
+/**
+ * Check an AI score the person typed or Dash was told: a whole number from 0
+ * to 100, or null to clear it. Returns the message to show, or null when fine.
+ */
+export function aiScoreError(score: number | null): string | null {
+  if (score === null) return null;
+  if (!Number.isInteger(score) || score < 0 || score > 100) return 'The AI score is a whole number from 0 to 100.';
+  return null;
+}
+
 export type RoleEditError = { message: string; code?: string };
 
 /** Said when the company a role moves to already holds the same posting. */

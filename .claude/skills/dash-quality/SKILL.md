@@ -229,9 +229,13 @@ when you see a cause of failure that one fix will not remove.
    nothing of the kind, and Dash had read only its first 160 characters. Add a check (cheap model or rules) that flags an answer
    naming rows, amounts or dates its lookups did not return, and record it
    in the run's grading.
-5. **Cover every workspace.** At least one case per workspace that is on
-   (jobs, shopping, todo, goals, learn, vault, news, you), and one for
-   recall. Write them from real questions in their chats.
+5. ~~**Cover every workspace.**~~ Done 17 November: every workspace that is
+   on (jobs, shopping, todo, goals, learn, vault, news, you, money) and
+   recall has at least one case. The last three added were vault
+   (b5037dcc, the MGT 847 note), you (80d00677, places lived) and news
+   (8c1bb116, saved stories); none has been asked yet, so the 1 December
+   run is their first. Retire the news case if those stories are unsaved.
+   A new workspace gets its case when it is turned on.
 6. **The connector (MCP) is Dash too.** Connected apps (claude.ai, Claude
    Desktop) call the same lookups through `app/api/mcp` and `lib/connector/`;
    the daily health reads `core.connector_calls` and alerts on `error` and
@@ -265,6 +269,26 @@ when you see a cause of failure that one fix will not remove.
    - `recall` over the connector cannot record its embedding spend (token
      transactions are read-only, migration 0134), so it goes unrecorded.
    - ~~No lookup has a time limit.~~ Done 14 November with item 2: 20 seconds each.
+   - ~~A guessed column failed the whole query_rows call.~~ Done 18
+     November: connected apps asked for posting_url, content or notes next
+     to real columns, and 13 of 151 calls in a week failed. `columns` now
+     leaves a guessed name out and names it in the note; a guess in `where`,
+     `order` or `group_by` is still refused, since it changes which rows
+     come back. Done 19 November: an id cut to its first 8 characters
+     ("9d69522d") reads as the ids it starts in query_rows, and as the one
+     row of theirs it starts in change_role, change_application and
+     add_role_note (`idPrefixRange`, `ownIdFor` in `lib/ask/db.ts`). Done
+     20 November: a name another tool uses for the same column reads as
+     that column anywhere in query_rows (`COLUMN_ALIASES` in
+     `lib/ask/query.ts`: a role's posting_url is jd_url), and the note says
+     so. Add a pair there when the health shows a guess repeated; a guess in
+     other units (pay_min against comp_min_cents) stays refused. Left:
+     a company name given to a uuid column still fails as "invalid input
+     syntax for type uuid", and other writes' refs still need the whole id.
+   - A connector failure is proven fixed for free: this session can call
+     the Dash connector's own tools (`mcp__Dash__*`, loaded with
+     ToolSearch), so re-send the failing read after the deploy instead of
+     paying for a case. Cases ask Ask Dash, not the connector.
 7. **Thread replies are graded like Ask, with two gaps.** Since 22 October
    a reply to an `@dash` comment keeps its lookups on its turn
    (`addThreadTurn` in `lib/thread/store.ts`), so the health sees it fail or

@@ -211,6 +211,10 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
             ...APPLICATION_COLUMNS,
             { table: 'job_search.cover_letters', column: 'id', type: 'uuid', nullable: false },
             { table: 'job_search.roles', column: 'id', type: 'uuid', nullable: false },
+            { table: 'job_search.roles', column: 'user_id', type: 'uuid', nullable: false },
+            { table: 'job_search.roles', column: 'title', type: 'text', nullable: false },
+            { table: 'job_search.roles', column: 'jd_url', type: 'text', nullable: true },
+            { table: 'job_search.roles', column: 'created_at', type: 'timestamp with time zone', nullable: false },
           ],
           links: [
             { table: 'job_search.applications', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
@@ -1569,6 +1573,35 @@ describe('query_rows (plan #2109.4)', () => {
       context({ ...tables, 'job_search.applications': many }),
     );
     expect(result.ok && result.matchedSet).toEqual({ table: 'job_search.applications', refs: [], matched: 120 });
+  });
+
+  it('leaves out a guessed column next to real ones, names it, and still lists the rows', async () => {
+    const result = await run({ where: [{ column: 'status', op: 'equals', value: 'to_apply' }], columns: ['cover_letter', 'notes'] });
+    const rows = expectLinkedRows(result);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => Object.keys(r.detail ?? {}))).toEqual([['cover_letter'], ['cover_letter']]);
+    expect(result.ok && result.note).toContain('Left out notes');
+    expect(result.ok && result.note).toContain('Its columns:');
+  });
+
+  it('reads posting_url on a role as jd_url, in where and columns, and says so (20 November)', async () => {
+    const roles: Tables = {
+      'job_search.roles': [
+        { id: ROLE, user_id: ME, title: 'Designer at Metaview', jd_url: 'https://jobs.example.com/metaview/1', created_at: '2026-11-01' },
+        { id: `${ROLE.slice(0, -2)}c2`, user_id: ME, title: 'Analyst at Savvy', jd_url: 'https://jobs.example.com/savvy/2', created_at: '2026-11-02' },
+        { id: `${ROLE.slice(0, -2)}c3`, user_id: THEM, title: 'Not mine', jd_url: 'https://jobs.example.com/metaview/3', created_at: '2026-11-03' },
+      ],
+    };
+    const result = await executeAskTool(
+      'query_rows',
+      { table: 'job_search.roles', where: [{ column: 'posting_url', op: 'contains', value: 'metaview' }], columns: ['title', 'posting_url'] },
+      context(roles),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.title)).toEqual(['Designer at Metaview']);
+    expect(rows[0].detail).toEqual({ jd_url: 'https://jobs.example.com/metaview/1' });
+    expect(result.ok && result.note).toContain('Read posting_url as jd_url');
+    expect(result.ok && result.note).not.toContain('Left out');
   });
 
   it('refuses a column the table does not have, wherever it is named', async () => {

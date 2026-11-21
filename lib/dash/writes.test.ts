@@ -261,6 +261,18 @@ describe('add_role_note', () => {
     expect(result).toMatchObject({ input: { roleId: ROLE } });
   });
 
+  it('reads a role ref cut to its first 8 characters as the one role it starts', async () => {
+    // A connected app sent "9d69522d" for a role it had read in full (18 November).
+    const ANALYST = '9d69522d-d9e8-4d5f-acea-38f05a7349f2';
+    tables['job_search.roles'].push({ id: ANALYST, user_id: ME, title: 'Analyst' });
+    seen.add(`job_search.roles:${ANALYST}`);
+    const result = ok(await apply('add_role_note', { role_ref: '9d69522d', body: 'Needs a Built In account.' }));
+    expect(result).toMatchObject({ input: { roleId: ANALYST, roleTitle: 'Analyst' } });
+    // Two rows of theirs start "00000000": the prefix names neither.
+    const shared = await apply('add_role_note', { role_ref: '00000000', body: 'x' });
+    expect(!shared.ok && shared.error).toContain('No lookup in this conversation returned');
+  });
+
   it('refuses an id that is neither their role nor their application', async () => {
     const STRANGER = '0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f';
     seen.add(`job_search.roles:${STRANGER}`);

@@ -59,14 +59,14 @@ async function readAllApplications(supabase: AppSupabaseClient, userId: string):
 }
 
 /**
- * What Jev is told about the person: evidence titles, target titles, the
- * roles on file, and how each application went (for the chance question,
+ * What Jev is told about the person: evidence titles, target titles, career
+ * goals, excluded industries, the roles on file, and how each application went (for the chance question,
  * plan #1202). An application reached an interview when an interview row is
  * on file for it or its rejection stage comes after the screen; see
  * `reachedInterview` in history.ts.
  */
 export async function loadScoringContext(supabase: AppSupabaseClient, userId: string): Promise<ScoringContext> {
-  const [evidence, profile, applications] = await Promise.all([
+  const [evidence, profile, thoughts, applications] = await Promise.all([
     supabase
       .from('evidence_items')
       .select('title, strength')
@@ -75,9 +75,15 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
       .limit(40),
     supabase
       .from('profiles')
-      .select('target_titles, home_location, workplace_preferences, salary_floor_cents, company_stages')
+      .select('target_titles, excluded_industries, home_location, workplace_preferences, salary_floor_cents, company_stages')
       .eq('id', userId)
       .maybeSingle(),
+    supabase
+      .from('thoughts')
+      .select('body')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20),
     readAllApplications(supabase, userId),
   ]);
 
@@ -112,6 +118,8 @@ export async function loadScoringContext(supabase: AppSupabaseClient, userId: st
     roles,
     history,
     preferences: readPreferences(profile.data as Row | null),
+    careerGoals: ((thoughts.data ?? []) as Row[]).map((row) => row.body as string).filter(Boolean),
+    excludedIndustries: ((profile.data as Row | null)?.excluded_industries as string[] | undefined) ?? [],
   };
 }
 
@@ -123,10 +131,20 @@ export type ScoreRunOutcome = {
   stopped: string | null;
 };
 
+export type ScoreRunOptions = {
+  onSpend?: SpendSink;
+  rescore?: boolean;
+  limit?: number;
+  apiKey?: string | null;
+  fetch?: typeof fetch;
+  /** A time (ms since epoch) past which no further call is started; what is left waits for the next run. */
+  deadline?: number;
+};
+
 export async function scoreOpeningsFor(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { onSpend?: SpendSink; rescore?: boolean; limit?: number; apiKey?: string | null; fetch?: typeof fetch } = {},
+  options: ScoreRunOptions = {},
 ): Promise<ScoreRunOutcome> {
   const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
   let query = supabase
@@ -149,6 +167,7 @@ export async function scoreOpeningsFor(
   ]);
   const minimum = readMinFitScore((gate.data as Row | null)?.min_fit_score);
   for (const row of openings) {
+    if (options.deadline && Date.now() > options.deadline) break;
     const company = one(row.companies as Row | Row[] | null);
     const result = await scoreOpening({
       opening: {
@@ -207,7 +226,7 @@ export async function scoreOpeningsFor(
 export async function scoreApplicationsFor(
   supabase: AppSupabaseClient,
   userId: string,
-  options: { onSpend?: SpendSink; rescore?: boolean; limit?: number; apiKey?: string | null; fetch?: typeof fetch } = {},
+  options: ScoreRunOptions = {},
 ): Promise<ScoreRunOutcome> {
   const outcome: ScoreRunOutcome = { scored: 0, failed: 0, stopped: null };
   let query = supabase
@@ -227,6 +246,7 @@ export async function scoreApplicationsFor(
 
   const context = await loadScoringContext(supabase, userId);
   for (const row of applications) {
+    if (options.deadline && Date.now() > options.deadline) break;
     const role = one(row.roles as Row | Row[] | null);
     if (!role) continue;
     const company = one(role.companies as Row | Row[] | null);

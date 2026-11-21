@@ -1,5 +1,5 @@
 import { readableName, type Source } from '@/lib/sources/types';
-import { AskInputError, clip, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
+import { AskInputError, clip, idPrefixRange, MATCHED_SET_CAP, matchedNote, optionalString, type AskContext, type AskRow, type AskSchema, type AskToolResult } from './db';
 import { asText, fallbackHref, LISTABLE, listableSource, ownerColumn, sourceWorkspace, viaTitle } from './list-rows';
 import { listableShapes, type TableColumn, type TableShape } from './table-info';
 
@@ -101,9 +101,49 @@ function likeEscaped(value: string): string {
   return value.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
+/**
+ * Names connected apps and Dash guess for a column, read as the column they
+ * mean. Each is a name another tool uses for the same value: change_role and
+ * save_job take a role's link as posting_url and store it in jd_url, so a
+ * client that has seen one asks query_rows for posting_url (20 November: two
+ * calls refused in a day, nine in a week). Only names whose value is the very
+ * same column belong here; a guess in other units (pay_min against
+ * comp_min_cents, in cents) stays refused.
+ */
+export const COLUMN_ALIASES: Record<string, Record<string, string>> = {
+  'job_search.roles': { posting_url: 'jd_url', description: 'jd_text' },
+  'job_search.resume_versions': { content: 'text_content' },
+  'core.conversation_turns': { content: 'body', text: 'body' },
+};
+
+/** The column a name means in this table: itself, or the column it is an alias for. */
+export function columnName(columns: Map<string, TableColumn>, table: string, name: string): string | null {
+  if (columns.has(name)) return name;
+  const alias = COLUMN_ALIASES[table]?.[name];
+  return alias && columns.has(alias) ? alias : null;
+}
+
+/** "Read posting_url as jd_url." for each alias the call named, or null. */
+function aliasNote(table: string, columns: Map<string, TableColumn>, input: Record<string, unknown>): string | null {
+  const named: unknown[] = [];
+  if (Array.isArray(input.columns)) named.push(...input.columns);
+  if (Array.isArray(input.where)) for (const c of input.where) named.push((c as { column?: unknown } | null)?.column);
+  if (input.order && typeof input.order === 'object') named.push((input.order as { column?: unknown }).column);
+  named.push(input.group_by);
+  const read = new Map<string, string>();
+  for (const name of named) {
+    if (typeof name !== 'string') continue;
+    const real = columnName(columns, table, name.trim());
+    if (real && real !== name.trim()) read.set(name.trim(), real);
+  }
+  if (read.size === 0) return null;
+  return `Read ${[...read].map(([from, to]) => `${from} as ${to}`).join(', ')}: ${table} keeps ${read.size === 1 ? 'that value' : 'those values'} under the second name.`;
+}
+
 function columnOf(columns: Map<string, TableColumn>, table: string, name: unknown, what: string): TableColumn {
   if (typeof name !== 'string' || !name.trim()) throw new AskInputError(`${what} must name a column.`);
-  const column = columns.get(name.trim());
+  const real = columnName(columns, table, name.trim());
+  const column = real ? columns.get(real) : undefined;
   if (!column) {
     throw new AskInputError(`${table} has no column ${name.trim()}. Its columns: ${[...columns.keys()].join(', ')}.`);
   }
@@ -240,6 +280,8 @@ type Filterable<Q> = {
   eq(column: string, value: unknown): Q;
   neq(column: string, value: unknown): Q;
   gt(column: string, value: unknown): Q;
+  gte(column: string, value: unknown): Q;
+  lte(column: string, value: unknown): Q;
   lt(column: string, value: unknown): Q;
   in(column: string, values: readonly unknown[]): Q;
   is(column: string, value: null): Q;
@@ -259,8 +301,11 @@ export function applyCondition<Q extends Filterable<Q>>(query: Q, c: Condition):
   const kind = typeKind(c.type);
   const col = c.column;
   switch (c.op) {
-    case 'equals':
-      return query.eq(col, c.value);
+    case 'equals': {
+      // An id cut to its first 8 characters reads as the ids it starts.
+      const range = c.type === 'uuid' && typeof c.value === 'string' ? idPrefixRange(c.value) : null;
+      return range ? query.gte(col, range[0]).lte(col, range[1]) : query.eq(col, c.value);
+    }
     case 'not_equals':
       // A row with nothing in the column is not equal to the value either;
       // SQL's <> alone would leave it out.
@@ -269,8 +314,19 @@ export function applyCondition<Q extends Filterable<Q>>(query: Q, c: Condition):
       return query.gt(col, c.value);
     case 'less':
       return query.lt(col, c.value);
-    case 'one_of':
-      return query.in(col, c.value as Scalar[]);
+    case 'one_of': {
+      const values = c.value as Scalar[];
+      const ranges = c.type === 'uuid' ? values.map((v) => (typeof v === 'string' ? idPrefixRange(v) : null)) : [];
+      if (!ranges.some(Boolean)) return query.in(col, values);
+      return query.or(
+        values
+          .map((v, i) => {
+            const range = ranges[i];
+            return range ? `and(${col}.gte.${range[0]},${col}.lte.${range[1]})` : `${col}.eq.${quoted(v)}`;
+          })
+          .join(','),
+      );
+    }
     case 'contains':
       return kind === 'array' ? query.contains(col, [c.value]) : query.ilike(col, `%${likeEscaped(String(c.value))}%`);
     case 'empty':
@@ -473,11 +529,21 @@ async function listed(
   const refColumn = source.ref ?? 'id';
 
   let asked: string[];
+  // Columns asked for that the table does not have. Connected apps guess
+  // names (posting_url, content, notes) next to real ones; a guess only
+  // changes what is shown, so it is left out and named, and the rows still
+  // come back. Only when every name is a guess is the call refused.
+  let unknown: string[] = [];
   if (input.columns === undefined || input.columns === null) {
     asked = [...source.search, ...(source.facts ?? [])].filter((c) => columns.has(c));
   } else {
     if (!Array.isArray(input.columns)) throw new AskInputError('columns must be a list of column names.');
-    asked = input.columns.map((c) => columnOf(columns, table, c, 'Each of columns').column);
+    const names = input.columns.map((c) => (typeof c === 'string' ? c.trim() : c));
+    const guessed = (c: unknown): c is string => typeof c === 'string' && c !== '' && !columnName(columns, table, c);
+    unknown = names.filter(guessed);
+    const known = names.filter((c) => !guessed(c));
+    if (known.length === 0 && unknown.length > 0) columnOf(columns, table, unknown[0], 'Each of columns');
+    asked = [...new Set(known.map((c) => columnOf(columns, table, c, 'Each of columns').column))];
   }
 
   const orderIn = input.order && typeof input.order === 'object' ? (input.order as Record<string, unknown>) : null;
@@ -509,6 +575,10 @@ async function listed(
   const order = `${orderColumn} ${ascending ? 'ascending' : 'descending'}`;
   const notes = [
     `Read ${what} in ${table}, by ${order}: ${matchedNote(matched, rows.length)}.`,
+    aliasNote(table, columns, input),
+    unknown.length > 0
+      ? `Left out ${unknown.join(', ')}: ${table} has no column of ${unknown.length === 1 ? 'that name' : 'those names'}. Its columns: ${[...columns.keys()].join(', ')}.`
+      : null,
     source.note ? `About this table: ${source.note}` : null,
   ].filter(Boolean);
   const listedRefs = found.map((row) => String(row[refColumn] ?? row.id ?? ''));

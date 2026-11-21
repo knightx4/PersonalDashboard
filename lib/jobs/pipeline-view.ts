@@ -5,6 +5,7 @@ import {
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
+import { POSTING_PLATFORMS, type PostingPlatform } from '@/lib/jobs/roles/platform';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { parseScoreMinimum, passesMinimum, type ScoreMinimum } from '@/lib/jobs/suggest/score-notes';
 import {
@@ -79,6 +80,8 @@ export type PipelineParams = {
   view?: string;
   status?: string;
   source?: string;
+  /** The site the posting is on, a POSTING_PLATFORMS key, or `none` for not known. */
+  site?: string;
   excitement?: string;
   minfit?: string;
   minchance?: string;
@@ -109,6 +112,8 @@ export type PipelineState = {
   view: PipelineViewName;
   scope: PipelineScope;
   source: ApplicationSource | null;
+  /** The posting's site, `none` for the rows whose site is not known, or null for any. */
+  site: PostingPlatform | 'none' | null;
   /** The lowest excitement shown, or null for any. */
   excitement: number | null;
   minimum: ScoreMinimum;
@@ -157,6 +162,7 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     view,
     scope,
     source: APPLICATION_SOURCES.find((s) => s === params.source) ?? null,
+    site: params.site === 'none' ? 'none' : (POSTING_PLATFORMS.find((p) => p === params.site) ?? null),
     excitement: (EXCITEMENT_MINIMUMS as readonly number[]).includes(excitement) ? excitement : null,
     minimum: parseScoreMinimum(params),
     terms: searchTerms(params.q),
@@ -174,6 +180,7 @@ export function inScope(row: Pick<PipelineRow, 'status'>, scope: PipelineScope):
 export type PipelineFacet =
   | 'status'
   | 'source'
+  | 'site'
   | 'company'
   | 'ready'
   | 'questions'
@@ -192,6 +199,7 @@ function passesFilters(
 ): boolean {
   return (
     (except === 'source' || !state.source || row.source === state.source) &&
+    (except === 'site' || !state.site || (row.postingPlatform ?? 'none') === state.site) &&
     (except === 'company' || !state.company || row.companySlug === state.company) &&
     (except === 'status' ||
       !state.stage || (state.stage.statuses as readonly ApplicationStatus[]).includes(row.status)) &&
@@ -249,6 +257,13 @@ export function pipelineCounts(
   const sources = new Map<ApplicationSource, number>();
   for (const row of facet('source')) sources.set(row.source, (sources.get(row.source) ?? 0) + 1);
 
+  // `none` counts the rows whose site is not known.
+  const sites = new Map<PostingPlatform | 'none', number>();
+  for (const row of facet('site')) {
+    const site = row.postingPlatform ?? 'none';
+    sites.set(site, (sites.get(site) ?? 0) + 1);
+  }
+
   const ready = facet('ready');
   const questions = facet('questions');
   const letter = facet('letter');
@@ -257,6 +272,7 @@ export function pipelineCounts(
   return {
     status: { live: live.length, closed: anyStatus.length - live.length, all: anyStatus.length, stages },
     sources,
+    sites,
     /** The rows every filter but the company lets through, for the Company menu. */
     companyRows: facet('company'),
     marks: {
@@ -322,6 +338,7 @@ export function pipelineHref(
 const PIPELINE_FILTER_KEYS = [
   'status',
   'source',
+  'site',
   'excitement',
   'minfit',
   'minchance',

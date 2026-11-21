@@ -1,9 +1,13 @@
 import { NO_GROUP, type ListDisplaySpec } from '@/lib/list-display';
 import { APPLICATION_STATUSES, SOURCE_LABELS } from '@/lib/jobs/pipeline';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
+import { POSTING_PLATFORMS, POSTING_PLATFORM_LABELS, type PostingPlatform } from '@/lib/jobs/roles/platform';
 import { ROLE_KINDS, ROLE_KIND_LABELS } from '@/lib/jobs/role-kind';
 import { noteRank } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
+
+/** The person's own score of how much a role involves AI work (roles.ai_score). */
+export const AI_SCORE_LABEL = 'AI score';
 
 /**
  * What the roles table offers: the six sorts it already had, three groupings
@@ -21,9 +25,10 @@ export type RolesSortKey =
   | 'title'
   | 'status'
   | 'applied'
-  | 'excitement'
+  | 'site'
   | 'fit'
   | 'chance'
+  | 'ai'
   | 'ready'
   | 'questions';
 
@@ -34,9 +39,10 @@ export const ROLE_PROPERTIES = [
   { id: 'status', label: 'Status' },
   { id: 'activity', label: 'Last activity' },
   { id: 'applied', label: 'Date applied' },
-  { id: 'excitement', label: 'Excitement' },
+  { id: 'site', label: 'Site' },
   { id: 'fit', label: FIT_SCORE_LABEL },
   { id: 'chance', label: CHANCE_LABEL },
+  { id: 'ai', label: AI_SCORE_LABEL },
   { id: 'ready', label: 'Ready' },
   { id: 'questions', label: 'Questions' },
   { id: 'comp', label: 'Comp' },
@@ -68,10 +74,11 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         label: 'Date applied',
         compare: (a, b) => (b.submittedAt ?? '').localeCompare(a.submittedAt ?? ''),
       },
+      // The posting site by name; a role whose site is not known sorts last.
       {
-        id: 'excitement',
-        label: 'Excitement',
-        compare: (a, b) => (b.excitement ?? 0) - (a.excitement ?? 0),
+        id: 'site',
+        label: 'Site',
+        compare: (a, b) => siteRank(a.postingPlatform) - siteRank(b.postingPlatform),
       },
       // Jev's two figures (plan #1206), highest first; a row not scored sorts last.
       {
@@ -83,6 +90,12 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
         id: 'chance',
         label: CHANCE_LABEL,
         compare: (a, b) => noteRank(b.scoreNote, 'chance') - noteRank(a.scoreNote, 'chance'),
+      },
+      // The person's own AI score, highest first; a role without one sorts last.
+      {
+        id: 'ai',
+        label: AI_SCORE_LABEL,
+        compare: (a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1),
       },
       // The two marks set on the role page, the ones marked first.
       {
@@ -274,4 +287,19 @@ export function contactsDisplay<T extends ContactLike>(): ListDisplaySpec<T> {
     defaultSort: 'name',
     defaultGroup: NO_GROUP,
   };
+}
+
+/** The posting sites in the order their names sort, with not known last. */
+const SITES_BY_NAME = [...POSTING_PLATFORMS].sort((a, b) =>
+  POSTING_PLATFORM_LABELS[a].localeCompare(POSTING_PLATFORM_LABELS[b]),
+);
+
+function siteRank(site: PostingPlatform | null | undefined): number {
+  return site ? SITES_BY_NAME.indexOf(site) : SITES_BY_NAME.length;
+}
+
+/** The short name a table cell shows for a posting site. */
+export function siteLabel(site: PostingPlatform | null | undefined): string | null {
+  if (!site) return null;
+  return site === 'in_house' ? 'Own site' : POSTING_PLATFORM_LABELS[site];
 }

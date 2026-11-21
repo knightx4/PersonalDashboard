@@ -8,8 +8,10 @@ import { fileJobNote, type JobNoteInput } from '@/lib/jobs/notes';
 import { saveRoleEdit } from '@/lib/jobs/roles/edit';
 import { COVER_LETTER_MAX, saveApplicationEdit, saveCoverLetterText, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import { draftCoverLetterFor } from '@/lib/jobs/drafting/run-draft';
-import type { CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
-import { dropDraft, LETTER_KEY, saveReplies } from '@/lib/jobs/drafting/store';
+import { coverLetterView, type CoverLetterDraftView } from '@/lib/jobs/drafting/draft-cover-letter-payload';
+import { latestLetterRequest, letterRequestOpen } from '@/lib/jobs/drafting/letter-request';
+import { bannedOrDefault } from '@/lib/jobs/evidence/draft-payload';
+import { dropDraft, LETTER_KEY, loadDrafts, saveReplies } from '@/lib/jobs/drafting/store';
 
 // latency: pending
 export async function addNote(input: JobNoteInput): Promise<{ error: string | null }> {
@@ -104,26 +106,52 @@ const draftLetterSchema = z.object({
 });
 
 /**
- * Dash drafts a cover letter from everything on file for the application
- * (plan #2135.1), using any replies to its earlier questions, which are
- * saved first. The letter is kept in application_drafts beside the editor;
- * nothing reaches applications.cover_letter until the person inserts it and
- * saves with saveCoverLetter.
+ * Dash drafts a cover letter from everything on file (plan #2135.1), using
+ * any replies to its earlier questions, which are saved first. The letter is
+ * written by the goals routine with the person's cover letter skill
+ * (lib/jobs/drafting/letter-request.ts), so this only queues it and starts
+ * the routine; coverLetterRun reports when it has landed. The letter is kept
+ * in application_drafts beside the editor; nothing reaches
+ * applications.cover_letter until the person inserts it and saves with
+ * saveCoverLetter.
  */
 // latency: pending
 export async function draftCoverLetter(input: {
   applicationId: string;
   /** Replies to earlier asks, by ask id. */
   replies?: Record<string, string>;
-}): Promise<{ draft: CoverLetterDraftView | null; error: string | null }> {
+}): Promise<{ queued: boolean; error: string | null }> {
   const parsed = draftLetterSchema.safeParse(input);
-  if (!parsed.success) return { draft: null, error: parsed.error.issues[0].message };
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { draft: null, error: 'Drafting is not configured.' };
+  if (!parsed.success) return { queued: false, error: parsed.error.issues[0].message };
 
   const user = await requireUser();
-  return draftCoverLetterFor(user.id, apiKey, parsed.data);
+  const result = await draftCoverLetterFor(user.id, parsed.data);
+  return { queued: result.queued, error: result.error };
+}
+
+/**
+ * Where the routine is with the letter, for the tab to poll: still writing,
+ * failed and why, or done with the draft it kept.
+ */
+// latency: pending
+export async function coverLetterRun(input: {
+  applicationId: string;
+}): Promise<{ pending: boolean; error: string | null; draft: CoverLetterDraftView | null }> {
+  const parsed = z.object({ applicationId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { pending: false, error: parsed.error.issues[0].message, draft: null };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const request = await latestLetterRequest(supabase, user.id, parsed.data.applicationId);
+  if (letterRequestOpen(request)) return { pending: true, error: null, draft: null };
+  if (request?.status === 'failed') return { pending: false, error: request.error ?? 'Drafting failed.', draft: null };
+
+  const [{ drafts }, { data: profile }] = await Promise.all([
+    loadDrafts(supabase, parsed.data.applicationId, 'cover_letter'),
+    supabase.from('profiles').select('banned_constructions').eq('id', user.id).maybeSingle(),
+  ]);
+  const draft = coverLetterView(drafts ? { drafts: drafts.drafts, asks: drafts.asks } : null, bannedOrDefault(profile?.banned_constructions));
+  return { pending: false, error: null, draft };
 }
 
 /**

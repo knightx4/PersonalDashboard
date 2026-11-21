@@ -15,6 +15,7 @@ import { safeTimeZone } from '@/lib/core/timezone';
 import { whenDate, whenDay, whenTime, whenZoneName, type WhenInput } from '@/lib/core/when';
 import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { lastTurnEvent } from '@/lib/jobs/move';
+import { isPostingPlatform, platformFromLink, type PostingPlatform } from '@/lib/jobs/roles/platform';
 
 /**
  * Reading the pipeline.
@@ -44,6 +45,8 @@ export interface PipelineRow {
   source: ApplicationSource;
   attempt: number;
   excitement: number | null;
+  /** How much the role involves AI work, 0 to 100, typed by the person (roles.ai_score). */
+  aiScore: number | null;
   needsReview: boolean;
   /** Marked ready to apply on the role's Application tab. */
   readyToApply: boolean;
@@ -76,6 +79,12 @@ export interface PipelineRow {
   compMinCents: number | null;
   compMaxCents: number | null;
   /**
+   * The site the posting is on (Ashby, Workday and so on): the one typed on
+   * the role, else the one its posting link names, else null. Optional so
+   * rows built elsewhere need not carry it.
+   */
+  postingPlatform?: PostingPlatform | null;
+  /**
    * Must-have coverage from the stored requirement match, or a null rate when
    * the role has never been matched. Derived once here rather than per card,
    * for the same reason `daysSinceActivity` is.
@@ -100,7 +109,8 @@ const SELECT = `
   submitted_at, confirmation_received_at, first_human_response_at, closed_at,
   outcome, rejection_stage, rejection_stage_override, next_action, next_action_due, created_at,
   roles!inner (
-    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
+    id, title, kind, location, work_mode, comp_min_cents, comp_max_cents, ai_score, requirement_matches,
+    posting_platform, jd_url,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
   interviews ( kind, scheduled_at, time_known ),
@@ -136,7 +146,10 @@ type RawRow = {
     work_mode: string | null;
     comp_min_cents: number | null;
     comp_max_cents: number | null;
+    ai_score: number | null;
     requirement_matches: CoverageEntry[] | null;
+    posting_platform: string | null;
+    jd_url: string | null;
     companies: {
       id: string;
       name: string;
@@ -198,6 +211,7 @@ export async function loadPipeline(
     source: row.source,
     attempt: row.attempt,
     excitement: row.excitement,
+    aiScore: row.roles.ai_score ?? null,
     needsReview: row.needs_review,
     readyToApply: row.ready_to_apply === true,
     allQuestionsAdded: row.all_questions_added === true,
@@ -218,6 +232,9 @@ export async function loadPipeline(
     compMinCents: row.roles.comp_min_cents,
     compMaxCents: row.roles.comp_max_cents,
     coverage: requirementCoverage(row.roles.requirement_matches),
+    postingPlatform: isPostingPlatform(row.roles.posting_platform)
+      ? row.roles.posting_platform
+      : platformFromLink(row.roles.jd_url),
     interviewKinds: (row.interviews ?? []).map((interview) => interview.kind),
     nextInterview: nextInterview(row.interviews ?? []),
   }));

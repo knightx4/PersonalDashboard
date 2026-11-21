@@ -2,7 +2,7 @@ import { sameAs, type DashWriteRuns } from './runs';
 import { ROLE_KINDS } from '@/lib/jobs/role-kind';
 import type Anthropic from '@anthropic-ai/sdk';
 import { PERSPECTIVE_QUESTIONS } from '@/lib/jobs/companies/perspective';
-import { bareRef, isUuid, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
+import { bareRef, isUuid, ownIdFor, type AskDb, type AskRow, type AskSchema, type SchemaClient } from '@/lib/ask/db';
 import type { JobsChangeInput, JobsChangeKind } from '@/lib/ask/jobs-changes';
 import { toRef } from '@/lib/core/refs';
 import { channelForMessage } from '@/lib/jobs/applications/channel';
@@ -43,7 +43,8 @@ import { COMPANY_NAME_MAX, normalisedDomains, renameUpdate, saveCompanyEdit } fr
 import { CLASSIFICATIONS, type MessageClassification } from '@/lib/jobs/email/classify';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { fileJobNote } from '@/lib/jobs/notes';
-import { descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { aiScoreError, descriptionUpdate, saveRoleEdit } from '@/lib/jobs/roles/edit';
+import { POSTING_PLATFORMS } from '@/lib/jobs/roles/platform';
 import { channelEdit, excitementError, saveApplicationEdit, type ApplicationEdit } from '@/lib/jobs/applications/edit';
 import {
   changedRoleFacts,
@@ -257,6 +258,12 @@ function idOf(value: string, what: string): string {
   return id;
 }
 
+/** The row of theirs a ref names, given whole or as an id prefix of 8 or more characters. */
+async function ownRowByRef(client: SchemaClient, table: string, ref: string, userId: string, what: string): Promise<Row> {
+  const id = await ownIdFor(client, table, userId, ref);
+  return ownRow(client, table, id ?? idOf(ref, what), userId, what);
+}
+
 async function ownRow(client: SchemaClient, table: string, id: string, userId: string, what: string): Promise<Row> {
   const { data, error } = await client.from(table).select('*').eq('id', id).eq('user_id', userId).maybeSingle();
   if (error) throw new Error(`Reading the ${what} failed: ${error.message}`);
@@ -294,10 +301,10 @@ const rolePaths = (id: string) => ['/jobs', '/jobs/roles', '/jobs/pipeline', '/j
 /** The role a call names: by its own ref, or by an application on it. */
 async function namedRole(env: JobsWriteEnv, args: Args): Promise<Row> {
   const roleRef = text(args, 'role_ref');
-  if (roleRef) return ownRow(env.jobs, 'roles', idOf(roleRef, 'role'), env.userId, 'role');
+  if (roleRef) return ownRowByRef(env.jobs, 'roles', roleRef, env.userId, 'role');
   const applicationRef = text(args, 'application_ref');
   if (!applicationRef) throw new JobsRefused('Name the role: role_ref, or application_ref for one of its applications.');
-  const application = await ownRow(env.jobs, 'applications', idOf(applicationRef, 'application'), env.userId, 'application');
+  const application = await ownRowByRef(env.jobs, 'applications', applicationRef, env.userId, 'application');
   return ownRow(env.jobs, 'roles', application.role_id as string, env.userId, 'role');
 }
 
@@ -395,6 +402,19 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
   if (given(args, 'posting_status')) {
     update.posting_status = oneOf(args, 'posting_status', POSTING_STATUSES, false);
     changed.push('whether the posting is open');
+  }
+  if (given(args, 'ai_score')) {
+    // The person's own score; nothing computes it. Empty or null clears it.
+    const raw = args.ai_score;
+    const score = raw === null || raw === '' ? null : Number(raw);
+    const bad = aiScoreError(score);
+    if (bad) throw new JobsRefused(bad);
+    update.ai_score = score;
+    changed.push('the AI score');
+  }
+  if (given(args, 'posting_platform')) {
+    update.posting_platform = oneOf(args, 'posting_platform', POSTING_PLATFORMS, true);
+    changed.push('the recruiting platform');
   }
   if (given(args, 'posting_url')) {
     const url = clearable(args, 'posting_url', 2000);
@@ -498,10 +518,10 @@ async function changeRole(env: JobsWriteEnv, args: Args): Promise<JobsMade> {
 /** The application a call names: by its own ref, or the latest one on a role, the one the board shows. */
 async function namedApplication(env: JobsWriteEnv, args: Args): Promise<Row> {
   const applicationRef = text(args, 'application_ref');
-  if (applicationRef) return ownRow(env.jobs, 'applications', idOf(applicationRef, 'application'), env.userId, 'application');
+  if (applicationRef) return ownRowByRef(env.jobs, 'applications', applicationRef, env.userId, 'application');
   const roleRef = text(args, 'role_ref');
   if (!roleRef) throw new JobsRefused('Name the application: application_ref, or role_ref for the role it is on.');
-  const role = await ownRow(env.jobs, 'roles', idOf(roleRef, 'role'), env.userId, 'role');
+  const role = await ownRowByRef(env.jobs, 'roles', roleRef, env.userId, 'role');
   const { data, error } = await env.jobs
     .from('applications')
     .select('*')
@@ -1249,6 +1269,7 @@ export const APPLICATION_CHILDREN = [
   { table: 'job_search.application_outreach', column: 'application_id', owned: true, unique: 'contact_id' },
   { table: 'job_search.attachments', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.contact_touches', column: 'application_id', owned: true, unique: null },
+  { table: 'job_search.cover_letter_requests', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.cover_letters', column: 'application_id', owned: true, unique: null },
   { table: 'job_search.interviews', column: 'application_id', owned: true, unique: 'ics_uid' },
   { table: 'job_search.interview_groups', column: 'application_id', owned: true, unique: null },
@@ -3024,7 +3045,7 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
       ['app/jobs/(app)/roles/[id]/actions.ts#moveRoleToCompany', 'lib/jobs/roles/edit.ts#saveRoleEdit'],
     ),
     description:
-      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
+      "Change a role in their Jobs workspace when they ask: its title, what kind of opening it is (a job, or an accelerator, fellowship or grant), location, work mode, seniority, posting link, whether the posting is open, its description, its yearly pay band and where that came from, the recruiting platform it is posted on (Ashby, Greenhouse, Workday, the company's own site and so on), its AI score (their own 0 to 100 rating of how much the role involves AI work, set only when they give it), or the company it is filed under (by name; one not on file is added), or mark its company a target (company_priority). Give only the fields to change. Name the role by role_ref, or application_ref. Moving it to another stage is move_roles.",
     input_schema: {
       type: 'object',
       properties: {
@@ -3041,6 +3062,14 @@ export const JOBS_WRITES: readonly JobsWrite[] = [
         pay_min: { type: 'number', description: 'The bottom of the yearly pay band, a whole amount such as 150000. 0 clears it.' },
         pay_max: { type: 'number', description: 'The top of the yearly pay band. 0 clears it.' },
         pay_source: { type: 'string', description: `Where the pay came from: ${PAY_SOURCES.join(', ')}. ${CLEARABLE}` },
+        posting_platform: {
+          type: 'string',
+          description: `The recruiting platform the posting is on: ${POSTING_PLATFORMS.join(', ')}. in_house is the company's own careers site. ${CLEARABLE}`,
+        },
+        ai_score: {
+          type: ['number', 'string'],
+          description: `Their AI score for the role: a whole number from 0 to 100, as they gave it. ${CLEARABLE}`,
+        },
         company: { type: 'string', description: 'The company the role belongs to, by name.' },
         company_priority: {
           type: 'string',

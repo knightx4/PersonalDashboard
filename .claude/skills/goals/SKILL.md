@@ -43,6 +43,9 @@ The skills fired this way so far:
   names (`insightsBrief` in `lib/you/insights.ts`).
 - `learn-drafts`: the Learn topics waiting to be drafted, into `learn.topics`
   through `npm run learn:drafts` (`learn.topic_draft_requests`, learn 0193).
+- `cover-letters`: the cover letter an application's Draft button queued,
+  written with the person's cover letter skill and saved beside the editor
+  through `npm run cover-letter` (`job_search.cover_letter_requests`, job_search 0084).
 
 ## How you read and write
 

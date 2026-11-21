@@ -67,6 +67,7 @@ const pursuit = (over: Partial<PipelineRow>): PipelineRow => ({
   source: 'portal',
   attempt: 1,
   excitement: null,
+  aiScore: null,
   needsReview: false,
   readyToApply: false,
   allQuestionsAdded: false,

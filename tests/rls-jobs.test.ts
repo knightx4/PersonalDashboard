@@ -262,6 +262,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.application_drafts = applicationDraft.id;
 
+  // A cover letter the routine wrote (job_search 0084).
+  const [letterRequest] = await admin<{ id: string }[]>`
+    insert into cover_letter_requests (user_id, application_id, status, finished_at)
+    values (${userId}, ${application.id}, 'done', now())
+    returning id`;
+  ids.cover_letter_requests = letterRequest.id;
+
   // A finished research run on the company (job_search 0062).
   const [research] = await admin<{ id: string }[]>`
     insert into company_research (user_id, company_id, status, summary, sources, finished_at)

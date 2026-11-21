@@ -16,17 +16,31 @@ import { preferenceState, type JobPreferences } from './preferences';
 
 export { companyKey };
 import { CHANCE_DISPLAY, CHANCE_FILTER_EDGES, chanceBand, type ChanceBand } from './chance-check';
+import {
+  CHANCE_QUESTIONS,
+  FIT_QUESTIONS,
+  baseRate,
+  combineChance,
+  combineFit,
+  interviewLevels,
+  parseRubric,
+  payFactor,
+  scoreFactor,
+  yesNoFactor,
+  type RubricBreakdown,
+} from './rubric';
 
 /**
- * Ten fixed questions about each opening Dash recommends (plan #1178; fit
- * and chance scores added by #1202).
+ * Fixed questions about each opening Dash recommends (plan #1178; fit and
+ * chance scores added by #1202, and built from a rubric of factors since
+ * 17 November 2026, rubric.ts).
  *
  * The recommended roles on Find come from a web search that writes a title, a
  * location, why it fits and how to go about it (job_search.suggestions, kind
  * `apply`). Jev reads that text, the posting itself once posting.ts has read
  * it from the link (job_search 0039), the person's evidence titles, the roles
- * they have applied to and what they want from a job, and answers ten
- * questions in one request, so the list can be sorted and filtered without a
+ * they have applied to, their career goals and what they want from a job,
+ * and answers every question in one request, so the list can be sorted and filtered without a
  * model reading every posting at length.
  *
  * The answers and Jev's confidence in each are kept on the suggestion row in
@@ -58,53 +72,8 @@ export type PercentScore = (typeof PERCENT_SCORES)[number];
 export const CHANCE_LABEL = 'Chance of an interview';
 export const FIT_SCORE_LABEL = 'Fit';
 
-/**
- * How the chance questions weigh the history (24 October 2026). The history
- * is a starting rate, not the answer: it counts only applications sent the
- * same way, leans on recent months while the person's applications are
- * improving, and the role itself moves the figure from there.
- */
-export const CHANCE_METHOD =
-  'Start from how their comparable past applications went: your_history_with_similar_roles and ' +
-  'your_history_overall count only applications sent the same way as this one (history_compared_against). ' +
-  'your_history_by_month shows whether that rate is rising or falling; weigh the recent months most, ' +
-  'but a month with many still waiting is not finished and its low count says little yet. ' +
-  'your_history_sent_another_way is how applications sent another way went, such as Easy Apply, ' +
-  'and says little about this one. Then move up or down from that rate for this job: how much of what it ' +
-  'asks for the evidence covers, its level against the levels they have reached interviews at, and how ' +
-  'many people a posting like it likely draws.';
-
-/**
- * The chance levels as interview rates, so the stored figure reads as one.
- * The old levels ran from "almost no chance" to "very likely", scaled to 0
- * to 100, so an even chance showed as 50 where the person's direct
- * applications reach an interview about one time in ten.
- */
-export const CHANCE_LEVELS = [
-  'Fewer than 5 in 100 like it reach an interview',
-  '5 to 15 in 100 reach an interview',
-  '15 to 30 in 100 reach an interview',
-  '30 to 50 in 100 reach an interview',
-  'More than 50 in 100 reach an interview',
-] as const;
-
-/** The rate each level stands for, in percent: about the middle of its range. */
-export const CHANCE_LEVEL_RATES = [2, 10, 22, 40, 65] as const;
-
-/**
- * Jev's probability-weighted chance score (0 to 4, and it can fall between
- * levels) as a percent, read straight between the rates of the levels either
- * side of it.
- */
-export function chancePercent(score: number): number {
-  if (!Number.isFinite(score)) return 0;
-  const at = Math.min(Math.max(score, 0), CHANCE_LEVEL_RATES.length - 1);
-  const low = Math.floor(at);
-  const high = Math.min(low + 1, CHANCE_LEVEL_RATES.length - 1);
-  return Math.round(CHANCE_LEVEL_RATES[low] + (CHANCE_LEVEL_RATES[high] - CHANCE_LEVEL_RATES[low]) * (at - low));
-}
-
-export const OPENING_QUESTIONS = {
+/** The eight questions answered as labels: chips to sort and filter by. */
+export const LABEL_QUESTIONS = {
   workplace: {
     type: 'choice',
     question: 'Where is the work done, going by the location and the text about the opening?',
@@ -175,29 +144,14 @@ export const OPENING_QUESTIONS = {
       'Nearly the same as one of them',
     ],
   },
-  fit_score: {
-    type: 'score',
-    question:
-      'How much of what this opening asks for is covered by the person\'s evidence items (your_evidence) ' +
-      'and target titles (your_target_titles)?',
-    levels: [
-      'None of the evidence bears on the job',
-      'A little of the evidence bears on the job, and its core is new to them',
-      'Some of the core of the job is covered by evidence',
-      'Most of the core of the job is covered by direct evidence',
-      'All of the core of the job is covered by direct evidence, at the level asked for',
-    ],
-  },
-  chance: {
-    type: 'score',
-    question:
-      'How likely is an application from this person to this opening to reach an interview? ' + CHANCE_METHOD,
-    levels: CHANCE_LEVELS,
-  },
 } as const satisfies Record<string, JevQuestion>;
 
-export type OpeningQuestion = keyof typeof OPENING_QUESTIONS;
-export const OPENING_QUESTION_KEYS = Object.keys(OPENING_QUESTIONS) as OpeningQuestion[];
+/** Everything Jev is asked about an opening: the labels, and the factors fit and chance are built from. */
+export const OPENING_QUESTIONS = { ...LABEL_QUESTIONS, ...FIT_QUESTIONS, ...CHANCE_QUESTIONS } as const;
+
+/** The answers kept on an opening: the labels, and the two figures built from the factors. */
+export type OpeningQuestion = keyof typeof LABEL_QUESTIONS | PercentScore;
+export const OPENING_QUESTION_KEYS = [...Object.keys(LABEL_QUESTIONS), ...PERCENT_SCORES] as OpeningQuestion[];
 
 /** One answer as stored: the value and how sure Jev was. */
 export type Scored<T> = { value: T; confidence: number };
@@ -213,10 +167,12 @@ export type OpeningScores = {
   duplicate?: Scored<boolean>;
   /** The level index, 0 to 3, rounded from Jev's weighted score. */
   closeness?: Scored<number>;
-  /** How well the evidence and target titles match the job, 0 to 100 (see `scaleScore`). */
+  /** How much the person would want the job, 0 to 100 (`combineFit` in rubric.ts). */
   fit_score?: Scored<number>;
-  /** The chance of reaching an interview in percent (see `chancePercent`). */
+  /** The chance of reaching an interview in percent (`combineChance` in rubric.ts). */
   chance?: Scored<number>;
+  /** Every factor answer behind the two figures. */
+  rubric?: RubricBreakdown;
 };
 
 /** At or above this, an answer is shown plainly; below it, as unsure. */
@@ -245,7 +201,36 @@ export type ScoringContext = {
   history: PastApplication[];
   /** What they want from a job, from /jobs/settings; absent reads as none set. */
   preferences?: JobPreferences;
+  /** Their career goals entries (job_search.thoughts), newest first; fit is read mostly against these. */
+  careerGoals?: string[];
+  /** Industries they will not work in (profiles.excluded_industries). */
+  excludedIndustries?: string[];
 };
+
+/** How much of the career goals Jev reads, newest first. */
+export const CAREER_GOALS_CHARS = 8_000;
+
+/** The career goals entries, newest first, cut to CAREER_GOALS_CHARS in all. */
+export function careerGoalsState(goals: readonly string[] | undefined): string[] {
+  const out: string[] = [];
+  let left = CAREER_GOALS_CHARS;
+  for (const goal of goals ?? []) {
+    const text = goal.trim();
+    if (!text || left <= 0) continue;
+    out.push(text.slice(0, left));
+    left -= text.length;
+  }
+  return out;
+}
+
+/** What every rubric question reads about the person beside the job. Exported for the application questions. */
+export function personState(context: ScoringContext, excludeId?: string): Record<string, unknown> {
+  return {
+    your_career_goals: careerGoalsState(context.careerGoals),
+    your_excluded_industries: context.excludedIndustries ?? [],
+    your_interview_levels: interviewLevels(context.history, excludeId),
+  };
+}
 
 /** How many applied roles Jev reads. Enough to show the pattern, cheap enough for a cent per hundred. */
 export const APPLIED_LIMIT = 30;
@@ -294,13 +279,14 @@ export function openingState(opening: OpeningText, context: ScoringContext): Rec
     your_target_titles: context.targetTitles,
     roles_you_applied_to: context.applied.slice(0, APPLIED_LIMIT),
     your_roles_at_this_company: rolesAtCompany(opening, context).map((role) => `${role.title} (${role.status.replace(/_/g, ' ')})`),
+    ...personState(context),
     ...historyState(opening.title, context.history),
   };
 }
 
 /**
- * The history fields of the state, under the names the chance question
- * reads. Exported for #1203, which asks the same question of an application.
+ * The history fields of the state, which the background question reads.
+ * Exported for #1203, which asks the same questions of an application.
  * An opening is compared against direct applications, the way it would go in.
  */
 export function historyState(
@@ -334,27 +320,6 @@ function level(result: JevResult<JevScoreAnswer>): Scored<number> | undefined {
   return { value: result.answer.level, confidence: round(result.answer.confidence) };
 }
 
-/**
- * A score question's answer as a whole number from 0 to 100: Jev's
- * probability-weighted score (0 to levels - 1, and it can fall between
- * levels) divided by the top level. Five levels put "even" at 50.
- */
-export function scaleScore(score: number, levels: number): number {
-  if (levels < 2 || !Number.isFinite(score)) return 0;
-  return Math.round((Math.min(Math.max(score, 0), levels - 1) / (levels - 1)) * 100);
-}
-
-function percent(result: JevResult<JevScoreAnswer>, levels: number): Scored<number> | undefined {
-  if (!result.ok) return undefined;
-  return { value: scaleScore(result.answer.score, levels), confidence: round(result.answer.confidence) };
-}
-
-/** The chance answer as a percent (`chancePercent`). Exported for the application questions. */
-export function chanceScored(result: JevResult<JevScoreAnswer>): Scored<number> | undefined {
-  if (!result.ok) return undefined;
-  return { value: chancePercent(result.answer.score), confidence: round(result.answer.confidence) };
-}
-
 function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -369,7 +334,8 @@ export type ScoreOpeningInput = {
 };
 
 /**
- * Ask the ten questions about one opening. Never throws. A failed request
+ * Ask every question about one opening and build fit and chance from the
+ * factor answers (rubric.ts). Never throws. A failed request
  * comes back as the failure; otherwise every readable answer is kept, so one
  * malformed answer costs that question only.
  */
@@ -395,11 +361,59 @@ export async function scoreOpening(
     cover_letter: yesNo(a.cover_letter),
     duplicate: duplicateByRule(input.opening, input.context) ?? yesNo(a.duplicate),
     closeness: level(a.closeness),
-    fit_score: percent(a.fit_score, OPENING_QUESTIONS.fit_score.levels.length),
-    chance: chanceScored(a.chance),
   };
+  const rubric = openingRubric(a, input.opening, input.context);
+  const fit = combineFit(rubric.fit);
+  if (fit) scores.fit_score = fit;
+  scores.chance = combineChance(rubric.chance);
+  scores.rubric = rubric;
   for (const key of OPENING_QUESTION_KEYS) if (scores[key] === undefined) delete scores[key];
   return { ok: true, scores };
+}
+
+type RubricAnswers = {
+  [K in keyof typeof FIT_QUESTIONS | keyof typeof CHANCE_QUESTIONS]: JevResult<
+    K extends 'fit_pay' ? JevChoiceAnswer : K extends 'fit_excluded_industry' | 'fit_ruled_out' | 'chance_blocker' ? JevYesNoAnswer : JevScoreAnswer
+  >;
+};
+
+/** Every fit factor answer Jev gave. Exported for the application questions. */
+export function fitFactors(a: Pick<RubricAnswers, keyof typeof FIT_QUESTIONS>): RubricBreakdown['fit'] {
+  const fit: RubricBreakdown['fit'] = {
+    fit_work: scoreFactor(a.fit_work),
+    fit_direction: scoreFactor(a.fit_direction),
+    fit_ambition: scoreFactor(a.fit_ambition),
+    fit_company_prestige: scoreFactor(a.fit_company_prestige),
+    fit_role_prestige: scoreFactor(a.fit_role_prestige),
+    fit_interest: scoreFactor(a.fit_interest),
+    fit_level: scoreFactor(a.fit_level),
+    fit_setup: scoreFactor(a.fit_setup),
+    fit_pay: payFactor(a.fit_pay),
+    fit_excluded_industry: yesNoFactor(a.fit_excluded_industry),
+    fit_ruled_out: yesNoFactor(a.fit_ruled_out),
+  };
+  for (const key of Object.keys(fit) as (keyof typeof fit)[]) if (fit[key] === undefined) delete fit[key];
+  return fit;
+}
+
+/** Every chance factor answer Jev gave. Exported for the application questions. */
+export function chanceFactors(a: Pick<RubricAnswers, keyof typeof CHANCE_QUESTIONS>): RubricBreakdown['chance'] {
+  const chance: RubricBreakdown['chance'] = {
+    chance_requirements: scoreFactor(a.chance_requirements),
+    chance_level: scoreFactor(a.chance_level),
+    chance_background: scoreFactor(a.chance_background),
+    chance_blocker: yesNoFactor(a.chance_blocker),
+    chance_competition: scoreFactor(a.chance_competition),
+  };
+  for (const key of Object.keys(chance) as (keyof typeof chance)[]) if (chance[key] === undefined) delete chance[key];
+  return chance;
+}
+
+/** An opening's breakdown: the factor answers and the base rate of direct applications. */
+function openingRubric(a: RubricAnswers, opening: OpeningText, context: ScoringContext): RubricBreakdown {
+  const base = baseRate(opening.title, context.history);
+  const described = (opening.postingText?.trim().length ?? 0) >= 200;
+  return { fit: fitFactors(a), chance: { base: Math.round(base.rate * 10000) / 10000, ...chanceFactors(a), described } };
 }
 
 // ---------------------------------------------------------------------------
@@ -440,6 +454,8 @@ export function parseOpeningScores(raw: unknown): OpeningScores | null {
   const isPercent = (value: unknown): value is number =>
     typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100;
   for (const key of PERCENT_SCORES) pick(key, isPercent);
+  const rubric = parseRubric(row.rubric);
+  if (rubric) out.rubric = rubric;
   return out;
 }
 

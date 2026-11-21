@@ -235,16 +235,16 @@ describe('aiWeight', () => {
 describe('renderLetterRequest and how much the role is about AI', () => {
   const base = { questions: [], letterComments: [] };
 
-  it('gives AI a paragraph only when AI is central', () => {
+  it('leads with AI only when AI is central', () => {
     const central = renderLetterRequest({
       material: { ...base, role: { requirements: [], posting: 'AI AI LLM generative AI' } } as unknown as GatheredMaterial,
     });
-    expect(central).toContain('Paragraph 3 may be about building with AI');
+    expect(central).toContain('AI is central to this role, so AI leads the letter.');
 
     const none = renderLetterRequest({
       material: { ...base, role: { requirements: [], posting: 'Own the forecast.' } } as unknown as GatheredMaterial,
     });
-    expect(none).toContain('AI gets one sentence near the end of paragraph 3 at most');
+    expect(none).toContain('AI gets one sentence near the end at most');
     expect(none).not.toContain('ask them for one');
   });
 });

@@ -286,7 +286,7 @@ export const draftApplicationAnswersTool: DashPaidTool = {
   },
 };
 
-/** The Draft button on an application's cover letter (plan #2135.2). */
+/** The Draft button on an application's cover letter (plan #2135.2), which queues it for the routine. */
 export const draftCoverLetterTool: DashPaidTool = {
   name: 'draft_cover_letter',
   kind: 'paid',
@@ -317,16 +317,14 @@ export const draftCoverLetterTool: DashPaidTool = {
     };
   },
   async run(ctx, args) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { ok: false, error: 'Drafting is not configured.' };
     const applicationId = String(args.applicationId);
-    const result = await draftCoverLetterFor(ctx.userId, apiKey, { applicationId });
-    if (result.error || !result.draft) return { ok: false, error: result.error ?? 'No letter came back.' };
+    const result = await draftCoverLetterFor(ctx.userId, { applicationId });
+    if (result.error || !result.queued) return { ok: false, error: result.error ?? 'The letter could not be queued.' };
     return {
       ok: true,
       subjectRef: toRef(APPLICATIONS, applicationId),
       op: 'update',
-      summary: 'Dash drafted the cover letter and kept it beside the editor for them to read.',
+      summary: 'Dash is writing the cover letter in a routine with their cover letter skill; it lands beside the editor in a few minutes.',
     };
   },
 };

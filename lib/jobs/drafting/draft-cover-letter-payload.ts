@@ -251,11 +251,11 @@ export function aiWeight(role: Pick<GatheredMaterial['role'], 'title' | 'industr
 
 const WEIGHT_GUIDE: Record<AiWeight, string> = {
   central:
-    'AI is central to this role. Paragraph 3 may be about building with AI, as the template describes; paragraph 2 is still their main employer.',
+    'AI is central to this role, so AI leads the letter. The opening says why AI work, and one full paragraph is about what they have built with AI and what it taught them, from their notes on building with AI below. The one-sentence limit on AI in their writing-style notes does not apply to this letter.',
   some:
-    'The posting mentions AI, automation or tooling, but the role is not about AI. The role\'s main focus leads. AI gets one sentence near the end of paragraph 3, no more.',
+    'The posting mentions AI, automation or tooling, but the role is not about AI. The role\'s main focus leads. AI gets one sentence near the end of the third paragraph, no more.',
   none:
-    'The posting does not mention AI or automation. The role\'s main focus leads. AI gets one sentence near the end of paragraph 3 at most, only where it serves the work. Do not suggest the team should use AI.',
+    'The posting does not mention AI or automation. The role\'s main focus leads. AI gets one sentence near the end at most, only where it serves the work. Do not suggest the team should use AI.',
 };
 
 /** One question and its answer on this application. */

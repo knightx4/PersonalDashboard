@@ -18,6 +18,7 @@ import {
   type PipelineParams,
   type PipelineState,
 } from '@/lib/jobs/pipeline-view';
+import { siteLabel } from '@/lib/jobs/roles-display';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS } from '@/lib/jobs/suggest/score-notes';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
@@ -78,6 +79,7 @@ export function PipelineFilters({
       {state.stage && <input type="hidden" name="stage" value={state.stage.key} />}
       {state.sentDays !== null && <input type="hidden" name="sent" value={state.sentDays} />}
       {state.company && <input type="hidden" name="company" value={state.company} />}
+      {state.site && <input type="hidden" name="site" value={state.site} />}
       {/* What a number on Today narrowed the page to (plan #1591), each with
           its own way out, ahead of the chips anybody can set here. */}
       {state.stage && (
@@ -91,6 +93,13 @@ export function PipelineFilters({
       )}
       {state.company && (
         <ClearChip href={pipelineHref(params, { company: undefined })} label={companyName ?? state.company} />
+      )}
+      {/* Set from the table's Site column; shown here so every view says so. */}
+      {state.site && (
+        <ClearChip
+          href={pipelineHref(params, { site: undefined })}
+          label={state.site === 'none' ? 'Site not known' : `On ${siteLabel(state.site)}`}
+        />
       )}
       <PressChip
         name="status"

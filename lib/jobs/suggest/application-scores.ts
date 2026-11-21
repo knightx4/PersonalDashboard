@@ -1,18 +1,29 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { formatMoney } from '@/lib/money';
-import { askJevAll, type JevFailure, type JevQuestion, type JevResult, type JevScoreAnswer } from '@/lib/jev/wire';
+import { askJevAll, type JevFailure, type JevQuestion } from '@/lib/jev/wire';
 import type { RequirementMatch } from '../evidence/match-payload';
 import type { Requirement } from '../jd/requirements';
 import { TERMINAL_STATUSES } from '../pipeline';
 import { CHANNEL_LABELS, channelOf, titleLevel } from './history';
+import { preferenceState } from './preferences';
 import {
-  CHANCE_METHOD,
-  chanceScored,
-  OPENING_QUESTIONS,
+  CHANCE_QUESTIONS,
+  FIT_QUESTIONS,
+  baseRate,
+  combineChance,
+  combineFit,
+  parseRubric,
+  requirementCoverage,
+  type RubricBreakdown,
+} from './rubric';
+import {
+  APPLIED_LIMIT,
   PERCENT_SCORES,
   SENIORITY_LABELS,
+  chanceFactors,
+  fitFactors,
   historyState,
-  scaleScore,
+  personState,
   type PercentScore,
   type Scored,
   type ScoringContext,
@@ -21,12 +32,15 @@ import {
 /**
  * Fit and chance on each open application (plan #1203).
  *
- * The same two numbers the openings on Roles carry (#1202), asked of the
- * applications still in play: every status but the four closed ones. Jev
- * reads the role as it is on file (title, company, level, work mode, pay,
- * the extracted requirements with their evidence verdicts where the match has
- * run, and the start of the description) beside the person's evidence and
- * how their past applications to similar roles went.
+ * The same two numbers the openings on Roles carry (#1202), built from the
+ * same rubric of factors (rubric.ts), asked of the applications still in
+ * play: every status but the four closed ones. Jev reads the role as it is on
+ * file (title, company, level, work mode, pay, the extracted requirements
+ * with their evidence verdicts where the match has run, and the start of the
+ * description) beside the person's evidence, career goals and how their past
+ * applications to similar roles went. Where the match has run, its verdicts
+ * stand in for Jev's answer on requirements, and a referral or cover letter
+ * on the application moves the chance.
  *
  * Stored on the application row in `scores` (migration job_search 0038) with
  * the same shape as an opening's fit_score and chance, so #1206 can show both
@@ -49,26 +63,11 @@ export const APPLICATION_JD_CHARS = 2_000;
 /** At most this many requirements go in; a long posting's tail is mostly repetition. */
 export const APPLICATION_REQUIREMENT_LIMIT = 40;
 
-export const APPLICATION_QUESTIONS = {
-  fit_score: {
-    type: 'score',
-    question:
-      'How much of what this role asks for is covered by the person\'s evidence items (your_evidence) ' +
-      'and target titles (your_target_titles)? Where the requirements carry a verdict from matching them ' +
-      'against the evidence (strong, partial or gap), weigh those verdicts, the must-haves most.',
-    levels: OPENING_QUESTIONS.fit_score.levels,
-  },
-  chance: {
-    type: 'score',
-    question:
-      'How likely is this application to reach an interview? ' + CHANCE_METHOD +
-      ' A referral or a cover letter on this application (role.how_it_goes_in) is a reason to score higher.',
-    levels: OPENING_QUESTIONS.chance.levels,
-  },
-} as const satisfies Record<PercentScore, JevQuestion>;
+/** The rubric's factor questions, the same as an opening's. */
+export const APPLICATION_QUESTIONS = { ...FIT_QUESTIONS, ...CHANCE_QUESTIONS } as const satisfies Record<string, JevQuestion>;
 
-/** What `applications.scores` holds. A question Jev gave no readable answer to is missing. */
-export type ApplicationScores = Partial<Record<PercentScore, Scored<number>>>;
+/** What `applications.scores` holds: the two figures, and the factor answers behind them. */
+export type ApplicationScores = Partial<Record<PercentScore, Scored<number>>> & { rubric?: RubricBreakdown };
 
 /** One open application as Jev is told about it. */
 export type ApplicationText = {
@@ -151,15 +150,47 @@ export function applicationState(app: ApplicationText, context: ScoringContext):
       requirements: requirementsState(app) ?? 'none extracted; read the description',
       description_start: jd ? jd.slice(0, APPLICATION_JD_CHARS) : 'no description on file',
     },
+    ...(context.preferences && preferenceState(context.preferences)
+      ? { your_preferences: preferenceState(context.preferences) }
+      : {}),
     your_evidence: context.evidence,
     your_target_titles: context.targetTitles,
+    roles_you_applied_to: context.applied.slice(0, APPLIED_LIMIT),
+    ...personState(context, app.id),
     ...historyState(app.title, context.history, { excludeId: app.id, channel: channelOf(app) }),
   };
 }
 
-function percent(result: JevResult<JevScoreAnswer>, levels: number): Scored<number> | undefined {
-  if (!result.ok) return undefined;
-  return { value: scaleScore(result.answer.score, levels), confidence: Math.round(result.answer.confidence * 1000) / 1000 };
+/** At least this much description counts as the job's own text. */
+export const DESCRIBED_CHARS = 200;
+
+/** Whether Jev had the job's own text: a description, or requirements extracted from one. */
+export function isDescribed(app: Pick<ApplicationText, 'jdText' | 'requirements' | 'requirementMatches'>): boolean {
+  return (app.jdText?.trim().length ?? 0) >= DESCRIBED_CHARS || (app.requirements?.length ?? 0) > 0 || (app.requirementMatches?.length ?? 0) > 0;
+}
+
+/**
+ * The application's chance factors: Jev's answers, the match verdicts in place
+ * of its requirements answer where the match has run, the base rate of
+ * applications sent the same way, and the referral and cover letter.
+ * `asOf` is for the back-test, which must see only the history before it.
+ */
+export function applicationChance(
+  app: ApplicationText,
+  context: ScoringContext,
+  jev: RubricBreakdown['chance'],
+  asOf?: string | null,
+): RubricBreakdown['chance'] {
+  const base = baseRate(app.title, context.history, { excludeId: app.id, channel: channelOf(app), asOf });
+  const coverage = requirementCoverage(app.requirementMatches);
+  return {
+    base: Math.round(base.rate * 10000) / 10000,
+    ...jev,
+    described: isDescribed(app),
+    ...(coverage !== null ? { chance_requirements: { score: Math.round(coverage * 4 * 1000) / 1000, sd: 0 }, from_matches: true } : {}),
+    referral: app.referral ?? false,
+    cover_letter: app.coverLetter ?? false,
+  };
 }
 
 export type ScoreApplicationInput = {
@@ -171,9 +202,9 @@ export type ScoreApplicationInput = {
   timeoutMs?: number;
 };
 
-/** Ask the two questions about one application. Never throws. */
+/** Ask the rubric's questions about one application and build fit and chance. Never throws. */
 export async function scoreApplication(
-  input: ScoreApplicationInput,
+  input: ScoreApplicationInput & { asOf?: string | null },
 ): Promise<{ ok: true; scores: ApplicationScores } | JevFailure> {
   const asked = await askJevAll({
     state: applicationState(input.application, input.context),
@@ -184,11 +215,13 @@ export async function scoreApplication(
     timeoutMs: input.timeoutMs,
   });
   if (!asked.ok) return asked;
-  const scores: ApplicationScores = {};
-  const fit = percent(asked.answers.fit_score, APPLICATION_QUESTIONS.fit_score.levels.length);
-  const chance = chanceScored(asked.answers.chance);
+  const rubric: RubricBreakdown = {
+    fit: fitFactors(asked.answers),
+    chance: applicationChance(input.application, input.context, chanceFactors(asked.answers), input.asOf),
+  };
+  const scores: ApplicationScores = { chance: combineChance(rubric.chance), rubric };
+  const fit = combineFit(rubric.fit);
   if (fit) scores.fit_score = fit;
-  if (chance) scores.chance = chance;
   return { ok: true, scores };
 }
 
@@ -205,5 +238,7 @@ export function parseApplicationScores(raw: unknown): ApplicationScores | null {
     if (typeof confidence !== 'number' || confidence < 0 || confidence > 1) continue;
     out[key] = { value, confidence };
   }
+  const rubric = parseRubric(row.rubric);
+  if (rubric) out.rubric = rubric;
   return out;
 }

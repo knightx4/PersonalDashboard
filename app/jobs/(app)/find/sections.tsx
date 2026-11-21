@@ -16,6 +16,7 @@ import { CheckRow, ChipSelect, Input } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { ScoreReasons, Unsure } from '@/components/jobs/ui/score-figures';
+import { ScoreNowButton } from '@/components/jobs/ui/score-now-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/toast';
 import { CloseButton } from '@/components/inbox/close-button';
@@ -80,6 +81,7 @@ function RecommendedSection({
   toolbar,
   footer,
   status,
+  extra,
   children,
 }: {
   title: string;
@@ -98,6 +100,8 @@ function RecommendedSection({
   toolbar?: React.ReactNode;
   /** Shown under the list while it is open, whether or not anything is in it. */
   footer?: React.ReactNode;
+  /** A second press beside the search button, such as Score now. */
+  extra?: React.ReactNode;
   /** How the latest search went, or what it is doing (search-runs.ts). */
   status?: RunLine | null;
   children: React.ReactNode;
@@ -193,6 +197,7 @@ function RecommendedSection({
     >
       <div className="mb-2 flex items-start gap-3">
         <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+        {extra}
         {search}
       </div>
       {count > 0 && toolbar}
@@ -279,6 +284,7 @@ export function RecommendedRoles({
     [suggestions, view],
   );
   const scored = suggestions.some((s) => s.scores);
+  const unscored = suggestions.filter((s) => !s.scores).length;
 
   return (
     <RecommendedSection
@@ -291,6 +297,7 @@ export function RecommendedRoles({
       action={suggestOpenings}
       count={suggestions.length}
       footer={<SourceStats stats={stats} searchCostMicros={searchCostMicros} />}
+      extra={<ScoreNowButton unscored={unscored} />}
       status={searchLine}
       toolbar={
         scored ? (
