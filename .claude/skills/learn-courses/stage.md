@@ -82,7 +82,9 @@ unless the idea needs another:
    style attributes, colours, markers, defs, links, images or scripts. Text
    at font-size 11 to 14, a `viewBox` about 360 wide, `role="img"` and an
    `aria-label`. Arrowheads are small polygons you compute. No label may
-   overlap another or leave the frame.
+   overlap another or leave the frame: render each drawing and look at it
+   (where Playwright is installed, `require('playwright')` and a page with
+   the svg; otherwise check the coordinates by hand and say so).
 6. **A question** (check): one that makes the learner use the idea on a new
    small case, with the full worked answer. Never recall of a definition.
 

@@ -24,7 +24,8 @@ were told; read it for the rules.
    and every number drawn in a `figure` (read the svg's labels and
    coordinates: a point labelled (3, 1) must sit where the figure's scale
    puts it; a marked right angle must be one; a bar labelled 0.5 must be
-   half as long as one labelled 1). Do not trust the writer's own checking.
+   half as long as one labelled 1). Render each drawing and look at it
+   where Playwright is installed. Do not trust the writer's own checking.
 2. **Check the subject as stated**: definitions, the direction of
    implications ("if and only if" against "if"), conditions left out, and
    claims of "always" or "never".
