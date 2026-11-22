@@ -257,10 +257,12 @@ when you see a cause of failure that one fix will not remove.
      change and logs `connector write <tool> was not logged` to Vercel.
      Lookups still throw on a failed log, by design.
    - Partial failures still answer as clean: `agenda` drops the workspaces it
-     could not read, `recall` drops rows whose link failed while its totals
-     still count them, and `open_row` drops a thread it could not read. Say
-     what could not be read in the note, as `search` does, so the log and the
-     health see it.
+     could not read, and `recall` drops rows whose link failed while its
+     totals still count them. Say what could not be read in the note, as
+     `search` does ("Could not read: …."), so the log and the health see it.
+     Done 22 November: `open_row` says "Could not read: the comments under
+     this row." when its thread read fails, and the connector logs the open
+     as partial.
    - The connector counts every ref as seen (`seen: () => …` in
      `lib/connector/writes.ts`), so a write that takes two tables reads a
      bare id as the first. On 15 November `add_role_note` refused 11

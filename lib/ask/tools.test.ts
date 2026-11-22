@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ModuleId } from '@/lib/modules';
 import type { SearchHit, SearchSource } from '@/lib/search/sources';
 import { citationsOf, type AskContext, type AskDb, type AskSchema, type SchemaClient } from './db';
+import { unreadIn } from '@/lib/connector/calls';
 import { OPENABLE } from './lookups';
 import { ASK_TOOLS, ASK_TOOL_NAMES, LOOKUP_TIME_MS, executeAskTool, isTransientDbError } from './tools';
 
@@ -553,6 +554,25 @@ describe('open_row', () => {
     );
     const bare = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(tables));
     expect(expectLinkedRows(bare)[0].detail).not.toHaveProperty('comments');
+  });
+
+  it('says when the comments under the row could not be read, rather than answering as if there were none', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rows = fakeDb(tables);
+    const failingCore: AskDb = async (schema) =>
+      schema === 'core'
+        ? ({
+            from: () => {
+              throw new Error('connection reset');
+            },
+          } as unknown as SchemaClient)
+        : rows(schema);
+    const result = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(tables, { db: failingCore }));
+    expect(expectLinkedRows(result)[0].detail).not.toHaveProperty('comments');
+    expect(result.ok && result.note).toContain('Could not read: the comments under this row.');
+    expect(unreadIn(result.ok ? result.note : undefined)).toBe('Could not read: the comments under this row.');
+    const clean = await executeAskTool('open_row', { table: 'obsidian.notes', ref: 'Work/Leaving.md' }, context(tables));
+    expect(clean.ok && clean.note).toBeFalsy();
   });
 
   it('refuses a table it cannot open', async () => {

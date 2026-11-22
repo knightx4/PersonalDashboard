@@ -251,17 +251,25 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   if (part > 1 && Object.keys(detail).length === 0) {
     throw new AskInputError(`${table} row ${ref} has no part ${part}: its text is shorter than that.`);
   }
+  let threadUnread = false;
   if (part === 1) {
     for (const column of source.facts ?? []) detail[column] = clip(asText(row[column]), 1500);
     const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
     if (comments) detail.comments = comments;
+    threadUnread = comments === false;
   }
-  const note =
-    longer.length === 0
-      ? undefined
-      : more
-        ? `Long text: ${longer.join('; ')}. Call open_row with the same table and ref and part ${part + 1} to read on.`
-        : `Long text: ${longer.join('; ')}. This is the last part.`;
+  const parts = [
+    // The connector's log reads "Could not read: …." as a partial answer (unreadIn).
+    ...(threadUnread ? ['Could not read: the comments under this row. Do not say it has none.'] : []),
+    ...(longer.length === 0
+      ? []
+      : [
+          more
+            ? `Long text: ${longer.join('; ')}. Call open_row with the same table and ref and part ${part + 1} to read on.`
+            : `Long text: ${longer.join('; ')}. This is the last part.`,
+        ]),
+  ];
+  const note = parts.length > 0 ? parts.join(' ') : undefined;
 
   return {
     ok: true,
@@ -287,9 +295,11 @@ export const ROW_THREAD_TURNS = 8;
  * Prepare with Dash and a comment tagged @dash both answer on the row's own
  * thread, so this is where "did that finish, and where is it" is answered
  * (notes 1527e0bf, ae78d95e). A thread that cannot be read leaves the row as
- * it was rather than failing the open.
+ * it was rather than failing the open, and answers `false` so the note can say
+ * so: otherwise "no comments" and "could not read the comments" look alike,
+ * and the connector's log counts the open as clean.
  */
-async function rowThread(ctx: AskContext, table: string, id: string): Promise<string | null> {
+async function rowThread(ctx: AskContext, table: string, id: string): Promise<string | null | false> {
   try {
     const { data, error } = await (await ctx.db('core'))
       .from('thread_turns')
@@ -310,7 +320,7 @@ async function rowThread(ctx: AskContext, table: string, id: string): Promise<st
       .join('\n');
   } catch (error) {
     console.error('ask open_row thread', error instanceof Error ? error.message : error);
-    return null;
+    return false;
   }
 }
 
