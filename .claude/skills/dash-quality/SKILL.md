@@ -206,7 +206,11 @@ when you see a cause of failure that one fix will not remove.
    tool definitions (October 2026). Offer the tools a question needs, by
    workspace or by a cheap first pass, rather than all of them. Measure with
    the health's `avgPromptTokens` before and after; the alert is at 85,000
-   (`PROMPT_TOKENS_ALERT`) and the aim is under 30,000.
+   (`PROMPT_TOKENS_ALERT`) and the aim is under 30,000. Since 23 November
+   that average covers thread and goal replies too (`DASH_ANSWER_OPERATIONS`
+   in `lib/dash/quality/health.ts`); before then it read only Ask, so the
+   zeros from 10 to 22 November mean Ask went unused, not a smaller prompt.
+   Thread replies on 19 November averaged 93,109 tokens (max 103,083).
 2. ~~**No lookup may hang or fail opaquely.**~~ Done 14 November:
    `executeAskTool` (`lib/ask/tools.ts`) stops a lookup at `LOOKUP_TIME_MS`
    (20 seconds), retries once on a dropped connection or a 5xx
@@ -306,7 +310,8 @@ when you see a cause of failure that one fix will not remove.
 8. **Keep it cheap.** The person does not want to pay for testing. Hold the
    monthly run under $1.50 (`cost_micros`), and the month's checks, by hand
    and monthly, under about $3 together (`core.model_spend`, operation
-   `check-dash-quality`). When the cases outgrow it, retire the oldest
+   `check-dash-quality`). November ran over: the 1 November run cost $3.68
+   and the month's checks $10.53 by the 12th. When the cases outgrow it, retire the oldest
    passing ones whose cause another case also covers (`active = false`,
    never deleted). Shrinking the prompt (item 1) also makes every case
    cheaper.
@@ -332,7 +337,8 @@ End with a short report, which reaches the person's phone:
 - the run's result (passed of cases, alerts) and whether the pipeline ran;
 - what you fixed, each in one line with its commit;
 - what is still open and why;
-- on Mondays, the last seven days: answers, thumbs down, pushback,
+- on Mondays, the last seven days (the health's `answers`, not `calls`,
+  counts answers; `connector.calls` counts connected apps): answers, thumbs down, pushback,
   unfinished answers, average prompt tokens and test spend, and whether each
   is getting better.
 

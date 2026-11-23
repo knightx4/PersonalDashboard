@@ -1,11 +1,13 @@
 import type { TalkToolCall } from '@/lib/talk/talk';
 import { LOOKUP_NOT_RUN } from '@/lib/talk/talk';
+import type { CoreOperation, GoalsOperation } from '@/lib/core/spend/operations';
 import { LIMIT_MARKS, UNFINISHED_OPENING } from './grade';
 
 /**
  * How the person's real Dash answers went over a window, usually the last
  * day, worked out from what is already kept: the turns with their lookups and
- * thumbs, and the spend rows of ask-dash. Nothing here reads a database.
+ * thumbs, and the spend rows of every Dash answer (DASH_ANSWER_OPERATIONS).
+ * Nothing here reads a database.
  *
  * The alerts are what the nightly run writes a Dev note about and the daily
  * Dash quality session works first. Each threshold is set so that one real
@@ -72,6 +74,18 @@ export type DashHealth = {
   costUsd: number;
   alerts: string[];
 };
+
+/**
+ * The spend operations that are Dash answering: in Ask, under a comment on a
+ * row or a dev page, and under a goal. The prompt-size alert averages them
+ * all. Until 23 November it read only ask-dash, so thread replies averaging
+ * 93,000 tokens on 19 November raised nothing while Ask went unused.
+ */
+export const DASH_ANSWER_OPERATIONS: readonly (CoreOperation | GoalsOperation)[] = [
+  'ask-dash',
+  'reply-to-comment',
+  'reply-to-goal-comment',
+];
 
 /** A call's whole prompt above this many tokens is flagged: Dash's rules and tools have grown again. */
 export const PROMPT_TOKENS_ALERT = 85_000;

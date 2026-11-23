@@ -17,7 +17,7 @@ import { keepLookupCap } from '@/lib/dash/lookup-caps';
 import type { DashCall } from '@/lib/dash/loop';
 import { codeDeps } from '@/lib/dash/think-code';
 import { dashModelFor } from '@/lib/dash/model-choice';
-import type { HealthConnectorCall, HealthSpend, HealthTurn } from '@/lib/dash/quality/health';
+import { DASH_ANSWER_OPERATIONS, type HealthConnectorCall, type HealthSpend, type HealthTurn } from '@/lib/dash/quality/health';
 import { runModelCheck, type ModelCheckPorts } from '@/lib/dash/quality/model-replies';
 import { rehearsePaid } from '@/lib/dash/quality/rehearse-paid';
 import { runDashQuality, type DashQualityPorts, type DashQualityTrigger } from '@/lib/dash/quality/run';
@@ -256,7 +256,7 @@ export function dashQualityPorts(core: CoreSupabaseClient): DashQualityPorts {
         .from('model_spend')
         .select('input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, cost_micros')
         .eq('user_id', userId)
-        .eq('operation', 'ask-dash')
+        .in('operation', [...DASH_ANSWER_OPERATIONS])
         .gte('created_at', since)
         .limit(DAY_ROWS);
       if (error) throw new Error(`Reading the day's spend failed: ${error.message}`);
