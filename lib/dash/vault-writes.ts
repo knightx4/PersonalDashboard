@@ -1,6 +1,7 @@
 import { sameAs, type DashWriteRuns } from './runs';
 import type Anthropic from '@anthropic-ai/sdk';
 import { isUuid, type AskRow, type SchemaClient } from '@/lib/ask/db';
+import { escapeLike } from '@/lib/search/sources/map';
 import type { VaultChangeInput, VaultChangeKind } from '@/lib/ask/vault-changes';
 import { toRef } from '@/lib/core/refs';
 import type { ModuleId } from '@/lib/modules';
@@ -157,6 +158,12 @@ async function ownNote(env: VaultWriteEnv, id: string): Promise<Row> {
  * November 2026 a connected app's edit_vault_note was refused twice for
  * "ai red team.md" and "Inbox/Strategy for using weak model for red
  * teaming.md", both notes of theirs, and it took a search to find the ids.
+ *
+ * When neither the id nor the path matches, the name is read as a title: a
+ * connected app often names a nested note by its title alone, without the
+ * folder ("tenex ideas" for "Inbox/tenex ideas.md", refused on 23 November
+ * 2026). A title two notes share is refused with both paths, so the folder is
+ * never guessed.
  */
 async function noteNamed(env: VaultWriteEnv, args: Args, key: string): Promise<Row> {
   const given = text(args, key);
@@ -174,6 +181,20 @@ async function noteNamed(env: VaultWriteEnv, args: Args, key: string): Promise<R
       .maybeSingle();
     if (error) throw new Error(`Reading the note at ${candidate} failed: ${error.message}`);
     if (data) return data as unknown as Row;
+  }
+  const title = path.replace(/\.md$/i, '');
+  const { data: byTitle, error: titleError } = await env.vault
+    .from('notes')
+    .select(NOTE_COLUMNS)
+    .eq('user_id', env.userId)
+    .is('deleted_at', null)
+    .ilike('title', escapeLike(title));
+  if (titleError) throw new Error(`Reading the notes titled "${title}" failed: ${titleError.message}`);
+  const titled = (byTitle ?? []) as unknown as Row[];
+  if (titled.length === 1) return titled[0];
+  if (titled.length > 1) {
+    const paths = titled.map((note) => note.path as string).join(', ');
+    throw new VaultRefused(`More than one note of theirs is titled "${title}": ${paths}. Give the one you mean by its whole path or ref.`);
   }
   throw new VaultRefused(`No note of theirs is at the path "${given}". Give the note's ref, or its whole path, as a lookup returned it.`);
 }

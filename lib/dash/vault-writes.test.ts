@@ -112,6 +112,25 @@ describe('the Vault writes', () => {
     expect(await refused(env, 'edit_vault_note', { note_ref: 'Home/Flat.md', append: 'x' })).toMatch(/No note of theirs/);
   });
 
+  it('finds a nested note by its title when a connected app drops the folder', async () => {
+    const { env, rows, vault } = setup();
+    const IDEAS = '66666666-6666-4666-8666-666666666666';
+    rows.push(vault.note(IDEAS, 'Inbox/tenex ideas.md', '# tenex ideas\n\nShip the agent.\n', 'b-ideas'));
+    const change = await made(env, 'edit_vault_note', { note_ref: 'tenex ideas', append: 'And the eval.' });
+    expect(change.summary).toBe('Dash added to the foot of the note "tenex ideas".');
+    expect(rows.find((row) => row.id === IDEAS)?.body).toBe('# tenex ideas\n\nShip the agent.\n\nAnd the eval.\n');
+  });
+
+  it('refuses a bare title two notes share, naming both paths', async () => {
+    const { env, rows, vault } = setup();
+    rows.push(vault.note('66666666-6666-4666-8666-666666666666', 'Inbox/Plans.md', '# Plans\n\nOne.\n', 'b-one'));
+    rows.push(vault.note('77777777-7777-4777-8777-777777777777', 'Work/Plans.md', '# Plans\n\nTwo.\n', 'b-two'));
+    const error = await refused(env, 'edit_vault_note', { note_ref: 'Plans', append: 'x' });
+    expect(error).toMatch(/More than one note of theirs is titled "Plans"/);
+    expect(error).toContain('Inbox/Plans.md');
+    expect(error).toContain('Work/Plans.md');
+  });
+
   it('refuses an Undo once the note has moved on', async () => {
     const { env, rows } = setup();
     const change = await made(env, 'edit_vault_note', { note_ref: NOTE, body: '# Flat\n\nSold.\n' });

@@ -294,7 +294,10 @@ when you see a cause of failure that one fix will not remove.
      Done 21 November: the vault writes take a note's path (with or without
      `.md`) as its ref (`noteNamed` in `lib/dash/vault-writes.ts`), and a
      goal step that is not open says so in its search hit ("Step · done ·
-     …"), after a client tried to close two steps done for weeks.
+     …"), after a client tried to close two steps done for weeks. Done 24
+     November: a bare title with the folder dropped ("tenex ideas" for
+     "Inbox/tenex ideas.md", refused 23 November) now resolves by title in
+     `noteNamed`, and a title two notes share is refused with both paths.
    - A connector failure is proven fixed for free: this session can call
      the Dash connector's own tools (`mcp__Dash__*`, loaded with
      ToolSearch), so re-send the failing read after the deploy instead of
