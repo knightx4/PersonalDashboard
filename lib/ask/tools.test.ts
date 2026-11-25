@@ -185,6 +185,7 @@ const APPLICATION_COLUMNS = [
   { table: 'job_search.applications', column: 'excitement', type: 'integer', nullable: true },
   { table: 'job_search.applications', column: 'next_action', type: 'text', nullable: true },
   { table: 'job_search.applications', column: 'cover_letter', type: 'text', nullable: true },
+  { table: 'job_search.applications', column: 'submitted_at', type: 'timestamp with time zone', nullable: true },
   { table: 'job_search.applications', column: 'created_at', type: 'timestamp with time zone', nullable: false },
 ];
 
@@ -216,6 +217,12 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
             { table: 'job_search.roles', column: 'title', type: 'text', nullable: false },
             { table: 'job_search.roles', column: 'jd_url', type: 'text', nullable: true },
             { table: 'job_search.roles', column: 'created_at', type: 'timestamp with time zone', nullable: false },
+            { table: 'job_search.interviews', column: 'id', type: 'uuid', nullable: false },
+            { table: 'job_search.interviews', column: 'user_id', type: 'uuid', nullable: false },
+            { table: 'job_search.interviews', column: 'application_id', type: 'uuid', nullable: false },
+            { table: 'job_search.interviews', column: 'round', type: 'integer', nullable: true },
+            { table: 'job_search.interviews', column: 'notes', type: 'text', nullable: true },
+            { table: 'job_search.interviews', column: 'created_at', type: 'timestamp with time zone', nullable: false },
           ],
           links: [
             { table: 'job_search.applications', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
@@ -1622,6 +1629,56 @@ describe('query_rows (plan #2109.4)', () => {
     expect(rows[0].detail).toEqual({ jd_url: 'https://jobs.example.com/metaview/1' });
     expect(result.ok && result.note).toContain('Read posting_url as jd_url');
     expect(result.ok && result.note).not.toContain('Left out');
+  });
+
+  it('reads an application submit date asked for as applied_at or sent_on (25 November)', async () => {
+    const applied = (n: number, submitted: string | null) => app(n, ME, 'applied', { submitted_at: submitted });
+    const result = await executeAskTool(
+      'query_rows',
+      {
+        table: 'job_search.applications',
+        where: [{ column: 'applied_at', op: 'not_empty' }],
+        order: { column: 'sent_on', ascending: true },
+        columns: ['applied_at'],
+      },
+      context({
+        'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Designer at Acme' }],
+        'job_search.applications': [applied(1, '2026-10-20'), applied(2, '2026-10-10'), applied(3, null)],
+      }),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.detail)).toEqual([{ submitted_at: '2026-10-10' }, { submitted_at: '2026-10-20' }]);
+    expect(result.ok && result.note).toContain('Read applied_at as submitted_at, sent_on as submitted_at');
+    expect(result.ok && result.note).not.toContain('has no column');
+  });
+
+  it('reads an interview round asked for as round_number (25 November)', async () => {
+    const APP = '00000000-0000-4000-8000-0000000003a1';
+    const interview = (n: number, userId: string, round: number): Row => ({
+      id: `00000000-0000-4000-8000-0000000003${String(n).padStart(2, '0')}`,
+      user_id: userId,
+      application_id: APP,
+      round,
+      notes: `Round ${round} notes`,
+      created_at: `2026-11-0${n}`,
+    });
+    const result = await executeAskTool(
+      'query_rows',
+      {
+        table: 'job_search.interviews',
+        where: [{ column: 'round_number', op: 'greater', value: 1 }],
+        columns: ['round_number', 'notes'],
+      },
+      context({
+        'job_search.applications': [{ id: APP, user_id: ME, role_id: ROLE, status: 'interviewing' }],
+        'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Designer at Acme' }],
+        'job_search.interviews': [interview(1, ME, 1), interview(2, ME, 2), interview(3, THEM, 2)],
+      }),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.title)).toEqual(['Round 2 notes']);
+    expect(rows.map((r) => r.detail)).toEqual([{ round: '2' }]);
+    expect(result.ok && result.note).toContain('Read round_number as round');
   });
 
   it('refuses a column the table does not have, wherever it is named', async () => {

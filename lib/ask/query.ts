@@ -109,9 +109,18 @@ function likeEscaped(value: string): string {
  * calls refused in a day, nine in a week). Only names whose value is the very
  * same column belong here; a guess in other units (pay_min against
  * comp_min_cents, in cents) stays refused.
+ *
+ * Added 25 November from the connector's refused query_rows calls over 45
+ * days: an interview's round was asked for as round_number twice, and an
+ * application's submitted_at as applied_at and as sent_on; each names the very
+ * same value. A company given to applications (company_name) or a stage given
+ * to roles (pipeline_stage, status) stays refused, since those live on another
+ * table and a `linked` condition, not a column, reaches them.
  */
 export const COLUMN_ALIASES: Record<string, Record<string, string>> = {
   'job_search.roles': { posting_url: 'jd_url', description: 'jd_text' },
+  'job_search.applications': { applied_at: 'submitted_at', sent_on: 'submitted_at' },
+  'job_search.interviews': { round_number: 'round' },
   'job_search.resume_versions': { content: 'text_content' },
   'core.conversation_turns': { content: 'body', text: 'body' },
 };
