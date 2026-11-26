@@ -223,6 +223,11 @@ function fakeRpc(tables: Tables, calls: RpcCall[], owner = false) {
             { table: 'job_search.interviews', column: 'round', type: 'integer', nullable: true },
             { table: 'job_search.interviews', column: 'notes', type: 'text', nullable: true },
             { table: 'job_search.interviews', column: 'created_at', type: 'timestamp with time zone', nullable: false },
+            { table: 'job_search.contacts', column: 'id', type: 'uuid', nullable: false },
+            { table: 'job_search.contacts', column: 'user_id', type: 'uuid', nullable: false },
+            { table: 'job_search.contacts', column: 'full_name', type: 'text', nullable: false },
+            { table: 'job_search.contacts', column: 'company_id', type: 'uuid', nullable: true },
+            { table: 'job_search.contacts', column: 'created_at', type: 'timestamp with time zone', nullable: false },
           ],
           links: [
             { table: 'job_search.applications', column: 'role_id', ref_table: 'job_search.roles', ref_column: 'id' },
@@ -1679,6 +1684,33 @@ describe('query_rows (plan #2109.4)', () => {
     expect(rows.map((r) => r.title)).toEqual(['Round 2 notes']);
     expect(rows.map((r) => r.detail)).toEqual([{ round: '2' }]);
     expect(result.ok && result.note).toContain('Read round_number as round');
+  });
+
+  it('reads a contact filtered by name as full_name (26 November)', async () => {
+    const CONTACT = '00000000-0000-4000-8000-0000000004c1';
+    const result = await executeAskTool(
+      'query_rows',
+      { table: 'job_search.contacts', where: [{ column: 'name', op: 'contains', value: 'Michael' }], columns: ['name'] },
+      context({
+        'job_search.contacts': [
+          { id: CONTACT, user_id: ME, full_name: 'Michael Vrabel', company_id: null, created_at: '2026-11-01' },
+          { id: `${CONTACT.slice(0, -2)}c2`, user_id: ME, full_name: 'Dana Reed', company_id: null, created_at: '2026-11-02' },
+          { id: `${CONTACT.slice(0, -2)}c3`, user_id: THEM, full_name: 'Michael Other', company_id: null, created_at: '2026-11-03' },
+        ],
+      }),
+    );
+    const rows = expectLinkedRows(result);
+    expect(rows.map((r) => r.title)).toEqual(['Michael Vrabel']);
+    expect(result.ok && result.note).toContain('Read name as full_name');
+    expect(result.ok && result.note).not.toContain('has no column');
+  });
+
+  it('tells a client filtering applications by company to go through the role (26 November)', async () => {
+    const byId = await run({ where: [{ column: 'company_id', op: 'equals', value: '6784159f-8eb7-442b-8b99-ddf5fb21d2d3' }] });
+    expect(byId).toEqual({ ok: false, error: expect.stringContaining('has no column company_id') });
+    expect(byId.ok === false && byId.error).toContain('query job_search.roles with company_id for the role ids');
+    const byName = await run({ where: [{ column: 'company_name', op: 'equals', value: 'Ramp' }] });
+    expect(byName.ok === false && byName.error).toContain('find the company id in job_search.companies');
   });
 
   it('refuses a column the table does not have, wherever it is named', async () => {

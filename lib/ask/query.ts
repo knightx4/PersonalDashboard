@@ -116,13 +116,35 @@ function likeEscaped(value: string): string {
  * same value. A company given to applications (company_name) or a stage given
  * to roles (pipeline_stage, status) stays refused, since those live on another
  * table and a `linked` condition, not a column, reaches them.
+ *
+ * Added 26 November: a connected app filtered job_search.contacts by `name`,
+ * which the table keeps as full_name.
  */
 export const COLUMN_ALIASES: Record<string, Record<string, string>> = {
   'job_search.roles': { posting_url: 'jd_url', description: 'jd_text' },
   'job_search.applications': { applied_at: 'submitted_at', sent_on: 'submitted_at' },
   'job_search.interviews': { round_number: 'round' },
   'job_search.resume_versions': { content: 'text_content' },
+  'job_search.contacts': { name: 'full_name' },
   'core.conversation_turns': { content: 'body', text: 'body' },
+};
+
+/**
+ * A column a client keeps naming for a value that lives on a table this one
+ * links to, with the path that reaches it. A `linked` condition tests only
+ * whether a linked row is there, not its value, so filtering by the other
+ * table's column takes two calls; the error lists this table's columns and
+ * then says how to get there. Added 26 November: a connected app filtered
+ * job_search.applications by company_id, which is the role's company, not the
+ * application's (company_name was refused the same way before).
+ */
+export const LINKED_COLUMN_HINTS: Record<string, Record<string, string>> = {
+  'job_search.applications': {
+    company_id:
+      "an application's company is its role's: query job_search.roles with company_id for the role ids, then this table with role_id one_of them",
+    company_name:
+      "an application's company is its role's: find the company id in job_search.companies, query job_search.roles with that company_id for the role ids, then this table with role_id one_of them",
+  },
 };
 
 /** The column a name means in this table: itself, or the column it is an alias for. */
@@ -154,7 +176,9 @@ function columnOf(columns: Map<string, TableColumn>, table: string, name: unknow
   const real = columnName(columns, table, name.trim());
   const column = real ? columns.get(real) : undefined;
   if (!column) {
-    throw new AskInputError(`${table} has no column ${name.trim()}. Its columns: ${[...columns.keys()].join(', ')}.`);
+    const hint = LINKED_COLUMN_HINTS[table]?.[name.trim()];
+    const reach = hint ? ` To filter by ${name.trim()}, ${hint}.` : '';
+    throw new AskInputError(`${table} has no column ${name.trim()}.${reach} Its columns: ${[...columns.keys()].join(', ')}.`);
   }
   return column;
 }
